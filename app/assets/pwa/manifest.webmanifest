@@ -1,10 +1,10 @@
 {
-  "name": "Terminus",
-  "short_name": "Terminus",
-  "description": "A TRMNL server.",
+  "name": "Dither",
+  "short_name": "Dither",
+  "description": "A self-hosted e-ink display server.",
   "icons": [
     {
-      "src": "https://trmnl.com/icon.svg",
+      "src": "/assets/logos/mark-accent.svg",
       "type": "image/svg+xml",
       "sizes": "any"
     }
@@ -12,5 +12,6 @@
   "display": "standalone",
   "start_url": "/",
   "scope": "/",
-  "theme_color": "#000000"
+  "theme_color": "#6C4CE8",
+  "background_color": "#F7F7FA"
 }

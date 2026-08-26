@@ -40,7 +40,23 @@
 :yjit_link: link:https://docs.ruby-lang.org/en/master/jit/yjit_md.html[YJIT]
 :youtube_link: link:https://www.youtube.com/@useTRMNL[YouTube]
 
-= Terminus
+= Dither
+
+_slow on purpose._
+
+Dither is a {ruby_link}/{hanami_link} web server for managing e-ink displays on your own
+network. It talks the same firmware API as TRMNL hardware, renders screens from HTML, and
+can flash boards over USB straight from the dashboard.
+
+[NOTE]
+====
+Dither is a fork of link:https://github.com/usetrmnl/terminus[Terminus] by TRMNL, used
+under the MIT licence; the original copyright notice is retained in `LICENSE.adoc`. The
+paired firmware is a fork of link:https://github.com/usetrmnl/trmnl-firmware[trmnl-firmware]
+(GPL-3.0). Upstream references to `trmnl.com` that remain in this codebase are deliberate:
+they are live interop endpoints (the extension rendering framework, the recipe gallery, the
+palette/model APIs), not branding.
+====
 
 Terminus is a {ruby_link}/{hanami_link} web server that allows you to manage {trmnl_link} devices running on your own local network or hosted cloud. This is our flagship BYOS implementation that aims to be compatible with our {trmnl_link} Core server but _also different_ since this open source solution provides features not possible in our Core application.
 

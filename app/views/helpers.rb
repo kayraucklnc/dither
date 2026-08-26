@@ -57,17 +57,15 @@ module Terminus
       def git_latest_link
         settings = Hanami.app[:settings]
 
-        link_to "Latest (ahead of #{settings.git_tag})",
-                "https://github.com/usetrmnl/terminus/commit/#{settings.git_latest_sha}",
-                class: :link
+        # Deliberately unlinked: this fork has no public commit browser, and
+        # pointing at the upstream repo would misattribute local builds.
+        tag.span "Latest (ahead of #{settings.git_tag})", class: :link
       end
 
       def git_version_link
-        tag = Hanami.app[:settings].git_tag
+        version = Hanami.app[:settings].git_tag
 
-        link_to "Version #{tag}",
-                "https://alchemists.io/projects/terminus/versions/#{tag}/",
-                class: :link
+        tag.span "Version #{version}", class: :link
       end
 
       def human_at(value) = (value.strftime "%B %d %Y at %I:%M %p" if value)

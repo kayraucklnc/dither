@@ -1,16 +1,110 @@
+/* Dither palette.
+ *
+ * Monochrome-forward on purpose: the product renders to 1-bit e-ink, so the UI
+ * leans on paper/ink neutrals and spends its only chroma on a single accent.
+ *
+ * The legacy --site-<colour> names are kept as the public surface because every
+ * component already consumes them; redefining them here retints the whole app.
+ * Semantic tokens below are what new work should reach for.
+ */
+
 :root {
-  --site-ash: oklch(97% 0% 68deg);
-  --site-black: oklch(0% 0% 0deg);
-  --site-blue: oklch(61% 54% 258deg);
-  --site-crimson: oklch(0.38 0.15 31.3);
-  --site-darkgrey: oklch(47% 0% 0deg);
-  --site-darkorange: oklch(0.61 0.1931 37.38);
-  --site-ghost: oklch(94% 0% 68deg);
-  --site-green: oklch(65% 35% 155deg);
-  --site-lightgrey: oklch(83% 0% 264deg);
-  --site-orange: oklch(0.69 0.1855 32.11);
-  --site-red: oklch(53% 54% 29deg);
-  --site-silver: oklch(91% 0% 68deg);
-  --site-white: oklch(100% 0% 90deg);
-  --site-yellow: hsl(44.875, 100%, 75%);
+  color-scheme: light dark;
+
+  /* Neutral ramp: paper -> ink */
+  --site-paper: oklch(98.5% 0.003 285deg);
+  --site-surface: oklch(100% 0 0deg);
+  --site-surface-sunken: oklch(96.5% 0.004 285deg);
+  --site-surface-raised: oklch(100% 0 0deg);
+  --site-border: oklch(91% 0.006 285deg);
+  --site-border-strong: oklch(84% 0.008 285deg);
+  --site-ink: oklch(19% 0.014 285deg);
+  --site-ink-muted: oklch(48% 0.012 285deg);
+  --site-ink-subtle: oklch(62% 0.010 285deg);
+
+  /* Accent */
+  --site-accent: oklch(55% 0.20 285deg);
+  --site-accent-hover: oklch(48% 0.20 285deg);
+  --site-accent-soft: oklch(94% 0.04 285deg);
+  --site-accent-ink: oklch(100% 0 0deg);
+
+  /* Semantic */
+  --site-success: oklch(58% 0.15 155deg);
+  --site-success-soft: oklch(95% 0.04 155deg);
+  --site-warning: oklch(72% 0.16 75deg);
+  --site-warning-soft: oklch(96% 0.05 75deg);
+  --site-danger: oklch(55% 0.20 25deg);
+  --site-danger-soft: oklch(95% 0.04 25deg);
+
+  /* ---- Legacy names, remapped. Kept so existing components retheme for free. */
+  --site-ash: var(--site-surface-sunken);
+  --site-black: var(--site-ink);
+  --site-blue: var(--site-accent);
+  --site-crimson: oklch(45% 0.18 25deg);
+  --site-darkgrey: var(--site-ink-muted);
+  --site-darkorange: var(--site-accent-hover);
+  --site-ghost: var(--site-surface-sunken);
+  --site-green: var(--site-success);
+  --site-lightgrey: var(--site-border);
+  --site-orange: var(--site-accent);
+  --site-red: var(--site-danger);
+  --site-silver: var(--site-surface-sunken);
+  --site-white: var(--site-surface);
+  --site-yellow: var(--site-warning);
+}
+
+/* Dark mode. System preference by default; [data-theme] wins in both directions
+ * so the in-app toggle can override whatever the OS says. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --site-paper: oklch(15% 0.012 285deg);
+    --site-surface: oklch(18.5% 0.014 285deg);
+    --site-surface-sunken: oklch(13% 0.012 285deg);
+    --site-surface-raised: oklch(22% 0.016 285deg);
+    --site-border: oklch(27% 0.016 285deg);
+    --site-border-strong: oklch(36% 0.018 285deg);
+    --site-ink: oklch(96% 0.004 285deg);
+    --site-ink-muted: oklch(72% 0.010 285deg);
+    --site-ink-subtle: oklch(58% 0.012 285deg);
+
+    --site-accent: oklch(70% 0.17 285deg);
+    --site-accent-hover: oklch(78% 0.15 285deg);
+    --site-accent-soft: oklch(28% 0.07 285deg);
+    --site-accent-ink: oklch(14% 0.02 285deg);
+
+    --site-success: oklch(72% 0.15 155deg);
+    --site-success-soft: oklch(26% 0.05 155deg);
+    --site-warning: oklch(80% 0.14 75deg);
+    --site-warning-soft: oklch(28% 0.06 75deg);
+    --site-danger: oklch(68% 0.17 25deg);
+    --site-danger-soft: oklch(27% 0.06 25deg);
+
+    --site-crimson: oklch(62% 0.16 25deg);
+  }
+}
+
+:root[data-theme="dark"] {
+  --site-paper: oklch(15% 0.012 285deg);
+  --site-surface: oklch(18.5% 0.014 285deg);
+  --site-surface-sunken: oklch(13% 0.012 285deg);
+  --site-surface-raised: oklch(22% 0.016 285deg);
+  --site-border: oklch(27% 0.016 285deg);
+  --site-border-strong: oklch(36% 0.018 285deg);
+  --site-ink: oklch(96% 0.004 285deg);
+  --site-ink-muted: oklch(72% 0.010 285deg);
+  --site-ink-subtle: oklch(58% 0.012 285deg);
+
+  --site-accent: oklch(70% 0.17 285deg);
+  --site-accent-hover: oklch(78% 0.15 285deg);
+  --site-accent-soft: oklch(28% 0.07 285deg);
+  --site-accent-ink: oklch(14% 0.02 285deg);
+
+  --site-success: oklch(72% 0.15 155deg);
+  --site-success-soft: oklch(26% 0.05 155deg);
+  --site-warning: oklch(80% 0.14 75deg);
+  --site-warning-soft: oklch(28% 0.06 75deg);
+  --site-danger: oklch(68% 0.17 25deg);
+  --site-danger-soft: oklch(27% 0.06 25deg);
+
+  --site-crimson: oklch(62% 0.16 25deg);
 }

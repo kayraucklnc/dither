@@ -14,7 +14,7 @@ module Terminus
     # Order matters.
     use Rack::Attack
     use Aspects::Designs::Middleware, pattern: %r(/preview/(?<id>.+))
-    use Rack::Static, root: "public", urls: ["/.well-known/security.txt", "/fonts", "/uploads"]
+    use Rack::Static, root: "public", urls: ["/.well-known/security.txt", "/downloads", "/fonts", "/uploads"]
     use Rack::Deflater
 
     slice :authentication, at: "/" do
@@ -180,6 +180,8 @@ module Terminus
     get "/playlists/:playlist_id/screens/:id", to: "playlists.screens.show", as: :playlist_screen
 
     resources :problem_details, to: "problem_details", only: :index
+
+    get "/flash", to: "flash.index", as: :flash
 
     get "/screens", to: "screens.index", as: :screens
     get "/screens/:id", to: "screens.show", as: :screen

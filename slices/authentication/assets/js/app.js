@@ -3,4 +3,6 @@ import "../../../../app/assets/css/colors.css";
 import "../../../../app/assets/css/view_transitions.css";
 import "../../../../app/assets/css/defaults.css";
 import "../../../../app/assets/css/layout.css";
+import "../../../../app/assets/css/theme.css";
 import "../css/portal.css";
+import "../../../../app/assets/js/theme_toggle.js";

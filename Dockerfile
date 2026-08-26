@@ -6,11 +6,11 @@ FROM docker.io/library/ruby:$RUBY_VERSION-slim AS base
 
 ARG NODE_VERSION=24
 
-LABEL org.opencontainers.image.base.name=terminus
-LABEL org.opencontainers.image.title=Terminus
-LABEL org.opencontainers.image.description="A TRMNL server."
-LABEL org.opencontainers.image.authors="TRMNL <engineering@usetrmnl.com>"
-LABEL org.opencontainers.image.vendor=TRMNL
+LABEL org.opencontainers.image.base.name=dither
+LABEL org.opencontainers.image.title=Dither
+LABEL org.opencontainers.image.description="Dither - a self-hosted e-ink display server."
+LABEL org.opencontainers.image.authors="Dither"
+LABEL org.opencontainers.image.vendor=Dither
 
 ENV LANG=C.UTF-8
 ENV RACK_ENV=production

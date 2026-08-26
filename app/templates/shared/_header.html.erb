@@ -1,6 +1,6 @@
 <%= link_to routes.path(:root), class: "site-label" do %>
-  <%= tag.img src: assets["logos/salmon.svg"], alt: "Logo", width: 30, height: 30 %>
-  <h1 class=label>Terminus</h1>
+  <%= tag.img src: assets["logos/mark-accent.svg"], alt: "Dither", width: 30, height: 30 %>
+  <h1 class=label>dither</h1>
 <% end %>
 
 <nav class="site-navigation">
@@ -19,7 +19,11 @@
     <%= scope(:menu_item, label: "Models", path: routes.path(:models)).render %>
     <%= scope(:menu_item, label: "Extensions", path: routes.path(:extensions)).render %>
     <%= scope(:menu_item, label: "Firmware", path: routes.path(:firmwares)).render %>
+    <%= scope(:menu_item, label: "Flash", path: "/flash").render %>
     <%= scope(:menu_item, label: "Users", path: routes.path(:users)).render %>
     <%= scope(:menu_item, label: "Logout", path: "/logout").render %>
+    <li>
+      <button type="button" class="site-theme-toggle" aria-label="Toggle theme">◐</button>
+    </li>
   </ul>
 </nav>

@@ -1,7 +1,67 @@
 :root {
-  --site-font-family: Inter var, system-ui, sans-serif;
+  --site-font-family: Inter var, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --site-font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+
+  /* Type scale */
+  --site-text-xs: 0.75rem;
+  --site-text-sm: 0.8125rem;
+  --site-text-base: 0.9375rem;
+  --site-text-lg: 1.125rem;
+  --site-text-xl: 1.375rem;
+  --site-text-2xl: 1.75rem;
+  --site-text-3xl: 2.25rem;
+
+  /* Spacing */
+  --site-space-2xs: 0.25rem;
+  --site-space-xs: 0.5rem;
+  --site-space-sm: 0.75rem;
+  --site-space-md: 1rem;
+  --site-space-lg: 1.5rem;
+  --site-space-xl: 2rem;
+  --site-space-2xl: 3rem;
+
+  /* Radii */
+  --site-radius-sm: 6px;
+  --site-radius-md: 10px;
+  --site-radius-lg: 14px;
+  --site-radius-xl: 20px;
+  --site-radius-pill: 999px;
+
+  /* Elevation. Tuned for the light palette; dark mode swaps to a lifted border
+   * because large soft shadows read as mud on a dark surface. */
+  --site-shadow-sm: 0 1px 2px oklch(0% 0 0deg / 0.05);
+  --site-shadow-md: 0 2px 4px oklch(0% 0 0deg / 0.04), 0 4px 12px oklch(0% 0 0deg / 0.06);
+  --site-shadow-lg: 0 4px 8px oklch(0% 0 0deg / 0.04), 0 12px 32px oklch(0% 0 0deg / 0.10);
+  --site-shadow-focus: 0 0 0 3px var(--site-accent-soft);
+
+  /* Motion */
+  --site-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --site-duration-fast: 120ms;
+  --site-duration: 200ms;
+
   --site-z-index-hidden: -10;
   --site-z-index-tooltip: 10;
   --site-z-index-navigation: 20;
   --site-z-index-modal: 100;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --site-shadow-sm: 0 1px 2px oklch(0% 0 0deg / 0.30);
+    --site-shadow-md: 0 2px 8px oklch(0% 0 0deg / 0.40);
+    --site-shadow-lg: 0 8px 32px oklch(0% 0 0deg / 0.50);
+  }
+}
+
+:root[data-theme="dark"] {
+  --site-shadow-sm: 0 1px 2px oklch(0% 0 0deg / 0.30);
+  --site-shadow-md: 0 2px 8px oklch(0% 0 0deg / 0.40);
+  --site-shadow-lg: 0 8px 32px oklch(0% 0 0deg / 0.50);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --site-duration-fast: 0ms;
+    --site-duration: 0ms;
+  }
 }

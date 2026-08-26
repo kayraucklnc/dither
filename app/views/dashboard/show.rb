@@ -7,6 +7,7 @@ module Terminus
       class Show < View
         include Deps[
           design_relation: "relations.screen_template",
+          device_repository: "repositories.device",
           device_relation: "relations.device",
           extension_relation: "relations.extension",
           firmware_relation: "relations.firmware",
@@ -19,6 +20,15 @@ module Terminus
         expose :api_uri
         decorate :ip_addresses
         expose :firmware
+        expose(:devices, decorate: true) { device_repository.all }
+
+        expose :device_summary do
+          count = device_relation.count
+          next "No devices connected yet." if count.zero?
+
+          "#{count} #{count == 1 ? "device" : "devices"} connected."
+        end
+
         expose(:design_count) { design_relation.count }
         expose(:device_count) { device_relation.count }
         expose(:extension_count) { extension_relation.count }

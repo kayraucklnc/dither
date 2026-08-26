@@ -2,32 +2,41 @@
 
 <html lang="en">
   <head>
+    <script>
+      // Applied before paint to avoid a flash of the wrong theme.
+      (function () {
+        try {
+          var t = localStorage.getItem("dither:theme");
+          if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+        } catch (e) {}
+      })();
+    </script>
     <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
 
     <title><%= content_for :title %></title>
 
     <meta charset="utf-8">
-    <meta name="description" content="A TRMNL server.">
-    <meta name="author" content="TRMNL">
+    <meta name="description" content="Dither — a self-hosted e-ink display server.">
+    <meta name="author" content="Dither">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="htmx-config" content='{"selfRequestsOnly":true}'>
     <meta name="view-transition" content="same-origin">
 
-    <%= tag.link title: "Terminus: Icon",
+    <%= tag.link title: "Dither: Icon",
                  rel: :icon,
-                 href: main_assets["logos/salmon.svg"],
+                 href: main_assets["logos/mark-accent.svg"],
                  type: "image/svg+xml" %>
 
-    <%= tag.link title: "Terminus: Apple Icon",
+    <%= tag.link title: "Dither: Apple Icon",
                  rel: "apple-touch-icon",
                  href: main_assets["logos/apple.png"] %>
 
-    <%= tag.link title: "Terminus: Manifest",
+    <%= tag.link title: "Dither: Manifest",
                  rel: :manifest,
                  href: main_assets["manifest.webmanifest"] %>
 
-    <%= tag.link title: "Terminus: Stylesheet",
+    <%= tag.link title: "Dither: Stylesheet",
                  rel: :stylesheet,
                  href: assets["app.css"] %>
 
@@ -37,8 +46,8 @@
   <body class="site-page site-authentication">
     <header>
       <%= link_to routes.path(:root), class: "site-label" do %>
-        <%= tag.img src: main_assets["logos/salmon.svg"], alt: "Logo", width: 30, height: 30 %>
-        <h1 class=label>Terminus</h1>
+        <%= tag.img src: main_assets["logos/mark-accent.svg"], alt: "Dither", width: 30, height: 30 %>
+        <h1 class=label>dither</h1>
       <% end %>
     </header>
 

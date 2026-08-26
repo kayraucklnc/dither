@@ -11,7 +11,7 @@ module Terminus
           def self.for device, settings: Hanami.app[:settings]
             new api_key: device.api_key,
                 image_url: %(#{settings.api_uri}/assets/setup.bmp),
-                message: "Welcome to Terminus!",
+                message: "Welcome to Dither!",
                 status: 200
           end
 

@@ -25,18 +25,25 @@
   }
 
   :where(input[type="submit"]) {
-    border-radius: 1.5rem;
+    background: var(--site-accent);
+    border-radius: var(--site-radius-md);
     border: none;
+    color: var(--site-accent-ink);
     cursor: pointer;
-    font-size: 1rem;
-    padding: 0.5rem 1rem;
-
-    background: var(--site-orange);
-    color: var(--site-white);
+    font-size: var(--site-text-base);
+    font-weight: 550;
+    padding: 0.6rem 1rem;
+    transition: background-color var(--site-duration-fast) var(--site-ease);
 
     &:hover {
-      background-color: var(--site-darkorange);
+      background-color: var(--site-accent-hover);
       text-decoration: none;
+    }
+
+    &:focus-visible {
+      box-shadow: var(--site-shadow-focus);
+      outline: 2px solid var(--site-accent);
+      outline-offset: 1px;
     }
   }
 
@@ -50,17 +57,11 @@
 
   .panel {
     align-items: center;
-    background-color: var(--site-white);
-    border-radius: 0.5rem;
-    border: 0.2rem solid var(--site-black);
-    box-shadow:
-      0.7px 0.7px 0.7px rgba(0, 0, 0, 0.022),
-      1.7px 1.7px 1.7px rgba(0, 0, 0, 0.031),
-      3.5px 3.5px 3.5px rgba(0, 0, 0, 0.039),
-      7.3px 7.3px 7.3px rgba(0, 0, 0, 0.048),
-      20px 20px 20px rgba(0, 0, 0, 0.07)
-    ;
-    color: var(--site-black);
+    background-color: var(--site-surface);
+    border-radius: var(--site-radius-xl);
+    border: 1px solid var(--site-border);
+    box-shadow: var(--site-shadow-lg);
+    color: var(--site-ink);
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -97,4 +98,29 @@
     margin: 0;
   }
 
+}
+
+/* Auth shell: centre the card and give the wordmark room. */
+.site-authentication {
+  .site-label {
+    gap: var(--site-space-xs);
+    margin-block-end: var(--site-space-lg);
+
+    .label {
+      font-size: var(--site-text-2xl);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+  }
+
+  .form-label {
+    color: var(--site-ink-muted);
+    font-size: var(--site-text-sm);
+    font-weight: 550;
+  }
+
+  .panel .label {
+    font-size: var(--site-text-xl);
+    letter-spacing: -0.02em;
+  }
 }

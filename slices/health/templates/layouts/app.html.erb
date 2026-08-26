@@ -2,6 +2,15 @@
 
 <html lang="en">
   <head>
+    <script>
+      // Applied before paint to avoid a flash of the wrong theme.
+      (function () {
+        try {
+          var t = localStorage.getItem("dither:theme");
+          if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+        } catch (e) {}
+      })();
+    </script>
     <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
 
     <title><%= content_for :title %></title>
@@ -12,17 +21,17 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
 
-    <link title="Terminus: Favicon"
+    <link title="Dither: Favicon"
           rel="icon"
           href="https://trmnl.com/favicon.ico"
           sizes="32x32">
 
-    <%= favicon_tag main_assets["logos/salmon.svg"],
-                    title: "Terminus: Icon",
+    <%= favicon_tag main_assets["logos/mark-accent.svg"],
+                    title: "Dither: Icon",
                     rel: :icon,
                     type: "image/svg+xml" %>
 
-    <link title="Terminus: Apple Icon"
+    <link title="Dither: Apple Icon"
           rel="apple-touch-icon"
           href="https://trmnl.com/images/brand/icon--brand.png"
           type="image/png">
