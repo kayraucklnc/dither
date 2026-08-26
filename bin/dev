@@ -2,12 +2,16 @@
 #
 # Development stack wrapper.
 #
-#   bin/dev up            start (source-mounted, assets watching)
-#   bin/dev down          stop
-#   bin/dev url           print this worktree's URL
-#   bin/dev logs assets   follow the asset watcher
-#   bin/dev restart web   pick up Ruby changes under app/
-#   bin/dev <anything>    passed straight through to docker compose
+# Prefer the Makefile — `make help` — which wraps the common calls. This script
+# is the implementation, and still takes anything docker compose does.
+#
+#   bin/dev up                     start (source-mounted, assets watching)
+#   bin/dev down                   stop
+#   bin/dev url                    print this worktree's URL
+#   bin/dev account <email> <pw>   register an account on this worktree
+#   bin/dev logs assets            follow the asset watcher
+#   bin/dev restart web            pick up Ruby changes under app/
+#   bin/dev <anything>             passed straight through to docker compose
 #
 # Every git worktree gets its own Compose project and its own port trio, so the
 # stacks run side by side and you can compare two branches in two browser tabs.
@@ -107,6 +111,55 @@ prepare_database() {
   compose run --rm --no-deps web bundle exec hanami db prepare
 }
 
+# Registers an account through the running server rather than by inserting rows,
+# so Rodauth owns the password hashing and the account/membership records. Every
+# worktree has its own database, so every worktree needs this once.
+create_account() {
+  local email="$1" password="$2" name="$3"
+  local base="http://localhost:${HANAMI_PORT}"
+  local jar token status
+
+  jar="$(mktemp)"
+  trap 'rm -f "$jar"' RETURN
+
+  token="$(curl --silent --cookie-jar "$jar" "$base/register" |
+           grep --only-matching 'name="_csrf" value="[^"]*"' |
+           sed 's/.*value="//; s/"$//')"
+
+  if [ -z "$token" ]; then
+    echo "bin/dev: ${base} is not answering. Start it with 'bin/dev up' first." >&2
+    return 1
+  fi
+
+  status="$(curl --silent --cookie "$jar" --output /dev/null --write-out '%{http_code}' \
+                 --request POST \
+                 --data-urlencode "_csrf=${token}" \
+                 --data-urlencode "name=${name}" \
+                 --data-urlencode "login=${email}" \
+                 --data-urlencode "login-confirm=${email}" \
+                 --data-urlencode "password=${password}" \
+                 "$base/register")"
+
+  # Rodauth redirects on success and re-renders the form on any rejection.
+  if [ "$status" != "302" ]; then
+    echo "bin/dev: registration was rejected (HTTP ${status})." >&2
+    echo "         The account may already exist, or the password may be too common." >&2
+    return 1
+  fi
+
+  # Only the first account on a server is verified automatically; later ones are
+  # created but cannot sign in until an administrator verifies them. Both cases
+  # redirect, so ask whether the new session can actually reach the dashboard.
+  if [ "$(curl --silent --cookie "$jar" --output /dev/null --write-out '%{http_code}' "$base/")" = "200" ]; then
+    echo "==> Created ${email} on ${COMPOSE_PROJECT_NAME}. Sign in at ${base}/login"
+    return 0
+  fi
+
+  echo "==> Created ${email}, but it is unverified and cannot sign in yet." >&2
+  echo "    Only the first account on a server is verified automatically." >&2
+  return 1
+}
+
 case "${1:-}" in
   up)
     shift
@@ -120,6 +173,14 @@ case "${1:-}" in
     ;;
   open)
     open "http://localhost:${HANAMI_PORT}"
+    ;;
+  account)
+    shift
+    if [ $# -lt 2 ]; then
+      echo "usage: bin/dev account <email> <password> [name]" >&2
+      exit 1
+    fi
+    create_account "$1" "$2" "${3:-Developer}"
     ;;
   *)
     exec docker compose "${FILES[@]}" "$@"
