@@ -1,8 +1,11 @@
 <%== rodauth.login_form_header %>
 
-<form method="post" class="rodauth" role="form" id="login-form">
-  <h1 class="label">Login</h1>
+<header class="auth-header">
+  <h1 class="auth-title">Welcome back</h1>
+  <p class="auth-subtitle">Sign in to your Dither server.</p>
+</header>
 
+<form method="post" class="rodauth" role="form" id="login-form">
   <%== rodauth.login_additional_form_tags %>
   <%== rodauth.csrf_tag %>
   <%== rodauth.skip_login_field_on_login? ? rodauth.render("login-display") : rodauth.render("login-field") %>
@@ -10,4 +13,6 @@
   <%== rodauth.button rodauth.login_button %>
 </form>
 
-<%= link_to "Register", "/register" %>
+<p class="auth-footnote">
+  No account yet? <%= link_to "Register", "/register" %>
+</p>
