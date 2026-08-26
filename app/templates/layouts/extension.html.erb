@@ -7,31 +7,19 @@
     <title><%= content_for :title %></title>
 
     <meta charset="utf-8">
-    <meta name="description" content="A TRMNL server.">
-    <meta name="author" content="TRMNL">
+    <meta name="description" content="Dither screen.">
+    <meta name="author" content="Dither">
 
-    <%= tag.link title: "TRMNL: Stylesheet",
-                 rel: :stylesheet,
-                 href: "https://trmnl.com/css/latest/plugins.css" %>
+    <%= render "screen_framework" %>
 
     <style type="text/css">
-      :where(body) {
-        align-items: center;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-      }
-
       .screen {
         <%= content_for :screen_variables %>
       }
     </style>
-
-    <%= javascript_tag "https://trmnl.com/js/latest/plugins.js" %>
   </head>
 
-  <body class="trmnl">
+  <body>
     <%= yield %>
   </body>
 </html>
-
