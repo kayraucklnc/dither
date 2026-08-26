@@ -18,9 +18,9 @@ module Terminus
           include Dry::Monads[:result]
           include Initable[coalescer: proc { Terminus::Aspects::Extensions::Exchanges::Coalescer }]
 
-          def call extension, context: Core::EMPTY_HASH
+          def call extension, context: Core::EMPTY_HASH, template: nil
             refresh extension.id
-            render extension, context
+            render extension, context, template || extension.template
           end
 
           private
@@ -29,11 +29,11 @@ module Terminus
             exchange_repository.where(extension_id:).each { refresher.call it }
           end
 
-          def render extension, context
+          def render extension, context, template
             exchanges = exchange_repository.where extension_id: extension.id
             data = coalescer.call exchanges
 
-            Success renderer.call(extension.template, context.merge(data))
+            Success renderer.call(template, context.merge(data))
           end
         end
       end

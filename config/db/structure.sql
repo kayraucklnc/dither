@@ -403,7 +403,8 @@ CREATE TABLE public.extension (
     start_at timestamp without time zone DEFAULT date_trunc('day'::text, CURRENT_TIMESTAMP) NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    mode text DEFAULT 'text'::text NOT NULL
+    mode text DEFAULT 'text'::text NOT NULL,
+    variants jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 
@@ -1799,4 +1800,5 @@ INSERT INTO schema_migrations (filename) VALUES
 ('20260810100653_add_screen_extension_id_column.rb'),
 ('20260810102551_drop_screen_device_id_and_kind_index.rb'),
 ('20260824132105_add_device_firmware_reset_column.rb'),
-('20260825130920_drop_screen_kind_enum.rb');
+('20260825130920_drop_screen_kind_enum.rb'),
+('20260827090000_add_extension_variants_column.rb');

@@ -14,9 +14,13 @@ module Terminus
         ]
 
         def call extension
+          # Variants ship as their own files so the export is byte-identical
+          # to what a bundled extension looks like on disk, and so a designer
+          # can open one shape without wading through the others.
           manifest = {
             "configuration.yml" => configuration_for(extension),
-            "template.html.liquid" => extension.template
+            "template.html.liquid" => extension.template,
+            **Variants.entries_for(extension.variants)
           }
 
           zipper.call manifest

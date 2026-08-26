@@ -24,6 +24,7 @@ module Terminus
               required(:days).maybe :array
               required(:last_day_of_month).filled :bool
               required(:start_at).filled :date_time
+              optional(:variants).maybe :hash
               required(:exchanges).maybe(:array).each(:hash) do
                 required(:headers).maybe :hash
                 required(:verb).filled :string

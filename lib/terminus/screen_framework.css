@@ -37,6 +37,73 @@
   .screen--invert .rule, .screen--invert .list > * + * { border-color: var(--paper); }
   .screen--invert .badge { background: var(--paper); color: var(--ink); }
 
+  /* ---- Composition ---------------------------------------------------
+     A view is a 6x6 grid of slots, each holding one extension's markup for
+     the shape it was authored at. The grid's gap is the panel background
+     showing through, which draws exactly one rule between neighbours and
+     none at the panel edge - no double-thick lines where two slots meet.
+     See lib/terminus/layouts.rb for the shape and preset vocabulary. */
+
+  .view {
+    background: var(--ink);
+    display: grid;
+    gap: var(--rule);
+    grid-template-columns: repeat(6, 1fr);
+    grid-template-rows: repeat(6, 1fr);
+    height: 100vh;
+    overflow: hidden;
+    width: 100vw;
+  }
+
+  .slot {
+    background: var(--paper);
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  /* The same markup an extension renders full-page also renders in a slot;
+     only the box it fills changes. */
+  .slot > .screen { height: 100%; width: 100%; }
+
+  /* Small shapes get tighter chrome and smaller headings, so an author does
+     not have to fight the full-page defaults to fit a corner. */
+  .slot[data-shape="quarter"],
+  .slot[data-shape="third_width"],
+  .slot[data-shape="third_height"] {
+    --pad: 14px;
+    --gap: 10px;
+    --rule: 2px;
+  }
+
+  .slot[data-shape="half_width"],
+  .slot[data-shape="half_height"],
+  .slot[data-shape="two_thirds_width"],
+  .slot[data-shape="two_thirds_height"] {
+    --pad: 18px;
+    --gap: 12px;
+  }
+
+  .slot[data-shape="quarter"] .title-bar .title,
+  .slot[data-shape="third_width"] .title-bar .title,
+  .slot[data-shape="third_height"] .title-bar .title { font-size: 20px; }
+
+  .slot[data-shape="half_width"] .title-bar .title,
+  .slot[data-shape="half_height"] .title-bar .title,
+  .slot[data-shape="two_thirds_width"] .title-bar .title,
+  .slot[data-shape="two_thirds_height"] .title-bar .title { font-size: 24px; }
+
+  /* An empty slot is a real state, not a bug: a view can be saved half built.
+     It says so rather than rendering a hole. */
+  .slot--empty {
+    align-items: center;
+    display: flex;
+    font-size: 14px;
+    justify-content: center;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
   /* ---- Bars ---------------------------------------------------------- */
 
   .title-bar {
