@@ -1,0 +1,50 @@
+{% comment %}
+  Renders at the device's resolution, then gets dithered to 1-bit. Use the
+  Dither screen framework classes (lib/terminus/screen_framework.css): pure
+  black on white, heavy rules, no greys.
+
+  Available:
+    {{ extension.data }}   parsed JSON from the exchanges above
+    {{ extension.values }} the settings the owner filled in
+    {{ extension.label }}  this extension's label
+
+  The shape below matches the transport.rest API. For a different provider,
+  change only the loop and the field paths.
+{% endcomment %}
+
+<div class="screen">
+  <div class="title-bar">
+    <div class="title">{{ extension.values.heading | default: "Departures" }}</div>
+    <div class="meta">{{ extension.data.departures[0].stop.name | truncate: 28 }}</div>
+  </div>
+
+  <div class="content">
+    {% if extension.data.departures and extension.data.departures.size > 0 %}
+      <div class="list">
+        {% for departure in extension.data.departures %}
+          <div class="list-item">
+            <span class="primary truncate">
+              {{ departure.line.name }} — {{ departure.destination.name }}
+            </span>
+            <span class="secondary t-mono t-bold">
+              {{ departure.when | date: "%H:%M" }}
+              {% if departure.delay and departure.delay > 0 %}
+                +{{ departure.delay | divided_by: 60 }}
+              {% endif %}
+            </span>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="layout layout--col layout--center">
+        <p class="t-lg t-bold">No departures</p>
+        <p class="t-sm">Check the stop ID in this extension's settings.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="footer-bar">
+    <span>Stop {{ extension.values.stop_id }}</span>
+    <span class="badge">live</span>
+  </div>
+</div>

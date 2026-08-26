@@ -1,0 +1,72 @@
+# Dither bundled extension.
+#
+# This file plus template.html.liquid is the whole contract. The pair is also
+# a valid zip import, so anything authored here can be shipped to someone else
+# and loaded through Extensions -> Import without changes.
+#
+# See extensions/README.md for the full field reference.
+
+version: "1.0.0"
+name: public_transport
+label: Public Transport
+description: >
+  Next departures for a stop. Point it at any transit API that returns JSON;
+  map the response in template.html.liquid.
+
+# poll = Dither calls the API on a schedule. The alternative is webhook, where
+# the third party posts to us instead.
+kind: poll
+mode: text
+tags:
+  - transport
+
+# Every 5 minutes. Units: none, minute, hour, day, week, month.
+interval: 5
+unit: minute
+days: []
+last_day_of_month: false
+start_at: "2026-01-01T00:00:00Z"
+
+static_body: {}
+data: {}
+
+# Fields become the settings form the extension's owner fills in. Each keyname
+# is addressable in the template and in exchange URLs as {{ values.<keyname> }}.
+fields:
+  - keyname: api_base
+    name: API base URL
+    field_type: string
+    default: "https://v6.db.transport.rest"
+    help_text: Root of the transit API. The default is the free Deutsche Bahn mirror.
+    optional: false
+
+  - keyname: stop_id
+    name: Stop ID
+    field_type: string
+    default: "8011160"
+    help_text: Provider-specific stop identifier. 8011160 is Berlin Hbf.
+    optional: false
+
+  - keyname: results
+    name: Departures to show
+    field_type: string
+    default: "6"
+    help_text: How many rows to render. Keep it low; the panel is 800x480.
+    optional: true
+
+  - keyname: heading
+    name: Heading
+    field_type: string
+    default: "Departures"
+    help_text: Title shown in the top bar.
+    optional: true
+
+# Each exchange is one HTTP call. The response is merged into the extension's
+# data and reachable as {{ extension.data }} in the template. URL, headers and
+# body are all Liquid-rendered, so field values can be interpolated.
+exchanges:
+  - verb: get
+    template: "{{ values.api_base }}/stops/{{ values.stop_id }}/departures?results={{ values.results }}&duration=120"
+    headers:
+      Accept: application/json
+    body: {}
