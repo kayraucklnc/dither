@@ -32,9 +32,15 @@ module Terminus
     setting :keyvalue_url, constructor: Types::Params::String.constrained(filled: true)
     setting :model_synchronizer, constructor: Types::Params::Bool, default: true
     setting :rack_attack_allowed_subnets, constructor: Types::Params::String, default: ""
+    setting :remember_cookie_key,
+            constructor: Types::Params::String.constrained(filled: true),
+            default: "_remember"
     setting :sensors_path,
             constructor: Terminus::Types::Pathname,
             default: Hanami.app.root.join("public/sensors.json")
+    setting :session_cookie_key,
+            constructor: Types::Params::String.constrained(filled: true),
+            default: "terminus.session"
     setting :session_inactivity_limit, constructor: Types::Params::Integer, default: 1_800
     setting :session_lifetime_limit, constructor: Types::Params::Integer, default: 86_400
     setting :session_expiration_enabled, constructor: Types::Params::Bool, default: true

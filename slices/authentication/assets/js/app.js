@@ -6,3 +6,4 @@ import "../../../../app/assets/css/layout.css";
 import "../../../../app/assets/css/theme.css";
 import "../css/portal.css";
 import "../../../../app/assets/js/theme_toggle.js";
+import "./dither.js";
