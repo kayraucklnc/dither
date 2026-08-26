@@ -1,0 +1,28 @@
+{% comment %} Third height: 800x160. Everything on one line, rules between. {% endcomment %}
+
+<div class="screen">
+  <div class="content content--tight">
+    {% if source_1.current %}
+      <div class="layout layout--row layout--split divide-x">
+        <div class="stack stack--tight fit">
+          <span class="t-mono t-xl t-bold">{{ source_1.current.temperature_2m | round }}&deg;</span>
+          <span class="t-sm">{{ extension.values.place | default: "Now" }}</span>
+        </div>
+        <div class="stack stack--tight fit">
+          <span class="t-mono t-xl t-bold">
+            {{ source_1.daily.temperature_2m_max[0] | round }}&deg;/{{ source_1.daily.temperature_2m_min[0] | round }}&deg;
+          </span>
+          <span class="t-sm">High / low</span>
+        </div>
+        <div class="stack stack--tight fit">
+          <span class="t-mono t-xl t-bold">{{ source_1.daily.precipitation_probability_max[0] }}%</span>
+          <span class="t-sm">Chance of rain</span>
+        </div>
+      </div>
+    {% else %}
+      <div class="layout layout--row layout--center">
+        <p class="t-bold">No forecast &middot; check the coordinates</p>
+      </div>
+    {% endif %}
+  </div>
+</div>

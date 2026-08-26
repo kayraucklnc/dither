@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Screens::Interrupts::Welcome, :db do
+RSpec.describe Dither::Aspects::Screens::Interrupts::Welcome, :db do
   subject(:welcomer) { described_class.new }
 
   describe "#call" do

@@ -4,7 +4,7 @@
 require "core"
 require "refinements/hash"
 
-module Terminus
+module Dither
   module Schemas
     # Coerces a key's value to an empty array when key is missing.
     module Coercers

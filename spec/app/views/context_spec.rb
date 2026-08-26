@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Views::Context do
+RSpec.describe Dither::Views::Context do
   subject(:view_context) { described_class.new }
 
   describe "#htmx?" do

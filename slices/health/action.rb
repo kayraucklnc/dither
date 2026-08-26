@@ -3,6 +3,6 @@
 
 module Health
   # The slice base action.
-  class Action < Terminus::Action
+  class Action < Dither::Action
   end
 end

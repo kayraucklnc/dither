@@ -2,7 +2,7 @@
 
 require "hanami/db/repo"
 
-module Terminus
+module Dither
   module DB
     # The application database base repository.
     class Repository < Hanami::DB::Repo

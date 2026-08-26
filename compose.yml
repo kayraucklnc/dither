@@ -28,7 +28,7 @@ services:
     volumes:
       - certificates:/etc/ssl/certs
       - web-fonts:/app/public/fonts
-      - web-fonts:/usr/share/fonts/terminus
+      - web-fonts:/usr/share/fonts/dither
       - web-uploads:/app/public/uploads
     depends_on:
       init-certificates:
@@ -63,7 +63,7 @@ services:
     volumes:
       - certificates:/etc/ssl/certs
       - web-fonts:/app/public/fonts
-      - web-fonts:/usr/share/fonts/terminus
+      - web-fonts:/usr/share/fonts/dither
       - web-uploads:/app/public/uploads
     depends_on:
       web:

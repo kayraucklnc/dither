@@ -36,7 +36,7 @@ The following provides a visual roadmap of current development and work that is 
 | Third Party              | ⚪️
 | Recipes                  | 🟢
 | Import (Core)            | 🟢
-| Import/Export (Terminus) | 🟢
+| Import/Export (Dither) | 🟢
 |===
 
 == Walkthrough
@@ -98,9 +98,9 @@ If you'd like to leverage sensor information, there are two ways to do this. Eac
 
 === Device
 
-⚠️ Terminus supports acquiring sensors readings from sensors connected to your devices but a new {firmware_link} version is still required for full support. There is a Firmware feature branch in the works that, once folded in, will close the loop on this feature.
+⚠️ Dither supports acquiring sensors readings from sensors connected to your devices but a new {firmware_link} version is still required for full support. There is a Firmware feature branch in the works that, once folded in, will close the loop on this feature.
 
-Once sensors are attached to your devices, Terminus will immediately capture this information for rendering in your Liquid templates.
+Once sensors are attached to your devices, Dither will immediately capture this information for rendering in your Liquid templates.
 
 Behind the scenes, your device will automatically include the `HTTP_SENSORS` header which adheres to {rfc_2626_link} when making a `/api/display` request with content similar to the following:
 

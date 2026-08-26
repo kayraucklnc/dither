@@ -2,10 +2,10 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Extensions::Generators::Poll, :db do
+RSpec.describe Dither::Aspects::Extensions::Generators::Poll, :db do
   subject(:generator) { described_class.new refresher: }
 
-  let(:refresher) { instance_spy Terminus::Aspects::Extensions::Exchanges::Refresher }
+  let(:refresher) { instance_spy Dither::Aspects::Extensions::Exchanges::Refresher }
 
   describe "#call" do
     let :extension do
@@ -40,7 +40,7 @@ RSpec.describe Terminus::Aspects::Extensions::Generators::Poll, :db do
       exchange
       generator.call(extension, context:)
 
-      expect(refresher).to have_received(:call).with(kind_of(Terminus::Structs::ExtensionExchange))
+      expect(refresher).to have_received(:call).with(kind_of(Dither::Structs::ExtensionExchange))
     end
 
     it "answers success for single source" do

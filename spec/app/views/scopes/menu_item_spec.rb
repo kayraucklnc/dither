@@ -2,11 +2,11 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Views::Scopes::MenuItem do
-  subject(:scope) { described_class.new locals:, rendering: Terminus::View.new.rendering(context:) }
+RSpec.describe Dither::Views::Scopes::MenuItem do
+  subject(:scope) { described_class.new locals:, rendering: Dither::View.new.rendering(context:) }
 
   let(:locals) { {label: "Tasks", path: "/tasks"} }
-  let(:context) { Terminus::Views::Context.new(request:) }
+  let(:context) { Dither::Views::Context.new(request:) }
 
   let :request do
     Hanami::Action::Request.new env: Rack::MockRequest.env_for(request_path), params: {}

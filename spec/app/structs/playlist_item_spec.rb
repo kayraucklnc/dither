@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Structs::PlaylistItem do
+RSpec.describe Dither::Structs::PlaylistItem do
   subject :playlist_item do
     Factory.structs[
       :playlist_item,

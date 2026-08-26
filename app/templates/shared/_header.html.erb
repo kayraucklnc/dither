@@ -12,11 +12,9 @@
 
   <ul class="site-menu">
     <%# Primary: the things you touch while running displays. %>
-    <%= scope(:menu_item, label: "Devices", path: routes.path(:devices)).render %>
     <%= scope(:menu_item, label: "Compose", path: routes.path(:scene_new)).render %>
-    <%= scope(:menu_item, label: "Screens", path: routes.path(:screens)).render %>
-    <%= scope(:menu_item, label: "Playlists", path: routes.path(:playlists)).render %>
-    <%= scope(:menu_item, label: "Designs", path: routes.path(:designs)).render %>
+    <%= scope(:menu_item, label: "Scenes", path: routes.path(:scenes)).render %>
+    <%= scope(:menu_item, label: "Devices", path: routes.path(:devices)).render %>
     <%= scope(:menu_item, label: "Extensions", path: routes.path(:extensions)).render %>
 
     <%# Secondary: set once, rarely revisited. A <details> keeps this JS-free. %>
@@ -31,6 +29,11 @@
         </summary>
 
         <div class="site-dropdown-menu">
+          <p class="site-dropdown-heading">Being replaced</p>
+          <%= link_to "Screens", routes.path(:screens) %>
+          <%= link_to "Playlists", routes.path(:playlists) %>
+          <%= link_to "Designs", routes.path(:designs) %>
+
           <p class="site-dropdown-heading">Hardware</p>
           <%= link_to "Models", routes.path(:models) %>
           <%= link_to "Firmware", routes.path(:firmwares) %>

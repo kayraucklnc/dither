@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Structs::Screen, :db do
+RSpec.describe Dither::Structs::Screen, :db do
   subject(:screen) { Factory[:screen, updated_at: "2025-08-01T10:10:10+0000"] }
 
   let(:path) { SPEC_ROOT.join "support/fixtures/test.png" }

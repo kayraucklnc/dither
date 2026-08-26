@@ -2,8 +2,8 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Views::Parts::Model, :db do
-  subject(:part) { described_class.new value: model, rendering: Terminus::View.new.rendering }
+RSpec.describe Dither::Views::Parts::Model, :db do
+  subject(:part) { described_class.new value: model, rendering: Dither::View.new.rendering }
 
   let(:model) { Factory.structs[:model] }
 
@@ -27,7 +27,7 @@ RSpec.describe Terminus::Views::Parts::Model, :db do
       let :model do
         palette = Factory[:palette, label: "Test"]
         model = Factory[:model, default_palette_id: palette.id]
-        Terminus::Repositories::Model.new.find model.id
+        Dither::Repositories::Model.new.find model.id
       end
 
       it "answers label" do
@@ -82,7 +82,7 @@ RSpec.describe Terminus::Views::Parts::Model, :db do
 
   describe "#kind_label" do
     it "answers capitalized label" do
-      expect(part.kind_label).to eq("Terminus")
+      expect(part.kind_label).to eq("Dither")
     end
 
     context "with byod" do

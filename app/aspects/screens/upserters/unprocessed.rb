@@ -3,7 +3,7 @@
 require "dry/monads"
 require "refinements/struct"
 
-module Terminus
+module Dither
   module Aspects
     module Screens
       module Upserters
@@ -18,7 +18,7 @@ module Terminus
 
           using Refinements::Struct
 
-          def initialize(struct: Terminus::Structs::Screen.new, **)
+          def initialize(struct: Dither::Structs::Screen.new, **)
             @struct = struct
             super(**)
           end

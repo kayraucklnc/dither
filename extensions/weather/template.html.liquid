@@ -1,0 +1,57 @@
+{% comment %}
+  Full page. Weather codes are WMO; the mapping below covers the groups that
+  matter on a 1-bit panel, where an icon would dither to mush anyway.
+{% endcomment %}
+
+{% assign code = source_1.current.weather_code %}
+{% assign summary = "Clear" %}
+{% if code >= 1 and code <= 3 %}{% assign summary = "Cloudy" %}{% endif %}
+{% if code >= 45 and code <= 48 %}{% assign summary = "Fog" %}{% endif %}
+{% if code >= 51 and code <= 67 %}{% assign summary = "Rain" %}{% endif %}
+{% if code >= 71 and code <= 77 %}{% assign summary = "Snow" %}{% endif %}
+{% if code >= 80 and code <= 82 %}{% assign summary = "Showers" %}{% endif %}
+{% if code >= 95 %}{% assign summary = "Storm" %}{% endif %}
+
+<div class="screen">
+  <div class="title-bar">
+    <div class="title">{{ extension.values.place | default: "Weather" }}</div>
+    <div class="meta">{{ summary }}</div>
+  </div>
+
+  <div class="content">
+    {% if source_1.current %}
+      <div class="layout layout--row layout--split divide-x">
+        <div class="stat fit layout--center">
+          <span class="value t-mono" style="font-size: 120px">
+            {{ source_1.current.temperature_2m | round }}&deg;
+          </span>
+          <span class="label">Now</span>
+        </div>
+
+        <div class="stack fit" style="justify-content: center">
+          <div class="kv">
+            <span class="k">High</span>
+            <span class="v t-mono t-bold">{{ source_1.daily.temperature_2m_max[0] | round }}&deg;</span>
+          </div>
+          <div class="kv">
+            <span class="k">Low</span>
+            <span class="v t-mono t-bold">{{ source_1.daily.temperature_2m_min[0] | round }}&deg;</span>
+          </div>
+          <div class="kv">
+            <span class="k">Rain</span>
+            <span class="v t-mono t-bold">{{ source_1.daily.precipitation_probability_max[0] }}%</span>
+          </div>
+          <div class="kv">
+            <span class="k">Wind</span>
+            <span class="v t-mono t-bold">{{ source_1.current.wind_speed_10m | round }} km/h</span>
+          </div>
+        </div>
+      </div>
+    {% else %}
+      <div class="layout layout--col layout--center">
+        <p class="t-lg t-bold">No forecast</p>
+        <p class="t-sm">Check the coordinates in this extension's settings.</p>
+      </div>
+    {% endif %}
+  </div>
+</div>

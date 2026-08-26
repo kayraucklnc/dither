@@ -2,13 +2,13 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Actions::Extensions::Import::Create, :db do
+RSpec.describe Dither::Actions::Extensions::Import::Create, :db do
   using Refinements::Pathname
 
   subject(:action) { described_class.new }
 
   describe "#call" do
-    let(:exporter) { Terminus::Aspects::Extensions::Exporter.new }
+    let(:exporter) { Dither::Aspects::Extensions::Exporter.new }
     let(:extension) { Factory.structs[:extension] }
 
     it "renders errors when invalid" do

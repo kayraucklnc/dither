@@ -1,7 +1,7 @@
 # auto_register: false
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Middleware
     # Handles Rodauth authentication for the Sidekiq Web interface.
     class SidekiqAuth

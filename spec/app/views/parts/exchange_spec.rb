@@ -2,8 +2,8 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Views::Parts::Exchange do
-  subject(:part) { described_class.new value: exchange, rendering: Terminus::View.new.rendering }
+RSpec.describe Dither::Views::Parts::Exchange do
+  subject(:part) { described_class.new value: exchange, rendering: Dither::View.new.rendering }
 
   let(:extension) { Factory.structs[:extension] }
   let(:exchange) { Factory.structs[:extension_exchange, template: "https://test.io"] }

@@ -2,10 +2,10 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Extensions::Generators::Image do
+RSpec.describe Dither::Aspects::Extensions::Generators::Image do
   subject(:generator) { described_class.new exchange_repository: }
 
-  let(:exchange_repository) { instance_double Terminus::Repositories::ExtensionExchange }
+  let(:exchange_repository) { instance_double Dither::Repositories::ExtensionExchange }
 
   describe "#call" do
     let :extension do

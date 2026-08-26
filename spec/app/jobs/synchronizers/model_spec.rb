@@ -2,11 +2,11 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Jobs::Synchronizers::Model do
+RSpec.describe Dither::Jobs::Synchronizers::Model do
   subject(:job) { described_class.new palette:, model: }
 
-  let(:palette) { instance_spy Terminus::Aspects::Palettes::Synchronizer }
-  let(:model) { instance_spy Terminus::Aspects::Models::Synchronizer }
+  let(:palette) { instance_spy Dither::Aspects::Palettes::Synchronizer }
+  let(:model) { instance_spy Dither::Aspects::Models::Synchronizer }
 
   include_context "with application dependencies"
 

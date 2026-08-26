@@ -2,7 +2,7 @@
 
 require "initable"
 
-module Terminus
+module Dither
   module Actions
     module Extensions
       module Exchanges

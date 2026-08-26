@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Structs::Model do
+RSpec.describe Dither::Structs::Model do
   subject(:model) { Factory.structs[:model, **attributes] }
 
   let :attributes do

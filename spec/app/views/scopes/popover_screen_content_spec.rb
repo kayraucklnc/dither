@@ -2,12 +2,12 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Views::Scopes::PopoverScreenContent do
+RSpec.describe Dither::Views::Scopes::PopoverScreenContent do
   using Refinements::Hash
 
-  subject(:scope) { described_class.new locals:, rendering: Terminus::View.new.rendering }
+  subject(:scope) { described_class.new locals:, rendering: Dither::View.new.rendering }
 
-  let(:locals) { Terminus::Aspects::Screens::Placeholder[id: 1].popover_attributes }
+  let(:locals) { Dither::Aspects::Screens::Placeholder[id: 1].popover_attributes }
 
   describe "#element_id" do
     it "answers ID" do

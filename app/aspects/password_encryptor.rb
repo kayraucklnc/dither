@@ -3,7 +3,7 @@
 require "bcrypt"
 require "initable"
 
-module Terminus
+module Dither
   module Aspects
     # Creates passwords with computation cost respective of environment.
     class PasswordEncryptor

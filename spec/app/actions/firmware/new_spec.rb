@@ -2,12 +2,12 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Actions::Firmware::New, :db do
+RSpec.describe Dither::Actions::Firmware::New, :db do
   subject(:action) { described_class.new }
 
   describe "#call" do
     let(:firmware) { Factory[:firmware] }
-    let(:params) { {firmware: {version: "0.0.0", kind: "terminus"}} }
+    let(:params) { {firmware: {version: "0.0.0", kind: "dither"}} }
 
     it "renders default response" do
       response = Rack::MockRequest.new(action).post("", params:)

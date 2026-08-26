@@ -81,8 +81,8 @@ RSpec.describe "Extensions", :db do
   end
 
   it "imports", :aggregate_failures, :js do
-    exporter = Terminus::Aspects::Extensions::Exporter.new
-    importer = Terminus::Aspects::Extensions::Importers::Local::Creator.new
+    exporter = Dither::Aspects::Extensions::Exporter.new
+    importer = Dither::Aspects::Extensions::Importers::Local::Creator.new
     extension = Factory.structs[:extension, label: "Extension Import Test"]
     path = exporter.call(extension).bind { |io| temp_dir.join("test.zip").write io.read }
 
@@ -116,13 +116,5 @@ RSpec.describe "Extensions", :db do
     end
 
     expect(page).to have_no_text(extension.label)
-  end
-
-  it "views gallery", :aggregate_failures do
-    Hanami.app.start :trmnl_api
-    visit routes.path(:extensions_gallery)
-
-    expect(page).to have_text("Gallery")
-    expect(page).to have_text("connection")
   end
 end

@@ -2,14 +2,14 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Screens::Rotator, :db do
+RSpec.describe Dither::Aspects::Screens::Rotator, :db do
   subject(:rotator) { described_class.new }
 
   describe "#call" do
     let(:device) { provisioner.call(model_id: Factory[:model].id).value! }
-    let(:provisioner) { Terminus::Aspects::Devices::Provisioner.new }
-    let(:playlist_repository) { Terminus::Repositories::Playlist.new }
-    let(:item_repository) { Terminus::Repositories::PlaylistItem.new }
+    let(:provisioner) { Dither::Aspects::Devices::Provisioner.new }
+    let(:playlist_repository) { Dither::Repositories::Playlist.new }
+    let(:item_repository) { Dither::Repositories::PlaylistItem.new }
 
     it "answers sleep screen when device is asleep" do
       allow(device).to receive(:asleep?).and_return true

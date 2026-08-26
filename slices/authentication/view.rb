@@ -3,7 +3,7 @@
 
 module Authentication
   # The slice view.
-  class View < Terminus::View
+  class View < Dither::View
     config.paths += ["app/templates"]
   end
 end

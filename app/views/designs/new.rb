@@ -2,11 +2,11 @@
 
 require "core"
 
-module Terminus
+module Dither
   module Views
     module Designs
       # The new view.
-      class New < Terminus::View
+      class New < Dither::View
         expose :models
         expose :template
         expose :screens, default: Core::EMPTY_ARRAY

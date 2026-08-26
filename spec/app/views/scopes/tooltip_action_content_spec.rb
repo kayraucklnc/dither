@@ -2,10 +2,10 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Views::Scopes::TooltipActionContent do
+RSpec.describe Dither::Views::Scopes::TooltipActionContent do
   using Refinements::Hash
 
-  subject(:scope) { described_class.new locals:, rendering: Terminus::View.new.rendering }
+  subject(:scope) { described_class.new locals:, rendering: Dither::View.new.rendering }
 
   let(:locals) { {label: "Test"} }
 

@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Screens::Shoter do
+RSpec.describe Dither::Aspects::Screens::Shoter do
   subject(:shoter) { described_class.new }
 
   include_context "with temporary directory"

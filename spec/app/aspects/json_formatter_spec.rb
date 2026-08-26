@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::JSONFormatter do
+RSpec.describe Dither::Aspects::JSONFormatter do
   subject(:formatter) { described_class }
 
   describe ".call" do

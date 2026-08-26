@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Actions::Firmware::Delete, :db do
+RSpec.describe Dither::Actions::Firmware::Delete, :db do
   subject(:action) { described_class.new }
 
   include_context "with application dependencies"

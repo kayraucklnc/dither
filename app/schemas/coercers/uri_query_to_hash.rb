@@ -4,7 +4,7 @@
 require "json"
 require "refinements/hash"
 
-module Terminus
+module Dither
   module Schemas
     # Coerces key's URI query parameters value into a hash.
     module Coercers

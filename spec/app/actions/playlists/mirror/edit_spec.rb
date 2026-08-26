@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Actions::Playlists::Mirror::Edit, :db do
+RSpec.describe Dither::Actions::Playlists::Mirror::Edit, :db do
   subject(:action) { described_class.new }
 
   describe "#call" do

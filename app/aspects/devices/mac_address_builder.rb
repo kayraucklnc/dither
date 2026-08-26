@@ -2,7 +2,7 @@
 
 require "securerandom"
 
-module Terminus
+module Dither
   module Aspects
     module Devices
       # Builds a random, locally administered, unicast MAC address.

@@ -63,6 +63,7 @@ ends up matching the files exactly instead of accumulating stale calls.
 | `static_body` | yes | Fixed data merged into the template. `{}` if unused. |
 | `data` | yes | Seed data. `{}` — the exchanges fill this in. |
 | `fields` | yes | The settings form. See below. |
+| `sample` | no | Representative data for previews. See below. |
 | `exchanges` | no | The HTTP calls. See below. |
 
 ### fields
@@ -102,6 +103,30 @@ an ID that the next one needs.
 
 ---
 
+## Sample data
+
+An extension that has never fetched anything renders its empty state, which
+means a fresh install shows a blank panel and there is nothing to judge. So
+every extension should ship representative data:
+
+```yaml
+sample:
+  source_1:
+    departures:
+      - when: "2026-01-01T08:12:00+01:00"
+        line: {name: "ICE 1045"}
+        destination: {name: "Munchen Hbf"}
+```
+
+Shape it **exactly like the real response**, keyed the same way the template
+reads it. A design that looks right against the sample looks right in the
+field; one that does not, will not.
+
+Sample data is used only in previews, and only when there is no real data yet.
+A device is never served it, and the moment a real fetch succeeds it is ignored.
+
+---
+
 ## Layout variants
 
 A scene divides the panel into slots and drops one extension into each. An
@@ -130,7 +155,7 @@ required. Everything else is optional.
 | `templates/two_thirds_height.html.liquid` | full w × ⅔ h | 800×320 | the tall side of a banner split |
 
 A name outside this list is a load error, not a silently ignored file. The
-canonical list lives in `lib/terminus/composition.rb`.
+canonical list lives in `lib/dither/composition.rb`.
 
 ### The scenes they unlock
 
@@ -186,7 +211,7 @@ Exchange responses land in `source_N`, **not** in `extension.data` — that trip
 up everyone once. `extension.data` is the hand-editable blob on the settings
 page.
 
-Use the **Dither screen framework** classes (`lib/terminus/screen_framework.css`).
+Use the **Dither screen framework** classes (`lib/dither/screen_framework.css`).
 Do not link external stylesheets: the renderer has no origin, so relative URLs
 cannot resolve and a remote fetch would put someone else's CDN on the critical
 path of every render.
@@ -231,6 +256,7 @@ template loop; the structure stays.
 - [ ] `name` is unique and lowercase
 - [ ] No secrets in the file — anything user-specific is a `field`
 - [ ] `default` values make it render sensibly before configuration
+- [ ] `sample` data is present and shaped like the real response
 - [ ] The template handles empty and error responses
 - [ ] Rendered and eyeballed at 800×480 after dithering
 - [ ] Every declared variant eyeballed at *its own* size, not just full page

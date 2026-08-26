@@ -2,7 +2,7 @@
 
 require "core"
 
-module Terminus
+module Dither
   module Aspects
     module Extensions
       # Assembles the Liquid context for rendering screens.

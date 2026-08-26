@@ -3,7 +3,7 @@
 
 require "refinements/array"
 
-module Terminus
+module Dither
   module Aspects
     module Playlists
       # The playlist slideshow window of current item and associated slides.

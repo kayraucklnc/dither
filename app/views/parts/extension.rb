@@ -3,7 +3,7 @@
 require "hanami/view"
 require "initable"
 
-module Terminus
+module Dither
   module Views
     module Parts
       # The extension presenter.

@@ -1,7 +1,7 @@
 # auto_register: false
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Aspects
     module Extensions
       module Importers
@@ -25,6 +25,7 @@ module Terminus
               required(:last_day_of_month).filled :bool
               required(:start_at).filled :date_time
               optional(:variants).maybe :hash
+              optional(:sample).maybe :hash
               required(:exchanges).maybe(:array).each(:hash) do
                 required(:headers).maybe :hash
                 required(:verb).filled :string

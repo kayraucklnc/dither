@@ -2,14 +2,14 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Views::Parts::Firmware do
-  subject(:part) { described_class.new value: firmware, rendering: Terminus::View.new.rendering }
+RSpec.describe Dither::Views::Parts::Firmware do
+  subject(:part) { described_class.new value: firmware, rendering: Dither::View.new.rendering }
 
   let(:firmware) { Factory.structs[:firmware] }
 
   describe "#kind_label" do
     it "answers capitalized label" do
-      expect(part.kind_label).to eq("Terminus")
+      expect(part.kind_label).to eq("Dither")
     end
 
     context "with trmnl" do

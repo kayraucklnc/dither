@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Serializers::PlaylistItem do
+RSpec.describe Dither::Serializers::PlaylistItem do
   subject(:serializer) { described_class.new playlist_item }
 
   let(:playlist_item) { Factory.structs[:playlist_item, **attributes] }

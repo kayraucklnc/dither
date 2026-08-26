@@ -2,7 +2,7 @@
 
 require "refinements/pathname"
 
-module Terminus
+module Dither
   module Actions
     module API
       module Firmware

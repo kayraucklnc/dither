@@ -2,13 +2,13 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Jobs::Batches::Extension, :db do
+RSpec.describe Dither::Jobs::Batches::Extension, :db do
   subject(:job) { described_class.new }
 
   include_context "with application dependencies"
 
   describe "#perform" do
-    let(:repository) { Terminus::Repositories::Extension.new }
+    let(:repository) { Dither::Repositories::Extension.new }
     let(:extension) { Factory[:extension] }
     let(:model) { Factory[:model] }
 

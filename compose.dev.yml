@@ -36,7 +36,7 @@ services:
       - dev-node-modules:/app/node_modules
       - certificates:/etc/ssl/certs
       - web-fonts:/app/public/fonts
-      - web-fonts:/usr/share/fonts/terminus
+      - web-fonts:/usr/share/fonts/dither
       - web-uploads:/app/public/uploads
     command: bundle exec puma --config ./config/puma.rb
 
@@ -95,7 +95,7 @@ services:
       - dev-node-modules:/app/node_modules
       - certificates:/etc/ssl/certs
       - web-fonts:/app/public/fonts
-      - web-fonts:/usr/share/fonts/terminus
+      - web-fonts:/usr/share/fonts/dither
       - web-uploads:/app/public/uploads
 
 volumes:

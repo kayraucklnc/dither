@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Actions
     module Designs
       # The create action.
-      class Create < Terminus::Action
+      class Create < Dither::Action
         include Deps[
           "aspects.screens.upserter",
           repository: "repositories.screen_template",

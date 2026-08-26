@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Screens::TempPather, :db do
+RSpec.describe Dither::Aspects::Screens::TempPather, :db do
   using Refinements::Struct
 
   subject(:pather) { described_class.new }
@@ -39,7 +39,7 @@ RSpec.describe Terminus::Aspects::Screens::TempPather, :db do
 
   describe "#inspect" do
     it "has inspected attributes" do
-      expect(pather.inspect).to match_inspection(sanitizer: "Terminus::Aspects::Sanitizer")
+      expect(pather.inspect).to match_inspection(sanitizer: "Dither::Aspects::Sanitizer")
     end
   end
 end

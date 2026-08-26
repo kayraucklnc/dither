@@ -2,14 +2,14 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Devices::Sensors::Synchronizer, :db do
+RSpec.describe Dither::Aspects::Devices::Sensors::Synchronizer, :db do
   using Refinements::Pathname
 
   subject(:synchronizer) { described_class.new }
 
   include_context "with application dependencies"
 
-  let(:repository) { Terminus::Repositories::DeviceSensor.new }
+  let(:repository) { Dither::Repositories::DeviceSensor.new }
   let(:path) { SPEC_ROOT.join "support/fixtures/sensors.json" }
 
   before { allow(settings).to receive(:sensors_path).and_return(path) }

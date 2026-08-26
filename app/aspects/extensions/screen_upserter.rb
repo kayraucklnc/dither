@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Aspects
     module Extensions
       # Creates or updates associated screen from Liquid content.

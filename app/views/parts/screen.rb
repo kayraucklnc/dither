@@ -2,7 +2,7 @@
 
 require "hanami/view"
 
-module Terminus
+module Dither
   module Views
     module Parts
       # The screen presenter.

@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Screens::Upserters::HTML, :db do
+RSpec.describe Dither::Aspects::Screens::Upserters::HTML, :db do
   using Refinements::Struct
 
   subject(:upserter) { described_class.new }
@@ -36,7 +36,7 @@ RSpec.describe Terminus::Aspects::Screens::Upserters::HTML, :db do
 
   describe "#inspect" do
     it "has inspected attributes" do
-      expect(upserter.inspect).to match_inspection(sanitizer: "Terminus::Aspects::Sanitizer")
+      expect(upserter.inspect).to match_inspection(sanitizer: "Dither::Aspects::Sanitizer")
     end
   end
 end

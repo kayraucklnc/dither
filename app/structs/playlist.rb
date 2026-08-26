@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Structs
     # The playlist struct.
     class Playlist < DB::Struct

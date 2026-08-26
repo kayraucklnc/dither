@@ -3,11 +3,11 @@
 require "core"
 require "refinements/hash"
 
-module Terminus
+module Dither
   module Structs
     # The firmware struct.
     class Firmware < DB::Struct
-      include Terminus::Uploaders::Binary::Attachment[:attachment]
+      include Dither::Uploaders::Binary::Attachment[:attachment]
 
       using Refinements::Hash
 

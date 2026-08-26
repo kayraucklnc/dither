@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Devices::Provisioner, :db do
+RSpec.describe Dither::Aspects::Devices::Provisioner, :db do
   subject(:provisioner) { described_class.new }
 
   describe "#call" do
@@ -65,7 +65,7 @@ RSpec.describe Terminus::Aspects::Devices::Provisioner, :db do
 
       it "associates device with playlist" do
         device = provisioner.call(mac_address: "02:A1:B2:C3:D4:E5", model_id: model.id).success
-        playlist = Terminus::Repositories::Playlist.new.find device.playlist_id
+        playlist = Dither::Repositories::Playlist.new.find device.playlist_id
 
         expect(playlist).to have_attributes(
           label: "Device #{device.id}",
@@ -75,7 +75,7 @@ RSpec.describe Terminus::Aspects::Devices::Provisioner, :db do
 
       it "associates playlist item with welcome screen" do
         device = provisioner.call(mac_address: "02:A1:B2:C3:D4:E5", model_id: model.id).success
-        item = Terminus::Repositories::PlaylistItem.new.find_by playlist_id: device.playlist_id
+        item = Dither::Repositories::PlaylistItem.new.find_by playlist_id: device.playlist_id
         screen = item.screen
 
         expect(screen).to have_attributes(
@@ -87,8 +87,8 @@ RSpec.describe Terminus::Aspects::Devices::Provisioner, :db do
 
       it "associates playlist current item with welcome screen" do
         device = provisioner.call(mac_address: "02:A1:B2:C3:D4:E5", model_id: model.id).success
-        playlist = Terminus::Repositories::Playlist.new.find device.playlist_id
-        screen = Terminus::Repositories::Screen.new.find playlist.current_item.screen_id
+        playlist = Dither::Repositories::Playlist.new.find device.playlist_id
+        screen = Dither::Repositories::Screen.new.find playlist.current_item.screen_id
 
         expect(screen).to have_attributes(
           label: "Welcome #{device.id}",

@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Extensions::Exchanges::Coalescer do
+RSpec.describe Dither::Aspects::Extensions::Exchanges::Coalescer do
   subject(:coalescer) { described_class }
 
   describe "#call" do

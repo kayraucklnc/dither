@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Relations
     # The model and palette join relation.
     class ModelPalette < DB::Relation

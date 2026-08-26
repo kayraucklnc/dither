@@ -50,7 +50,7 @@ RSpec/ExampleLength:
     - "spec/features/**/*"
 RSpec/SpecFilePathFormat:
   CustomTransform:
-    Terminus: ""
+    Dither: ""
 Style/IpAddresses:
   Exclude:
     - spec/**/*

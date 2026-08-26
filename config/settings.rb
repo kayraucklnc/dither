@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require "terminus/types"
+require "dither/types"
 
-module Terminus
+module Dither
   # The application base settings.
   class Settings < Hanami::Settings
     setting :api_access_token_period, constructor: Types::Params::Integer, default: 1_800
@@ -14,7 +14,7 @@ module Terminus
     setting :ferrum_process_timeout, constructor: Types::Params::Integer, default: 15
     setting :ferrum_javascript_errors, constructor: Types::Params::Bool, default: true
     setting :fonts_root,
-            constructor: Terminus::Types::Pathname,
+            constructor: Dither::Types::Pathname,
             default: Hanami.app.root.join("public/fonts")
     setting :git_latest_sha,
             constructor: Types::Params::String,
@@ -33,7 +33,7 @@ module Terminus
     setting :model_synchronizer, constructor: Types::Params::Bool, default: true
     setting :rack_attack_allowed_subnets, constructor: Types::Params::String, default: ""
     setting :sensors_path,
-            constructor: Terminus::Types::Pathname,
+            constructor: Dither::Types::Pathname,
             default: Hanami.app.root.join("public/sensors.json")
     setting :session_inactivity_limit, constructor: Types::Params::Integer, default: 1_800
     setting :session_lifetime_limit, constructor: Types::Params::Integer, default: 86_400

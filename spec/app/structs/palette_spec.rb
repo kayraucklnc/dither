@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Structs::Palette do
+RSpec.describe Dither::Structs::Palette do
   subject(:palette) { Factory.structs[:palette, grays: 2, colors: %w[#000000 #FFFFFF]] }
 
   describe "#screen_attributes" do

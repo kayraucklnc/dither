@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Actions::Models::Create, :db do
+RSpec.describe Dither::Actions::Models::Create, :db do
   subject(:action) { described_class.new }
 
   describe "#call" do
@@ -13,7 +13,7 @@ RSpec.describe Terminus::Actions::Models::Create, :db do
         model: {
           label: "Test",
           name: "test",
-          **Terminus::Aspects::Models::DEFAULTS
+          **Dither::Aspects::Models::DEFAULTS
         }
       }
     end

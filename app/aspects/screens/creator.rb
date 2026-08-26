@@ -3,7 +3,7 @@
 require "dry/monads"
 require "initable"
 
-module Terminus
+module Dither
   module Aspects
     module Screens
       # Creates (or finds) record with image attachment using only HTML content.
@@ -13,7 +13,7 @@ module Terminus
           "aspects.screens.mold_builder",
           repository: "repositories.screen"
         ]
-        include Initable[struct: proc { Terminus::Structs::Screen.new }]
+        include Initable[struct: proc { Dither::Structs::Screen.new }]
         include Dry::Monads[:result]
 
         def call(**)

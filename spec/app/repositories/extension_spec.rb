@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Repositories::Extension, :db do
+RSpec.describe Dither::Repositories::Extension, :db do
   subject(:repository) { described_class.new }
 
   let(:extension) { Factory[:extension] }
@@ -20,7 +20,7 @@ RSpec.describe Terminus::Repositories::Extension, :db do
 
   describe "#create_with_devices" do
     let(:device) { Factory[:device] }
-    let(:union_repository) { Terminus::Repositories::ExtensionDevice.new }
+    let(:union_repository) { Dither::Repositories::ExtensionDevice.new }
 
     it "answers record" do
       record = repository.create_with_devices({name: "test", label: "Test"}, [device.id])
@@ -50,7 +50,7 @@ RSpec.describe Terminus::Repositories::Extension, :db do
 
   describe "#create_with_models" do
     let(:model) { Factory[:model] }
-    let(:union_repository) { Terminus::Repositories::ExtensionModel.new }
+    let(:union_repository) { Dither::Repositories::ExtensionModel.new }
 
     it "answers record" do
       record = repository.create_with_models({name: "test", label: "Test"}, [model.id])
@@ -134,7 +134,7 @@ RSpec.describe Terminus::Repositories::Extension, :db do
 
   describe "#update_with_devices" do
     let(:device) { Factory[:device] }
-    let(:union_repository) { Terminus::Repositories::ExtensionDevice.new }
+    let(:union_repository) { Dither::Repositories::ExtensionDevice.new }
 
     it "answers record" do
       record = repository.update_with_devices extension.id,
@@ -161,7 +161,7 @@ RSpec.describe Terminus::Repositories::Extension, :db do
 
   describe "#update_with_models" do
     let(:model) { Factory[:model] }
-    let(:union_repository) { Terminus::Repositories::ExtensionModel.new }
+    let(:union_repository) { Dither::Repositories::ExtensionModel.new }
 
     it "answers record" do
       record = repository.update_with_models extension.id, {name: "test", label: "Test"}, [model.id]

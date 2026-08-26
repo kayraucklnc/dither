@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Aspects
     module Screens
       # Converts to greyscale image based on MIME Type.

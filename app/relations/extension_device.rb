@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Relations
     # The extension and device join relation.
     class ExtensionDevice < DB::Relation

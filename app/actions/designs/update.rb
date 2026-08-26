@@ -2,7 +2,7 @@
 
 require "refinements/hash"
 
-module Terminus
+module Dither
   module Actions
     module Designs
       # The update action.

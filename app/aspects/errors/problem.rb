@@ -6,7 +6,7 @@ require "refinements/array"
 require "refinements/hash"
 require "rfc/api/problem"
 
-module Terminus
+module Dither
   module Aspects
     module Errors
       # Builds details for global problems.

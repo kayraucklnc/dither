@@ -3,7 +3,7 @@
 require "initable"
 require "refinements/hash"
 
-module Terminus
+module Dither
   module Aspects
     module Palettes
       # A palettes synchronizer with Core server.

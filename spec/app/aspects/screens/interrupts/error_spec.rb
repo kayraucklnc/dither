@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Screens::Interrupts::Error, :db do
+RSpec.describe Dither::Aspects::Screens::Interrupts::Error, :db do
   subject(:gaffer) { described_class.new }
 
   describe "#call" do

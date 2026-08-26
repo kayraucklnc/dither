@@ -2,10 +2,10 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Actions::Extensions::Preview::Show, :db do
+RSpec.describe Dither::Actions::Extensions::Preview::Show, :db do
   subject(:action) { described_class.new generator: }
 
-  let(:generator) { instance_double Terminus::Aspects::Extensions::Generator, call: result }
+  let(:generator) { instance_double Dither::Aspects::Extensions::Generator, call: result }
   let(:result) { "" }
 
   describe "#call" do

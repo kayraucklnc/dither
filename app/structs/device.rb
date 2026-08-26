@@ -3,7 +3,7 @@
 require "core"
 require "refinements/hash"
 
-module Terminus
+module Dither
   module Structs
     # The device struct.
     class Device < DB::Struct

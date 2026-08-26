@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Repositories::Palette, :db do
+RSpec.describe Dither::Repositories::Palette, :db do
   subject(:repository) { described_class.new }
 
   let(:palette) { Factory[:palette] }

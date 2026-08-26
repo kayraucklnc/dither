@@ -3,6 +3,6 @@
 
 module Health
   # The slice base view.
-  class View < Terminus::View
+  class View < Dither::View
   end
 end

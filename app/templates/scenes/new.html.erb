@@ -9,8 +9,9 @@
     <div>
       <h1>Compose a scene</h1>
       <p class="sub">
-        Drag an extension onto a slot. Slots an extension was not designed for
-        will not accept it &mdash; nothing is ever scaled down to fit.
+        Pick an extension, then click a slot &mdash; or drag it across. Slots an
+        extension was not designed for will not accept it; nothing is ever
+        scaled down to fit.
       </p>
     </div>
 
@@ -81,11 +82,30 @@
         This is the real render &mdash; screenshotted and dithered exactly as the
         panel would receive it.
       </p>
+
+      <%# Saving is what turns a composition into something a rule can point
+          at, so it lives with the panel rather than behind another page. %>
+      <form class="scene-save" method="post" action="<%= routes.path(:scenes) %>" id="scene-save">
+        <%= tag.input name: :_csrf_token, type: :hidden, value: csrf_token %>
+        <input type="hidden" name="layout" value="<%= scene_layout.id %>">
+        <input type="hidden" name="model_id" value="<%= model ? model.id : "" %>">
+        <div id="scene-save-slots"></div>
+
+        <label class="scene-save-name">
+          <span>Name this scene</span>
+          <input type="text" name="label" placeholder="Morning commute" required>
+        </label>
+
+        <button type="submit" class="bit-button-accept" id="scene-save-button" disabled>
+          Save scene
+        </button>
+      </form>
     </div>
 
     <%# ---- Extensions --------------------------------------------------- %>
     <aside class="composer-rail">
       <p class="rail-label">Extensions</p>
+      <p class="palette-hint" id="palette-hint" hidden></p>
 
       <% if extensions.to_a.any? %>
         <ul class="palette">
@@ -113,9 +133,9 @@
       <% end %>
 
       <p class="rail-note">
-        An extension can only be dropped where it has a design. Add
-        <code>templates/&lt;shape&gt;.html.liquid</code> to give it more places
-        to live.
+        An extension can only go where it has a design. Add a
+        <code>templates/&lt;shape&gt;.html.liquid</code> file to give it more
+        places to live.
       </p>
     </aside>
   </div>

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Repositories
     # The device log repository.
     class DeviceLog < DB::Repository[:device_log]

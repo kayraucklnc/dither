@@ -4,7 +4,7 @@ require "rfc/api/problem"
 
 require_relative "../../aspects/errors/problem"
 
-module Terminus
+module Dither
   module Actions
     module API
       # The base action.

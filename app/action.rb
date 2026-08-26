@@ -5,7 +5,7 @@ require "dry/monads"
 require "hanami/action"
 require "initable"
 
-module Terminus
+module Dither
   # The application base action.
   class Action < Hanami::Action
     include Dry::Monads[:result]

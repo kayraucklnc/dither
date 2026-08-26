@@ -2,14 +2,14 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Contracts::Rules::AttachmentSize do
+RSpec.describe Dither::Contracts::Rules::AttachmentSize do
   subject(:contract) { simulation.new }
 
   let :simulation do
     implementation = described_class
 
     Class.new Dry::Validation::Contract do
-      params { required(:test).hash { optional(:attachment).filled Terminus::Schemas::Attachment } }
+      params { required(:test).hash { optional(:attachment).filled Dither::Schemas::Attachment } }
       rule(test: :attachment, &implementation)
     end
   end

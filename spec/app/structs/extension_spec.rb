@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Structs::Extension do
+RSpec.describe Dither::Structs::Extension do
   subject :extension do
     Factory.structs[
       :extension,
@@ -143,7 +143,7 @@ RSpec.describe Terminus::Structs::Extension do
           "extension-test",
           {
             cron: "*/5 * * * *",
-            class: "Terminus::Jobs::Batches::Extension",
+            class: "Dither::Jobs::Batches::Extension",
             args: [1],
             description: "The Test extension update schedule."
           }

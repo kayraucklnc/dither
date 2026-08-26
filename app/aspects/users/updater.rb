@@ -2,7 +2,7 @@
 
 require "refinements/string"
 
-module Terminus
+module Dither
   module Aspects
     module Users
       # Validates and updates an existing user.

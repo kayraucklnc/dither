@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Aspects
     module Screens
       # Defines the blueprint in which to create a screen.

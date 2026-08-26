@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Croner do
+RSpec.describe Dither::Aspects::Croner do
   subject(:croner) { described_class }
 
   describe ".call" do

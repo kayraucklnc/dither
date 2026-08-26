@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Repositories
     # The screen template repository.
     class ScreenTemplate < DB::Repository[:screen_template]

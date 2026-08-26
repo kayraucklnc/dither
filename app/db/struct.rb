@@ -2,7 +2,7 @@
 
 require "hanami/db/struct"
 
-module Terminus
+module Dither
   module DB
     # The application database base struct.
     class Struct < Hanami::DB::Struct

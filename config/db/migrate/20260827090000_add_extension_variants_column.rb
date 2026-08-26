@@ -8,7 +8,7 @@
 # so on. An absent key means the extension cannot occupy that shape, which is
 # the whole point: the composer offers only what was actually designed.
 #
-# See lib/terminus/layouts.rb for the shape vocabulary.
+# See lib/dither/layouts.rb for the shape vocabulary.
 ROM::SQL.migration do
   change do
     alter_table :extension do

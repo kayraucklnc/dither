@@ -3,7 +3,7 @@
 require "core"
 require "refinements/hash"
 
-module Terminus
+module Dither
   module Aspects
     module Jobs
       # Manages job schedules.

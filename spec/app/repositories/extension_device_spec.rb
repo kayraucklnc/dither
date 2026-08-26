@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Repositories::ExtensionDevice, :db do
+RSpec.describe Dither::Repositories::ExtensionDevice, :db do
   subject(:repository) { described_class.new }
 
   let(:record) { Factory[:extension_device] }

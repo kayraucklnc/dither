@@ -4,7 +4,7 @@ require "dry/monads"
 require "initable"
 require "refinements/string"
 
-module Terminus
+module Dither
   module Aspects
     # A monadic decompressor of zip file content.
     class Unzipper

@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Serializers::Device do
+RSpec.describe Dither::Serializers::Device do
   subject(:serializer) { described_class.new device }
 
   let :device do

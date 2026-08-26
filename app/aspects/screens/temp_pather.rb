@@ -3,7 +3,7 @@
 require "dry/monads"
 require "inspectable"
 
-module Terminus
+module Dither
   module Aspects
     module Screens
       # Saves content as image to temporary file path for optional processing.
@@ -41,7 +41,7 @@ module Terminus
             <html lang="en">
               <head>
                 <meta charset="utf-8">
-                <style>#{Terminus::ScreenFramework.css}</style>
+                <style>#{Dither::ScreenFramework.css}</style>
               </head>
               <body>#{content}</body>
             </html>

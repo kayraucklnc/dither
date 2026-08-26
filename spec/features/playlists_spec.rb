@@ -93,7 +93,7 @@ RSpec.describe "Playlists", :db do
       ]
     end
 
-    Terminus::Repositories::Playlist.new.update playlist.id, current_item_id: items.first.id
+    Dither::Repositories::Playlist.new.update playlist.id, current_item_id: items.first.id
 
     visit routes.path(:playlists)
     click_link "Play"

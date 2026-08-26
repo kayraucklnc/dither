@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Screens::MoldBuilder, :db do
+RSpec.describe Dither::Aspects::Screens::MoldBuilder, :db do
   subject(:builder) { described_class.new }
 
   include_context "with application dependencies"
@@ -14,7 +14,7 @@ RSpec.describe Terminus::Aspects::Screens::MoldBuilder, :db do
       result = builder.call model_id: model.id, name: "test", label: "Test", kind: "general"
 
       expect(result).to be_success(
-        Terminus::Aspects::Screens::Mold[
+        Dither::Aspects::Screens::Mold[
           model_id: model.id,
           label: "Test",
           name: "test",
@@ -38,7 +38,7 @@ RSpec.describe Terminus::Aspects::Screens::MoldBuilder, :db do
       result = builder.call model_id: model.id, label: "Test", name: "test", kind: "general"
 
       expect(result).to be_success(
-        Terminus::Aspects::Screens::Mold[
+        Dither::Aspects::Screens::Mold[
           model_id: model.id,
           label: "Test",
           name: "test",

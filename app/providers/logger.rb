@@ -1,7 +1,7 @@
 # auto_register: false
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Providers
     # The logger provider.
     class Logger < Hanami::Provider::Source

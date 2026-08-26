@@ -1,7 +1,7 @@
 # auto_register: false
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Contracts
     module Rules
       AttachmentSize = lambda do |max = 512_000|

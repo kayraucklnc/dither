@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Repositories::PlaylistItem, :db do
+RSpec.describe Dither::Repositories::PlaylistItem, :db do
   subject(:repository) { described_class.new }
 
   let(:playlist_item) { Factory[:playlist_item] }
@@ -30,8 +30,8 @@ RSpec.describe Terminus::Repositories::PlaylistItem, :db do
         playlist_id: playlist.id,
         screen_id: screen.id,
         position: 2,
-        playlist: kind_of(Terminus::Structs::Playlist),
-        screen: kind_of(Terminus::Structs::Screen)
+        playlist: kind_of(Dither::Structs::Playlist),
+        screen: kind_of(Dither::Structs::Screen)
       )
     end
 
@@ -115,7 +115,7 @@ RSpec.describe Terminus::Repositories::PlaylistItem, :db do
 
       expect(repository.previous(playlist_id:, position: two.position)).to have_attributes(
         position: one.position,
-        screen: kind_of(Terminus::Structs::Screen)
+        screen: kind_of(Dither::Structs::Screen)
       )
     end
   end
@@ -128,7 +128,7 @@ RSpec.describe Terminus::Repositories::PlaylistItem, :db do
 
       expect(repository.subsequent(playlist_id:, position: one.position)).to have_attributes(
         position: two.position,
-        screen: kind_of(Terminus::Structs::Screen)
+        screen: kind_of(Dither::Structs::Screen)
       )
     end
   end
@@ -141,7 +141,7 @@ RSpec.describe Terminus::Repositories::PlaylistItem, :db do
 
       expect(repository.first(playlist_id:)).to have_attributes(
         position: one.position,
-        screen: kind_of(Terminus::Structs::Screen)
+        screen: kind_of(Dither::Structs::Screen)
       )
     end
   end
@@ -154,7 +154,7 @@ RSpec.describe Terminus::Repositories::PlaylistItem, :db do
 
       expect(repository.last(playlist_id:)).to have_attributes(
         position: two.position,
-        screen: kind_of(Terminus::Structs::Screen)
+        screen: kind_of(Dither::Structs::Screen)
       )
     end
   end

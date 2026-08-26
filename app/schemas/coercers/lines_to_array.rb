@@ -3,7 +3,7 @@
 
 require "refinements/hash"
 
-module Terminus
+module Dither
   module Schemas
     # Coerces a key's line delimited string value into an array.
     module Coercers

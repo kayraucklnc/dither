@@ -2,28 +2,43 @@
 
 require "dry/monads"
 
-module Terminus
+module Dither
   module Aspects
     module Screens
       # Fetches a device's current screen.
       class Fetcher
         include Deps[
           "aspects.screens.interrupts.sleep",
+          "aspects.scenes.resolver",
+          "aspects.scenes.publisher",
+          rule_repository: "repositories.rule",
           playlist_repository: "repositories.playlist",
           playlist_item_repository: "repositories.playlist_item"
         ]
         include Dry::Monads[:result]
 
         def call device
-          if device.asleep?
-            sleep.call device
-          else
-            find_playlist(device.playlist_id).bind { |playlist| find_current_item playlist }
-                                             .fmap(&:screen)
-          end
+          return sleep.call device if device.asleep?
+          return from_rules device if rules? device
+
+          from_playlist device
         end
 
         private
+
+        # Rules are the model going forward; playlists remain for devices that
+        # have not been moved across yet, so upgrading does not blank a panel.
+        def rules?(device) = rule_repository.for_device(device.id).any?
+
+        def from_rules device
+          resolver.call(device)
+                  .bind { |decision| publisher.call decision.scene, device: }
+        end
+
+        def from_playlist device
+          find_playlist(device.playlist_id).bind { |playlist| find_current_item playlist }
+                                           .fmap(&:screen)
+        end
 
         def find_playlist id
           playlist = playlist_repository.find id

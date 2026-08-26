@@ -8,7 +8,7 @@ require "functionable"
 require "json"
 require "nori"
 
-module Terminus
+module Dither
   module Aspects
     module Extensions
       # Sources supported data types into a hash for further processing.

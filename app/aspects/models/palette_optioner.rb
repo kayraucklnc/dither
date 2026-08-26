@@ -2,7 +2,7 @@
 
 require "core"
 
-module Terminus
+module Dither
   module Aspects
     module Models
       # Builds palette selections for use as HTML select options.

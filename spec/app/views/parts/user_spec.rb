@@ -2,8 +2,8 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Views::Parts::User do
-  subject(:part) { described_class.new value: user, rendering: Terminus::View.new.rendering }
+RSpec.describe Dither::Views::Parts::User do
+  subject(:part) { described_class.new value: user, rendering: Dither::View.new.rendering }
 
   let(:user) { Factory.structs[:user, status_id: 1] }
 

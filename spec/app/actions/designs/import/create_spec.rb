@@ -2,11 +2,11 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Actions::Designs::Import::Create, :db do
+RSpec.describe Dither::Actions::Designs::Import::Create, :db do
   subject(:action) { described_class.new }
 
   describe "#call" do
-    let(:exporter) { Terminus::Aspects::Designs::Exporter.new }
+    let(:exporter) { Dither::Aspects::Designs::Exporter.new }
     let(:model) { Factory[:model] }
     let(:screen_template) { Factory.structs[:screen_template] }
 

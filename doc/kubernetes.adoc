@@ -31,7 +31,7 @@ The Kubernetes deployment consists of these components:
 |Storage for uploaded images, generated content, and Valkey data persistence
 
 |Deployment
-|Main Terminus app + worker (sidekiq) as sidecar container
+|Main Dither app + worker (sidekiq) as sidecar container
 
 |Service
 |Internal ClusterIP exposing the application
@@ -45,7 +45,7 @@ The Kubernetes deployment consists of these components:
 
 == Valkey
 
-Terminus uses link:https://valkey.io[Valkey] (redis-compatible in-memory storage). Deploy a dedicated Valkey instance or consider something like link:https://github.com/hyperspike/valkey-operator[Valkey Operator]
+Dither uses link:https://valkey.io[Valkey] (redis-compatible in-memory storage). Deploy a dedicated Valkey instance or consider something like link:https://github.com/hyperspike/valkey-operator[Valkey Operator]
 
 [source,yaml]
 ----
@@ -138,7 +138,7 @@ kubectl create secret generic terminus-secrets \
 
 == Storage
 
-Terminus needs a PersistentVolumeClaim for uploaded images and generated content:
+Dither needs a PersistentVolumeClaim for uploaded images and generated content:
 
 [source,yaml]
 ----
@@ -314,7 +314,7 @@ spec:
 
 == Service
 
-Expose Terminus internally with a ClusterIP service:
+Expose Dither internally with a ClusterIP service:
 
 [source,yaml]
 ----
@@ -333,7 +333,7 @@ spec:
 
 == Ingress with Envoy Gateway
 
-Route external traffic to Terminus using an HTTPRoute:
+Route external traffic to Dither using an HTTPRoute:
 
 [source,yaml]
 ----
@@ -708,4 +708,4 @@ annotations:
 
 === Permission denied on uploads
 
-Verify `fsGroup: 1000` is set in the pod's `securityContext`. The Terminus container runs as UID 1000.
+Verify `fsGroup: 1000` is set in the pod's `securityContext`. The Dither container runs as UID 1000.

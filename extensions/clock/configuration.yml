@@ -1,0 +1,46 @@
+# Dither bundled extension: Clock.
+#
+# No data source at all - it renders the server's clock, shifted by whatever
+# offset you configure. Useful on its own, and useful as the simplest possible
+# worked example of the format.
+
+version: "1.0.0"
+name: clock
+label: Clock
+description: >
+  The time and date, large enough to read across a room. Shifted to your
+  timezone by a fixed offset.
+
+# static = nothing is fetched. The alternative is poll, where Dither calls an
+# API on a schedule.
+kind: static
+mode: text
+tags:
+  - time
+
+interval: 1
+unit: none
+days: []
+last_day_of_month: false
+start_at: "2026-01-01T00:00:00Z"
+
+static_body: {}
+data: {}
+sample: {}
+
+fields:
+  - keyname: utc_offset_hours
+    name: Hours from UTC
+    field_type: string
+    default: "0"
+    help_text: "The server clock is UTC. Berlin in summer is 2, New York is -4."
+    optional: true
+
+  - keyname: heading
+    name: Heading
+    field_type: string
+    default: ""
+    help_text: Optional label above the time. Leave blank to hide it.
+    optional: true
+
+exchanges: []

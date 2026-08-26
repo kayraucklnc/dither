@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Aspects
     module Playlists
       # Creates list of screen options for selection within a HTML select element.

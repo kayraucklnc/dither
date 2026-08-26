@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Extensions::Fetcher::Request do
+RSpec.describe Dither::Aspects::Extensions::Fetcher::Request do
   subject(:input) { described_class.new uri: "https://test.io" }
 
   describe "#initialize" do

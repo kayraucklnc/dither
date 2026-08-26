@@ -2,7 +2,7 @@
 
 require "initable"
 
-module Terminus
+module Dither
   module Aspects
     module Extensions
       module Importers
@@ -11,7 +11,7 @@ module Terminus
             # Creates exchange.
             class Exchange
               include Deps[:logger, repository: "repositories.extension_exchange"]
-              include Initable[job: Terminus::Jobs::Extensions::ExchangeRefresh]
+              include Initable[job: Dither::Jobs::Extensions::ExchangeRefresh]
 
               def initialize(schema: Schemas::Exchange, error_joiner: Errors::ResultJoiner, **)
                 @schema = schema

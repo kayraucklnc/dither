@@ -3,7 +3,7 @@
 
 require "sidekiq"
 
-module Terminus
+module Dither
   module Jobs
     # The base abstract class for which all jobs inherit from.
     class Base

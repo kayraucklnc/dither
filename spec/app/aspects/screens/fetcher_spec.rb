@@ -2,14 +2,14 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Screens::Fetcher, :db do
+RSpec.describe Dither::Aspects::Screens::Fetcher, :db do
   subject(:fetcher) { described_class.new }
 
   describe "#call" do
     let(:device) { provisioner.call(model_id: Factory[:model].id).value! }
-    let(:provisioner) { Terminus::Aspects::Devices::Provisioner.new }
-    let(:playlist_repository) { Terminus::Repositories::Playlist.new }
-    let(:item_repository) { Terminus::Repositories::PlaylistItem.new }
+    let(:provisioner) { Dither::Aspects::Devices::Provisioner.new }
+    let(:playlist_repository) { Dither::Repositories::Playlist.new }
+    let(:item_repository) { Dither::Repositories::PlaylistItem.new }
 
     it "answers welcome screen when device is new" do
       expect(fetcher.call(device).success).to have_attributes(label: /Welcome/)
@@ -17,7 +17,7 @@ RSpec.describe Terminus::Aspects::Screens::Fetcher, :db do
 
     it "answers custom screen when device has updated playlist" do
       playlist = playlist_repository.find device.playlist_id
-      result = Terminus::Aspects::Screens::Upserter.new.call model_id: device.model_id,
+      result = Dither::Aspects::Screens::Upserter.new.call model_id: device.model_id,
                                                              label: "Test",
                                                              name: "test",
                                                              content: "<h1>Test</h1>"

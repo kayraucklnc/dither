@@ -2,12 +2,12 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Actions::Extensions::Sensors::Index, :db do
+RSpec.describe Dither::Actions::Extensions::Sensors::Index, :db do
   subject(:action) { described_class.new }
 
   describe "#call" do
     let(:extension) { Factory[:extension] }
-    let(:repository) { Terminus::Repositories::Extension.new }
+    let(:repository) { Dither::Repositories::Extension.new }
 
     let :response do
       action.call Rack::MockRequest.env_for(

@@ -1,0 +1,210 @@
+:root {
+    --ink: #000;
+    --paper: #fff;
+    --rule: 3px;
+    --pad: 24px;
+    --gap: 16px;
+    --font: Inter, "DejaVu Sans", sans-serif;
+    --font-mono: "DejaVu Sans Mono", monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font);
+    /* Grayscale antialiasing keeps glyph edges from picking up colour fringes
+       that the dither would smear. */
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .screen {
+    background: var(--paper);
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    width: 100vw;
+  }
+
+  /* Inverted screens read well on e-ink and cost nothing extra to refresh. */
+  .screen--invert { background: var(--ink); color: var(--paper); }
+  .screen--invert .title-bar { border-color: var(--paper); }
+  .screen--invert .rule, .screen--invert .list > * + * { border-color: var(--paper); }
+  .screen--invert .badge { background: var(--paper); color: var(--ink); }
+
+  /* ---- Composition ---------------------------------------------------
+     A view is a 6x6 grid of slots, each holding one extension's markup for
+     the shape it was authored at. The grid's gap is the panel background
+     showing through, which draws exactly one rule between neighbours and
+     none at the panel edge - no double-thick lines where two slots meet.
+     See lib/dither/layouts.rb for the shape and preset vocabulary. */
+
+  .view {
+    background: var(--ink);
+    display: grid;
+    gap: var(--rule);
+    grid-template-columns: repeat(6, 1fr);
+    grid-template-rows: repeat(6, 1fr);
+    height: 100vh;
+    overflow: hidden;
+    width: 100vw;
+  }
+
+  .slot {
+    background: var(--paper);
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  /* The same markup an extension renders full-page also renders in a slot;
+     only the box it fills changes. */
+  .slot > .screen { height: 100%; width: 100%; }
+
+  /* Small shapes get tighter chrome and smaller headings, so an author does
+     not have to fight the full-page defaults to fit a corner. */
+  .slot[data-shape="quarter"],
+  .slot[data-shape="third_width"],
+  .slot[data-shape="third_height"] {
+    --pad: 14px;
+    --gap: 10px;
+    --rule: 2px;
+  }
+
+  .slot[data-shape="half_width"],
+  .slot[data-shape="half_height"],
+  .slot[data-shape="two_thirds_width"],
+  .slot[data-shape="two_thirds_height"] {
+    --pad: 18px;
+    --gap: 12px;
+  }
+
+  .slot[data-shape="quarter"] .title-bar .title,
+  .slot[data-shape="third_width"] .title-bar .title,
+  .slot[data-shape="third_height"] .title-bar .title { font-size: 20px; }
+
+  .slot[data-shape="half_width"] .title-bar .title,
+  .slot[data-shape="half_height"] .title-bar .title,
+  .slot[data-shape="two_thirds_width"] .title-bar .title,
+  .slot[data-shape="two_thirds_height"] .title-bar .title { font-size: 24px; }
+
+  /* An empty slot is a real state, not a bug: a view can be saved half built.
+     It says so rather than rendering a hole. */
+  .slot--empty {
+    align-items: center;
+    display: flex;
+    font-size: 14px;
+    justify-content: center;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* ---- Bars ---------------------------------------------------------- */
+
+  .title-bar {
+    align-items: baseline;
+    border-bottom: var(--rule) solid var(--ink);
+    display: flex;
+    gap: var(--gap);
+    justify-content: space-between;
+    padding: var(--pad) var(--pad) 12px;
+  }
+
+  .title-bar .title { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
+  .title-bar .meta { font-size: 16px; font-weight: 500; }
+
+  .footer-bar {
+    align-items: baseline;
+    border-top: var(--rule) solid var(--ink);
+    display: flex;
+    font-size: 14px;
+    gap: var(--gap);
+    justify-content: space-between;
+    margin-top: auto;
+    padding: 12px var(--pad) var(--pad);
+  }
+
+  /* ---- Content ------------------------------------------------------- */
+
+  .content { flex: 1; min-height: 0; overflow: hidden; padding: var(--pad); }
+  .content--tight { padding: 12px var(--pad); }
+
+  .layout { display: flex; gap: var(--gap); height: 100%; min-height: 0; }
+  .layout--col { flex-direction: column; }
+  .layout--row { flex-direction: row; }
+  .layout--split > * { flex: 1 1 0; min-width: 0; }
+  .layout--center { align-items: center; justify-content: center; }
+
+  .cols { display: grid; gap: var(--gap); height: 100%; min-height: 0; }
+  .cols--2 { grid-template-columns: 1fr 1fr; }
+  .cols--3 { grid-template-columns: repeat(3, 1fr); }
+  .cols--sidebar { grid-template-columns: 2fr 1fr; }
+
+  .stack { display: flex; flex-direction: column; gap: var(--gap); min-height: 0; }
+  .stack--tight { gap: 8px; }
+  .fit { flex: 1; min-height: 0; min-width: 0; }
+
+  /* Vertical rule between columns. */
+  .divide-x > * + * { border-left: var(--rule) solid var(--ink); padding-left: var(--gap); }
+
+  /* ---- Components ---------------------------------------------------- */
+
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .stat .value { font-size: 64px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+  .stat .value--sm { font-size: 40px; }
+  .stat .label { font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .list { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .list > * + * { border-top: 2px solid var(--ink); }
+  .list-item {
+    align-items: baseline;
+    display: flex;
+    gap: var(--gap);
+    justify-content: space-between;
+    padding: 10px 0;
+  }
+  .list-item .primary { font-size: 20px; font-weight: 600; min-width: 0; }
+  .list-item .secondary { font-size: 16px; white-space: nowrap; }
+
+  .kv { display: flex; gap: 8px; justify-content: space-between; }
+  .kv .k { font-size: 15px; font-weight: 600; }
+  .kv .v { font-size: 15px; font-variant-numeric: tabular-nums; }
+
+  .badge {
+    background: var(--ink);
+    color: var(--paper);
+    display: inline-block;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 3px 8px;
+    text-transform: uppercase;
+  }
+
+  .box { border: var(--rule) solid var(--ink); padding: var(--gap); }
+  .rule { border: 0; border-top: var(--rule) solid var(--ink); margin: 0; }
+
+  /* ---- Type ---------------------------------------------------------- */
+
+  .t-xxl { font-size: 56px; line-height: 1.05; }
+  .t-xl  { font-size: 36px; line-height: 1.1; }
+  .t-lg  { font-size: 26px; line-height: 1.15; }
+  .t-md  { font-size: 20px; line-height: 1.25; }
+  .t-sm  { font-size: 16px; line-height: 1.3; }
+  .t-xs  { font-size: 13px; line-height: 1.35; }
+  .t-bold { font-weight: 700; }
+  .t-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .t-center { text-align: center; }
+  .t-right { text-align: right; }
+  .t-upper { letter-spacing: 0.06em; text-transform: uppercase; }
+
+  .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .clamp-2 { -webkit-box-orient: vertical; -webkit-line-clamp: 2; display: -webkit-box; overflow: hidden; }
+  .clamp-3 { -webkit-box-orient: vertical; -webkit-line-clamp: 3; display: -webkit-box; overflow: hidden; }
+
+  .muted { opacity: 1; }  /* deliberately not faded: opacity dithers to noise */

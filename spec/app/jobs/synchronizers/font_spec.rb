@@ -2,10 +2,10 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Jobs::Synchronizers::Font do
+RSpec.describe Dither::Jobs::Synchronizers::Font do
   subject(:job) { described_class.new synchronizer: }
 
-  let(:synchronizer) { instance_spy Terminus::Aspects::Fonts::Synchronizer }
+  let(:synchronizer) { instance_spy Dither::Aspects::Fonts::Synchronizer }
 
   include_context "with application dependencies"
 

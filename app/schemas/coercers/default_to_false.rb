@@ -3,7 +3,7 @@
 
 require "refinements/hash"
 
-module Terminus
+module Dither
   module Schemas
     # Coerces a key's value to false when key is missing.
     module Coercers

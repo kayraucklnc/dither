@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Screens::Mold do
+RSpec.describe Dither::Aspects::Screens::Mold do
   using Refinements::Struct
 
   subject :mold do

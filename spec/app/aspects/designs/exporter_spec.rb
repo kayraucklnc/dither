@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Designs::Exporter do
+RSpec.describe Dither::Aspects::Designs::Exporter do
   using Refinements::Time
 
   subject(:exporter) { described_class.new }
@@ -16,7 +16,7 @@ RSpec.describe Terminus::Aspects::Designs::Exporter do
 
     let :proof do
       exporter.call(screen_template)
-              .bind { Terminus::Aspects::Unzipper.new.call it }
+              .bind { Dither::Aspects::Unzipper.new.call it }
               .value!
     end
 

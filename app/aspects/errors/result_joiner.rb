@@ -3,7 +3,7 @@
 require "refinements/array"
 require "refinements/hash"
 
-module Terminus
+module Dither
   module Aspects
     # Joins multiple error messages from a Dry Schema/Validation result into a single sentence.
     module Errors

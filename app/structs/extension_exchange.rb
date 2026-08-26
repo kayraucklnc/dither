@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Structs
     # The extension exchange struct.
     class ExtensionExchange < DB::Struct

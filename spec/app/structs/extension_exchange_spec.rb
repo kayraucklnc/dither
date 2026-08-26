@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Structs::ExtensionExchange do
+RSpec.describe Dither::Structs::ExtensionExchange do
   subject :exchange do
     Factory.structs[
       :extension_exchange,

@@ -3,7 +3,7 @@
 
 require "initable"
 
-module Terminus
+module Dither
   module Jobs
     module Batches
       # Enqueues a job for each model ID.

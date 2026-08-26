@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Scenes::Composer, :db do
+RSpec.describe Dither::Aspects::Scenes::Composer, :db do
   subject(:composer) { described_class.new }
 
   let(:extension) { Factory[:extension, template: "<p>full</p>"] }

@@ -5,7 +5,7 @@ require "initable"
 
 require_relative "event_source"
 
-module Terminus
+module Dither
   module Aspects
     module Designs
       # Streams Server Side Events (SSE) for device screen previews.

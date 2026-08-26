@@ -6,7 +6,7 @@ require "initable"
 require "pipeable"
 require "yaml"
 
-module Terminus
+module Dither
   module Aspects
     module Designs
       # Imports (creates) screen template from zip file.

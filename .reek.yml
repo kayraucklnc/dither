@@ -5,131 +5,131 @@ exclude_paths:
 detectors:
   Attribute:
     exclude:
-      - Terminus::Views::Parts::User#password
+      - Dither::Views::Parts::User#password
   ControlParameter:
     exclude:
-      - Terminus::Aspects::PasswordEncryptor#call
-      - Terminus::Aspects::Playlists::SlideWindow#screens
+      - Dither::Aspects::PasswordEncryptor#call
+      - Dither::Aspects::Playlists::SlideWindow#screens
   DataClump:
     exclude:
-      - Terminus::Actions::API::Base
-      - Terminus::Aspects::Croner
-      - Terminus::Aspects::Errors::Problem
-      - Terminus::Aspects::Screens::Shoter
-      - Terminus::Repositories::Screen
+      - Dither::Actions::API::Base
+      - Dither::Aspects::Croner
+      - Dither::Aspects::Errors::Problem
+      - Dither::Aspects::Screens::Shoter
+      - Dither::Repositories::Screen
   DuplicateMethodCall:
     exclude:
-      - Terminus::Aspects::Devices::Provisioner#create
-      - Terminus::Aspects::Extensions::Exchanges::RequestBuilder#render
-      - Terminus::Views::Helpers#default_option
+      - Dither::Aspects::Devices::Provisioner#create
+      - Dither::Aspects::Extensions::Exchanges::RequestBuilder#render
+      - Dither::Views::Helpers#default_option
   FeatureEnvy:
     exclude:
-      - Terminus::Action#authorize
-      - Terminus::Actions::API::Base#detail_duplicate
-      - Terminus::Actions::API::Base#detail_enum
-      - Terminus::Actions::API::Base#detail_foreign_key
-      - Terminus::Actions::API::Devices::Create#unprocessable_content
-      - Terminus::Actions::API::Devices::Patch#unprocessable_content
-      - Terminus::Actions::API::Firmware::Create#unprocessable_content
-      - Terminus::Actions::API::Firmware::Create#unprocessable_download
-      - Terminus::Actions::API::Firmware::Delete#failure
-      - Terminus::Actions::API::Firmware::Patch#unprocessable_content
-      - Terminus::Actions::API::Firmware::Patch#unprocessable_download
-      - Terminus::Actions::API::Models::Create#unprocessable_content
-      - Terminus::Actions::API::Models::Patch#unprocessable_content
-      - Terminus::Actions::API::Playlists::Create#unprocessable_content
-      - Terminus::Actions::API::Playlists::Patch#unprocessable_content
-      - Terminus::Actions::API::Screens::Create#handle
-      - Terminus::Actions::API::Screens::Create#save
-      - Terminus::Actions::API::Screens::Create#unprocessable_content_for_creation
-      - Terminus::Actions::API::Screens::Create#unprocessable_content_for_parameters
-      - Terminus::Actions::API::Screens::Delete#failure
-      - Terminus::Actions::API::Screens::Patch#replace
-      - Terminus::Actions::API::Screens::Patch#unprocessable_content_for_creation
-      - Terminus::Actions::API::Screens::Patch#unprocessable_content_for_parameters
-      - Terminus::Actions::Devices::Create#provision
-      - Terminus::Actions::Devices::Create#render_new
-      - Terminus::Actions::Devices::Update#edit
-      - Terminus::Actions::Extensions::Clone::Create#error
-      - Terminus::Actions::Extensions::Create#error
-      - Terminus::Actions::Extensions::Gallery::Create#render_error
-      - Terminus::Actions::Extensions::Gallery::Create#render_schema_error
-      - Terminus::Actions::Extensions::Gallery::Index#render_error
-      - Terminus::Actions::Extensions::Update#error
-      - Terminus::Actions::Firmware::Create#error
-      - Terminus::Actions::Firmware::Delete#render
-      - Terminus::Actions::Firmware::Update#error
-      - Terminus::Actions::Models::Update#error
-      - Terminus::Actions::Playlists::Create#error
-      - Terminus::Actions::Playlists::Items::Edit#screen_options
-      - Terminus::Actions::Playlists::Items::New#screen_options
-      - Terminus::Actions::Playlists::Screens::Show#view_settings
-      - Terminus::Actions::Playlists::Update#error
-      - Terminus::Actions::Users::Update#error
-      - Terminus::Aspects::Devices::Provisioner#maybe_redact_api_key
-      - Terminus::Aspects::Errors::Problem#enum
-      - Terminus::Aspects::Extensions::Cloner#build_attributes
-      - Terminus::Aspects::Extensions::Exchanges::Refresher#fetch
-      - Terminus::Aspects::Extensions::Fetcher::Client#maybe_alter_mime_type
-      - Terminus::Aspects::Extensions::Importers::Remote::Extractor#build
-      - Terminus::Aspects::Extensions::Importers::Remote::Transformers::Kind#process
-      - Terminus::Aspects::Extensions::Renderers::Image#render_multiple
-      - Terminus::Aspects::Playlists::ScreenOptioner#call
-      - Terminus::Aspects::Screens::Compressor#convert
-      - Terminus::Aspects::Screens::Converters::Color#convert
-      - Terminus::Aspects::Screens::Converters::Monochrome#as_one_bit
-      - Terminus::Aspects::Screens::Converters::Monochrome#as_one_bit_dither
-      - Terminus::Aspects::Screens::Converters::Monochrome#as_two_to_eight_bit
-      - Terminus::Aspects::Screens::Converters::Monochrome#as_two_to_eight_bit
-      - Terminus::Aspects::Screens::Converters::Monochrome#as_two_to_four_bit_dither
-      - Terminus::Aspects::Screens::Converters::Monochrome#convert
-      - Terminus::Aspects::Screens::Creator#find
-      - Terminus::Aspects::Screens::Creators::TempPath#capture_input
-      - Terminus::Aspects::Screens::Designer::EventStream#render_preview
-      - Terminus::Aspects::Screens::Shoter#save
-      - Terminus::Aspects::Screens::TempPather#capture_input
-      - Terminus::Aspects::Screens::Upserters::TempPath#capture_input
-      - Terminus::IPFinder#all
-      - Terminus::Jobs::Batches::Extension#enqueue_devices
-      - Terminus::Jobs::Batches::Extension#enqueue_models
-      - Terminus::Providers::RackAttack#throttle_api_setup
-      - Terminus::Providers::RackAttack#throttle_login
-      - Terminus::Repositories::Screen#create_with_image
-      - Terminus::Repositories::Screen#update_with_image
+      - Dither::Action#authorize
+      - Dither::Actions::API::Base#detail_duplicate
+      - Dither::Actions::API::Base#detail_enum
+      - Dither::Actions::API::Base#detail_foreign_key
+      - Dither::Actions::API::Devices::Create#unprocessable_content
+      - Dither::Actions::API::Devices::Patch#unprocessable_content
+      - Dither::Actions::API::Firmware::Create#unprocessable_content
+      - Dither::Actions::API::Firmware::Create#unprocessable_download
+      - Dither::Actions::API::Firmware::Delete#failure
+      - Dither::Actions::API::Firmware::Patch#unprocessable_content
+      - Dither::Actions::API::Firmware::Patch#unprocessable_download
+      - Dither::Actions::API::Models::Create#unprocessable_content
+      - Dither::Actions::API::Models::Patch#unprocessable_content
+      - Dither::Actions::API::Playlists::Create#unprocessable_content
+      - Dither::Actions::API::Playlists::Patch#unprocessable_content
+      - Dither::Actions::API::Screens::Create#handle
+      - Dither::Actions::API::Screens::Create#save
+      - Dither::Actions::API::Screens::Create#unprocessable_content_for_creation
+      - Dither::Actions::API::Screens::Create#unprocessable_content_for_parameters
+      - Dither::Actions::API::Screens::Delete#failure
+      - Dither::Actions::API::Screens::Patch#replace
+      - Dither::Actions::API::Screens::Patch#unprocessable_content_for_creation
+      - Dither::Actions::API::Screens::Patch#unprocessable_content_for_parameters
+      - Dither::Actions::Devices::Create#provision
+      - Dither::Actions::Devices::Create#render_new
+      - Dither::Actions::Devices::Update#edit
+      - Dither::Actions::Extensions::Clone::Create#error
+      - Dither::Actions::Extensions::Create#error
+      - Dither::Actions::Extensions::Gallery::Create#render_error
+      - Dither::Actions::Extensions::Gallery::Create#render_schema_error
+      - Dither::Actions::Extensions::Gallery::Index#render_error
+      - Dither::Actions::Extensions::Update#error
+      - Dither::Actions::Firmware::Create#error
+      - Dither::Actions::Firmware::Delete#render
+      - Dither::Actions::Firmware::Update#error
+      - Dither::Actions::Models::Update#error
+      - Dither::Actions::Playlists::Create#error
+      - Dither::Actions::Playlists::Items::Edit#screen_options
+      - Dither::Actions::Playlists::Items::New#screen_options
+      - Dither::Actions::Playlists::Screens::Show#view_settings
+      - Dither::Actions::Playlists::Update#error
+      - Dither::Actions::Users::Update#error
+      - Dither::Aspects::Devices::Provisioner#maybe_redact_api_key
+      - Dither::Aspects::Errors::Problem#enum
+      - Dither::Aspects::Extensions::Cloner#build_attributes
+      - Dither::Aspects::Extensions::Exchanges::Refresher#fetch
+      - Dither::Aspects::Extensions::Fetcher::Client#maybe_alter_mime_type
+      - Dither::Aspects::Extensions::Importers::Remote::Extractor#build
+      - Dither::Aspects::Extensions::Importers::Remote::Transformers::Kind#process
+      - Dither::Aspects::Extensions::Renderers::Image#render_multiple
+      - Dither::Aspects::Playlists::ScreenOptioner#call
+      - Dither::Aspects::Screens::Compressor#convert
+      - Dither::Aspects::Screens::Converters::Color#convert
+      - Dither::Aspects::Screens::Converters::Monochrome#as_one_bit
+      - Dither::Aspects::Screens::Converters::Monochrome#as_one_bit_dither
+      - Dither::Aspects::Screens::Converters::Monochrome#as_two_to_eight_bit
+      - Dither::Aspects::Screens::Converters::Monochrome#as_two_to_eight_bit
+      - Dither::Aspects::Screens::Converters::Monochrome#as_two_to_four_bit_dither
+      - Dither::Aspects::Screens::Converters::Monochrome#convert
+      - Dither::Aspects::Screens::Creator#find
+      - Dither::Aspects::Screens::Creators::TempPath#capture_input
+      - Dither::Aspects::Screens::Designer::EventStream#render_preview
+      - Dither::Aspects::Screens::Shoter#save
+      - Dither::Aspects::Screens::TempPather#capture_input
+      - Dither::Aspects::Screens::Upserters::TempPath#capture_input
+      - Dither::IPFinder#all
+      - Dither::Jobs::Batches::Extension#enqueue_devices
+      - Dither::Jobs::Batches::Extension#enqueue_models
+      - Dither::Providers::RackAttack#throttle_api_setup
+      - Dither::Providers::RackAttack#throttle_login
+      - Dither::Repositories::Screen#create_with_image
+      - Dither::Repositories::Screen#update_with_image
   LongParameterList:
     enabled: false
   NestedIterators:
     exclude:
-      - Terminus::Providers::RackAttack#allow_subnets
+      - Dither::Providers::RackAttack#allow_subnets
   RepeatedConditional:
     exclude:
       - Authentication::Middleware
   TooManyInstanceVariables:
     exclude:
-      - Terminus::Aspects::Screens::Placeholder
+      - Dither::Aspects::Screens::Placeholder
   TooManyStatements:
     exclude:
-      - Terminus::Action#handle_rodauth_redirect
-      - Terminus::Actions::Extensions::Poll::Show#fetch
-      - Terminus::Aspects::Croner#call
-      - Terminus::Aspects::Extensions::Exchanges::RequestBuilder#render
-      - Terminus::Aspects::Extensions::Fetcher::Client#parse
-      - Terminus::Aspects::Extensions::Importers::Remote::Transformer#process
-      - Terminus::Aspects::Extensions::Parser#from_json
-      - Terminus::Aspects::Firmware::Downloader#get
-      - Terminus::Aspects::Screens::Compressor#call
-      - Terminus::Aspects::Screens::Converters::Color#convert
-      - Terminus::Aspects::Screens::Converters::Monochrome#convert
-      - Terminus::Aspects::Screens::Placeholder#initialize
-      - Terminus::Aspects::Screens::Shoter#save
-      - Terminus::Providers::Sidekiq#load_schedule
-      - Terminus::Structs::Device#battery_voltage_to_percent
-      - Terminus::Structs::Device#wifi_percentage
-      - Terminus::Views::Parts::DeviceLog#level_class
+      - Dither::Action#handle_rodauth_redirect
+      - Dither::Actions::Extensions::Poll::Show#fetch
+      - Dither::Aspects::Croner#call
+      - Dither::Aspects::Extensions::Exchanges::RequestBuilder#render
+      - Dither::Aspects::Extensions::Fetcher::Client#parse
+      - Dither::Aspects::Extensions::Importers::Remote::Transformer#process
+      - Dither::Aspects::Extensions::Parser#from_json
+      - Dither::Aspects::Firmware::Downloader#get
+      - Dither::Aspects::Screens::Compressor#call
+      - Dither::Aspects::Screens::Converters::Color#convert
+      - Dither::Aspects::Screens::Converters::Monochrome#convert
+      - Dither::Aspects::Screens::Placeholder#initialize
+      - Dither::Aspects::Screens::Shoter#save
+      - Dither::Providers::Sidekiq#load_schedule
+      - Dither::Structs::Device#battery_voltage_to_percent
+      - Dither::Structs::Device#wifi_percentage
+      - Dither::Views::Parts::DeviceLog#level_class
       - UniversalLoggerPatch#_log_structured
   UtilityFunction:
     exclude:
-      - Terminus::Aspects::Croner
-      - Terminus::Aspects::Errors::Problem#duplicate
-      - Terminus::Aspects::Errors::Problem#foreign_key
-      - Terminus::Aspects::Liquid::Filters#json
+      - Dither::Aspects::Croner
+      - Dither::Aspects::Errors::Problem#duplicate
+      - Dither::Aspects::Errors::Problem#foreign_key
+      - Dither::Aspects::Liquid::Filters#json

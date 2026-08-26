@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Contracts::Rules::Cron do
+RSpec.describe Dither::Contracts::Rules::Cron do
   subject(:contract) { simulation.new }
 
   let :simulation do

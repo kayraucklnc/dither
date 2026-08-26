@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Contracts::Rules::SleepStopAt do
+RSpec.describe Dither::Contracts::Rules::SleepStopAt do
   subject(:contract) { simulation.new }
 
   let :simulation do

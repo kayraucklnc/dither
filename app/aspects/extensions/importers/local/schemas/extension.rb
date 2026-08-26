@@ -1,7 +1,7 @@
 # auto_register: false
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Aspects
     module Extensions
       module Importers
@@ -18,6 +18,7 @@ module Terminus
               required(:static_body).maybe :hash
               required(:template).filled :string
               optional(:variants).maybe :hash
+              optional(:sample).maybe :hash
               required(:fields).maybe :array
               required(:data).maybe :hash
               required(:interval).maybe :integer

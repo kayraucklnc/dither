@@ -2,7 +2,7 @@
 
 require "yaml"
 
-module Terminus
+module Dither
   module Aspects
     module Extensions
       # Exports extension attributes for sharing.

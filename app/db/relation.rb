@@ -2,7 +2,7 @@
 
 require "hanami/db/relation"
 
-module Terminus
+module Dither
   module DB
     # The application database base relation.
     class Relation < Hanami::DB::Relation

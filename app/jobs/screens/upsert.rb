@@ -4,7 +4,7 @@
 require "core"
 require "refinements/hash"
 
-module Terminus
+module Dither
   module Jobs
     module Screens
       # Creates or updates screen.

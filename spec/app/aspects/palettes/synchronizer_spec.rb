@@ -3,7 +3,7 @@
 require "hanami_helper"
 require "trmnl/api"
 
-RSpec.describe Terminus::Aspects::Palettes::Synchronizer, :db do
+RSpec.describe Dither::Aspects::Palettes::Synchronizer, :db do
   subject(:synchronizer) { described_class.new trmnl_api: }
 
   let :trmnl_api do
@@ -21,7 +21,7 @@ RSpec.describe Terminus::Aspects::Palettes::Synchronizer, :db do
                     )
   end
 
-  let(:repository) { Terminus::Repositories::Palette.new }
+  let(:repository) { Dither::Repositories::Palette.new }
 
   describe "#call" do
     context "with no remote palettes" do

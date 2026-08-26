@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Actions::Playlists::Mirror::Update, :db do
+RSpec.describe Dither::Actions::Playlists::Mirror::Update, :db do
   subject(:action) { described_class.new }
 
   include_context "with application dependencies"

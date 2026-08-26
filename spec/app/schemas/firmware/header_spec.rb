@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Schemas::Firmware::Header do
+RSpec.describe Dither::Schemas::Firmware::Header do
   subject(:contract) { described_class }
 
   include_context "with firmware headers"

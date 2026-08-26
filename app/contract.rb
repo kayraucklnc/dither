@@ -2,7 +2,7 @@
 
 require "dry/validation"
 
-module Terminus
+module Dither
   # Defines user create contract.
   class Contract < Dry::Validation::Contract
     config.messages.backend = :i18n

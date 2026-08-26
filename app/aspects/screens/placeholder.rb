@@ -2,7 +2,7 @@
 
 require "wholeable"
 
-module Terminus
+module Dither
   module Aspects
     module Screens
       # A fallback (null object) for times when you need a screen that behaves like one but isn't.

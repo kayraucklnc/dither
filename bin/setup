@@ -12,7 +12,7 @@ if [[ "${1:-}" == "docker" ]]; then
   printf "%s\n" "Setting up Docker..."
   create_global_environment
 else
-  printf "%s\n\n" "Setting up Terminus..."
+  printf "%s\n\n" "Setting up Dither..."
 
   mkdir -p log
   create_global_environment

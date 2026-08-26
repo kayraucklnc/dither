@@ -32,12 +32,14 @@ import "../css/pages/devices.css";
 import "../css/pages/playlists.css";
 import "../css/pages/problem_details.css";
 import "../css/pages/scenes.css";
+import "../css/pages/rules.css";
 import "../css/theme.css";
 
 import "./theme_toggle.js";
 import "./flash.js";
 import "./copy_button.js";
 import "./scene_composer.js";
+import "./rule_form.js";
 
 import Alpine from "alpinejs";
 import htmx from "htmx.org";

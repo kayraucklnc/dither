@@ -5,7 +5,7 @@ require "dry/monads"
 require "initable"
 require "refinements/hash"
 
-module Terminus
+module Dither
   module Aspects
     module Firmware
       module Headers

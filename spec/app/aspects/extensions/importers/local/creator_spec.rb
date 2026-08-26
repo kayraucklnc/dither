@@ -2,13 +2,13 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Extensions::Importers::Local::Creator, :db do
+RSpec.describe Dither::Aspects::Extensions::Importers::Local::Creator, :db do
   subject(:creator) { described_class.new }
 
   describe "#call" do
     let :io do
       manifest = {"configuration.yml" => configuration, "template.html.liquid" => "<h1>Test</h1>"}
-      Terminus::Aspects::Zipper.new.call(manifest).value!
+      Dither::Aspects::Zipper.new.call(manifest).value!
     end
 
     let :configuration do
@@ -59,7 +59,7 @@ RSpec.describe Terminus::Aspects::Extensions::Importers::Local::Creator, :db do
     end
 
     it "answers success" do
-      expect(creator.call(io)).to match(Success(kind_of(Terminus::Structs::Extension)))
+      expect(creator.call(io)).to match(Success(kind_of(Dither::Structs::Extension)))
     end
 
     context "with out exchanges" do
@@ -85,7 +85,7 @@ RSpec.describe Terminus::Aspects::Extensions::Importers::Local::Creator, :db do
       end
 
       it "answers success when there are no exchanges" do
-        expect(creator.call(io)).to match(Success(kind_of(Terminus::Structs::Extension)))
+        expect(creator.call(io)).to match(Success(kind_of(Dither::Structs::Extension)))
       end
     end
 
@@ -112,7 +112,7 @@ RSpec.describe Terminus::Aspects::Extensions::Importers::Local::Creator, :db do
       end
 
       it "answers success" do
-        expect(creator.call(io)).to match(Success(kind_of(Terminus::Structs::Extension)))
+        expect(creator.call(io)).to match(Success(kind_of(Dither::Structs::Extension)))
       end
     end
 
@@ -149,7 +149,7 @@ RSpec.describe Terminus::Aspects::Extensions::Importers::Local::Creator, :db do
 
     it "answers failure when extension can't be created" do
       extension_creator = instance_double(
-        Terminus::Aspects::Extensions::Importers::Local::Creators::Extension,
+        Dither::Aspects::Extensions::Importers::Local::Creators::Extension,
         call: Failure("Danger!")
       )
 
@@ -160,7 +160,7 @@ RSpec.describe Terminus::Aspects::Extensions::Importers::Local::Creator, :db do
 
     it "answers failure when exchange can't be created" do
       exchange_creator = instance_double(
-        Terminus::Aspects::Extensions::Importers::Local::Creators::Exchange,
+        Dither::Aspects::Extensions::Importers::Local::Creators::Exchange,
         call: Failure("Danger!")
       )
 

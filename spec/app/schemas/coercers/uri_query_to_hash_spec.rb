@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Schemas::Coercers::URIQueryToHash do
+RSpec.describe Dither::Schemas::Coercers::URIQueryToHash do
   subject(:coercer) { described_class }
 
   let :attributes do

@@ -1,0 +1,13 @@
+{% comment %} Quarter: 400x240. Time only - the date does not survive the shrink. {% endcomment %}
+
+{% assign shift = extension.values.utc_offset_hours | times: 3600 %}
+{% assign stamp = "now" | date: "%s" | plus: shift %}
+
+<div class="screen">
+  <div class="content layout layout--col layout--center">
+    <p class="t-mono t-bold" style="font-size: 72px; line-height: 1">
+      {{ stamp | date: "%H:%M" }}
+    </p>
+    <p class="t-sm">{{ stamp | date: "%a %-d %b" }}</p>
+  </div>
+</div>

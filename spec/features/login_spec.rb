@@ -3,7 +3,7 @@
 require "hanami_helper"
 
 RSpec.describe "Login", :db do
-  let(:repository) { Terminus::Repositories::User.new }
+  let(:repository) { Dither::Repositories::User.new }
 
   it "logs out and in", :aggregate_failures do
     visit "/logout"

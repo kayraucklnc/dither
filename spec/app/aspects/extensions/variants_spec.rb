@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Extensions::Variants do
+RSpec.describe Dither::Aspects::Extensions::Variants do
   describe ".call" do
     it "collects a known shape" do
       result = described_class.call "templates/half_width.html.liquid" => "<p>x</p>"

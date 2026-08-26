@@ -6,7 +6,7 @@ require "initable"
 require "refinements/pathname"
 require "refinements/string"
 
-module Terminus
+module Dither
   module Aspects
     module Screens
       # Saves web page as screenshot.

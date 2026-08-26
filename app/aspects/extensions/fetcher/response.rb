@@ -2,7 +2,7 @@
 
 require "core"
 
-module Terminus
+module Dither
   module Aspects
     module Extensions
       module Fetcher

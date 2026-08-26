@@ -1,0 +1,318 @@
+/* Device rules and the scene library.
+ *
+ * The rule list is a priority stack, so it reads top to bottom and the one in
+ * force is marked. Everything else is deliberately plain: these are sentences
+ * you scan, not cards you admire.
+ */
+
+.page-rules,
+.page-scenes {
+  display: grid;
+  gap: var(--site-space-lg);
+  margin-block-end: var(--site-space-2xl);
+}
+
+.rules-head,
+.scenes-head {
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--site-space-md);
+  justify-content: space-between;
+
+  h1 {
+    font-size: var(--site-text-3xl);
+    letter-spacing: -0.03em;
+    margin: 0;
+  }
+
+  .sub {
+    color: var(--site-ink-subtle);
+    font-size: var(--site-text-sm);
+    margin: 0.25rem 0 0;
+    max-inline-size: 60ch;
+  }
+}
+
+/* ---- What is showing now --------------------------------------------- */
+
+.rules-now {
+  background-color: var(--site-surface);
+  border: 1px solid var(--site-border);
+  border-radius: var(--site-radius-lg);
+  padding: var(--site-space-md) var(--site-space-lg);
+}
+
+.rules-now-scene {
+  font-size: var(--site-text-lg);
+  margin: 0;
+}
+
+.rules-now-none {
+  color: var(--site-ink-muted);
+  margin: 0;
+  max-inline-size: 70ch;
+}
+
+/* ---- The stack -------------------------------------------------------- */
+
+.rule-list {
+  counter-reset: rule;
+  display: grid;
+  gap: var(--site-space-xs);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rule-row {
+  align-items: center;
+  background-color: var(--site-surface);
+  border: 1px solid var(--site-border);
+  border-radius: var(--site-radius-md);
+  display: grid;
+  gap: var(--site-space-md);
+  grid-template-columns: 2rem 1fr auto;
+  padding: var(--site-space-sm) var(--site-space-md);
+
+  /* The rule actually in force. Colour is never the only signal; the panel
+     above names the same rule in words. */
+  &[data-active="true"] {
+    border-color: var(--site-ink-muted);
+    box-shadow: inset 3px 0 0 var(--site-ink);
+  }
+}
+
+.rule-position {
+  color: var(--site-ink-subtle);
+  font-size: var(--site-text-sm);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.rule-sentence {
+  font-size: var(--site-text-base);
+  margin: 0;
+}
+
+.rule-meta {
+  color: var(--site-ink-subtle);
+  font-size: var(--site-text-xs);
+  margin: 0.1rem 0 0;
+}
+
+.rule-actions {
+  align-items: center;
+  display: flex;
+  gap: var(--site-space-xs);
+
+  form { margin: 0; }
+
+  /* Reordering is the common action, so it needs to be visible without being
+     loud. Removing is rare and destructive, so it is quiet until you reach
+     for it. */
+  button {
+    background-color: var(--site-surface);
+    border: 1px solid var(--site-border-strong);
+    border-radius: var(--site-radius-sm);
+    color: var(--site-ink-muted);
+    cursor: pointer;
+    font-size: var(--site-text-sm);
+    line-height: 1;
+    padding: 0.35rem 0.55rem;
+
+    &:hover:not(:disabled) {
+      border-color: var(--site-ink-muted);
+      color: var(--site-ink);
+    }
+
+    &:disabled { cursor: default; opacity: 0.35; }
+  }
+
+  .bit-button-reject {
+    border-color: var(--site-border);
+
+    &:hover:not(:disabled) {
+      background-color: var(--site-danger-soft, var(--site-surface-sunken));
+      border-color: var(--site-danger);
+      color: var(--site-danger);
+    }
+  }
+}
+
+.rules-empty {
+  background-color: var(--site-surface);
+  border: 1px dashed var(--site-border-strong);
+  border-radius: var(--site-radius-md);
+  color: var(--site-ink-muted);
+  margin: 0;
+  padding: var(--site-space-lg);
+}
+
+/* ---- Add a rule ------------------------------------------------------- */
+
+.rule-form {
+  background-color: var(--site-surface);
+  border: 1px solid var(--site-border);
+  border-radius: var(--site-radius-lg);
+  display: grid;
+  gap: var(--site-space-md);
+  padding: var(--site-space-lg);
+
+  label {
+    display: grid;
+    gap: 0.25rem;
+  }
+
+  label > span {
+    color: var(--site-ink-subtle);
+    font-size: var(--site-text-xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  small {
+    color: var(--site-ink-subtle);
+    font-size: var(--site-text-xs);
+  }
+
+  button[type="submit"] { justify-self: start; }
+}
+
+.rule-form-grid {
+  display: grid;
+  gap: var(--site-space-md);
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+
+.condition-fields {
+  border-block-start: 1px solid var(--site-border);
+  display: grid;
+  gap: var(--site-space-md);
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  padding-block-start: var(--site-space-md);
+}
+
+.day-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+
+  .day {
+    align-items: center;
+    display: flex;
+    gap: 0.25rem;
+
+    span {
+      font-size: var(--site-text-sm);
+      letter-spacing: 0;
+      text-transform: none;
+    }
+  }
+}
+
+/* ---- Scene library ---------------------------------------------------- */
+
+.scene-list {
+  display: grid;
+  gap: var(--site-space-sm);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.scene-row {
+  align-items: center;
+  background-color: var(--site-surface);
+  border: 1px solid var(--site-border);
+  border-radius: var(--site-radius-md);
+  display: grid;
+  gap: var(--site-space-md);
+  grid-template-columns: 5rem 1fr auto;
+  padding: var(--site-space-sm) var(--site-space-md);
+}
+
+/* The scene's own slot geometry, so the thumbnail cannot drift from what the
+   scene actually is. Filled slots are solid, empty ones hollow. */
+.scene-figure {
+  aspect-ratio: 5 / 3;
+  background-color: var(--site-border-strong);
+  border: 1px solid var(--site-border-strong);
+  display: grid;
+  gap: 1px;
+
+  span {
+    background-color: var(--site-surface);
+
+    /* A filled slot is ink, an empty one is paper - the same language the
+       panel itself speaks, rather than a colour that means nothing. */
+    &[data-filled="true"] { background-color: var(--site-ink-muted); }
+  }
+}
+
+.scene-body {
+  h3 {
+    font-size: var(--site-text-lg);
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+}
+
+.scene-summary {
+  color: var(--site-ink-subtle);
+  font-size: var(--site-text-sm);
+  margin: 0.15rem 0 0;
+}
+
+.scene-actions form { margin: 0; }
+
+.scene-actions button {
+  background-color: var(--site-surface);
+  border: 1px solid var(--site-border);
+  border-radius: var(--site-radius-sm);
+  color: var(--site-ink-muted);
+  cursor: pointer;
+  font-size: var(--site-text-sm);
+  padding: 0.35rem 0.7rem;
+
+  &:hover {
+    background-color: var(--site-danger-soft, var(--site-surface-sunken));
+    border-color: var(--site-danger);
+    color: var(--site-danger);
+  }
+}
+
+/* ---- Saving from the composer ----------------------------------------- */
+
+.scene-save {
+  align-items: end;
+  background-color: var(--site-surface);
+  border: 1px solid var(--site-border);
+  border-radius: var(--site-radius-md);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--site-space-sm);
+  inline-size: 100%;
+  margin-block-start: var(--site-space-xs);
+  max-inline-size: 40rem;
+  padding: var(--site-space-md);
+}
+
+.scene-save-name {
+  display: grid;
+  flex: 1 1 14rem;
+  gap: 0.25rem;
+
+  span {
+    color: var(--site-ink-subtle);
+    font-size: var(--site-text-xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+}
+
+.device-rules-link {
+  margin: var(--site-space-sm) 0 0;
+}

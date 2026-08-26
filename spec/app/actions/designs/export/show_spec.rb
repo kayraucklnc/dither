@@ -3,14 +3,14 @@
 require "hanami_helper"
 require "trmnl/api"
 
-RSpec.describe Terminus::Actions::Designs::Export::Show, :db do
+RSpec.describe Dither::Actions::Designs::Export::Show, :db do
   subject(:action) { described_class.new }
 
   include_context "with application dependencies"
 
   describe "#call" do
     let(:screen_template) { Factory[:screen_template] }
-    let(:unzipper) { Terminus::Aspects::Unzipper.new }
+    let(:unzipper) { Dither::Aspects::Unzipper.new }
 
     it "renders zip when success" do
       response = action.call Rack::MockRequest.env_for(
@@ -24,7 +24,7 @@ RSpec.describe Terminus::Actions::Designs::Export::Show, :db do
     end
 
     it "renders error when failure" do
-      exporter = instance_double Terminus::Aspects::Designs::Exporter, call: Failure("Danger!")
+      exporter = instance_double Dither::Aspects::Designs::Exporter, call: Failure("Danger!")
       action = described_class.new(exporter:)
 
       response = action.call Rack::MockRequest.env_for(

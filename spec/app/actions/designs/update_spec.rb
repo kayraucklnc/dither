@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Actions::Designs::Update, :db do
+RSpec.describe Dither::Actions::Designs::Update, :db do
   subject(:action) { described_class.new }
 
   describe "#call" do
@@ -26,7 +26,7 @@ RSpec.describe Terminus::Actions::Designs::Update, :db do
       Sidekiq::Testing.fake! do
         Rack::MockRequest.new(action).put "", params: parameters
 
-        expect(Terminus::Jobs::Screens::Upsert.jobs).to contain_exactly(
+        expect(Dither::Jobs::Screens::Upsert.jobs).to contain_exactly(
           hash_including(
             "args" => [
               model.id,

@@ -2,7 +2,7 @@
 
 require "trmnl/api"
 
-module Terminus
+module Dither
   module Actions
     module API
       module Display

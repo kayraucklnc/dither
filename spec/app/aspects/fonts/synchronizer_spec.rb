@@ -4,14 +4,14 @@ require "hanami_helper"
 require "http"
 require "trmnl/api"
 
-RSpec.describe Terminus::Aspects::Fonts::Synchronizer do
+RSpec.describe Dither::Aspects::Fonts::Synchronizer do
   using Refinements::Pathname
 
   subject(:synchronizer) { described_class.new downloader: }
 
   include_context "with application dependencies"
 
-  let(:downloader) { instance_double Terminus::Aspects::Downloader, call: response }
+  let(:downloader) { instance_double Dither::Aspects::Downloader, call: response }
 
   let :response do
     Success(
@@ -33,7 +33,7 @@ RSpec.describe Terminus::Aspects::Fonts::Synchronizer do
     end
 
     it "doesn't download files that exist" do
-      downloader = instance_double Terminus::Aspects::Downloader, call: Failure("Skip.")
+      downloader = instance_double Dither::Aspects::Downloader, call: Failure("Skip.")
       synchronizer = described_class.new(downloader:)
 
       temp_dir.join("BlockKie.ttf").touch

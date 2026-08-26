@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Actions::Playlists::Screens::Index, :db do
+RSpec.describe Dither::Actions::Playlists::Screens::Index, :db do
   subject(:action) { described_class.new }
 
   it "answers unprocessable entity with invalid parameters" do

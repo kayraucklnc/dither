@@ -3,7 +3,7 @@
 require "hanami_helper"
 require "http"
 
-RSpec.describe Terminus::Aspects::Downloader do
+RSpec.describe Dither::Aspects::Downloader do
   subject(:downloader) { described_class.new http:, allowed_domains: ["test.io"] }
 
   include_context "with application dependencies"

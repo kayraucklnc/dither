@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Contracts::Rules::ImageMimeType do
+RSpec.describe Dither::Contracts::Rules::ImageMimeType do
   subject(:contract) { simulation.new }
 
   let :simulation do

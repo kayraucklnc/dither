@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Providers::Sidekiq do
+RSpec.describe Dither::Providers::Sidekiq do
   subject :provider do
     described_class.new provider_container:, target_container:, slice:, resolver: proc { sidekiq }
   end

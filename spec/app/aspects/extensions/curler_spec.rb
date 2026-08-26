@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Extensions::Curler do
+RSpec.describe Dither::Aspects::Extensions::Curler do
   subject(:curler) { described_class.new }
 
   describe "#initialize" do
