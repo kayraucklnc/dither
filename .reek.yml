@@ -6,10 +6,16 @@ detectors:
   Attribute:
     exclude:
       - Terminus::Views::Parts::User#password
+  BooleanParameter:
+    exclude:
+      - Terminus::Aspects::Transit::Departure#initialize
+      - Terminus::Aspects::Transit::Settings#initialize
   ControlParameter:
     exclude:
+      - Terminus::Aspects::Extensions::Views::View#clamp
       - Terminus::Aspects::PasswordEncryptor#call
       - Terminus::Aspects::Playlists::SlideWindow#screens
+      - Terminus::Aspects::Transit::Providers::Trenord::Provider#collect
   DataClump:
     exclude:
       - Terminus::Actions::API::Base
@@ -21,6 +27,9 @@ detectors:
     exclude:
       - Terminus::Aspects::Devices::Provisioner#create
       - Terminus::Aspects::Extensions::Exchanges::RequestBuilder#render
+      - Terminus::Aspects::Transit::Finder#board
+      - Terminus::Aspects::Transit::Providers::Trenord::OriginStop#call
+      - Terminus::Aspects::Transit::Providers::Trenord::Registry#search
       - Terminus::Views::Helpers#default_option
   FeatureEnvy:
     exclude:
@@ -65,6 +74,9 @@ detectors:
       - Terminus::Actions::Playlists::Items::New#screen_options
       - Terminus::Actions::Playlists::Screens::Show#view_settings
       - Terminus::Actions::Playlists::Update#error
+      - Terminus::Actions::Transit::Catalog::Index#handle
+      - Terminus::Actions::Transit::Stations::Index#render
+      - Terminus::Actions::Transit::Stations::Index#search
       - Terminus::Actions::Users::Update#error
       - Terminus::Aspects::Devices::Provisioner#maybe_redact_api_key
       - Terminus::Aspects::Errors::Problem#enum
@@ -74,12 +86,13 @@ detectors:
       - Terminus::Aspects::Extensions::Importers::Remote::Extractor#build
       - Terminus::Aspects::Extensions::Importers::Remote::Transformers::Kind#process
       - Terminus::Aspects::Extensions::Renderers::Image#render_multiple
+      - Terminus::Aspects::Extensions::Contextualizer#load_views
+      - Terminus::Aspects::Extensions::Views::View#bounds
       - Terminus::Aspects::Playlists::ScreenOptioner#call
       - Terminus::Aspects::Screens::Compressor#convert
       - Terminus::Aspects::Screens::Converters::Color#convert
       - Terminus::Aspects::Screens::Converters::Monochrome#as_one_bit
       - Terminus::Aspects::Screens::Converters::Monochrome#as_one_bit_dither
-      - Terminus::Aspects::Screens::Converters::Monochrome#as_two_to_eight_bit
       - Terminus::Aspects::Screens::Converters::Monochrome#as_two_to_eight_bit
       - Terminus::Aspects::Screens::Converters::Monochrome#as_two_to_four_bit_dither
       - Terminus::Aspects::Screens::Converters::Monochrome#convert
@@ -89,6 +102,14 @@ detectors:
       - Terminus::Aspects::Screens::Shoter#save
       - Terminus::Aspects::Screens::TempPather#capture_input
       - Terminus::Aspects::Screens::Upserters::TempPath#capture_input
+      - Terminus::Aspects::Transit::Providers::Trenord::Alerts#call
+      - Terminus::Aspects::Transit::Providers::Trenord::Client#journey_params
+      - Terminus::Aspects::Transit::Providers::Trenord::DepartureBuilder#journey_identity
+      - Terminus::Aspects::Transit::Providers::Trenord::DepartureBuilder#train_identity
+      - Terminus::Aspects::Transit::Providers::Trenord::Normalizer#route
+      - Terminus::Aspects::Transit::Providers::Trenord::Provider#journeys
+      - Terminus::Aspects::Transit::SettingsParser#supported?
+      - Terminus::Aspects::Transit::SettingsParser#with_timezone
       - Terminus::IPFinder#all
       - Terminus::Jobs::Batches::Extension#enqueue_devices
       - Terminus::Jobs::Batches::Extension#enqueue_models
@@ -101,6 +122,10 @@ detectors:
   NestedIterators:
     exclude:
       - Terminus::Providers::RackAttack#allow_subnets
+  NilCheck:
+    exclude:
+      - Terminus::Aspects::Extensions::Views::Manifest#supports?
+      - Terminus::Aspects::Transit::Catalog#self.supports?
   RepeatedConditional:
     exclude:
       - Authentication::Middleware
@@ -122,6 +147,12 @@ detectors:
       - Terminus::Aspects::Screens::Converters::Monochrome#convert
       - Terminus::Aspects::Screens::Placeholder#initialize
       - Terminus::Aspects::Screens::Shoter#save
+      - Terminus::Aspects::Extensions::Generator#process
+      - Terminus::Aspects::Transit::Providers::Trenord::Client#get
+      - Terminus::Aspects::Transit::Providers::Trenord::OriginStop#call
+      - Terminus::Aspects::Transit::Providers::Trenord::Provider#collect
+      - Terminus::Aspects::Transit::Providers::Trenord::Registry#load
+      - Terminus::Aspects::Transit::Providers::Trenord::Registry#search
       - Terminus::Providers::Sidekiq#load_schedule
       - Terminus::Structs::Device#battery_voltage_to_percent
       - Terminus::Structs::Device#wifi_percentage
@@ -129,7 +160,15 @@ detectors:
       - UniversalLoggerPatch#_log_structured
   UtilityFunction:
     exclude:
+      - Terminus::Actions::Transit::Stations::Index#found
+      - Terminus::Aspects::Extensions::Contextualizer#sized
       - Terminus::Aspects::Croner
       - Terminus::Aspects::Errors::Problem#duplicate
       - Terminus::Aspects::Errors::Problem#foreign_key
+      - Terminus::Aspects::Extensions::Views::View#clamp
       - Terminus::Aspects::Liquid::Filters#json
+      - Terminus::Aspects::Transit::Clock#minutes
+      - Terminus::Aspects::Transit::Providers::Trenord::Client#escape
+      - Terminus::Aspects::Transit::Providers::Trenord::DepartureBuilder#cancelled?
+      - Terminus::Aspects::Transit::Providers::Trenord::DepartureBuilder#departed?
+      - Terminus::Aspects::Transit::Providers::Trenord::DepartureBuilder#offset

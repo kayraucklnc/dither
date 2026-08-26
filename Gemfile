@@ -49,6 +49,7 @@ gem "sidekiq", "~> 8.0"
 gem "sidekiq-scheduler", "~> 6.0"
 gem "trmnl-api", "~> 0.20"
 gem "trmnl-liquid", "~> 0.8"
+gem "tzinfo", "~> 2.0"
 gem "versionaire", "~> 15.3"
 gem "wholeable", "~> 2.1"
 
