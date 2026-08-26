@@ -5,12 +5,16 @@
                target: locals.fetch(:target, "closest .bit-card"),
                swap: "swap:0.3s"
              ] do |form| %>
-  <%= form.submit class: locals.fetch(:class, "action bit-button-delete bit-tooltip-action-trigger"),
-                  interestfor: "tooltip-action-delete" do %>
-    <%= image_tag "icons/trash.svg",
-        alt: locals.fetch(:label, "Delete"),
-        class: :icon,
-        width: 25,
-        height: 25 %>
+  <% if locals[:text] == false || locals[:label].nil? %>
+    <%= form.submit class: locals.fetch(:class, "action bit-button-delete bit-tooltip-action-trigger"),
+                    interestfor: "tooltip-action-delete" do %>
+      <%= image_tag "icons/trash.svg",
+          alt: "Delete",
+          class: :icon,
+          width: 25,
+          height: 25 %>
+    <% end %>
+  <% else %>
+    <%= form.submit locals[:label], class: locals.fetch(:class, "bit-button-delete") %>
   <% end %>
 <% end %>

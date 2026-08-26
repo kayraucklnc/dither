@@ -55,6 +55,9 @@ RSpec.configure do |config|
 
   config.before :suite do
     Hanami.app.start :htmx
+    # Feature specs that run a real browser fetch preview images, which render
+    # through Liquid.
+    Hanami.app.start :liquid
     Hanami.app.start :mini_magick
     Hanami.app.start :sidekiq
 

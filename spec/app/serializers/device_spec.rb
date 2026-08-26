@@ -6,16 +6,14 @@ RSpec.describe Dither::Serializers::Device do
   subject(:serializer) { described_class.new device }
 
   let :device do
-    Factory.structs[:device, model_id: model.id, playlist_id: playlist.id, **attributes]
+    Factory.structs[:device, model_id: model.id, **attributes]
   end
 
   let(:model) { Factory.structs[:model] }
-  let(:playlist) { Factory.structs[:playlist] }
 
   let :attributes do
     {
       model_id: model.id,
-      playlist_id: playlist.id,
       label: "Serialize Test",
       mac_address: "A1:B2:C3:D4:E5:F6",
       api_key: "abc123",

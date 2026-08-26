@@ -1,38 +1,30 @@
-{% comment %}
-  Quarter: 400x240. One corner of the panel.
-
-  There is only room for the answer to "when is the next one", so that is all
-  this shows: the next departure large, the one after it small. Anything more
-  and it stops being readable from across a room, which is the whole point of
-  putting it in a corner.
-{% endcomment %}
+{% comment %} Quarter: 400x240. The next train, and the one after it. {% endcomment %}
 
 <div class="screen">
-  {% if source_1.departures and source_1.departures.size > 0 %}
-    {% assign next = source_1.departures[0] %}
-
+  {% if transit.empty %}
+    <div class="content layout layout--col layout--center">
+      <p class="t-bold">No departures</p>
+    </div>
+  {% else %}
+    {% assign next = transit.departures[0] %}
     <div class="content layout layout--col" style="justify-content: space-between">
       <div class="kv">
-        <span class="k t-xs">{{ extension.values.heading | default: "Departures" }}</span>
-        <span class="v t-xs truncate">{{ next.stop.name | truncate: 18 }}</span>
+        <span class="k t-xs">{{ transit.origin | truncate: 16 }}</span>
+        <span class="v t-xs">{{ next.line }}</span>
       </div>
 
       <div class="stat">
-        <span class="value t-mono">{{ next.when | date: "%H:%M" }}</span>
-        <span class="label truncate">{{ next.line.name }} &rarr; {{ next.destination.name }}</span>
+        <span class="value t-mono">{% if next.cancelled %}CANC{% else %}{{ next.expected }}{% endif %}</span>
+        <span class="label truncate">{{ next.direction }}</span>
       </div>
 
-      {% if source_1.departures.size > 1 %}
-        {% assign following = source_1.departures[1] %}
+      {% if transit.departures.size > 1 %}
+        {% assign following = transit.departures[1] %}
         <div class="kv t-sm">
-          <span class="k truncate">then {{ following.line.name }}</span>
-          <span class="v t-mono t-bold">{{ following.when | date: "%H:%M" }}</span>
+          <span class="k truncate">then {{ following.line }}</span>
+          <span class="v t-mono t-bold">{{ following.expected }}</span>
         </div>
       {% endif %}
-    </div>
-  {% else %}
-    <div class="content layout layout--col layout--center">
-      <p class="t-bold">No departures</p>
     </div>
   {% endif %}
 </div>

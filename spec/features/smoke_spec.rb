@@ -4,6 +4,10 @@ require "hanami_helper"
 
 # Visits every page the dashboard offers and fails on a server error.
 #
+# Whole pages only. Endpoints that answer htmx fragments are deliberately not
+# here: they have no doctype, so the HTML5 validator rejects them for a reason
+# that says nothing about whether they work.
+#
 # This exists because deleting the playlist model left views exposing counts
 # for relations that no longer existed, and nothing caught it until a person
 # logged in and hit a stack trace. A page that raises is a bug regardless of
@@ -31,8 +35,6 @@ RSpec.describe "Every page", :db do
       "extension new" => routes.path(:extension_new),
       "extension edit" => routes.path(:extension_edit, id: extension.id),
       "extension exchanges" => routes.path(:extension_exchanges, extension_id: extension.id),
-      "extension sources" => routes.path(:extension_sources, extension_id: extension.id),
-      "extension sensors" => routes.path(:extension_sensors, extension_id: extension.id),
       "models" => routes.path(:models),
       "model" => routes.path(:model, id: model.id),
       "model new" => routes.path(:model_new),
