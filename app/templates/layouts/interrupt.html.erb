@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
+    <meta charset="utf-8">
+
+    <title><%= content_for :title %></title>
+
+    <style type="text/css">
+      * {
+        margin: 0;
+      }
+
+      :where(html) {
+        font-family: Verdana;
+      }
+
+      :where(main) {
+        align-items: center;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        justify-content: center;
+        width: 100vw;
+        font-size: clamp(2vw, 2vmin, 2vh);
+      }
+
+      :where(dl) {
+        display: grid;
+        gap: 0 1rem;
+        grid-template: auto / 1fr 1fr;
+        margin: 2rem 0 0 0;
+      }
+
+      .dark {
+        background-color: black;
+        color: white;
+      }
+
+      .light {
+        background-color: white;
+        color: black;
+      }
+
+      .hero {
+        font-size: clamp(25vw, 25vmin, 25vh);
+        height: auto;
+      }
+
+      .key {
+        font-weight: 600;
+        text-align: right;
+      }
+    </style>
+  </head>
+
+  <body>
+    <%= yield %>
+  </body>
+</html>

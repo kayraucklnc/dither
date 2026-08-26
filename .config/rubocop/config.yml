@@ -1,0 +1,56 @@
+inherit_gem:
+  caliber: config/all.yml
+
+plugins: rubocop-sequel
+
+Metrics/AbcSize:
+  Exclude:
+    - app/aspects/extensions/importers/remote/transformer.rb
+    - app/aspects/screens/converters/color.rb
+    - app/aspects/screens/converters/monochrome.rb
+    - app/aspects/screens/shoter.rb
+Metrics/BlockLength:
+  Exclude:
+    - config/db/migrate/*
+    - slices/authentication/feature.rb
+    - slices/authentication/middleware.rb
+Metrics/CollectionLiteralLength:
+  Exclude:
+    - app/serializers/device.rb
+    - spec/app/contracts/devices/patch_spec.rb
+    - spec/app/schemas/devices/upsert_spec.rb
+    - spec/app/serializers/device_spec.rb
+    - spec/requests/devices_spec.rb
+Metrics/CyclomaticComplexity:
+  AllowedMethods:
+    - battery_voltage_to_percent
+    - wifi_percentage
+Metrics/MethodLength:
+  AllowedMethods:
+    - battery_voltage_to_percent
+    - cloneable_attributes
+    - device_attributes
+    - export_attributes
+    - wifi_percentage
+  Exclude:
+    - app/aspects/screens/converters/color.rb
+    - app/aspects/screens/converters/monochrome.rb
+    - app/aspects/screens/shoter.rb
+    - app/views/helpers.rb
+    - config/initializers/universal_logger_patch.rb
+Metrics/ParameterLists:
+  Exclude:
+    - app/aspects/extensions/fetcher/request.rb
+    - app/aspects/screens/placeholder.rb
+Naming/VariableNumber:
+  AllowedPatterns:
+    - md5
+RSpec/ExampleLength:
+  Exclude:
+    - "spec/features/**/*"
+RSpec/SpecFilePathFormat:
+  CustomTransform:
+    Terminus: ""
+Style/IpAddresses:
+  Exclude:
+    - spec/**/*

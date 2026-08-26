@@ -1,0 +1,86 @@
+# Development overlay — source-mounted, with a live asset watcher.
+#
+#   docker compose -f compose.yml -f compose.dev.yml up -d      (or: bin/dev up)
+#
+# Layered on compose.yml rather than replacing it, so database and keyvalue stay
+# defined in one place and keep the same volumes — your account and devices carry
+# over between the dev and production stacks.
+#
+# What is hot: CSS and JS (the assets service rebuilds on save) and ERB templates
+# (Hanami re-reads them per render in development). Ruby changes under app/ still
+# need `bin/dev restart web`, since hanami-reloader is not in the Gemfile.
+
+services:
+  init-certificates:
+    image: dither:dev
+    build:
+      context: .
+      target: development
+
+  web:
+    image: dither:dev
+    build:
+      context: .
+      target: development
+    environment:
+      HANAMI_ENV: development
+      RACK_ENV: development
+      HANAMI_SERVE_ASSETS: "true"
+      # Assets are compiled by the watcher below, not on boot.
+      APP_SETUP: "false"
+    volumes:
+      - ".:/app"
+      # Masks the host's node_modules: the host installs a darwin-arm64 esbuild
+      # binary, which cannot execute in a linux container. This named volume is
+      # seeded from the image, so the linux binaries win.
+      - dev-node-modules:/app/node_modules
+      - certificates:/etc/ssl/certs
+      - web-fonts:/app/public/fonts
+      - web-fonts:/usr/share/fonts/terminus
+      - web-uploads:/app/public/uploads
+    command: bundle exec puma --config ./config/puma.rb
+
+  # Rebuilds app.css / app.js on every save. This is the hot-reload workhorse.
+  assets:
+    image: dither:dev
+    build:
+      context: .
+      target: development
+    init: true
+    environment:
+      # hanami assets watch boots the full app, so Hanami::Settings validates
+      # every required setting here too - not just in web.
+      HANAMI_ENV: development
+      RACK_ENV: development
+      HANAMI_PORT: ${HANAMI_PORT}
+      API_URI: ${API_URI}
+      APP_SECRET: ${APP_SECRET}
+      DATABASE_URL: postgres://${DATABASE_USER}:${DATABASE_PASSWORD}@database:${DATABASE_PORT}/${DATABASE_NAME}
+      KEYVALUE_URL: redis://:${KEYVALUE_PASSWORD}@keyvalue:${KEYVALUE_PORT}/${KEYVALUE_DATABASE}
+    volumes:
+      - ".:/app"
+      - dev-node-modules:/app/node_modules
+    command: bundle exec hanami assets watch
+    restart: unless-stopped
+    depends_on:
+      init-certificates:
+        condition: service_completed_successfully
+
+  worker:
+    image: dither:dev
+    build:
+      context: .
+      target: development
+    environment:
+      HANAMI_ENV: development
+      RACK_ENV: development
+    volumes:
+      - ".:/app"
+      - dev-node-modules:/app/node_modules
+      - certificates:/etc/ssl/certs
+      - web-fonts:/app/public/fonts
+      - web-fonts:/usr/share/fonts/terminus
+      - web-uploads:/app/public/uploads
+
+volumes:
+  dev-node-modules:

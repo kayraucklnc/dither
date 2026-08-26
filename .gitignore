@@ -1,0 +1,15 @@
+*.env*
+!*.env*.tt
+*.log
+.bundle
+.DS_Store
+# compose.dev.yml is committed here: it is this fork's hand-written dev overlay,
+# not the file upstream's bin/setup generates.
+coverage
+db/*.sqlite
+node_modules
+Procfile.dev
+public/*
+!public/404.html
+!public/500.html
+tmp

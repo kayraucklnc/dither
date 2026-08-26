@@ -1,0 +1,34 @@
+# frozen_string_literal: true
+
+require "hanami"
+require "rfc/api/problem"
+
+require_relative "initializers/universal_logger_patch"
+
+module Terminus
+  # The application base configuration.
+  class App < Hanami::App
+    RubyVM::YJIT.enable if defined? RubyVM::YJIT
+    Dry::Schema.load_extensions :monads
+    Dry::Validation.load_extensions :monads
+
+    config.inflections { it.acronym "DEFAULTS", "HTML", "IP", "MAC", "URI" }
+
+    config.actions.content_security_policy.then do |csp|
+      csp[:connect_src] += " https://trmnl.com"
+      csp[:font_src] += " https://trmnl.com"
+      csp[:manifest_src] = "'self'"
+      csp[:script_src] += " 'unsafe-eval' 'unsafe-inline' https://trmnl.com"
+    end
+
+    config.actions.formats.register :problem_details, RFC::API::Problem::MEDIA_TYPE_JSON
+
+    # rubocop:todo-next Layout/FirstArrayElementLineBreak
+    config.actions.sessions = :cookie,
+                              {
+                                key: "terminus.session",
+                                secret: settings.app_secret,
+                                expire_after: 3_600 # 1 hour.
+                              }
+  end
+end

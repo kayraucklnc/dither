@@ -1,0 +1,29 @@
+<%= link_to routes.path(:root), class: "site-label" do %>
+  <%= tag.img src: assets["logos/mark-accent.svg"], alt: "Dither", width: 30, height: 30 %>
+  <h1 class=label>dither</h1>
+<% end %>
+
+<nav class="site-navigation">
+  <input type="checkbox" id="navigation-toggle" class="checkbox">
+
+  <label for="navigation-toggle" class="label">
+    <span class="toggle"></span>
+  </label>
+
+  <ul class="site-menu">
+    <%= scope(:menu_item, label: "Dashboard", path: routes.path(:root)).render %>
+    <%= scope(:menu_item, label: "Designs", path: routes.path(:designs)).render %>
+    <%= scope(:menu_item, label: "Screens", path: routes.path(:screens)).render %>
+    <%= scope(:menu_item, label: "Playlists", path: routes.path(:playlists)).render %>
+    <%= scope(:menu_item, label: "Devices", path: routes.path(:devices)).render %>
+    <%= scope(:menu_item, label: "Models", path: routes.path(:models)).render %>
+    <%= scope(:menu_item, label: "Extensions", path: routes.path(:extensions)).render %>
+    <%= scope(:menu_item, label: "Firmware", path: routes.path(:firmwares)).render %>
+    <%= scope(:menu_item, label: "Flash", path: "/flash").render %>
+    <%= scope(:menu_item, label: "Users", path: routes.path(:users)).render %>
+    <%= scope(:menu_item, label: "Logout", path: "/logout").render %>
+    <li>
+      <button type="button" class="site-theme-toggle" aria-label="Toggle theme">◐</button>
+    </li>
+  </ul>
+</nav>

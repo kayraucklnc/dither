@@ -1,0 +1,24 @@
+# frozen_string_literal: true
+
+require "hanami_helper"
+
+RSpec.describe Terminus::Structs::ScreenTemplate do
+  subject(:screen_template) { Factory.structs[:screen_template, label: "Test", name: "test"] }
+
+  describe "#export_attributes" do
+    it "answers attributes" do
+      expect(screen_template.export_attributes).to eq(label: "Test", name: "test")
+    end
+  end
+
+  describe "#screen_attributes" do
+    it "answers attributes" do
+      expect(screen_template.screen_attributes).to eq(
+        template_id: screen_template.id,
+        label: "Test",
+        name: "test",
+        content: "<h1>Test</h1>"
+      )
+    end
+  end
+end

@@ -1,0 +1,313 @@
+/* Dither theme layer.
+ *
+ * Loaded last, on purpose. Rather than rewriting the twenty files under bits/,
+ * this composes over them: modern radii, real focus rings, calmer elevation,
+ * and the handful of dark-mode corrections the original sheets can't express
+ * because they hardcode light-mode assumptions (icon inversion, mainly).
+ */
+
+/* ---------- Shell ---------------------------------------------------- */
+
+:where(html) {
+  background-color: var(--site-paper);
+  color: var(--site-ink);
+  font-size: clamp(0.95rem, 0.92rem + 0.2dvw, 1.05rem);
+}
+
+body.site-page {
+  background-color: var(--site-paper);
+  color: var(--site-ink);
+}
+
+.site-header {
+  background-color: color-mix(in oklch, var(--site-surface) 82%, transparent);
+  backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--site-border);
+  color: var(--site-ink);
+  padding-block: var(--site-space-sm);
+}
+
+.site-label .label {
+  color: var(--site-ink);
+  font-size: var(--site-text-xl);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.site-body {
+  padding-block: var(--site-space-xl);
+}
+
+/* ---------- Navigation ------------------------------------------------ */
+
+.site-menu {
+  gap: var(--site-space-2xs);
+
+  a {
+    border-radius: var(--site-radius-sm);
+    color: var(--site-ink-muted);
+    font-size: var(--site-text-sm);
+    font-weight: 500;
+    padding: 0.4rem 0.7rem;
+    transition: background-color var(--site-duration-fast) var(--site-ease),
+                color var(--site-duration-fast) var(--site-ease);
+
+    &:hover {
+      background-color: var(--site-surface-sunken);
+      color: var(--site-ink);
+      text-decoration: none;
+    }
+
+    &[aria-current], &.active {
+      background-color: var(--site-accent-soft);
+      color: var(--site-accent);
+    }
+  }
+}
+
+/* ---------- Buttons --------------------------------------------------- */
+
+.bit-button, .bit-button-accept, .bit-button-decline, .bit-button-delete {
+  align-items: center;
+  border-radius: var(--site-radius-md);
+  font-size: var(--site-text-sm);
+  font-weight: 550;
+  padding: 0.5rem 0.9rem;
+  /* The original shrink-on-hover reads as dated and fights pointer accuracy. */
+  scale: 1 !important;
+  transition: background-color var(--site-duration-fast) var(--site-ease),
+              box-shadow var(--site-duration-fast) var(--site-ease),
+              opacity var(--site-duration-fast) var(--site-ease);
+
+  &:focus-visible {
+    box-shadow: var(--site-shadow-focus);
+    outline: 2px solid var(--site-accent);
+    outline-offset: 1px;
+  }
+
+  &:disabled {
+    background-color: var(--site-surface-sunken);
+    color: var(--site-ink-subtle);
+    opacity: 0.7;
+  }
+}
+
+.bit-button-accept {
+  background-color: var(--site-accent);
+  box-shadow: var(--site-shadow-sm);
+  color: var(--site-accent-ink);
+
+  &:not(:disabled):hover { background-color: var(--site-accent-hover); }
+}
+
+.bit-button-decline {
+  background-color: var(--site-surface-sunken);
+  border: 1px solid var(--site-border);
+  color: var(--site-ink);
+
+  &:not(:disabled):hover { background-color: var(--site-border); }
+}
+
+.bit-button-delete {
+  background-color: var(--site-danger-soft);
+  color: var(--site-danger);
+
+  &:not(:disabled):hover {
+    background-color: var(--site-danger);
+    color: var(--site-surface);
+  }
+}
+
+/* ---------- Surfaces -------------------------------------------------- */
+
+.bit-card, .bit-frame, .bit-container {
+  background-color: var(--site-surface);
+  border: 1px solid var(--site-border);
+  border-radius: var(--site-radius-lg);
+  box-shadow: var(--site-shadow-sm);
+}
+
+.bit-card {
+  transition: border-color var(--site-duration) var(--site-ease),
+              box-shadow var(--site-duration) var(--site-ease);
+
+  &:hover {
+    border-color: var(--site-border-strong);
+    box-shadow: var(--site-shadow-md);
+  }
+}
+
+/* ---------- Forms ----------------------------------------------------- */
+
+/* Text-entry fields only. Submit/button/reset are styled as buttons elsewhere,
+ * and portal.css declares those with :where() (zero specificity), so a broad
+ * `input` selector here would silently outrank it. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="reset"]),
+select,
+textarea {
+  background-color: var(--site-surface);
+  border: 1px solid var(--site-border-strong);
+  border-radius: var(--site-radius-md);
+  color: var(--site-ink);
+  font-family: inherit;
+  font-size: var(--site-text-base);
+  padding: 0.55rem 0.75rem;
+  transition: border-color var(--site-duration-fast) var(--site-ease),
+              box-shadow var(--site-duration-fast) var(--site-ease);
+
+  &::placeholder { color: var(--site-ink-subtle); }
+
+  &:focus, &:focus-visible {
+    border-color: var(--site-accent);
+    box-shadow: var(--site-shadow-focus);
+    outline: none;
+  }
+}
+
+/* ---------- Feedback -------------------------------------------------- */
+
+.site-alert, .site-notice {
+  border-radius: var(--site-radius-md);
+  font-size: var(--site-text-sm);
+  margin-block-end: var(--site-space-md);
+  padding: var(--site-space-sm) var(--site-space-md);
+}
+
+.site-alert {
+  background-color: var(--site-danger-soft);
+  border: 1px solid color-mix(in oklch, var(--site-danger) 30%, transparent);
+  color: var(--site-danger);
+}
+
+.site-notice {
+  background-color: var(--site-success-soft);
+  border: 1px solid color-mix(in oklch, var(--site-success) 30%, transparent);
+  color: var(--site-success);
+}
+
+/* ---------- Typography ------------------------------------------------ */
+
+h1, h2, h3 { letter-spacing: -0.022em; }
+code, pre, .mono { font-family: var(--site-font-family-mono); }
+
+/* ---------- Dark-mode corrections ------------------------------------ */
+/* bits/*.css inverts icons assuming a light background. Undo that in dark and
+ * invert the base icon instead, so glyphs stay legible either way. */
+
+:root[data-theme="dark"], :root:not([data-theme="light"]) {
+  @media (prefers-color-scheme: dark) {
+    .icon { filter: invert(1) !important; }
+    .bit-button-accept .icon { filter: none !important; }
+  }
+}
+
+:root[data-theme="dark"] {
+  .icon { filter: invert(1) !important; }
+  .bit-button-accept .icon { filter: none !important; }
+}
+
+/* ---------- Theme toggle --------------------------------------------- */
+
+.site-theme-toggle {
+  align-items: center;
+  background: none;
+  border: 1px solid var(--site-border);
+  border-radius: var(--site-radius-pill);
+  color: var(--site-ink-muted);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: var(--site-text-sm);
+  height: 2rem;
+  justify-content: center;
+  transition: background-color var(--site-duration-fast) var(--site-ease),
+              color var(--site-duration-fast) var(--site-ease);
+  width: 2rem;
+
+  &:hover { background-color: var(--site-surface-sunken); color: var(--site-ink); }
+
+  &:focus-visible {
+    box-shadow: var(--site-shadow-focus);
+    outline: 2px solid var(--site-accent);
+  }
+}
+
+/* ---------- Flash page ----------------------------------------------- */
+
+.flash {
+  display: grid;
+  gap: var(--site-space-lg);
+  padding: var(--site-space-xl);
+}
+
+.flash-grid {
+  display: grid;
+  gap: var(--site-space-md);
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}
+
+.flash-field {
+  display: grid;
+  gap: var(--site-space-2xs);
+
+  span {
+    color: var(--site-ink-muted);
+    font-size: var(--site-text-sm);
+    font-weight: 550;
+  }
+}
+
+.flash-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--site-space-md);
+}
+
+#flash-status {
+  font-size: var(--site-text-sm);
+
+  &[data-kind="idle"] { color: var(--site-ink-subtle); }
+  &[data-kind="working"] { color: var(--site-accent); }
+  &[data-kind="ok"] { color: var(--site-success); }
+  &[data-kind="error"] { color: var(--site-danger); }
+}
+
+.flash-progress {
+  background-color: var(--site-surface-sunken);
+  border-radius: var(--site-radius-pill);
+  block-size: 0.5rem;
+  overflow: hidden;
+
+  .bar {
+    background-color: var(--site-accent);
+    block-size: 100%;
+    inline-size: 0;
+    transition: inline-size var(--site-duration) var(--site-ease);
+  }
+}
+
+.flash-log {
+  background-color: var(--site-surface-sunken);
+  border: 1px solid var(--site-border);
+  border-radius: var(--site-radius-md);
+  color: var(--site-ink-muted);
+  font-family: var(--site-font-family-mono);
+  font-size: var(--site-text-xs);
+  margin: 0;
+  max-block-size: 18rem;
+  min-block-size: 6rem;
+  overflow: auto;
+  padding: var(--site-space-md);
+  white-space: pre-wrap;
+}
+
+.flash-help {
+  border-top: 1px solid var(--site-border);
+  color: var(--site-ink-muted);
+  font-size: var(--site-text-sm);
+  padding-top: var(--site-space-md);
+
+  summary { cursor: pointer; font-weight: 550; }
+  ol { margin-block: var(--site-space-sm); padding-inline-start: 1.25rem; }
+  li { margin-block: var(--site-space-2xs); }
+}

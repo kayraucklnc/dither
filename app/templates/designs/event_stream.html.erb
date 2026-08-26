@@ -1,0 +1,9 @@
+<% if screen %>
+  <%= tag.img class: :image,
+              src: screen.image_uri,
+              alt: "Preview",
+              width: screen.width,
+              height: screen.height %>
+<% else %>
+  <%= render :loader %>
+<% end %>

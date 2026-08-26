@@ -1,0 +1,70 @@
+<%= render "../shared/title", text: "Flash" %>
+
+<section class="bit-container flash">
+  <header class="bit-header">
+    <h1>Flash a device</h1>
+    <p class="subtitle">Write firmware straight to a board over USB, from this browser.</p>
+  </header>
+
+  <div id="flash-unsupported" class="site-alert" hidden>
+    <p>
+      This browser can't reach the serial port from this URL. WebSerial needs a secure
+      context: open <code>http://localhost:2300/flash</code> on the machine running Dither,
+      or serve the dashboard over HTTPS. Chrome, Edge, and Opera on desktop are supported.
+    </p>
+  </div>
+
+  <div class="flash-grid">
+    <label class="flash-field">
+      <span>Image</span>
+      <% if images.empty? %>
+        <select id="flash-image" disabled>
+          <option>No images found in public/downloads</option>
+        </select>
+      <% else %>
+        <select id="flash-image">
+          <% images.each do |image| %>
+            <option value="<%= image[:path] %>"><%= image[:name] %></option>
+          <% end %>
+        </select>
+      <% end %>
+    </label>
+
+    <label class="flash-field">
+      <span>Baud</span>
+      <select id="flash-baud">
+        <option value="921600" selected>921600 (fast)</option>
+        <option value="460800">460800</option>
+        <option value="115200">115200 (safe)</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="flash-actions">
+    <button type="button" id="flash-start" class="bit-button-accept" <%= "disabled" if images.empty? %>>
+      Connect &amp; flash
+    </button>
+    <span id="flash-status" data-kind="idle">Idle.</span>
+  </div>
+
+  <div id="flash-progress" class="flash-progress" hidden>
+    <div id="flash-progress-bar" class="bar"></div>
+  </div>
+
+  <pre id="flash-log" class="flash-log" aria-live="polite"></pre>
+
+  <details class="flash-help">
+    <summary>Board won't connect?</summary>
+    <ol>
+      <li>Plug the board in over USB before clicking, then pick its port in the chooser.</li>
+      <li>If detection fails, hold <strong>BOOT</strong>, tap <strong>RST</strong>, release BOOT, and retry.</li>
+      <li>Close any serial monitor holding the port (<code>pio device monitor</code>, screen, Arduino IDE).</li>
+      <li>Still stuck? Drop the baud to 115200 — long USB cables don't like 921600.</li>
+    </ol>
+    <p>
+      Images are read from <code>public/downloads</code> and written at offset <code>0x0</code>,
+      so they must be merged images (bootloader + partitions + app), not a bare
+      <code>firmware.bin</code>.
+    </p>
+  </details>
+</section>

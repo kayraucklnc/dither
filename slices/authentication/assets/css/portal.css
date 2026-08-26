@@ -1,0 +1,126 @@
+.site-label {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  justify-content: center;
+  margin: 0;
+}
+
+.site-authentication {
+  :where(header) {
+    display: flex;
+    justify-content: center;
+    margin-top: 2rem;
+  }
+
+  :where(form) {
+    gap: 1.5rem;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :where(p) {
+    margin: 0;
+  }
+
+  :where(input[type="submit"]) {
+    background: var(--site-accent);
+    border-radius: var(--site-radius-md);
+    border: none;
+    color: var(--site-accent-ink);
+    cursor: pointer;
+    font-size: var(--site-text-base);
+    font-weight: 550;
+    padding: 0.6rem 1rem;
+    transition: background-color var(--site-duration-fast) var(--site-ease);
+
+    &:hover {
+      background-color: var(--site-accent-hover);
+      text-decoration: none;
+    }
+
+    &:focus-visible {
+      box-shadow: var(--site-shadow-focus);
+      outline: 2px solid var(--site-accent);
+      outline-offset: 1px;
+    }
+  }
+
+  .content {
+    align-items: center;
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+    margin-top: 2rem;
+  }
+
+  .panel {
+    align-items: center;
+    background-color: var(--site-surface);
+    border-radius: var(--site-radius-xl);
+    border: 1px solid var(--site-border);
+    box-shadow: var(--site-shadow-lg);
+    color: var(--site-ink);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    margin: 0 auto;
+    max-width: 20rem;
+    min-width: 13rem;
+    padding: 1rem 1rem 2rem 1rem;
+    width: 90%;
+    gap: 1rem;
+
+    .label {
+      font-size: 1.5rem;
+      font-weight: 600;
+      text-align: center;
+      margin: 0;
+    }
+  }
+
+  .form-label {
+    font-weight: 500;
+  }
+
+  .form-group {
+    border: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .error_message {
+    color:  var(--site-red);
+    font-size: 0.9rem;
+    padding: 0.2rem 0 0.1rem 0.3rem;
+    margin: 0;
+  }
+
+}
+
+/* Auth shell: centre the card and give the wordmark room. */
+.site-authentication {
+  .site-label {
+    gap: var(--site-space-xs);
+    margin-block-end: var(--site-space-lg);
+
+    .label {
+      font-size: var(--site-text-2xl);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+  }
+
+  .form-label {
+    color: var(--site-ink-muted);
+    font-size: var(--site-text-sm);
+    font-weight: 550;
+  }
+
+  .panel .label {
+    font-size: var(--site-text-xl);
+    letter-spacing: -0.02em;
+  }
+}

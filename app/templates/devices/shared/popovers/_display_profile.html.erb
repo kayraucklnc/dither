@@ -1,0 +1,22 @@
+<%= scope(:popover_default_content, name: :display_profile, label: "Display Profile").render do %>
+  <p>Allows you to adjust display behavior especially if you'd like to improve display speed and reduce the built up of shades of gray. This does require experimentation and results will differ across devices.</p>
+
+  <ul>
+    <li>
+      <strong>Default</strong>:
+      Uses fast updates and default settings for original display panels.
+    </li>
+
+    <li>
+      <strong>A</strong>:
+      For generation 1 display panels. Uses fast gray modes.
+    </li>
+
+    <li>
+      <strong>B</strong>:
+      Uses built-in (darker) LUTs instead of fast gray modes for all display panels.
+    </li>
+  </ul>
+
+  <p>💡 Temperature A and B are identical for TRMNL X devices.</p>
+<% end %>

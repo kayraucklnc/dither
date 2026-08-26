@@ -1,0 +1,22 @@
+#! /usr/bin/env bash
+#
+# Development stack wrapper. Saves retyping the two -f flags.
+#
+#   bin/dev up            start (source-mounted, assets watching)
+#   bin/dev down          stop
+#   bin/dev logs assets   follow the asset watcher
+#   bin/dev restart web   pick up Ruby changes under app/
+#   bin/dev <anything>    passed straight through to docker compose
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+FILES=(--file compose.yml --file compose.dev.yml)
+
+case "${1:-}" in
+  up) shift; exec docker compose "${FILES[@]}" up --detach "$@" ;;
+  *)  exec docker compose "${FILES[@]}" "$@" ;;
+esac
