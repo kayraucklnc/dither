@@ -13,3 +13,4 @@ public/*
 !public/404.html
 !public/500.html
 tmp
+log/*.log.*

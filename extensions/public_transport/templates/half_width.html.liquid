@@ -1,0 +1,36 @@
+{% comment %}
+  Half width: 400x480 on an 800x480 panel. A tall, narrow column.
+
+  Half the width means half the room for a destination name, so the line and
+  the time carry the row and the destination clamps to two lines underneath
+  rather than truncating to nothing.
+{% endcomment %}
+
+<div class="screen">
+  <div class="title-bar">
+    <div class="title">{{ extension.values.heading | default: "Departures" }}</div>
+  </div>
+
+  <div class="content content--tight">
+    {% if source_1.departures and source_1.departures.size > 0 %}
+      <div class="list">
+        {% for departure in source_1.departures limit: 5 %}
+          <div class="stack stack--tight" style="padding: 8px 0">
+            <div class="kv">
+              <span class="k t-bold">{{ departure.line.name }}</span>
+              <span class="v t-mono t-bold">
+                {{ departure.when | date: "%H:%M" }}{% if departure.delay and departure.delay > 0 %}<span class="t-sm">+{{ departure.delay | divided_by: 60 }}</span>{% endif %}
+              </span>
+            </div>
+            <div class="t-sm clamp-2">{{ departure.destination.name }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="layout layout--col layout--center">
+        <p class="t-bold">No departures</p>
+        <p class="t-sm">Check the stop ID.</p>
+      </div>
+    {% endif %}
+  </div>
+</div>

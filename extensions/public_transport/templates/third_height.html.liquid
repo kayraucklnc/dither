@@ -1,0 +1,27 @@
+{% comment %}
+  Third height: 800x160. A full-width strip, usually along the top or bottom.
+
+  Wide and short, so the rows run across rather than down: three departures
+  side by side with a rule between them.
+{% endcomment %}
+
+<div class="screen">
+  <div class="content content--tight">
+    {% if source_1.departures and source_1.departures.size > 0 %}
+      <div class="layout layout--row layout--split divide-x">
+        {% for departure in source_1.departures limit: 3 %}
+          <div class="stack stack--tight fit">
+            <span class="t-mono t-xl t-bold">
+              {{ departure.when | date: "%H:%M" }}{% if departure.delay and departure.delay > 0 %}<span class="t-sm">+{{ departure.delay | divided_by: 60 }}</span>{% endif %}
+            </span>
+            <span class="t-sm truncate">{{ departure.line.name }} &rarr; {{ departure.destination.name }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="layout layout--row layout--center">
+        <p class="t-bold">No departures &middot; check the stop ID</p>
+      </div>
+    {% endif %}
+  </div>
+</div>

@@ -15,29 +15,30 @@ module Terminus
           ]
           include Dry::Monads[:result]
 
-          def call extension, context: Core::EMPTY_HASH
+          def call extension, context: Core::EMPTY_HASH, template: nil
             exchanges = exchange_repository.where extension_id: extension.id
+            template ||= extension.template
 
             if exchanges.one?
               content = renderer.call(
-                extension.template,
+                template,
                 {**context, "source_1" => {"url" => exchanges.first.template}}
               )
 
               Success content
             else
-              render_many extension, exchanges, context
+              render_many template, exchanges, context
             end
           end
 
           private
 
-          def render_many extension, exchanges, context
+          def render_many template, exchanges, context
             data = exchanges.each.with_index(1).with_object({}) do |(exchange, index), all|
               all["source_#{index}"] = {"url" => exchange.template}
             end
 
-            Success renderer.call(extension.template, context.merge(data))
+            Success renderer.call(template, context.merge(data))
           end
         end
       end

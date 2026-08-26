@@ -150,6 +150,9 @@ module Terminus
     get "/models/:model_id/clone/new", to: "models.clone.new", as: :model_clone_new
     post "/models/:model_id/clone", to: "models.clone.create", as: :model_clone
 
+    get "/scenes/new", to: "scenes.new", as: :scene_new
+    get "/scenes/preview", to: "scenes.preview.show", as: :scene_preview
+
     get "/playlists", to: "playlists.index", as: :playlists
     get "/playlists/:id", to: "playlists.show", as: :playlist
     get "/playlists/new", to: "playlists.new", as: :playlist_new

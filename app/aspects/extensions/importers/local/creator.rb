@@ -35,7 +35,7 @@ module Terminus
             # rubocop:todo-next Metrics/AbcSize
             def call io, attributes: {}
               unzipper.call(io)
-                      .fmap { |entries| transform entries }
+                      .bind { |entries| transform entries }
                       .fmap { attributes.replace it }
                       .bind { schema.call(it).to_monad }
                       .alt_map { error_joiner.call "Import", it }
@@ -48,7 +48,20 @@ module Terminus
             attr_reader :schema, :error_joiner
 
             def transform entries
-              entries.transform_keys!(key_map).then { {**it, **YAML.load(it[:configuration])} }
+              entries.transform_keys! key_map
+              variants = Variants.call entries
+
+              return Failure variants.problems.join " " if variants.problems.any?
+
+              entries.reject! { |key, _| key.to_s.start_with? "#{Variants::DIRECTORY}/" }
+
+              Success(
+                {
+                  **entries,
+                  **YAML.load(entries[:configuration]),
+                  "variants" => variants.variants
+                }
+              )
             end
 
             def create_exchanges extension, attributes

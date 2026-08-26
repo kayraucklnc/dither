@@ -1,0 +1,353 @@
+/* Scene composer.
+ *
+ * Three columns: layouts, the panel, extensions. The panel is the hero - it
+ * shows the real render, so the thing you are judging is the thing that ships,
+ * not a diagram of it.
+ */
+
+.page-composer {
+  display: grid;
+  gap: var(--site-space-lg);
+  margin-block-end: var(--site-space-2xl);
+}
+
+.composer-head {
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--site-space-md);
+  justify-content: space-between;
+
+  h1 {
+    font-size: var(--site-text-3xl);
+    letter-spacing: -0.03em;
+    margin: 0;
+  }
+
+  .sub {
+    color: var(--site-ink-subtle);
+    font-size: var(--site-text-sm);
+    margin: 0.25rem 0 0;
+    max-inline-size: 58ch;
+  }
+}
+
+.composer-model {
+  align-items: center;
+  display: flex;
+  gap: var(--site-space-xs);
+
+  span {
+    color: var(--site-ink-subtle);
+    font-size: var(--site-text-xs);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+}
+
+.composer-body {
+  align-items: start;
+  display: grid;
+  gap: var(--site-space-lg);
+  grid-template-columns: 13rem minmax(0, 1fr) 15rem;
+}
+
+@media (max-width: 60rem) {
+  .composer-body { grid-template-columns: 1fr; }
+}
+
+.composer-rail {
+  display: grid;
+  gap: var(--site-space-sm);
+}
+
+.rail-label {
+  color: var(--site-ink-subtle);
+  font-size: var(--site-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.rail-note {
+  color: var(--site-ink-subtle);
+  font-size: var(--site-text-xs);
+  line-height: 1.5;
+  margin: var(--site-space-xs) 0 0;
+}
+
+/* ---- Layout picker --------------------------------------------------- */
+
+.layout-picker {
+  display: grid;
+  gap: var(--site-space-xs);
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.layout-option {
+  background: var(--site-surface);
+  border: 1px solid var(--site-border);
+  border-radius: var(--site-radius-md);
+  cursor: pointer;
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.5rem;
+  text-align: start;
+  transition: border-color var(--site-duration-fast) var(--site-ease),
+              background-color var(--site-duration-fast) var(--site-ease);
+
+  &:hover { border-color: var(--site-border-strong); }
+
+  &.is-active {
+    background-color: var(--site-accent-soft);
+    border-color: var(--site-accent);
+  }
+}
+
+/* The diagram is the layout's own slot geometry, not a hand-drawn icon, so it
+   cannot drift from what the layout actually does. */
+.layout-diagram {
+  aspect-ratio: 5 / 3;
+  background-color: var(--site-border);
+  display: grid;
+  gap: 1px;
+
+  span {
+    background-color: var(--site-surface-sunken);
+  }
+}
+
+.layout-option.is-active .layout-diagram span {
+  background-color: var(--site-surface);
+}
+
+.layout-name {
+  color: var(--site-ink-muted);
+  font-size: var(--site-text-xs);
+  font-weight: 550;
+  line-height: 1.2;
+}
+
+.layout-option.is-active .layout-name { color: var(--site-ink); }
+
+/* ---- Panel ------------------------------------------------------------ */
+
+.composer-stage {
+  display: grid;
+  gap: var(--site-space-sm);
+}
+
+.panel-frame {
+  background-color: var(--site-surface-sunken);
+  /* Checkerboard, so a mostly-white e-ink render still reads as an image
+     rather than a hole in the page. */
+  background-image:
+    linear-gradient(45deg, var(--site-border) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--site-border) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--site-border) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--site-border) 75%);
+  background-position: 0 0, 0 7px, 7px -7px, -7px 0;
+  background-size: 14px 14px;
+  border: 1px solid var(--site-border-strong);
+  border-radius: var(--site-radius-md);
+  overflow: hidden;
+  position: relative;
+
+  img {
+    block-size: 100%;
+    display: block;
+    inline-size: 100%;
+    object-fit: contain;
+  }
+}
+
+.panel-slots {
+  display: grid;
+  inset: 0;
+  position: absolute;
+}
+
+.slot-target {
+  align-items: center;
+  border: 1px dashed transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  justify-content: center;
+  margin: 2px;
+  padding: 0.35rem;
+  text-align: center;
+  transition: background-color var(--site-duration-fast) var(--site-ease),
+              border-color var(--site-duration-fast) var(--site-ease);
+}
+
+/* Idle: only empty slots announce themselves. A filled slot gets out of the
+   way so the render underneath is what you look at. */
+.slot-target:not(.is-filled) {
+  background-color: color-mix(in oklch, var(--site-surface) 78%, transparent);
+  border-color: var(--site-border-strong);
+}
+
+.slot-shape {
+  color: var(--site-ink-subtle);
+  font-size: var(--site-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.slot-target.is-filled .slot-shape { display: none; }
+
+.slot-filled {
+  background-color: var(--site-surface);
+  border: 1px solid var(--site-border);
+  border-radius: var(--site-radius-pill);
+  color: var(--site-ink);
+  font-size: var(--site-text-xs);
+  font-weight: 600;
+  opacity: 0;
+  padding: 0.1rem 0.45rem;
+  transition: opacity var(--site-duration-fast) var(--site-ease);
+}
+
+.slot-target.is-filled:hover .slot-filled { opacity: 1; }
+
+.slot-clear {
+  background-color: var(--site-surface);
+  border: 1px solid var(--site-border);
+  border-radius: 50%;
+  block-size: 1.25rem;
+  color: var(--site-ink-muted);
+  cursor: pointer;
+  inline-size: 1.25rem;
+  inset-block-start: 0.3rem;
+  inset-inline-end: 0.3rem;
+  line-height: 1;
+  opacity: 0;
+  padding: 0;
+  position: absolute;
+  transition: opacity var(--site-duration-fast) var(--site-ease);
+
+  &:hover { border-color: var(--site-danger); color: var(--site-danger); }
+}
+
+.slot-target { position: relative; }
+.slot-target.is-filled:hover .slot-clear { opacity: 1; }
+
+/* While dragging, every slot states plainly whether it will take this
+   extension. Refusal is shown before the drop, not after. */
+.is-dragging .slot-target[data-droppable="true"] {
+  background-color: color-mix(in oklch, var(--site-accent-soft) 88%, transparent);
+  border-color: var(--site-accent);
+  border-style: solid;
+}
+
+.is-dragging .slot-target[data-droppable="false"] {
+  background-color: color-mix(in oklch, var(--site-surface-sunken) 80%, transparent);
+  border-color: var(--site-border);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.is-dragging .slot-target[data-droppable="false"] .slot-shape {
+  text-decoration: line-through;
+}
+
+.slot-target.is-over {
+  background-color: var(--site-accent-soft);
+  border-color: var(--site-accent);
+  border-style: solid;
+  border-width: 2px;
+}
+
+.panel-status {
+  background-color: var(--site-surface);
+  border: 1px solid var(--site-border);
+  border-radius: var(--site-radius-pill);
+  box-shadow: var(--site-shadow-md);
+  color: var(--site-ink-muted);
+  font-size: var(--site-text-xs);
+  font-weight: 600;
+  inset-block-end: var(--site-space-sm);
+  inset-inline-start: 50%;
+  padding: 0.3rem 0.7rem;
+  position: absolute;
+  transform: translateX(-50%);
+
+  &[data-tone="error"] {
+    border-color: var(--site-danger);
+    color: var(--site-danger);
+    max-inline-size: 80%;
+    text-align: center;
+  }
+}
+
+.stage-note {
+  color: var(--site-ink-subtle);
+  font-size: var(--site-text-xs);
+  margin: 0;
+}
+
+/* ---- Extension palette ------------------------------------------------ */
+
+.palette {
+  display: grid;
+  gap: var(--site-space-xs);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.palette-item {
+  background-color: var(--site-surface);
+  border: 1px solid var(--site-border);
+  border-radius: var(--site-radius-md);
+  cursor: grab;
+  display: grid;
+  gap: 0.35rem;
+  padding: var(--site-space-sm);
+  transition: border-color var(--site-duration-fast) var(--site-ease),
+              box-shadow var(--site-duration-fast) var(--site-ease);
+
+  &:hover {
+    border-color: var(--site-border-strong);
+    box-shadow: var(--site-shadow-md);
+  }
+
+  &.is-dragging { cursor: grabbing; opacity: 0.5; }
+}
+
+.palette-name {
+  font-size: var(--site-text-sm);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.palette-shapes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+
+.shape-chip {
+  background-color: var(--site-surface-sunken);
+  border-radius: var(--site-radius-sm);
+  color: var(--site-ink-subtle);
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.1rem 0.3rem;
+}
+
+.palette-empty {
+  background-color: var(--site-surface);
+  border: 1px dashed var(--site-border-strong);
+  border-radius: var(--site-radius-md);
+  color: var(--site-ink-muted);
+  font-size: var(--site-text-sm);
+  padding: var(--site-space-md);
+
+  p { margin: 0 0 0.4rem; }
+  p:last-child { margin: 0; }
+}

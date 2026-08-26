@@ -29,6 +29,33 @@ module Terminus
         }
       end
 
+      # ---- Layout -------------------------------------------------------
+      #
+      # Where this extension is allowed to sit. `template` is the full page;
+      # `variants` holds the other shapes its author designed for. A shape with
+      # no template is a shape this extension cannot occupy, and the composer
+      # will not offer it there rather than scaling the full page down to fit.
+
+      def templates
+        declared = Hash(variants).transform_keys(&:to_s)
+        declared[Composition::DEFAULT_SHAPE] = template unless String(template).empty?
+
+        Composition.shape_ids.filter_map { |id| [id, declared[id]] if declared[id] }.to_h
+      end
+
+      def shape_ids = templates.keys
+
+      def shapes = shape_ids.filter_map { Composition.shape it }
+
+      def supports?(shape_id) = templates.key? shape_id.to_s
+
+      def template_for(shape_id) = templates[shape_id.to_s]
+
+      # Arrangements this extension could fill on its own, in every slot.
+      def layouts = Composition.layouts_satisfiable_by shape_ids
+
+      def variant_count = shape_ids.size
+
       def liquid_attributes
         all_fields = Array fields
 

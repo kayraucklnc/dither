@@ -6,9 +6,9 @@
 # defined in one place and keep the same volumes — your account and devices carry
 # over between the dev and production stacks.
 #
-# What is hot: CSS and JS (the assets service rebuilds on save) and ERB templates
-# (Hanami re-reads them per render in development). Ruby changes under app/ still
-# need `bin/dev restart web`, since hanami-reloader is not in the Gemfile.
+# Everything is hot. CSS and JS are rebuilt by the assets service, ERB is re-read
+# per render by Hanami, and Ruby changes restart the web server via the reloader
+# service below. Save a file, refresh the browser.
 
 services:
   init-certificates:
@@ -40,7 +40,23 @@ services:
       - web-uploads:/app/public/uploads
     command: bundle exec puma --config ./config/puma.rb
 
-  # Rebuilds app.css / app.js on every save. This is the hot-reload workhorse.
+  # Restarts the web server when Ruby changes. See bin/dev_reloader.
+  reloader:
+    image: dither:dev
+    build:
+      context: .
+      target: development
+    init: true
+    environment:
+      HANAMI_ENV: development
+      RACK_ENV: development
+    volumes:
+      - ".:/app"
+      - dev-node-modules:/app/node_modules
+    command: bin/dev_reloader
+    restart: unless-stopped
+
+  # Rebuilds app.css / app.js on every save.
   assets:
     image: dither:dev
     build:

@@ -4,7 +4,7 @@
   black on white, heavy rules, no greys.
 
   Available:
-    {{ extension.data }}   parsed JSON from the exchanges above
+    {{ source_1 }}         parsed JSON from the first exchange
     {{ extension.values }} the settings the owner filled in
     {{ extension.label }}  this extension's label
 
@@ -15,13 +15,13 @@
 <div class="screen">
   <div class="title-bar">
     <div class="title">{{ extension.values.heading | default: "Departures" }}</div>
-    <div class="meta">{{ extension.data.departures[0].stop.name | truncate: 28 }}</div>
+    <div class="meta">{{ source_1.departures[0].stop.name | truncate: 28 }}</div>
   </div>
 
   <div class="content">
-    {% if extension.data.departures and extension.data.departures.size > 0 %}
+    {% if source_1.departures and source_1.departures.size > 0 %}
       <div class="list">
-        {% for departure in extension.data.departures %}
+        {% for departure in source_1.departures %}
           <div class="list-item">
             <span class="primary truncate">
               {{ departure.line.name }} — {{ departure.destination.name }}

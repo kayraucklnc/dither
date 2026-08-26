@@ -17,6 +17,7 @@ module Terminus
               required(:tags).maybe :array
               required(:static_body).maybe :hash
               required(:template).filled :string
+              optional(:variants).maybe :hash
               required(:fields).maybe :array
               required(:data).maybe :hash
               required(:interval).maybe :integer

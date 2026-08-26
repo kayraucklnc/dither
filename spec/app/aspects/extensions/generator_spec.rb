@@ -35,7 +35,7 @@ RSpec.describe Terminus::Aspects::Extensions::Generator, :db do
         allow(extension).to receive(:kind).and_return("image")
         generator.call extension, model_id: model.id
 
-        expect(image).to have_received(:call).with(extension, context:)
+        expect(image).to have_received(:call).with(extension, context:, template: extension.template)
       end
     end
 
@@ -46,7 +46,7 @@ RSpec.describe Terminus::Aspects::Extensions::Generator, :db do
 
       it "delegates generator" do
         generator.call extension, model_id: model.id
-        expect(poll).to have_received(:call).with(extension, context:)
+        expect(poll).to have_received(:call).with(extension, context:, template: extension.template)
       end
     end
 
@@ -59,7 +59,7 @@ RSpec.describe Terminus::Aspects::Extensions::Generator, :db do
         allow(extension).to receive(:kind).and_return("static")
         generator.call extension, model_id: model.id
 
-        expect(static).to have_received(:call).with(extension, context:)
+        expect(static).to have_received(:call).with(extension, context:, template: extension.template)
       end
     end
 

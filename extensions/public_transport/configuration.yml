@@ -31,7 +31,9 @@ static_body: {}
 data: {}
 
 # Fields become the settings form the extension's owner fills in. Each keyname
-# is addressable in the template and in exchange URLs as {{ values.<keyname> }}.
+# is addressable in templates and in exchange URLs as
+# {{ extension.values.<keyname> }} - everything an extension knows about
+# itself hangs off the "extension" key.
 fields:
   - keyname: api_base
     name: API base URL
@@ -61,12 +63,13 @@ fields:
     help_text: Title shown in the top bar.
     optional: true
 
-# Each exchange is one HTTP call. The response is merged into the extension's
-# data and reachable as {{ extension.data }} in the template. URL, headers and
-# body are all Liquid-rendered, so field values can be interpolated.
+# Each exchange is one HTTP call. Its parsed response reaches the template as
+# {{ source_1 }} - numbered in the order listed here, not merged into
+# extension.data. URL, headers and body are all Liquid-rendered, so field
+# values can be interpolated.
 exchanges:
   - verb: get
-    template: "{{ values.api_base }}/stops/{{ values.stop_id }}/departures?results={{ values.results }}&duration=120"
+    template: "{{ extension.values.api_base }}/stops/{{ extension.values.stop_id }}/departures?results={{ extension.values.results }}&duration=120"
     headers:
       Accept: application/json
     body: {}

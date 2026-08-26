@@ -3,8 +3,9 @@
 
 # Loads bundled extensions from extensions/*/ into the database.
 #
-# Each directory holds configuration.yml + template.html.liquid, which is the
-# same pair the zip importer accepts - so a bundled extension is also a valid
+# Each directory holds configuration.yml + template.html.liquid, plus an
+# optional templates/<shape>.html.liquid per extra layout variant. That is the
+# same set the zip importer accepts - so a bundled extension is also a valid
 # export, and anything authored here can be handed to someone else unchanged.
 #
 #   bin/seed_extensions                 load anything not already present
@@ -47,8 +48,22 @@ directories.sort.each do |directory|
     next
   end
 
+  # Variants are declared by writing them: every templates/<shape>.html.liquid
+  # is a shape this extension may occupy, and nothing else is.
+  variants = Terminus::Aspects::Extensions::Variants.call(
+    directory.glob("templates/*.html.liquid")
+             .to_h { |path| [path.relative_path_from(directory).to_s, path.read] }
+  )
+
+  if variants.problems.any?
+    variants.problems.each { |problem| warn "  ERROR   #{name}: #{problem}" }
+    failed += 1
+    next
+  end
+
   attributes = YAML.load_file(configuration_path, aliases: true)
   attributes["template"] = template_path.read
+  attributes["variants"] = variants.variants
 
   existing = repository.find_by name: attributes.fetch("name")
 
@@ -75,7 +90,11 @@ directories.sort.each do |directory|
   extension = result.value!
   exchanges.each { |exchange| exchange_creator.call exchange.merge("extension_id" => extension.id) }
 
-  puts "  #{existing ? "replace" : "install"} #{name} (#{exchanges.size} exchange#{"s" unless exchanges.size == 1})"
+  shapes = ["full", *variants.variants.keys]
+  detail = "#{exchanges.size} exchange#{"s" unless exchanges.size == 1}, " \
+           "#{shapes.size} shape#{"s" unless shapes.size == 1}: #{shapes.join ", "}"
+
+  puts "  #{existing ? "replace" : "install"} #{name} (#{detail})"
   loaded += 1
 end
 
