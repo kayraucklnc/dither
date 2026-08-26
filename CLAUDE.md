@@ -16,13 +16,19 @@ The essentials, inline, so they survive even without opening it:
   Supporting a shape is optional; full page is the floor. The composer must
   **refuse** to place an extension in a shape it has not declared — never fake
   it by scaling.
-- **Screens are composed by dragging extensions into slots**, not authored as
-  raw HTML. Illegal arrangements should be impossible, not merely discouraged.
-- **Screens are selected by triggers**: time, battery %, webhook, API result,
-  extension status. Several can be true at once; the resolution model is an
-  open question and must be deliberate, not insertion order.
-- **Renaming in progress**: Design → Layout, Screen → View, Playlist →
-  Schedule. "Playlist" wrongly implies shuffle.
+- **Scenes are composed by dragging extensions into slots**, not authored as
+  raw HTML. Illegal arrangements are impossible, not merely discouraged.
+- **Nothing is authored as a combination.** A scene is resolved from rules, not
+  hand-built per situation, or you get 2^N screens for N extensions.
+- **Two layers decide what shows.** *Modes* are exclusive, priority-ordered and
+  have separate enter/exit conditions (hysteresis); they carry refresh cadence.
+  *Rules* are additive and compete slot by slot, by priority. Never insertion
+  order.
+- **The layout is derived, not chosen** — the resolver picks the smallest layout
+  that seats every active rule, which only works because extensions declare
+  shapes.
+- **Naming settled**: Shape / Layout / Scene / Mode + Rules. "View" was rejected
+  because `Terminus::Views` is Hanami's own namespace.
 - **A preview showing what the device sees right now** is core, not a
   nice-to-have. The product must be evaluable before owning hardware.
 - The user has authorised **scrapping inherited code and naming freely**.
@@ -30,14 +36,17 @@ The essentials, inline, so they survive even without opening it:
 ## Running it
 
 ```bash
-bin/dev up        # dev stack, source-mounted, hot reload on CSS/JS/ERB
+bin/dev up        # dev stack, source-mounted, everything hot reloads
 bin/dev down
-bin/dev restart web   # needed after Ruby changes (no hanami-reloader)
+bin/dev logs reloader   # what the Ruby watcher is restarting on
 ```
 
 http://localhost:2300. Production build: `docker compose up -d`.
 
-Ruby changes do **not** hot reload. CSS, JS and ERB templates do.
+Everything hot reloads. CSS and JS via the `assets` service, ERB per render,
+and Ruby via `bin/dev_reloader`, which polls for changes and touches
+`tmp/restart.txt` for Puma's `tmp_restart` plugin. Polling rather than inotify
+because filesystem events do not cross the macOS/container boundary reliably.
 
 ## Seeding
 
@@ -60,3 +69,11 @@ bin/dev exec web bundle exec bin/seed_extensions   # bundled extensions
   associations.
 - Host `node_modules` holds a darwin-arm64 esbuild binary — the dev compose
   masks it with a named volume so the linux one wins.
+- **`liquid.sanitize` returns a whole document**, not a fragment. Anything
+  embedding a rendered extension must unwrap `<body>` first, or the nested
+  `<html>` makes `TempPather` skip inlining the stylesheet.
+- **Exchange responses arrive as `source_1`, `source_2`…**, never in
+  `extension.data`. Settings are `{{ extension.values.x }}`, not
+  `{{ values.x }}`.
+- **`expose :layout` in a view never reaches the template** — Hanami views own
+  that name. Same trap as `Terminus::Views`.
