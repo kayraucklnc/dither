@@ -5,7 +5,7 @@ module Terminus
     module Extensions
       module Gallery
         # The index view.
-        class Index < Hanami::View
+        class Index < View
           expose :recipe
           expose :query
           expose :page
