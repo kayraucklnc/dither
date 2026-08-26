@@ -75,6 +75,12 @@ export HANAMI_PORT=$((BASE_HANAMI + DEV_PORT_OFFSET))
 export DATABASE_PORT=$((BASE_DATABASE + DEV_PORT_OFFSET))
 export KEYVALUE_PORT=$((BASE_KEYVALUE + DEV_PORT_OFFSET))
 
+# Ports do not scope cookies. Without a per-project name every stack on
+# localhost fights over one session cookie, and logging into this one gets you
+# a CSRF InvalidToken as soon as another worktree overwrites it.
+export SESSION_COOKIE_KEY="${COMPOSE_PROJECT_NAME}.session"
+export REMEMBER_COOKIE_KEY="${COMPOSE_PROJECT_NAME}.remember"
+
 FILES=(--file compose.yml --file compose.dev.yml)
 
 compose() {

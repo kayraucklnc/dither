@@ -129,6 +129,7 @@ module Authentication
 
       # Feature: remember
       remember_button "Save"
+      remember_cookie_key Hanami.app[:settings].remember_cookie_key
       remember_table :user_remember_key
       remember_route "me/remember"
 
