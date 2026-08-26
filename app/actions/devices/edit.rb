@@ -8,8 +8,7 @@ module Dither
         include Deps[
           :htmx_layout,
           repository: "repositories.device",
-          model_repository: "repositories.model",
-          playlist_repository: "repositories.playlist"
+          model_repository: "repositories.model"
         ]
 
         params { required(:id).filled :integer }
@@ -27,7 +26,6 @@ module Dither
         def view_settings request, parameters
           {
             models: model_repository.all,
-            playlists: playlist_repository.all,
             device: repository.find(parameters[:id]),
             layout: htmx_layout.call(request)
           }

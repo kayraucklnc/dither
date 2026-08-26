@@ -1,0 +1,143 @@
+# Dither bundled extension: Milan transit (Trenord).
+#
+# A "transit" extension has no exchanges. The settings name a country, city and
+# provider; the provider knows how to answer, including the time zone, which
+# matters because providers quote local wall clock times and this server runs
+# in UTC.
+#
+# Adding another city means adding a provider under app/aspects/transit, not
+# editing this file.
+
+version: "1.0.0"
+name: milan_transit
+label: Milan Transit
+description: >
+  Trenord departures between two Milan stations, with delays, platforms and
+  service alerts.
+
+kind: transit
+mode: text
+tags:
+  - transport
+  - milan
+
+interval: 5
+unit: minute
+days: []
+last_day_of_month: false
+start_at: "2026-01-01T00:00:00Z"
+
+static_body: {}
+data: {}
+
+fields:
+  - keyname: origin
+    name: From
+    field_type: string
+    default: "Milano Cadorna"
+    help_text: Station name. The settings page offers a search.
+    optional: false
+
+  - keyname: destination
+    name: To
+    field_type: string
+    default: "Saronno"
+    help_text: Leave blank to show every departure from the origin.
+    optional: true
+
+  - keyname: lead_time
+    name: Walking time
+    field_type: string
+    default: "0"
+    help_text: Minutes to reach the platform. Departures sooner than this are hidden.
+    optional: true
+
+  - keyname: limit
+    name: Departures to show
+    field_type: string
+    default: "5"
+    help_text: Keep it low. The panel is 800x480.
+    optional: true
+
+  - keyname: show_platform
+    name: Show platform
+    field_type: string
+    default: "true"
+    help_text: "true or false."
+    optional: true
+
+  - keyname: hide_cancelled
+    name: Hide cancelled
+    field_type: string
+    default: "false"
+    help_text: "true or false."
+    optional: true
+
+  - keyname: title
+    name: Heading
+    field_type: string
+    default: ""
+    help_text: Defaults to "origin to destination".
+    optional: true
+
+# Shaped exactly like a real board, so a design that reads well here reads well
+# in the field.
+sample:
+  transit:
+    origin: "Milano Cadorna"
+    destination: "Saronno"
+    provider: "trenord"
+    city: "milan"
+    country: "it"
+    empty: false
+    departures:
+      - line: "S3"
+        number: "24015"
+        direction: "Saronno"
+        scheduled: "08:12"
+        expected: "08:15"
+        delay: 3
+        delayed: true
+        platform: "2"
+        arrival: "08:41"
+        duration: 29
+        changes: 0
+        direct: true
+        cancelled: false
+        live: true
+        status: "DELAYED"
+      - line: "R14"
+        number: "2612"
+        direction: "Como Lago"
+        scheduled: "08:27"
+        expected: "08:27"
+        delay: 0
+        delayed: false
+        platform: "4"
+        arrival: "08:55"
+        duration: 28
+        changes: 0
+        direct: true
+        cancelled: false
+        live: true
+        status: "ON TIME"
+      - line: "S1"
+        number: "24019"
+        direction: "Saronno"
+        scheduled: "08:42"
+        expected: "08:42"
+        delay: 0
+        delayed: false
+        platform: "1"
+        arrival: "09:12"
+        duration: 30
+        changes: 1
+        direct: false
+        cancelled: false
+        live: false
+        status: "SCHEDULED"
+    alerts:
+      - title: "Reduced service"
+        description: "Engineering work between Cadorna and Bovisa until 10:00."
+
+exchanges: []

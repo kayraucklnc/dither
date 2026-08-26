@@ -43,11 +43,28 @@ module Dither
         Composition.shape_ids.filter_map { |id| [id, declared[id]] if declared[id] }.to_h
       end
 
-      def shape_ids = templates.keys
+      # Shapes this extension declares by publishing a manifest rather than by
+      # writing a separate template. One template branching on {{ view.name }}
+      # is a reasonable way to support several shapes when the designs differ
+      # only a little, so both count.
+      def manifest_shape_ids
+        Aspects::Extensions::Views::Manifest.for(self)
+                                            .views
+                                            .map(&:shape)
+                                            .select { Composition.shape? it }
+      end
+
+      # The union, in the vocabulary's own order, so the two ways of declaring
+      # a shape are indistinguishable to everything downstream.
+      def shape_ids
+        declared = templates.keys | manifest_shape_ids
+
+        Composition.shape_ids.select { declared.include? it }
+      end
 
       def shapes = shape_ids.filter_map { Composition.shape it }
 
-      def supports?(shape_id) = templates.key? shape_id.to_s
+      def supports?(shape_id) = shape_ids.include? shape_id.to_s
 
       def template_for(shape_id) = templates[shape_id.to_s]
 

@@ -19,13 +19,24 @@
     <p class="rail-label">Showing right now</p>
 
     <% if decision.success? %>
-      <p class="rules-now-scene">
-        <strong><%= decision.value!.scene.label %></strong>
-        &mdash; <%= decision.value!.rule.condition_label %>
-        <% if decision.value!.refresh_rate %>
-          &middot; refreshing every <%= decision.value!.refresh_rate / 60 %> min
-        <% end %>
-      </p>
+      <div class="rules-now-body">
+        <div class="rules-now-panel">
+          <img src="<%= routes.path(:scene_image, id: decision.value!.scene.id, model_id: device.model_id) %>"
+               alt="What <%= device.label %> would show right now"
+               loading="lazy">
+        </div>
+
+        <div>
+          <p class="rules-now-scene"><strong><%= decision.value!.scene.label %></strong></p>
+          <p class="rules-now-why">
+            because <%= decision.value!.rule.condition_label %><% if decision.value!.refresh_rate %>,
+            refreshing every <%= decision.value!.refresh_rate / 60 %> min<% end %>
+          </p>
+          <p class="rules-now-why">
+            <%= decision.value!.considered %> rule<%= "s" unless decision.value!.considered == 1 %> checked.
+          </p>
+        </div>
+      </div>
     <% else %>
       <p class="rules-now-none"><%= decision.failure %></p>
     <% end %>
@@ -36,6 +47,13 @@
       <% rules.each_with_index do |rule, index| %>
         <li class="rule-row" data-active="<%= decision.success? && decision.value!.rule.id == rule.id %>">
           <span class="rule-position"><%= index + 1 %></span>
+
+          <% if rule.scene %>
+            <div class="rule-thumb">
+              <img src="<%= routes.path(:scene_image, id: rule.scene.id, model_id: device.model_id) %>"
+                   alt="<%= rule.scene.label %>" loading="lazy">
+            </div>
+          <% end %>
 
           <div class="rule-body">
             <p class="rule-sentence"><%= rule.sentence %></p>
@@ -79,16 +97,24 @@
     <p class="rail-label">Add a rule</p>
 
     <% if scenes.to_a.any? %>
-      <div class="rule-form-grid">
-        <label>
-          <span>Show</span>
-          <select name="scene_id" required>
-            <% scenes.each do |scene| %>
-              <option value="<%= scene.id %>"><%= scene.label %></option>
-            <% end %>
-          </select>
-        </label>
+      <div class="scene-picker">
+        <p class="rail-label">Show</p>
 
+        <div class="scene-choices">
+          <% scenes.each_with_index do |scene, index| %>
+            <label class="scene-choice">
+              <input type="radio" name="scene_id" value="<%= scene.id %>" <%= "checked" if index.zero? %> required>
+              <span class="scene-choice-panel">
+                <img src="<%= routes.path(:scene_image, id: scene.id, model_id: device.model_id) %>"
+                     alt="<%= scene.label %>" loading="lazy">
+              </span>
+              <span class="scene-choice-name"><%= scene.label %></span>
+            </label>
+          <% end %>
+        </div>
+      </div>
+
+      <div class="rule-form-grid">
         <label>
           <span>When</span>
           <select name="condition_kind" id="condition-kind">

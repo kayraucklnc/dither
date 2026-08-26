@@ -136,7 +136,10 @@ RSpec.describe "/api/display", :db do
     end
   end
 
-  context "with any error" do
+  # A device nobody has written rules for is not an error, it is unfinished.
+  # It gets the welcome screen, which says so, rather than whatever happened to
+  # be on the glass before.
+  context "with no rules" do
     let(:device) { Factory[:device, api_key: firmware_headers.fetch("HTTP_ACCESS_TOKEN")] }
 
     before do
@@ -144,9 +147,9 @@ RSpec.describe "/api/display", :db do
       get routes.path(:api_display), {}, **firmware_headers
     end
 
-    it "answers error image" do
+    it "answers the welcome image" do
       expect(json_payload).to match(
-        filename: "#{device.screen_name :error}.png",
+        filename: %r(\Awelcome_#{device.id}-\d+\z),
         firmware_url: nil,
         firmware_version: nil,
         image_url: %r(memory://\h{32}\.png),

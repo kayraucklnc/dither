@@ -50,14 +50,6 @@
         </dd>
 
         <dt class="key">
-          Playlist
-          <%= scope(:popover_trigger_button, tip: :info, target: :playlist).render %>
-        </dt>
-        <dd class="value">
-          <%= device.playlist ? link_to(device.playlist.label, routes.path(:playlist, id: device.playlist_id)) : nil %>
-        </dd>
-
-        <dt class="key">
           MAC Address
           <%= scope(:popover_trigger_button, tip: :info, target: :mac_address).render %>
         </dt>

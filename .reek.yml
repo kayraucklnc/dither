@@ -9,7 +9,13 @@ detectors:
   ControlParameter:
     exclude:
       - Dither::Aspects::PasswordEncryptor#call
-      - Dither::Aspects::Playlists::SlideWindow#screens
+      - Dither::Views::Parts::User#password
+  BooleanParameter:
+      - Dither::Aspects::Transit::Departure#initialize
+      - Dither::Aspects::Transit::Settings#initialize
+      - Dither::Aspects::Extensions::Views::View#clamp
+      - Dither::Aspects::PasswordEncryptor#call
+      - Dither::Aspects::Transit::Providers::Trenord::Provider#collect
   DataClump:
     exclude:
       - Dither::Actions::API::Base
@@ -37,8 +43,6 @@ detectors:
       - Dither::Actions::API::Firmware::Patch#unprocessable_download
       - Dither::Actions::API::Models::Create#unprocessable_content
       - Dither::Actions::API::Models::Patch#unprocessable_content
-      - Dither::Actions::API::Playlists::Create#unprocessable_content
-      - Dither::Actions::API::Playlists::Patch#unprocessable_content
       - Dither::Actions::API::Screens::Create#handle
       - Dither::Actions::API::Screens::Create#save
       - Dither::Actions::API::Screens::Create#unprocessable_content_for_creation
@@ -60,11 +64,6 @@ detectors:
       - Dither::Actions::Firmware::Delete#render
       - Dither::Actions::Firmware::Update#error
       - Dither::Actions::Models::Update#error
-      - Dither::Actions::Playlists::Create#error
-      - Dither::Actions::Playlists::Items::Edit#screen_options
-      - Dither::Actions::Playlists::Items::New#screen_options
-      - Dither::Actions::Playlists::Screens::Show#view_settings
-      - Dither::Actions::Playlists::Update#error
       - Dither::Actions::Users::Update#error
       - Dither::Aspects::Devices::Provisioner#maybe_redact_api_key
       - Dither::Aspects::Errors::Problem#enum
@@ -74,12 +73,10 @@ detectors:
       - Dither::Aspects::Extensions::Importers::Remote::Extractor#build
       - Dither::Aspects::Extensions::Importers::Remote::Transformers::Kind#process
       - Dither::Aspects::Extensions::Renderers::Image#render_multiple
-      - Dither::Aspects::Playlists::ScreenOptioner#call
       - Dither::Aspects::Screens::Compressor#convert
       - Dither::Aspects::Screens::Converters::Color#convert
       - Dither::Aspects::Screens::Converters::Monochrome#as_one_bit
       - Dither::Aspects::Screens::Converters::Monochrome#as_one_bit_dither
-      - Dither::Aspects::Screens::Converters::Monochrome#as_two_to_eight_bit
       - Dither::Aspects::Screens::Converters::Monochrome#as_two_to_eight_bit
       - Dither::Aspects::Screens::Converters::Monochrome#as_two_to_four_bit_dither
       - Dither::Aspects::Screens::Converters::Monochrome#convert
@@ -96,11 +93,98 @@ detectors:
       - Dither::Providers::RackAttack#throttle_login
       - Dither::Repositories::Screen#create_with_image
       - Dither::Repositories::Screen#update_with_image
+      - Dither::Aspects::Devices::Provisioner#create
+      - Dither::Aspects::Extensions::Exchanges::RequestBuilder#render
+      - Dither::Aspects::Transit::Finder#board
+      - Dither::Aspects::Transit::Providers::Trenord::OriginStop#call
+      - Dither::Aspects::Transit::Providers::Trenord::Registry#search
+      - Dither::Views::Helpers#default_option
+      - Dither::Action#authorize
+      - Dither::Actions::API::Base#detail_duplicate
+      - Dither::Actions::API::Base#detail_enum
+      - Dither::Actions::API::Base#detail_foreign_key
+      - Dither::Actions::API::Devices::Create#unprocessable_content
+      - Dither::Actions::API::Devices::Patch#unprocessable_content
+      - Dither::Actions::API::Firmware::Create#unprocessable_content
+      - Dither::Actions::API::Firmware::Create#unprocessable_download
+      - Dither::Actions::API::Firmware::Delete#failure
+      - Dither::Actions::API::Firmware::Patch#unprocessable_content
+      - Dither::Actions::API::Firmware::Patch#unprocessable_download
+      - Dither::Actions::API::Models::Create#unprocessable_content
+      - Dither::Actions::API::Models::Patch#unprocessable_content
+      - Dither::Actions::API::Screens::Create#handle
+      - Dither::Actions::API::Screens::Create#save
+      - Dither::Actions::API::Screens::Create#unprocessable_content_for_creation
+      - Dither::Actions::API::Screens::Create#unprocessable_content_for_parameters
+      - Dither::Actions::API::Screens::Delete#failure
+      - Dither::Actions::API::Screens::Patch#replace
+      - Dither::Actions::API::Screens::Patch#unprocessable_content_for_creation
+      - Dither::Actions::API::Screens::Patch#unprocessable_content_for_parameters
+      - Dither::Actions::Devices::Create#provision
+      - Dither::Actions::Devices::Create#render_new
+      - Dither::Actions::Devices::Update#edit
+      - Dither::Actions::Extensions::Clone::Create#error
+      - Dither::Actions::Extensions::Create#error
+      - Dither::Actions::Extensions::Gallery::Create#render_error
+      - Dither::Actions::Extensions::Gallery::Create#render_schema_error
+      - Dither::Actions::Extensions::Gallery::Index#render_error
+      - Dither::Actions::Extensions::Update#error
+      - Dither::Actions::Firmware::Create#error
+      - Dither::Actions::Firmware::Delete#render
+      - Dither::Actions::Firmware::Update#error
+      - Dither::Actions::Models::Update#error
+      - Dither::Actions::Transit::Catalog::Index#handle
+      - Dither::Actions::Transit::Stations::Index#render
+      - Dither::Actions::Transit::Stations::Index#search
+      - Dither::Actions::Users::Update#error
+      - Dither::Aspects::Devices::Provisioner#maybe_redact_api_key
+      - Dither::Aspects::Errors::Problem#enum
+      - Dither::Aspects::Extensions::Cloner#build_attributes
+      - Dither::Aspects::Extensions::Exchanges::Refresher#fetch
+      - Dither::Aspects::Extensions::Fetcher::Client#maybe_alter_mime_type
+      - Dither::Aspects::Extensions::Importers::Remote::Extractor#build
+      - Dither::Aspects::Extensions::Importers::Remote::Transformers::Kind#process
+      - Dither::Aspects::Extensions::Renderers::Image#render_multiple
+      - Dither::Aspects::Extensions::Contextualizer#load_views
+      - Dither::Aspects::Extensions::Views::View#bounds
+      - Dither::Aspects::Screens::Compressor#convert
+      - Dither::Aspects::Screens::Converters::Color#convert
+      - Dither::Aspects::Screens::Converters::Monochrome#as_one_bit
+      - Dither::Aspects::Screens::Converters::Monochrome#as_one_bit_dither
+      - Dither::Aspects::Screens::Converters::Monochrome#as_two_to_eight_bit
+      - Dither::Aspects::Screens::Converters::Monochrome#as_two_to_four_bit_dither
+      - Dither::Aspects::Screens::Converters::Monochrome#convert
+      - Dither::Aspects::Screens::Creator#find
+      - Dither::Aspects::Screens::Creators::TempPath#capture_input
+      - Dither::Aspects::Screens::Designer::EventStream#render_preview
+      - Dither::Aspects::Screens::Shoter#save
+      - Dither::Aspects::Screens::TempPather#capture_input
+      - Dither::Aspects::Screens::Upserters::TempPath#capture_input
+      - Dither::Aspects::Transit::Providers::Trenord::Alerts#call
+      - Dither::Aspects::Transit::Providers::Trenord::Client#journey_params
+      - Dither::Aspects::Transit::Providers::Trenord::DepartureBuilder#journey_identity
+      - Dither::Aspects::Transit::Providers::Trenord::DepartureBuilder#train_identity
+      - Dither::Aspects::Transit::Providers::Trenord::Normalizer#route
+      - Dither::Aspects::Transit::Providers::Trenord::Provider#journeys
+      - Dither::Aspects::Transit::SettingsParser#supported?
+      - Dither::Aspects::Transit::SettingsParser#with_timezone
+      - Dither::IPFinder#all
+      - Dither::Jobs::Batches::Extension#enqueue_devices
+      - Dither::Jobs::Batches::Extension#enqueue_models
+      - Dither::Providers::RackAttack#throttle_api_setup
+      - Dither::Providers::RackAttack#throttle_login
+      - Dither::Repositories::Screen#create_with_image
+      - Dither::Repositories::Screen#update_with_image
   LongParameterList:
     enabled: false
   NestedIterators:
     exclude:
       - Dither::Providers::RackAttack#allow_subnets
+      - Dither::Providers::RackAttack#allow_subnets
+  NilCheck:
+    exclude:
+      - Dither::Aspects::Extensions::Views::Manifest#supports?
+      - Dither::Aspects::Transit::Catalog#self.supports?
   RepeatedConditional:
     exclude:
       - Authentication::Middleware
@@ -133,3 +217,38 @@ detectors:
       - Dither::Aspects::Errors::Problem#duplicate
       - Dither::Aspects::Errors::Problem#foreign_key
       - Dither::Aspects::Liquid::Filters#json
+      - Dither::Action#handle_rodauth_redirect
+      - Dither::Actions::Extensions::Poll::Show#fetch
+      - Dither::Aspects::Croner#call
+      - Dither::Aspects::Extensions::Exchanges::RequestBuilder#render
+      - Dither::Aspects::Extensions::Fetcher::Client#parse
+      - Dither::Aspects::Extensions::Importers::Remote::Transformer#process
+      - Dither::Aspects::Extensions::Parser#from_json
+      - Dither::Aspects::Firmware::Downloader#get
+      - Dither::Aspects::Screens::Compressor#call
+      - Dither::Aspects::Screens::Converters::Color#convert
+      - Dither::Aspects::Screens::Converters::Monochrome#convert
+      - Dither::Aspects::Screens::Placeholder#initialize
+      - Dither::Aspects::Screens::Shoter#save
+      - Dither::Aspects::Extensions::Generator#process
+      - Dither::Aspects::Transit::Providers::Trenord::Client#get
+      - Dither::Aspects::Transit::Providers::Trenord::OriginStop#call
+      - Dither::Aspects::Transit::Providers::Trenord::Provider#collect
+      - Dither::Aspects::Transit::Providers::Trenord::Registry#load
+      - Dither::Aspects::Transit::Providers::Trenord::Registry#search
+      - Dither::Providers::Sidekiq#load_schedule
+      - Dither::Structs::Device#battery_voltage_to_percent
+      - Dither::Structs::Device#wifi_percentage
+      - Dither::Views::Parts::DeviceLog#level_class
+      - Dither::Actions::Transit::Stations::Index#found
+      - Dither::Aspects::Extensions::Contextualizer#sized
+      - Dither::Aspects::Croner
+      - Dither::Aspects::Errors::Problem#duplicate
+      - Dither::Aspects::Errors::Problem#foreign_key
+      - Dither::Aspects::Extensions::Views::View#clamp
+      - Dither::Aspects::Liquid::Filters#json
+      - Dither::Aspects::Transit::Clock#minutes
+      - Dither::Aspects::Transit::Providers::Trenord::Client#escape
+      - Dither::Aspects::Transit::Providers::Trenord::DepartureBuilder#cancelled?
+      - Dither::Aspects::Transit::Providers::Trenord::DepartureBuilder#departed?
+      - Dither::Aspects::Transit::Providers::Trenord::DepartureBuilder#offset

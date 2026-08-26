@@ -1,0 +1,29 @@
+# How a Conductor workspace for this repo runs.
+#
+# Committed rather than left in `.conductor/settings.local.toml`, so a new
+# workspace works for anybody who clones this — not only on the machine where
+# somebody once clicked through the settings panel.
+#
+# There is no `setup` script: dependencies live in the Docker image, and
+# `make up` prepares the workspace's database on first start. The gitignored
+# `.env` arrives via `.worktreeinclude` at the repository root.
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+[scripts]
+# Concurrent because each workspace takes its own Compose project and its own
+# port trio — see bin/dev. Several stacks running at once is the point.
+run_mode = "concurrent"
+
+[scripts.run.dev]
+# `make up` starts the stack detached and prints the workspace's URL; the logs
+# that follow are what makes it a useful long-running script.
+command = "make up && make logs"
+# Needs Docker, so local only.
+available_in = [ "local" ]
+default = true
+icon = "play"
+
+[scripts.run.check]
+command = "make test"
+available_in = [ "local" ]
+icon = "circle-check"

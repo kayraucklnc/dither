@@ -50,7 +50,7 @@ can flash boards over USB straight from the dashboard.
 
 [NOTE]
 ====
-Dither is a fork of link:https://github.com/usetrmnl/terminus[Terminus] by TRMNL, used
+Dither is a fork of link:https://github.com/usetrmnl/terminus[Dither] by TRMNL, used
 under the MIT licence; the original copyright notice is retained in `LICENSE.adoc`.
 
 Dither is the server only. It speaks the same device API as TRMNL hardware, so boards run

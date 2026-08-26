@@ -37,7 +37,6 @@ RSpec.describe Dither::Repositories::Screen, :db do
         model_id: model.id,
         name: "test",
         label: "Test",
-        template: nil,
         extension: nil,
         image_attributes: hash_including(
           metadata: hash_including(
@@ -137,7 +136,6 @@ RSpec.describe Dither::Repositories::Screen, :db do
         model_id: model.id,
         name: "test",
         label: "Test",
-        template: nil,
         extension: nil,
         image_attributes: hash_including(
           metadata: hash_including(

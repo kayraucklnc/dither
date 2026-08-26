@@ -12,9 +12,7 @@ module Dither
         include Deps[
           "aspects.devices.defaulter",
           "aspects.screens.interrupts.welcome",
-          repository: "repositories.device",
-          playlist_repository: "repositories.playlist",
-          item_repository: "repositories.playlist_item"
+          repository: "repositories.device"
         ]
 
         include Dry::Monads[:result]
@@ -43,11 +41,15 @@ module Dither
         def process(mac_address, **)
           cached_device = nil
 
+          # A new device gets a welcome screen and nothing else. What it shows
+          # after that is decided by rules, which are the owner's to write -
+          # inventing one here would make an unconfigured device look
+          # configured.
           pipe(
             create(mac_address, **),
             fmap { cached_device = it },
             bind { |device| welcome.call device },
-            fmap { |screen| configure cached_device, screen }
+            fmap { cached_device }
           )
         end
 
@@ -59,20 +61,6 @@ module Dither
           Failure error.message.sub(/.+DETAIL:  /m, "").strip
         end
 
-        def configure device, screen
-          playlist_id = create_playlist_id device
-          item = item_repository.create_with_position playlist_id:, screen_id: screen.id
-
-          playlist_repository.update playlist_id, current_item_id: item.id
-          repository.update device.id, playlist_id:
-        end
-
-        def create_playlist_id device
-          id = device.id
-          playlist = playlist_repository.create label: "Device #{id}", name: "device_#{id}"
-
-          playlist.id
-        end
       end
     end
   end

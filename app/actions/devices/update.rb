@@ -8,7 +8,6 @@ module Dither
         include Deps[
           repository: "repositories.device",
           model_repository: "repositories.model",
-          playlist_repository: "repositories.playlist",
           show_view: "views.devices.show"
         ]
 
@@ -39,7 +38,6 @@ module Dither
         def error device, parameters, response
           response.render view,
                           models: model_repository.all,
-                          playlists: playlist_repository.all,
                           device:,
                           fields: parameters[:device],
                           errors: parameters.errors[:device],

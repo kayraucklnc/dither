@@ -53,7 +53,7 @@ module Dither
 
       private
 
-      def with_associations = screen.combine :model, :template, :extension
+      def with_associations = screen.combine :model, :extension
 
       def update_with_image path, mold, record
         path.open { |io| record.replace io, metadata: {"filename" => mold.file_name} }

@@ -11,18 +11,6 @@
                     class: :value %>
   <% end %>
 
-  <%= scope(:form_field, key: :playlist_id, errors:).render do %>
-    <label class="key" for="device_playlist_id">
-      Playlist
-      <%= scope(:popover_trigger_button, tip: :info, target: :playlist).render %>
-    </label>
-
-    <%= form.select :playlist_id,
-                    select_options_for(playlists),
-                    id: :device_playlist_id,
-                    class: :value %>
-  <% end %>
-
   <%= scope(:form_field, key: :label, errors:).render do %>
     <label class="key" for="device_label">Label</label>
 

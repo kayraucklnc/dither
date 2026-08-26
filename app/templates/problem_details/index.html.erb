@@ -42,8 +42,6 @@
     <h2 class="label">Optional</h2>
 
     <dl class="bit-definition-list">
-      <dt class="key">playlist_id</dt>
-      <dd class="value">The playlist ID. The current device playlist. Default: <code>nil</code>.</dd>
 
       <dt class="key">api_key</dt>
       <dd class="value">The API Key. The unique API key for making Display API requests. Defaults to an auto-generated value when not supplied.</dd>
@@ -68,7 +66,6 @@
 
     <pre>
       "device": {
-        "playlist_id": "1",
         "model_id": 1,
         "label": "Demo",
         "mac_address": "A1:B2:C3:D4:E5:F6",
@@ -199,41 +196,6 @@
 
     <pre>
       "model": {
-        "name": "demo",
-        "label": "Demo"
-      }
-    </pre>
-  </details>
-
-  <details name="details">
-    <summary id="playlist_payload" class="summary">Playlist Payload</summary>
-
-    <p>Could not create or update playlist. When making an API HTTP POST request, the following is a list of all required and optional keys:</p>
-
-    <h2 class="label">Required</h2>
-
-    <dl class="bit-definition-list">
-      <dt class="key">name</dt>
-      <dd class="value">The unique name.</dd>
-
-      <dt class="key">label</dt>
-      <dd class="value">The unique label.</dd>
-    </dl>
-
-    <h2 class="label">Optional</h2>
-
-    <dl class="bit-definition-list">
-      <dt class="key">mode</dt>
-      <dd class="value">The playlist mode. This can be <code>automatic</code> (default) or <code>manual</code>.</dd>
-
-      <dt class="key">current_item_id</dt>
-      <dd class="value">The playlist curremt item ID. This is the item ID you want to make current.</dd>
-    </dl>
-
-    <p>Here's an example of a bare minimum request paylaod.</p>
-
-    <pre>
-      "playlist": {
         "name": "demo",
         "label": "Demo"
       }

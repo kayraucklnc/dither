@@ -6,14 +6,13 @@ module Dither
       # The show view.
       class Show < View
         include Deps[
-          design_relation: "relations.screen_template",
           device_repository: "repositories.device",
           device_relation: "relations.device",
           extension_relation: "relations.extension",
+          scene_relation: "relations.scene",
+          rule_relation: "relations.rule",
           firmware_relation: "relations.firmware",
           model_relation: "relations.model",
-          playlist_relation: "relations.playlist",
-          screen_relation: "relations.screen",
           user_relation: "relations.user"
         ]
 
@@ -28,14 +27,12 @@ module Dither
 
           "#{count} #{count == 1 ? "device" : "devices"} connected."
         end
-
-        expose(:design_count) { design_relation.count }
         expose(:device_count) { device_relation.count }
         expose(:extension_count) { extension_relation.count }
+        expose(:scene_count) { scene_relation.count }
+        expose(:rule_count) { rule_relation.count }
         expose(:firmware_count) { firmware_relation.count }
         expose(:model_count) { model_relation.count }
-        expose(:playlist_count) { playlist_relation.count }
-        expose(:screen_count) { screen_relation.count }
         expose(:user_count) { user_relation.count }
       end
     end

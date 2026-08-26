@@ -19,10 +19,6 @@ module Dither
 
       def find_by(**) = with_associations.where(**).one
 
-      def mirror_playlist ids, playlist_id
-        device.where(Sequel[playlist_id:] | Sequel[id: ids])
-              .update(playlist_id: Sequel.case({{id: ids} => playlist_id}, nil))
-      end
 
       def search key, value
         device.combine(:model)
@@ -48,7 +44,7 @@ module Dither
 
       private
 
-      def with_associations = device.combine :model, :playlist
+      def with_associations = device.combine :model
     end
   end
 end

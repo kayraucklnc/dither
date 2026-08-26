@@ -47,13 +47,4 @@ RSpec.describe "Scene flow", :db do
     expect(screen.value!.label).to eq "Morning"
   end
 
-  it "keeps serving playlists to devices that have no rules" do
-    device = Factory[:device, model_id: model.id]
-    result = Hanami.app["aspects.screens.fetcher"].call Hanami.app["repositories.device"].find(device.id)
-
-    # No rules and no playlist is a failure, not a crash, and crucially not a
-    # detour through the rule path.
-    expect(result).to be_failure
-    expect(result.failure).to match(/playlist/)
-  end
 end

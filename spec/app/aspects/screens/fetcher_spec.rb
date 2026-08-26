@@ -5,51 +5,48 @@ require "hanami_helper"
 RSpec.describe Dither::Aspects::Screens::Fetcher, :db do
   subject(:fetcher) { described_class.new }
 
+  let(:model) { Factory[:model, width: 800, height: 480] }
+  let(:device) { Dither::Aspects::Devices::Provisioner.new.call(model_id: model.id).value! }
+  let(:repository) { Dither::Repositories::Device.new }
+
   describe "#call" do
-    let(:device) { provisioner.call(model_id: Factory[:model].id).value! }
-    let(:provisioner) { Dither::Aspects::Devices::Provisioner.new }
-    let(:playlist_repository) { Dither::Repositories::Playlist.new }
-    let(:item_repository) { Dither::Repositories::PlaylistItem.new }
-
-    it "answers welcome screen when device is new" do
-      expect(fetcher.call(device).success).to have_attributes(label: /Welcome/)
-    end
-
-    it "answers custom screen when device has updated playlist" do
-      playlist = playlist_repository.find device.playlist_id
-      result = Dither::Aspects::Screens::Upserter.new.call model_id: device.model_id,
-                                                             label: "Test",
-                                                             name: "test",
-                                                             content: "<h1>Test</h1>"
-
-      result.bind do |screen|
-        item = item_repository.create_with_position playlist_id: playlist.id, screen_id: screen.id
-        playlist_repository.update playlist.id, current_item_id: item.id
-      end
-
-      expect(fetcher.call(device).success).to have_attributes(label: /Test/)
-    end
-
-    it "answers sleep screen when device is asleep" do
+    it "answers the sleep screen when the device is asleep" do
       allow(device).to receive(:asleep?).and_return true
+
       expect(fetcher.call(device).success).to have_attributes(label: /Sleep/)
     end
 
-    it "answers failure when device has no playlist" do
-      device = Factory[:device]
-
-      expect(fetcher.call(device)).to be_failure(
-        "Unable to fetch screen. Can't find playlist with ID: nil."
-      )
+    it "answers the welcome screen when the device has no rules" do
+      expect(fetcher.call(device).success).to have_attributes(label: /Welcome/)
     end
 
-    it "answers failure when device has no playlist current item" do
-      playlist = Factory[:playlist]
-      device = Factory[:device, playlist_id: playlist.id]
+    it "answers the scene a matching rule points at" do
+      extension = Factory[:extension, template: %(<div class="screen">Hi</div>)]
+      scene = Factory[:scene, label: "Morning", layout: "full", model_id: model.id]
+      Factory[:scene_slot, scene_id: scene.id, slot_key: "main", extension_id: extension.id]
+      Factory[:rule, device_id: device.id, scene_id: scene.id, position: 0]
 
-      expect(fetcher.call(device)).to be_failure(
-        "Unable to fetch screen. Can't find current playlist item with ID: nil."
-      )
+      expect(fetcher.call(repository.find(device.id)).success).to have_attributes(label: "Morning")
+    end
+
+    it "falls back to welcome when no rule matches" do
+      scene = Factory[:scene, label: "Morning", layout: "full"]
+      Factory[:rule, device_id: device.id, scene_id: scene.id, position: 0,
+              condition_kind: "battery_below", settings: {"percent" => 0}]
+
+      expect(fetcher.call(repository.find(device.id)).success).to have_attributes(label: /Welcome/)
+    end
+
+    it "prefers the higher rule when two match" do
+      extension = Factory[:extension, template: %(<div class="screen">Hi</div>)]
+      first = Factory[:scene, label: "First", name: "first", layout: "full", model_id: model.id]
+      second = Factory[:scene, label: "Second", name: "second", layout: "full", model_id: model.id]
+      Factory[:scene_slot, scene_id: first.id, slot_key: "main", extension_id: extension.id]
+      Factory[:scene_slot, scene_id: second.id, slot_key: "main", extension_id: extension.id]
+      Factory[:rule, device_id: device.id, scene_id: first.id, position: 0]
+      Factory[:rule, device_id: device.id, scene_id: second.id, position: 1]
+
+      expect(fetcher.call(repository.find(device.id)).success).to have_attributes(label: "First")
     end
   end
 end

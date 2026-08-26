@@ -8,7 +8,6 @@ module Dither
       KEYS = %i[
         id
         model_id
-        playlist_id
         label
         mac_address
         api_key

@@ -12,23 +12,39 @@ module Dither
           config.formats.register :png, "image/png"
           config.formats.register :bmp, "image/bmp"
 
-          include Deps["aspects.scenes.renderer"]
+          include Deps["aspects.scenes.renderer", scene_repository: "repositories.scene"]
 
+          # Renders either a saved scene by id, or a composition in progress
+          # from its layout and slots. The composer needs the second; every
+          # place that lets you pick a scene needs the first, because picking
+          # one from a dropdown you cannot see is guesswork.
           def handle request, response
-            slots = Hash(request.params[:slots]).transform_keys(&:to_s)
-                                                .transform_values(&:to_i)
-                                                .reject { |_, id| id.zero? }
-
-            result = renderer.call request.params[:layout],
-                                   slots,
-                                   model_id: request.params[:model_id],
-                                   preview: true
+            result = saved(request.params) || composed(request.params)
 
             result.either -> render { send_image response, render },
                           -> failure { send_failure response, failure }
           end
 
           private
+
+          def saved parameters
+            scene = scene_repository.find parameters[:id]
+
+            return nil unless scene
+
+            renderer.call scene.layout,
+                          scene.assignments,
+                          model_id: parameters[:model_id] || scene.model_id,
+                          preview: true
+          end
+
+          def composed parameters
+            slots = Hash(parameters[:slots]).transform_keys(&:to_s)
+                                            .transform_values(&:to_i)
+                                            .reject { |_, id| id.zero? }
+
+            renderer.call parameters[:layout], slots, model_id: parameters[:model_id], preview: true
+          end
 
           def send_image response, render
             response.format = render.mime_type.include?("bmp") ? :bmp : :png
