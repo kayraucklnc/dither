@@ -9,6 +9,8 @@
 :rfc_2626_link: link:https://www.rfc-editor.org/rfc/rfc822[RFC 2616]
 :trmnl_liquid_gem_link: link:https://github.com/usetrmnl/trmnl-liquid[TRMNL Liquid]
 :trmnl_sensor_scanner_link: link:https://github.com/usetrmnl/sensor_scanner[Sensor Scanner]
+:transit_link: link:/doc/transit.adoc[Transit]
+:views_link: link:/doc/extension_views.adoc[Extension Views]
 
 = Extensions
 
@@ -31,6 +33,8 @@ The following provides a visual roadmap of current development and work that is 
 |===
 |                          | Status
 | Native                   | ⚪️
+| Transit                  | 🟢
+| Views                    | 🟢
 | Private                  | 🟢
 | Public                   | 🟢
 | Third Party              | ⚪️
@@ -38,6 +42,22 @@ The following provides a visual roadmap of current development and work that is 
 | Import (Core)            | 🟢
 | Import/Export (Terminus) | 🟢
 |===
+
+== Kinds
+
+[options="header"]
+|===
+| Kind | Renders
+| Image | Remote images.
+| Poll | Remote data, fetched through exchanges.
+| Static | Local data supplied as JSON.
+| Transit | A live public transport departure board. See {transit_link}.
+|===
+
+== Views
+
+An extension declares the shapes it can render and the sizes each survives at,
+rather than storing a layout as a setting. See {views_link}.
 
 == Walkthrough
 

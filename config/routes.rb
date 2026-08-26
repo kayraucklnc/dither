@@ -14,7 +14,9 @@ module Terminus
     # Order matters.
     use Rack::Attack
     use Aspects::Designs::Middleware, pattern: %r(/preview/(?<id>.+))
-    use Rack::Static, root: "public", urls: ["/.well-known/security.txt", "/downloads", "/fonts", "/uploads"]
+    use Rack::Static,
+        root: "public",
+        urls: ["/.well-known/security.txt", "/downloads", "/fonts", "/uploads"]
     use Rack::Deflater
 
     slice :authentication, at: "/" do
@@ -125,6 +127,9 @@ module Terminus
     delete "/extensions/:extension_id/exchanges/:id",
            to: "extensions.exchanges.delete",
            as: :extension_exchange
+
+    get "/transit/catalog", to: "transit.catalog.index", as: :transit_catalog
+    get "/transit/stations", to: "transit.stations.index", as: :transit_stations
 
     get "/extensions/:extension_id/export", to: "extensions.export.show", as: :extension_export
     get "/extensions/:extension_id/preview", to: "extensions.preview.show", as: :extension_preview

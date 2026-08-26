@@ -26,6 +26,7 @@ import "../css/bits/secrets.css";
 import "../css/bits/text.css";
 import "../css/bits/toggles.css";
 import "../css/bits/tooltips.css";
+import "../css/bits/transit.css";
 import "../css/pages/dashboard.css";
 import "../css/pages/designer.css";
 import "../css/pages/devices.css";
@@ -36,6 +37,7 @@ import "../css/theme.css";
 import "./theme_toggle.js";
 import "./flash.js";
 import "./copy_button.js";
+import "./transit_settings.js";
 
 import Alpine from "alpinejs";
 import htmx from "htmx.org";

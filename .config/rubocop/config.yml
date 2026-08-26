@@ -31,6 +31,7 @@ Metrics/MethodLength:
     - cloneable_attributes
     - device_attributes
     - export_attributes
+    - liquid_attributes
     - wifi_percentage
   Exclude:
     - app/aspects/screens/converters/color.rb
@@ -40,8 +41,18 @@ Metrics/MethodLength:
     - config/initializers/universal_logger_patch.rb
 Metrics/ParameterLists:
   Exclude:
+    # Render context assembly: model, device, and view are all callers' choices.
+    - app/aspects/extensions/contextualizer.rb
+    - app/aspects/extensions/generator.rb
     - app/aspects/extensions/fetcher/request.rb
     - app/aspects/screens/placeholder.rb
+    # Value objects: the parameter list is the shape of the data.
+    - app/aspects/transit/board.rb
+    - app/aspects/transit/departure.rb
+    - app/aspects/transit/settings.rb
+    - app/aspects/transit/station.rb
+    # Mirrors Trenord's own query string.
+    - app/aspects/transit/providers/trenord/client.rb
 Naming/VariableNumber:
   AllowedPatterns:
     - md5

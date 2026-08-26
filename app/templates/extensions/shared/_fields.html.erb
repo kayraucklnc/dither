@@ -91,7 +91,8 @@
                    items: [
                      %w[Image image],
                      %w[Poll poll],
-                     %w[Static static]
+                     %w[Static static],
+                     %w[Transit transit]
                    ],
                    name: "extension[kind]",
                    model: "kind" %>
@@ -106,6 +107,11 @@
 
         <p class="help" x-show="kind === 'static'">
           Render local data. Use the static body field, below, to supply JSON data.
+        </p>
+
+        <p class="help" x-show="kind === 'transit'">
+          Render a public transport departure board. Pick a country, city, and provider
+          via the fields below; no exchanges are needed.
         </p>
       </div>
 

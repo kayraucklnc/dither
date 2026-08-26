@@ -1,0 +1,143 @@
+:toc: macro
+:toclevels: 5
+:figure-caption!:
+
+= Extension Views
+
+An extension does not know where it will be shown. A screen might hand it the
+whole panel, a band across the top, a column down one side, or a card floating
+over something else. *Views* are how an extension answers that: it declares the
+shapes it can render and the sizes each one survives at, and whoever is placing
+it picks one.
+
+toc::[]
+
+== The rule
+
+*A view is never a setting.*
+
+Which view renders is a placement decision, made by whatever is composing the
+screen. The extension only advertises. This matters because the same extension
+will be placed differently on different devices, and a value stored in the
+extension's settings cannot be two things at once.
+
+== Declaring views
+
+Views live under the `views` key of an extension's `data`, so they travel with
+the extension through export and import:
+
+[source,yaml]
+----
+data:
+  views:
+    - name: full
+      label: Full screen
+      shape: full
+      description: The whole canvas.
+      width:
+        min: 400
+        ideal: 800
+        max: 1600
+      height:
+        min: 300
+        ideal: 480
+        max: 1200
+      align:
+        - fill
+----
+
+[options="header"]
+|===
+| Key | Meaning
+| `name` | Unique within the extension. What a caller asks for.
+| `label` | Human name. Defaults to the capitalized `name`.
+| `shape` | Form factor. Defaults to `name`. See below.
+| `description` | One sentence, shown wherever views are listed.
+| `width` / `height` | `min`, `ideal`, and `max` in pixels.
+| `align` | The anchors this view can be placed at. A list of options, not a choice.
+|===
+
+An extension that declares nothing gets a single `full` view spanning
+200–2000px in both directions.
+
+== Shapes, not positions
+
+Name a view for its *form factor*, not for where you imagine it sitting. A wide
+short strip is `horizontal` whether it ends up at the top or the bottom; where
+it actually goes is one of the anchors in `align`.
+
+[options="header"]
+|===
+| Shape | Form | Typical anchors
+| `full` | Takes the whole canvas | `fill`
+| `horizontal` | Wide and short | `top`, `middle`, `bottom`
+| `vertical` | Narrow and tall | `left`, `middle`, `right`
+| `overlay` | Small, drawn over other content | corners, `center`
+|===
+
+== Rendering a view
+
+The renderer resolves the requested view and puts it in the Liquid context, so
+a template branches on shape:
+
+[source,liquid]
+----
+{% assign shape = view.shape | default: "full" %}
+
+{% if shape == "horizontal" %}
+  ...
+{% elsif shape == "vertical" %}
+  ...
+{% endif %}
+----
+
+Available keys:
+
+* `view.name`, `view.label`, `view.shape`, `view.description`
+* `view.width` and `view.height`, each `{min, ideal, max}`
+* `view.align`, the anchors on offer
+* `view.size`, the concrete `{width, height}` this render was given, clamped to
+  the declared bounds
+* `views`, the whole manifest, for anything that needs to list what is supported
+
+To see a specific view, add `?view=<name>` to an extension's preview URL. A
+request for an unknown view is not an error: the first declared view renders
+instead, because a layout page may know about shapes an older extension does
+not.
+
+== Declaring a range means surviving it
+
+`min` and `max` are a promise. A design that only works at its ideal size
+should not claim a range it cannot hold.
+
+The cheapest way to keep the promise is to size type and spacing against the
+canvas rather than in fixed pixels:
+
+[source,css]
+----
+.dep-time { font-size: clamp(15px, 6vh, 42px); }
+.dep { padding: clamp(2px, 1vh, 8px) 0; column-gap: clamp(6px, 2vw, 18px); }
+----
+
+Rows that share the space with `flex: 1 1 0` and clip with `overflow: hidden`
+then hold together at every size in between. Render at `min`, at `ideal`, and
+at `max` before believing the numbers.
+
+== Drawing for e-ink
+
+Renders are dithered to 1 or 2 bits, so mid-greys become noise and hairlines
+disappear. Use filled black shapes, heavy rules, and large type steps.
+
+Icons should be single `evenodd` paths whose counters are real holes rather
+than white shapes, so a glyph stays legible when it lands on an inverted
+surface such as an overlay card:
+
+[source,html]
+----
+<svg viewBox="0 0 24 24">
+  <path fill-rule="evenodd" d="M12 1.5 23.5 22H.5Zm-1.2 7.9v6.4h2.4V9.4Zm0 8v2.2h2.4v-2.2Z"/>
+</svg>
+----
+
+The link:/doc/transit.adoc[Transit documentation] has a worked example of all
+four shapes sharing one template and one icon set.

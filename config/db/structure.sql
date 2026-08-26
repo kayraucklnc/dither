@@ -85,7 +85,8 @@ CREATE TYPE public.extension_kind_enum AS ENUM (
     'poll',
     'secure',
     'static',
-    'webhook'
+    'webhook',
+    'transit'
 );
 
 
@@ -1799,4 +1800,5 @@ INSERT INTO schema_migrations (filename) VALUES
 ('20260810100653_add_screen_extension_id_column.rb'),
 ('20260810102551_drop_screen_device_id_and_kind_index.rb'),
 ('20260824132105_add_device_firmware_reset_column.rb'),
-('20260825130920_drop_screen_kind_enum.rb');
+('20260825130920_drop_screen_kind_enum.rb'),
+('20260827004500_add_transit_extension_kind.rb');

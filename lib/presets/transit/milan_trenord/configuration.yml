@@ -1,0 +1,176 @@
+---
+version: "0.1.0"
+name: milan-trenord
+label: Milan Trains
+description: Live Trenord departures between two stations in Lombardy.
+mode: text
+kind: transit
+tags:
+  - transit
+  - milan
+  - trenord
+static_body:
+fields:
+  - keyname: country
+    field_type: select
+    name: Country
+    description: Where you are travelling.
+    default: it
+    options:
+      - Italy: it
+  - keyname: city
+    field_type: select
+    name: City
+    description: Only Milan is supported today.
+    default: milan
+    options:
+      - Milan: milan
+  - keyname: provider
+    field_type: select
+    name: Provider
+    description: The operator whose timetable is read.
+    default: trenord
+    options:
+      - Trenord: trenord
+  - keyname: origin
+    field_type: string
+    name: Origin station
+    description: Your station, spelled the way Trenord spells it. The example below is only a starting point.
+    default: MILANO CERTOSA
+  - keyname: destination
+    field_type: string
+    name: Destination station
+    description: Where you are heading. Trenord plans journeys, so a board always points somewhere. Change this.
+    default: MILANO CADORNA
+  - keyname: lead_time
+    field_type: number
+    name: Lead time (minutes)
+    description: How long it takes you to reach the platform. Trains leaving sooner are hidden.
+    default: 0
+  - keyname: limit
+    field_type: number
+    name: Departures
+    description: How many trains to show, 1 to 20.
+    default: 5
+  - keyname: transfers
+    field_type: number
+    name: Maximum changes
+    description: 0 keeps the board to direct trains only.
+    default: 0
+  - keyname: language
+    field_type: select
+    name: Language
+    description: Language used for service alerts.
+    default: en
+    options:
+      - English: en
+      - Italiano: it
+  - keyname: title
+    field_type: string
+    name: Title
+    description: Overrides the heading. Leave blank to use the origin station.
+    optional: true
+    default:
+  - keyname: show_platform
+    field_type: select
+    name: Show platform
+    description: Platforms are only published once a train is close to departure.
+    default: "true"
+    options:
+      - "Yes": "true"
+      - "No": "false"
+  - keyname: hide_cancelled
+    field_type: select
+    name: Hide cancelled
+    description: Cancelled trains are worth seeing, so they are shown by default.
+    default: "false"
+    options:
+      - "Yes": "true"
+      - "No": "false"
+data:
+  # What this extension can render, and at what sizes. Declared, not chosen:
+  # a layout page asks for one of these at a size inside the bounds, and the
+  # extension renders itself to fit. Nobody picks a view in the settings.
+  views:
+    - name: full
+      label: Full screen
+      shape: full
+      description: The whole canvas. Next train large, then the rest as a list.
+      width:
+        min: 400
+        ideal: 800
+        max: 1600
+      height:
+        min: 300
+        ideal: 480
+        max: 1200
+      align:
+        - fill
+    - name: horizontal
+      label: Horizontal band
+      shape: horizontal
+      description: A wide, short strip of chips that reads from across the room.
+      width:
+        min: 400
+        ideal: 800
+        max: 1600
+      height:
+        min: 96
+        ideal: 160
+        max: 220
+      align:
+        - top
+        - middle
+        - bottom
+    - name: vertical
+      label: Vertical column
+      shape: vertical
+      description: A narrow, tall column of departures beside other content.
+      width:
+        min: 180
+        ideal: 264
+        max: 360
+      height:
+        min: 300
+        ideal: 480
+        max: 1200
+      align:
+        - left
+        - middle
+        - right
+    - name: overlay
+      label: Overlay card
+      shape: overlay
+      description: One train only, inverted, drawn over whatever is underneath.
+      width:
+        min: 220
+        ideal: 320
+        max: 420
+      height:
+        min: 88
+        ideal: 120
+        max: 160
+      align:
+        - top-left
+        - top-right
+        - bottom-left
+        - bottom-right
+        - center
+  values:
+    country: it
+    city: milan
+    provider: trenord
+    origin: MILANO CERTOSA
+    destination: MILANO CADORNA
+    lead_time: 0
+    limit: 5
+    transfers: 0
+    language: en
+    show_platform: true
+    hide_cancelled: false
+interval: 5
+unit: minute
+days: []
+last_day_of_month: false
+start_at: "2026-01-01T00:00:00"
+exchanges: []

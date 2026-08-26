@@ -1,6 +1,7 @@
 *.env*
 !*.env*.tt
 *.log
+*.log.*
 .bundle
 .DS_Store
 # compose.dev.yml is committed here: it is this fork's hand-written dev overlay,
