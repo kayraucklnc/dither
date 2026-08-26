@@ -407,3 +407,94 @@ code, pre, .mono { font-family: var(--site-font-family-mono); }
     border: 0;
   }
 }
+
+/* ---------- Compact media tiles (screens, designs) -------------------- */
+/* Replaces the tall bit-card: the artwork is the content, so metadata and
+ * actions stay small and the card must not move on hover - the old
+ * scale-on-hover read as things jumping around under the cursor. */
+
+.bit-gallery {
+  display: grid;
+  gap: var(--site-space-md);
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tile {
+  background-color: var(--site-surface);
+  border: 1px solid var(--site-border);
+  border-radius: var(--site-radius-lg);
+  display: grid;
+  overflow: hidden;
+  position: relative;
+  transition: border-color var(--site-duration-fast) var(--site-ease);
+
+  &:hover { border-color: var(--site-border-strong); }
+
+  /* No translate, no scale: the tile stays put. */
+  &:hover .tile-actions { opacity: 1; pointer-events: auto; }
+}
+
+.tile-preview {
+  aspect-ratio: 5 / 3;
+  background-color: var(--site-surface-sunken);
+  border-block-end: 1px solid var(--site-border);
+  cursor: zoom-in;
+  display: block;
+  overflow: hidden;
+
+  img { block-size: 100%; display: block; inline-size: 100%; object-fit: contain; }
+}
+
+.tile-body { display: grid; gap: 0.1rem; padding: var(--site-space-sm) var(--site-space-md); }
+
+.tile-name {
+  font-size: var(--site-text-sm);
+  font-weight: 600;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tile-meta {
+  color: var(--site-ink-subtle);
+  font-size: var(--site-text-xs);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  .dot { margin-inline: 0.3rem; }
+  a { color: inherit; }
+}
+
+/* Actions float over the preview instead of adding a fourth row of height. */
+.tile-actions {
+  backdrop-filter: blur(6px);
+  background-color: color-mix(in oklch, var(--site-surface) 88%, transparent);
+  border: 1px solid var(--site-border);
+  border-radius: var(--site-radius-pill);
+  display: flex;
+  gap: 0.15rem;
+  inset-block-start: var(--site-space-xs);
+  inset-inline-end: var(--site-space-xs);
+  opacity: 0;
+  padding: 0.2rem;
+  pointer-events: none;
+  position: absolute;
+  transition: opacity var(--site-duration-fast) var(--site-ease);
+
+  a, button, form { display: inline-flex; }
+
+  .icon { block-size: 16px; inline-size: 16px; }
+}
+
+/* Keyboard users never hover, so reveal on focus too. */
+.tile:focus-within .tile-actions { opacity: 1; pointer-events: auto; }
+
+@media (hover: none) {
+  .tile-actions { opacity: 1; pointer-events: auto; }
+}

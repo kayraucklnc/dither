@@ -1,26 +1,27 @@
-<li id="<%= screen.id %>" class="bit-card screen">
-  <h2 class="label"><%= screen.label %></h2>
-
+<li id="<%= screen.id %>" class="tile">
   <%= scope(
         :popover_trigger_button,
         target: "screen-#{screen.id}"
       ).render("shared/popovers/triggers/screen") do %>
-    <%= render "shared/screen", uri: screen.image_uri %>
+    <span class="tile-preview">
+      <%= tag.img src: screen.image_uri, alt: screen.label, loading: :lazy %>
+    </span>
   <% end %>
 
   <%= scope(:popover_screen_content, **screen.popover_attributes).render %>
 
-  <span class="type">
-    <%= link_to screen.model.label, routes.path(:model, id: screen.model_id) %>
-  </span>
+  <div class="tile-body">
+    <p class="tile-name" title="<%= screen.label %>"><%= screen.label %></p>
+    <p class="tile-meta">
+      <%= link_to screen.model.label, routes.path(:model, id: screen.model_id) %>
+      <span class="dot">·</span><%= screen.dimensions %>
+    </p>
+  </div>
 
-  <span class="type"><%= screen.dimensions %></span>
-
-  <div class="actions">
+  <div class="tile-actions">
     <%= render "shared/actions/view", path: routes.path(:screen, id: screen.id) %>
     <%= render "shared/actions/edit", path: routes.path(:screen_edit, id: screen.id) %>
     <%= render "shared/actions/download", path: screen.image_uri, name: screen.image_name %>
-
     <%= render "shared/actions/delete",
                path: routes.path(:screen, id: screen.id),
                subject: :screen %>
