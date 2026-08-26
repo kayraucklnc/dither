@@ -102,6 +102,30 @@ fields:
     help_text: Defaults to "origin to destination".
     optional: true
 
+# What a rule may ask this extension about.
+facts:
+  - key: next_departure_in
+    label: Next departure leaves in
+    type: duration
+    path: transit.departures.0.minutes_until
+    unit: minutes
+
+  - key: next_delay
+    label: Next departure delay
+    type: duration
+    path: transit.departures.0.delay
+    unit: minutes
+
+  - key: next_cancelled
+    label: Next departure cancelled
+    type: boolean
+    path: transit.departures.0.cancelled
+
+  - key: alert
+    label: Service alert
+    type: text
+    path: transit.alerts.0.title
+
 # Shaped exactly like a real board, so a design that reads well here reads well
 # in the field.
 sample:
@@ -114,6 +138,7 @@ sample:
     empty: false
     departures:
       - line: "S3"
+        minutes_until: 6
         number: "24015"
         direction: "Saronno"
         scheduled: "08:12"
@@ -129,6 +154,7 @@ sample:
         live: true
         status: "DELAYED"
       - line: "R14"
+        minutes_until: 21
         number: "2612"
         direction: "Como Lago"
         scheduled: "08:27"
@@ -144,6 +170,7 @@ sample:
         live: true
         status: "ON TIME"
       - line: "S1"
+        minutes_until: 36
         number: "24019"
         direction: "Saronno"
         scheduled: "08:42"

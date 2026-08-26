@@ -110,7 +110,52 @@ module Dither
       }
     ]
 
-    ALL = [ALWAYS, BETWEEN, WEEKDAY, BATTERY_BELOW, CHARGING, OFFLINE_SINCE].freeze
+    WIFI_BELOW = Kind[
+      id: "wifi_below",
+      label: "Signal below",
+      summary: proc { |it| "signal below #{it.fetch "percent", 30}%" },
+      fields: [
+        Field[key: "percent", label: "Percent", kind: "number", default: 30, hint: "0 to 100."]
+      ],
+      evaluator: proc { |device, settings, _now|
+        device.wifi_percentage.to_f < settings.fetch("percent", 30).to_f
+      }
+    ]
+
+    # The open one. Any extension that declares facts becomes a trigger source
+    # without the rule engine learning anything about what it does: a calendar
+    # connector publishing "next meeting starts in" gives you commute triggers,
+    # and nothing here changes.
+    #
+    # Evaluated through a reader rather than inline, because values live on the
+    # extension's exchanges.
+    EXTENSION_FACT = Kind[
+      id: "extension_fact",
+      label: "Something an extension knows",
+      summary: proc { |it|
+        subject = it["fact_label"].to_s.empty? ? it["fact"].to_s.tr("_", " ") : it["fact_label"]
+        operator = Facts.operator it["operator"]
+        phrase = operator ? operator.label : "is"
+        value = operator && !operator.value? ? nil : it["value"]
+
+        ["#{it["extension_label"] || "an extension"}:", subject, phrase, value].compact.join(" ").strip
+      },
+      fields: [],
+      evaluator: proc { |_device, settings, _now|
+        Conditions.extension_fact_holds? settings
+      }
+    ]
+
+    ALL = [
+      ALWAYS,
+      BETWEEN,
+      WEEKDAY,
+      EXTENSION_FACT,
+      BATTERY_BELOW,
+      CHARGING,
+      WIFI_BELOW,
+      OFFLINE_SINCE
+    ].freeze
     BY_ID = ALL.to_h { [it.id, it] }.freeze
     DEFAULT = ALWAYS.id
 
@@ -127,6 +172,18 @@ module Dither
       found = kind kind_id
 
       found ? found.holds?(device, settings, now) : false
+    end
+
+    # Resolved through the container so the vocabulary stays a plain module
+    # while still reaching the repositories a fact needs.
+    def self.extension_fact_holds? settings
+      extension = Hanami.app["repositories.extension"].find settings["extension_id"]
+
+      return false unless extension
+
+      actual = Hanami.app["aspects.extensions.fact_reader"].value extension, settings["fact"]
+
+      Facts.compare actual, settings["operator"], settings["value"]
     end
 
     def self.describe kind_id, settings

@@ -19,6 +19,7 @@ module Dither
               required(:template).filled :string
               optional(:variants).maybe :hash
               optional(:sample).maybe :hash
+              optional(:facts).maybe :array
               required(:fields).maybe :array
               required(:data).maybe :hash
               required(:interval).maybe :integer

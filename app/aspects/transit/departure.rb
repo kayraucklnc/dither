@@ -41,6 +41,24 @@ module Dither
 
         def delayed? = delay.to_i.positive?
 
+        # Minutes from now until this leaves. The board shows a wall clock
+        # time, but a rule wants "leaves in under ten minutes", and computing
+        # that from "HH:MM" in a condition would put clock parsing in the rule
+        # engine.
+        def minutes_until now: Time.now
+          hour, minute = expected.to_s.split(":").map(&:to_i)
+
+          return nil unless hour
+
+          target = (hour * 60) + minute
+          current = (now.hour * 60) + now.min
+          elapsed = target - current + (day_offset.to_i * 1_440)
+
+          # A time that has just passed reads as tomorrow without this, which
+          # would make "leaves in under ten minutes" quietly never fire.
+          elapsed.negative? && elapsed > -120 ? 0 : elapsed
+        end
+
         def direct? = changes.to_i.zero?
 
         # Answers the single word a board puts in its status column.
@@ -60,6 +78,7 @@ module Dither
             "scheduled" => scheduled,
             "expected" => expected,
             "delay" => delay,
+            "minutes_until" => minutes_until,
             "delayed" => delayed?,
             "platform" => platform,
             "platform_actual" => platform_actual,
