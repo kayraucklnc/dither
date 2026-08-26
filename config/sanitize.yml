@@ -6,6 +6,15 @@ css:
     - "--dither-pixel-ratio"
     - "--ui-scale"
     - "--gap-scale"
+    # Dither screen framework tokens. Sanitize drops custom properties it
+    # does not know, which would empty :root and break every screen.
+    - "--ink"
+    - "--paper"
+    - "--rule"
+    - "--pad"
+    - "--gap"
+    - "--font"
+    - "--font-mono"
 elements:
   - canvas
   - circle

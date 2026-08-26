@@ -47,15 +47,17 @@ module Terminus
 
           job.perform_async screen.model_id, screen_template.screen_attributes.stringify_keys!
           response.render view, template: screen_template, layout: htmx_layout.call(request)
+        rescue Sequel::UniqueConstraintViolation
+          error request, parameters, response, name: ["has already been taken."]
         end
 
-        def error request, parameters, response
+        def error request, parameters, response, extra = {}
           template = find_template parameters
 
           response.render view,
                           template: template,
                           fields: parameters[:design],
-                          errors: parameters.errors[:design],
+                          errors: parameters.errors[:design].to_h.merge(extra),
                           layout: htmx_layout.call(request)
         end
 

@@ -38,14 +38,18 @@ module Terminus
 
           upserter.call(model_id: parameters[:model_id], **screen_template.screen_attributes)
           response.redirect_to routes.path(:design_edit, id: screen_template.id)
+        rescue Sequel::UniqueConstraintViolation
+          # `name` is unique in the schema. Without this the violation escapes as
+          # an unhandled 500 and the user loses everything they typed.
+          error response, parameters, name: ["has already been taken."]
         end
 
-        def error response, parameters
+        def error response, parameters, extra = {}
           response.render view,
                           models: model_repository.all,
                           template: nil,
                           fields: parameters[:design],
-                          errors: parameters.errors[:design]
+                          errors: parameters.errors[:design].to_h.merge(extra)
         end
       end
     end
