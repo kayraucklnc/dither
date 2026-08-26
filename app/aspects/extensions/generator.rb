@@ -12,14 +12,15 @@ module Terminus
           "aspects.extensions.contextualizer",
           "aspects.extensions.generators.image",
           "aspects.extensions.generators.poll",
-          "aspects.extensions.generators.static"
+          "aspects.extensions.generators.static",
+          "aspects.extensions.generators.transit"
         ]
         include Dry::Monads[:result]
 
         using Refinements::Hash
 
-        def call extension, model_id: nil, device_id: nil
-          process extension, contextualizer.call(extension, model_id:, device_id:)
+        def call extension, model_id: nil, device_id: nil, view: nil
+          process extension, contextualizer.call(extension, model_id:, device_id:, view:)
         end
 
         private
@@ -31,6 +32,7 @@ module Terminus
             when "image" then image.call extension, context:
             when "poll" then poll.call extension, context:
             when "static" then static.call extension, context:
+            when "transit" then transit.call extension, context:
             else Failure "Unsupported extension kind: #{kind}."
           end
         end

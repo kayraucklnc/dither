@@ -7,6 +7,19 @@ RSpec.describe Terminus::Aspects::Extensions::Contextualizer, :db do
 
   using Refinements::Hash
 
+  # An extension that declares nothing still gets the default full screen view.
+  let :default_view do
+    {
+      "name" => "full",
+      "label" => "Full screen",
+      "shape" => "full",
+      "description" => "Takes the whole screen.",
+      "width" => {"min" => 200, "max" => 2_000, "ideal" => nil},
+      "height" => {"min" => 120, "max" => 2_000, "ideal" => nil},
+      "align" => %w[fill]
+    }
+  end
+
   describe "#call" do
     let :extension do
       Factory.structs[
@@ -55,7 +68,27 @@ RSpec.describe Terminus::Aspects::Extensions::Contextualizer, :db do
             "source" => "device",
             "created_at" => Time.new(2025, 1, 1).utc
           }
-        ]
+        ],
+        "view" => default_view.merge("size" => {"width" => 800, "height" => 480}),
+        "views" => [default_view]
+      )
+    end
+
+    it "answers the view a caller asks for" do
+      extension = Factory.structs[
+        :extension,
+        data: {
+          "views" => [
+            {"name" => "full"},
+            {"name" => "vertical", "label" => "Side rail", "shape" => "vertical"}
+          ]
+        }
+      ]
+
+      expect(contextualizer.call(extension, view: "vertical")["view"]).to include(
+        "name" => "vertical",
+        "shape" => "vertical",
+        "label" => "Side rail"
       )
     end
 
@@ -72,7 +105,9 @@ RSpec.describe Terminus::Aspects::Extensions::Contextualizer, :db do
           "device" => {}
         },
         "screen_variables" => nil,
-        "sensors" => []
+        "sensors" => [],
+        "view" => default_view.merge("size" => {"width" => 200, "height" => 120}),
+        "views" => [default_view]
       )
     end
   end
