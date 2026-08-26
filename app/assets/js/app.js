@@ -32,6 +32,7 @@ import "../css/pages/devices.css";
 import "../css/pages/problem_details.css";
 import "../css/pages/scenes.css";
 import "../css/pages/rules.css";
+import "../css/pages/extensions.css";
 import "../css/theme.css";
 
 import "./theme_toggle.js";

@@ -1,20 +1,16 @@
 <%= render "shared/title", text: "Extensions" %>
 
-<section class="bit-page page-extensions">
-  <header class="bit-header">
-    <h1 class="label">
-      Extensions
+<section class="page-extensions">
+  <header class="ext-header">
+    <div>
+      <h1>Extensions</h1>
+      <p class="sub">
+        A block of content with a data source behind it. Drop one into a scene
+        slot whose shape it fits.
+      </p>
+    </div>
 
-      <%= scope(
-            :popover_trigger_button,
-            tip: :info,
-            target: :overview,
-            width: 20,
-            height: 20
-          ).render %>
-    </h1>
-
-    <div class="bit-actions">
+    <div class="ext-header-actions">
       <%= render "shared/actions/search", path: routes.path(:extensions), query: %>
 
       <%= scope(
@@ -26,14 +22,14 @@
         height: 25
       ).render %>
 
-      <%= render "shared/actions/new", path: routes.path(:extension_new) %>
+      <%= link_to "New extension", routes.path(:extension_new), class: "bit-button-accept" %>
     </div>
   </header>
 
   <%= render :import %>
 
   <%= scope(:popover_default_content, name: :overview, label: "Overview").render do %>
-    <p>Extensions allow you to extend existing functionality with custom behavior. These are an enhanced version of what you get when using <a href="https://trmnl.com/integrations">Core Plugins</a>.</p>
+    <p>An extension turns data from somewhere else into part of a screen. Each one declares the shapes it can render in, and can only be placed in a scene slot of a shape it declares.</p>
 
     <h2 class="label">Search</h2>
 
@@ -48,14 +44,19 @@
   <% end %>
 
   <% if extensions.any? %>
-    <ul class="bit-gallery">
+    <ul class="ext-list">
       <% extensions.each do |extension| %>
-        <%= extension.render :extension %>
+        <%= extension.render :extension, preview_model: %>
       <% end %>
     </ul>
   <% else %>
-    <div class="bit-gallery">
-      <%= render "shared/empty", message: "No extensions found." %>
+    <div class="ext-empty">
+      <h3>No extensions yet</h3>
+      <p>
+        Bundled ones live in <code>extensions/</code>. Load them with
+        <code>bin/seed_extensions</code>, import a zip, or write a new one.
+      </p>
+      <%= link_to "New extension", routes.path(:extension_new), class: "bit-button-accept" %>
     </div>
   <% end %>
 

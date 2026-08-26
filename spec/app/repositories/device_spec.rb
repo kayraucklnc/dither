@@ -20,7 +20,7 @@ RSpec.describe Dither::Repositories::Device, :db do
 
   describe "#find" do
     it "answers record by ID" do
-      record = repository.find(device.id).to_h.tap { it.delete :playlist }
+      record = repository.find(device.id).to_h
       expect(record).to eq(device.to_h)
     end
 
@@ -35,14 +35,13 @@ RSpec.describe Dither::Repositories::Device, :db do
 
   describe "#find_by" do
     it "answers record when found by single attribute" do
-      record = repository.find_by(label: device.label).to_h.tap { it.delete :playlist }
+      record = repository.find_by(label: device.label).to_h
       expect(record).to eq(device.to_h)
     end
 
     it "answers record when found by multiple attributes" do
       record = repository.find_by(label: device.label, mac_address: device.mac_address)
                          .to_h
-                         .tap { it.delete :playlist }
 
       expect(record).to eq(device.to_h)
     end
@@ -56,43 +55,6 @@ RSpec.describe Dither::Repositories::Device, :db do
     end
   end
 
-  describe "#mirror_playlist" do
-    let(:playlist) { Factory[:playlist] }
-
-    it "updates records with new playlist ID" do
-      repository.mirror_playlist [device.id], playlist.id
-      record = repository.find device.id
-
-      expect(record.playlist_id).to eq(playlist.id)
-    end
-
-    it "answers one when success" do
-      result = repository.mirror_playlist [device.id], playlist.id
-      expect(result).to eq(1)
-    end
-
-    it "answers zero when there is nothing to update" do
-      result = repository.mirror_playlist [], playlist.id
-      expect(result).to eq(0)
-    end
-
-    it "doesn't detach devices belonging to other playlists" do
-      other_playlist = Factory[:playlist]
-      other_device = Factory[:device, playlist_id: other_playlist.id]
-
-      repository.mirror_playlist [device.id], playlist.id
-
-      expect(repository.find(other_device.id).playlist_id).to eq(other_playlist.id)
-    end
-
-    it "detaches deselected devices that belong to this playlist" do
-      device = Factory[:device, playlist_id: playlist.id]
-
-      repository.mirror_playlist [], playlist.id
-
-      expect(repository.find(device.id).playlist_id).to be(nil)
-    end
-  end
 
   describe "#search" do
     before { device }
@@ -119,7 +81,7 @@ RSpec.describe Dither::Repositories::Device, :db do
     end
 
     it "answers record without updates for no attributes" do
-      update = repository.update_by_api_key(device.api_key).to_h.tap { it.delete :playlist }
+      update = repository.update_by_api_key(device.api_key).to_h
       expect(update).to eq(device.to_h)
     end
 
@@ -131,7 +93,7 @@ RSpec.describe Dither::Repositories::Device, :db do
 
   describe "#where" do
     it "answers record for label" do
-      records = repository.where(label: device.label).map { it.to_h.tap { it.delete :playlist } }
+      records = repository.where(label: device.label).map { it.to_h }
       expect(records).to contain_exactly(device.to_h)
     end
 

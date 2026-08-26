@@ -11,7 +11,6 @@ RSpec.describe Dither::Aspects::Devices::Provisioner, :db do
       result = provisioner.call mac_address: device.mac_address
 
       expect(result.success).to have_attributes(
-        playlist_id: nil,
         api_key: "",
         mac_address: "02:A1:B2:C3:D4:E5"
       )
@@ -24,7 +23,6 @@ RSpec.describe Dither::Aspects::Devices::Provisioner, :db do
         result = provisioner.call mac_address: device.mac_address
 
         expect(result.success).to have_attributes(
-          playlist_id: nil,
           api_key: device.api_key,
           mac_address: "02:A1:B2:C3:D4:E5"
         )
@@ -35,7 +33,6 @@ RSpec.describe Dither::Aspects::Devices::Provisioner, :db do
         result = provisioner.call mac_address: device.mac_address
 
         expect(result.success).to have_attributes(
-          playlist_id: nil,
           api_key: "",
           mac_address: "02:A1:B2:C3:D4:E5"
         )
@@ -63,50 +60,19 @@ RSpec.describe Dither::Aspects::Devices::Provisioner, :db do
         )
       end
 
-      it "associates device with playlist" do
+      # A new device is given something to show and nothing else. What it shows
+      # afterwards comes from rules, which are the owner's to write.
+      it "creates a welcome screen" do
         device = provisioner.call(mac_address: "02:A1:B2:C3:D4:E5", model_id: model.id).success
-        playlist = Dither::Repositories::Playlist.new.find device.playlist_id
+        screen = Dither::Repositories::Screen.new.find_by device_id: device.id
 
-        expect(playlist).to have_attributes(
-          label: "Device #{device.id}",
-          name: "device_#{device.id}"
-        )
+        expect(screen).to have_attributes(label: /Welcome/, kind: "welcome")
       end
 
-      it "associates playlist item with welcome screen" do
+      it "gives a new device no rules" do
         device = provisioner.call(mac_address: "02:A1:B2:C3:D4:E5", model_id: model.id).success
-        item = Dither::Repositories::PlaylistItem.new.find_by playlist_id: device.playlist_id
-        screen = item.screen
 
-        expect(screen).to have_attributes(
-          model_id: model.id,
-          label: "Welcome #{device.id}",
-          name: "welcome_#{device.id}"
-        )
-      end
-
-      it "associates playlist current item with welcome screen" do
-        device = provisioner.call(mac_address: "02:A1:B2:C3:D4:E5", model_id: model.id).success
-        playlist = Dither::Repositories::Playlist.new.find device.playlist_id
-        screen = Dither::Repositories::Screen.new.find playlist.current_item.screen_id
-
-        expect(screen).to have_attributes(
-          label: "Welcome #{device.id}",
-          name: "welcome_#{device.id}"
-        )
-      end
-
-      it "answers failure with nil model ID" do
-        result = provisioner.call mac_address: "02:A1:B2:C3:D4:E5", model_id: nil
-
-        expect(result).to be_failure(
-          %(Null value in column "model_id" of relation "device" violates not-null constraint.)
-        )
-      end
-
-      it "answers failure with invalid model ID" do
-        result = provisioner.call mac_address: "02:A1:B2:C3:D4:E5", model_id: 13
-        expect(result).to be_failure(%(Key (model_id)=(13) is not present in table "model".))
+        expect(Dither::Repositories::Rule.new.for_device(device.id)).to be_empty
       end
     end
   end

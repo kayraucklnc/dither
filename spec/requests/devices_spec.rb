@@ -5,14 +5,12 @@ require "hanami_helper"
 RSpec.describe "/api/devices", :db do
   include_context "with JWT"
 
-  let(:device) { Factory[:device, model_id: model.id, playlist_id: playlist.id] }
+  let(:device) { Factory[:device, model_id: model.id] }
   let(:model) { Factory[:model] }
-  let(:playlist) { Factory[:playlist] }
 
   let :attributes do
     {
       model_id: model.id,
-      playlist_id: playlist.id,
       label: "Test",
       mac_address: "A1:B2:C3:D4:E5:F6",
       api_key: "abc123",
@@ -55,7 +53,6 @@ RSpec.describe "/api/devices", :db do
         hash_including(
           id: device.id,
           model_id: model.id,
-          playlist_id: playlist.id,
           label: "Test",
           mac_address: "A1:B2:C3:D4:E5:F6",
           api_key: match_device_api_key,
@@ -107,7 +104,6 @@ RSpec.describe "/api/devices", :db do
       data: {
         id: device.id,
         model_id: model.id,
-        playlist_id: playlist.id,
         label: "Test",
         mac_address: "A1:B2:C3:D4:E5:F6",
         api_key: match_device_api_key,
@@ -159,7 +155,6 @@ RSpec.describe "/api/devices", :db do
       data: hash_including(
         id: kind_of(Integer),
         model_id: model.id,
-        playlist_id: kind_of(Integer),
         label: "Test",
         mac_address: "A1:B2:C3:D4:E5:F6",
         api_key: "abc123",
@@ -195,7 +190,6 @@ RSpec.describe "/api/devices", :db do
   it "creates device with valid (required only) attributes" do
     attributes = {
       model_id: model.id,
-      playlist_id: nil,
       label: "Test",
       mac_address: "A1:B2:C3:D4:E5:F6",
       api_key: "abc123"
@@ -210,7 +204,6 @@ RSpec.describe "/api/devices", :db do
       data: hash_including(
         id: kind_of(Integer),
         model_id: model.id,
-        playlist_id: kind_of(Integer),
         label: "Test",
         mac_address: "A1:B2:C3:D4:E5:F6",
         api_key: "abc123",
@@ -348,7 +341,6 @@ RSpec.describe "/api/devices", :db do
       data: {
         id: device.id,
         model_id: model.id,
-        playlist_id: playlist.id,
         label: "Test",
         mac_address: "A1:B2:C3:D4:E5:F6",
         api_key: match_device_api_key,

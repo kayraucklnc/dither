@@ -1,50 +1,46 @@
 {% comment %}
-  Renders at the device's resolution, then gets dithered to 1-bit. Use the
-  Dither screen framework classes (lib/dither/screen_framework.css): pure
-  black on white, heavy rules, no greys.
-
-  Available:
-    {{ source_1 }}         parsed JSON from the first exchange
-    {{ extension.values }} the settings the owner filled in
-    {{ extension.label }}  this extension's label
-
-  The shape below matches the transport.rest API. For a different provider,
-  change only the loop and the field paths.
+  Full page. A transit extension gets {{ transit }} rather than {{ source_1 }}:
+  the provider has already normalised whatever the operator's API returned.
 {% endcomment %}
 
 <div class="screen">
   <div class="title-bar">
-    <div class="title">{{ extension.values.heading | default: "Departures" }}</div>
-    <div class="meta">{{ source_1.departures[0].stop.name | truncate: 28 }}</div>
+    <div class="title">{{ transit.origin }}{% if transit.destination %} &rarr; {{ transit.destination }}{% endif %}</div>
+    <div class="meta">{{ transit.provider | upcase }}</div>
   </div>
 
   <div class="content">
-    {% if source_1.departures and source_1.departures.size > 0 %}
+    {% if transit.empty %}
+      <div class="layout layout--col layout--center">
+        <p class="t-lg t-bold">No departures</p>
+        <p class="t-sm">Nothing scheduled from here right now.</p>
+      </div>
+    {% else %}
       <div class="list">
-        {% for departure in source_1.departures %}
+        {% for departure in transit.departures %}
           <div class="list-item">
             <span class="primary truncate">
-              {{ departure.line.name }} — {{ departure.destination.name }}
+              <span class="t-bold">{{ departure.line }}</span>
+              {{ departure.direction }}
+              {% if departure.platform %}<span class="t-sm">plat {{ departure.platform }}</span>{% endif %}
             </span>
             <span class="secondary t-mono t-bold">
-              {{ departure.when | date: "%H:%M" }}
-              {% if departure.delay and departure.delay > 0 %}
-                +{{ departure.delay | divided_by: 60 }}
+              {% if departure.cancelled %}
+                CANC
+              {% else %}
+                {{ departure.expected }}{% if departure.delayed %}<span class="t-sm">+{{ departure.delay }}</span>{% endif %}
               {% endif %}
             </span>
           </div>
         {% endfor %}
       </div>
-    {% else %}
-      <div class="layout layout--col layout--center">
-        <p class="t-lg t-bold">No departures</p>
-        <p class="t-sm">Check the stop ID in this extension's settings.</p>
-      </div>
     {% endif %}
   </div>
 
-  <div class="footer-bar">
-    <span>Stop {{ extension.values.stop_id }}</span>
-    <span class="badge">live</span>
-  </div>
+  {% if transit.alerts.size > 0 %}
+    <div class="footer-bar">
+      <span class="truncate">{{ transit.alerts[0].title }}</span>
+      <span class="badge">alert</span>
+    </div>
+  {% endif %}
 </div>

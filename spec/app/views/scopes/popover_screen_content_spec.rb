@@ -30,6 +30,8 @@ RSpec.describe Dither::Views::Scopes::PopoverScreenContent do
   end
 
   describe "#render" do
+    # No branding in the popover: it shows what the panel shows and nothing
+    # else, which is the point of looking at it.
     it "renders content" do
       assets = Hanami.app[:assets]
 
@@ -41,10 +43,6 @@ RSpec.describe Dither::Views::Scopes::PopoverScreenContent do
             <img src="#{assets["setup.svg"]}" alt="Placeholder" width="800" height="480" loading="lazy">
             <figcaption>Placeholder</figcaption>
           </figure>
-
-          <p class="brand">
-            <img src="#{assets["logos/with_label.svg"]}" alt="Logo with Label" width="150" height="75">
-          </p>
         </dialog>
       CONTENT
     end

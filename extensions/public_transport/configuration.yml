@@ -1,26 +1,27 @@
-# Dither bundled extension.
+# Dither bundled extension: Public Transport.
 #
-# This file plus template.html.liquid is the whole contract. The pair is also
-# a valid zip import, so anything authored here can be shipped to someone else
-# and loaded through Extensions -> Import without changes.
+# One extension for every city we support. A "transit" extension has no
+# exchanges: the settings name a country, city and provider, and the provider
+# knows how to answer - including the time zone, which matters because
+# operators quote local wall clock times while this server runs in UTC.
 #
-# See extensions/README.md for the full field reference.
+# Milan/Trenord is what ships today. Adding Berlin, or a second Milan operator,
+# means adding an entry to app/aspects/transit/catalog.rb and a provider beside
+# it. This file does not change, and neither does anything a user has already
+# set up.
 
 version: "1.0.0"
 name: public_transport
 label: Public Transport
 description: >
-  Next departures for a stop. Point it at any transit API that returns JSON;
-  map the response in template.html.liquid.
+  Live departures between two stations, with delays, platforms and service
+  alerts. Pick your city and operator in settings.
 
-# poll = Dither calls the API on a schedule. The alternative is webhook, where
-# the third party posts to us instead.
-kind: poll
+kind: transit
 mode: text
 tags:
   - transport
 
-# Every 5 minutes. Units: none, minute, hour, day, week, month.
 interval: 5
 unit: minute
 days: []
@@ -30,84 +31,135 @@ start_at: "2026-01-01T00:00:00Z"
 static_body: {}
 data: {}
 
-# What this renders before it has ever fetched - not configured yet, API down,
-# or you are still evaluating with no hardware. Previews fall back to this and
-# label it as sample; a device is never served it. Shape it exactly like the
-# real response, so a design that looks right here looks right in the field.
-sample:
-  source_1:
-    departures:
-      - when: "2026-01-01T08:12:00+01:00"
-        delay: 180
-        line: {name: "ICE 1045"}
-        destination: {name: "Munchen Hbf"}
-        stop: {name: "Berlin Hauptbahnhof"}
-      - when: "2026-01-01T08:17:00+01:00"
-        delay: 0
-        line: {name: "RE 3"}
-        destination: {name: "Stralsund Hbf"}
-        stop: {name: "Berlin Hauptbahnhof"}
-      - when: "2026-01-01T08:24:00+01:00"
-        delay: 60
-        line: {name: "S7"}
-        destination: {name: "Potsdam Hauptbahnhof"}
-        stop: {name: "Berlin Hauptbahnhof"}
-      - when: "2026-01-01T08:31:00+01:00"
-        delay: 0
-        line: {name: "IC 2432"}
-        destination: {name: "Koln Hbf"}
-        stop: {name: "Berlin Hauptbahnhof"}
-      - when: "2026-01-01T08:39:00+01:00"
-        delay: 0
-        line: {name: "RB 21"}
-        destination: {name: "Wustermark"}
-        stop: {name: "Berlin Hauptbahnhof"}
-      - when: "2026-01-01T08:46:00+01:00"
-        delay: 300
-        line: {name: "ICE 597"}
-        destination: {name: "Stuttgart Hbf"}
-        stop: {name: "Berlin Hauptbahnhof"}
-
-# Fields become the settings form the extension's owner fills in. Each keyname
-# is addressable in templates and in exchange URLs as
-# {{ extension.values.<keyname> }} - everything an extension knows about
-# itself hangs off the "extension" key.
 fields:
-  - keyname: api_base
-    name: API base URL
+  - keyname: country
+    name: Country
     field_type: string
-    default: "https://v6.db.transport.rest"
-    help_text: Root of the transit API. The default is the free Deutsche Bahn mirror.
+    default: "it"
+    help_text: Two letter code. Only "it" is supported so far.
     optional: false
 
-  - keyname: stop_id
-    name: Stop ID
+  - keyname: city
+    name: City
     field_type: string
-    default: "8011160"
-    help_text: Provider-specific stop identifier. 8011160 is Berlin Hbf.
+    default: "milan"
+    help_text: City code from the catalog.
     optional: false
 
-  - keyname: results
+  - keyname: provider
+    name: Operator
+    field_type: string
+    default: "trenord"
+    help_text: Which operator answers for this city.
+    optional: false
+
+  - keyname: origin
+    name: From
+    field_type: string
+    default: "Milano Cadorna"
+    help_text: Station name. The settings page offers a search.
+    optional: false
+
+  - keyname: destination
+    name: To
+    field_type: string
+    default: "Saronno"
+    help_text: Leave blank to show every departure from the origin.
+    optional: true
+
+  - keyname: lead_time
+    name: Walking time
+    field_type: string
+    default: "0"
+    help_text: Minutes to reach the platform. Departures sooner than this are hidden.
+    optional: true
+
+  - keyname: limit
     name: Departures to show
     field_type: string
-    default: "6"
-    help_text: How many rows to render. Keep it low; the panel is 800x480.
+    default: "5"
+    help_text: Keep it low. The panel is 800x480.
     optional: true
 
-  - keyname: heading
+  - keyname: show_platform
+    name: Show platform
+    field_type: string
+    default: "true"
+    help_text: "true or false."
+    optional: true
+
+  - keyname: hide_cancelled
+    name: Hide cancelled
+    field_type: string
+    default: "false"
+    help_text: "true or false."
+    optional: true
+
+  - keyname: title
     name: Heading
     field_type: string
-    default: "Departures"
-    help_text: Title shown in the top bar.
+    default: ""
+    help_text: Defaults to "origin to destination".
     optional: true
 
-# Each exchange is one HTTP call. Its parsed response reaches the template as
-# {{ source_1 }} - numbered in the order listed here, not merged into
-# extension.data. URL, headers and body are all Liquid-rendered, so field
-# values can be interpolated.
-exchanges:
-  - verb: get
-    template: "{{ extension.values.api_base }}/stops/{{ extension.values.stop_id }}/departures?results={{ extension.values.results }}&duration=120"
-    headers:
-      Accept: application/json
-    body: {}
+# Shaped exactly like a real board, so a design that reads well here reads well
+# in the field.
+sample:
+  transit:
+    origin: "Milano Cadorna"
+    destination: "Saronno"
+    provider: "trenord"
+    city: "milan"
+    country: "it"
+    empty: false
+    departures:
+      - line: "S3"
+        number: "24015"
+        direction: "Saronno"
+        scheduled: "08:12"
+        expected: "08:15"
+        delay: 3
+        delayed: true
+        platform: "2"
+        arrival: "08:41"
+        duration: 29
+        changes: 0
+        direct: true
+        cancelled: false
+        live: true
+        status: "DELAYED"
+      - line: "R14"
+        number: "2612"
+        direction: "Como Lago"
+        scheduled: "08:27"
+        expected: "08:27"
+        delay: 0
+        delayed: false
+        platform: "4"
+        arrival: "08:55"
+        duration: 28
+        changes: 0
+        direct: true
+        cancelled: false
+        live: true
+        status: "ON TIME"
+      - line: "S1"
+        number: "24019"
+        direction: "Saronno"
+        scheduled: "08:42"
+        expected: "08:42"
+        delay: 0
+        delayed: false
+        platform: "1"
+        arrival: "09:12"
+        duration: 30
+        changes: 1
+        direct: false
+        cancelled: false
+        live: false
+        status: "SCHEDULED"
+    alerts:
+      - title: "Reduced service"
+        description: "Engineering work between Cadorna and Bovisa until 10:00."
+
+exchanges: []
