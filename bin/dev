@@ -33,6 +33,22 @@ BASE_HANAMI=2300
 BASE_DATABASE=5433
 BASE_KEYVALUE=6379
 
+SCRATCH=""
+
+cleanup() {
+  [ -n "$SCRATCH" ] && rm -rf "$SCRATCH"
+  return 0
+}
+
+trap cleanup EXIT
+
+# bash traps are global, not function-scoped, so nested helpers cannot each own
+# a RETURN trap without clobbering the other's. One directory, one cleanup.
+scratch_file() {
+  [ -n "$SCRATCH" ] || SCRATCH="$(mktemp -d)"
+  mktemp "${SCRATCH}/jar.XXXXXX"
+}
+
 port_free() {
   ! nc -z 127.0.0.1 "$1" >/dev/null 2>&1
 }
@@ -119,8 +135,7 @@ create_account() {
   local base="http://localhost:${HANAMI_PORT}"
   local jar token status
 
-  jar="$(mktemp)"
-  trap 'rm -f "$jar"' RETURN
+  jar="$(scratch_file)"
 
   token="$(curl --silent --cookie-jar "$jar" "$base/register" |
            grep --only-matching 'name="_csrf" value="[^"]*"' |
@@ -148,16 +163,41 @@ create_account() {
   fi
 
   # Only the first account on a server is verified automatically; later ones are
-  # created but cannot sign in until an administrator verifies them. Both cases
-  # redirect, so ask whether the new session can actually reach the dashboard.
-  if [ "$(curl --silent --cookie "$jar" --output /dev/null --write-out '%{http_code}' "$base/")" = "200" ]; then
+  # created but rejected at sign-in until an administrator verifies them. Both
+  # outcomes redirect, and registering does not sign you in, so the only honest
+  # check is to sign in with the credentials and see where we land.
+  if signs_in "$email" "$password"; then
     echo "==> Created ${email} on ${COMPOSE_PROJECT_NAME}. Sign in at ${base}/login"
     return 0
   fi
 
-  echo "==> Created ${email}, but it is unverified and cannot sign in yet." >&2
+  echo "==> Created ${email}, but it cannot sign in yet — it needs verifying." >&2
   echo "    Only the first account on a server is verified automatically." >&2
   return 1
+}
+
+# True when these credentials reach an authenticated page.
+signs_in() {
+  local email="$1" password="$2"
+  local base="http://localhost:${HANAMI_PORT}"
+  local jar token
+
+  jar="$(scratch_file)"
+
+  token="$(curl --silent --cookie-jar "$jar" --cookie "$jar" "$base/login" |
+           grep --only-matching 'name="_csrf" value="[^"]*"' |
+           sed 's/.*value="//; s/"$//')"
+
+  [ -n "$token" ] || return 1
+
+  curl --silent --cookie "$jar" --cookie-jar "$jar" --output /dev/null \
+       --request POST \
+       --data-urlencode "_csrf=${token}" \
+       --data-urlencode "login=${email}" \
+       --data-urlencode "password=${password}" \
+       "$base/login"
+
+  [ "$(curl --silent --cookie "$jar" --output /dev/null --write-out '%{http_code}' "$base/")" = "200" ]
 }
 
 case "${1:-}" in
