@@ -1,6 +1,12 @@
 # Development overlay — source-mounted, with a live asset watcher.
 #
-#   docker compose -f compose.yml -f compose.dev.yml up -d      (or: bin/dev up)
+#   bin/dev up
+#
+# Use bin/dev rather than docker compose directly: it assigns this worktree its
+# own Compose project name and port trio, and prepares the database the first
+# time the worktree starts. Raw `docker compose -f compose.yml -f compose.dev.yml`
+# still works, but every worktree would then fight over project "terminus" and
+# port 2300.
 #
 # Layered on compose.yml rather than replacing it, so database and keyvalue stay
 # defined in one place and keep the same volumes — your account and devices carry

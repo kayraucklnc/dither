@@ -1,6 +1,9 @@
-<form method="post" class="rodauth" role="form" id="change-login-form">
-  <h1 class="label">Login Update</h1>
+<header class="auth-header">
+  <h1 class="auth-title">Change email</h1>
+  <p class="auth-subtitle">This address is what you sign in with.</p>
+</header>
 
+<form method="post" class="rodauth" role="form" id="change-login-form">
   <%== rodauth.change_login_additional_form_tags %>
   <%== rodauth.csrf_tag %>
   <%== rodauth.render "login-field" %>
