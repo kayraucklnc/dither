@@ -51,40 +51,145 @@ wherever the extensions involved declare support for the resulting size. The
 composer should make illegal arrangements impossible rather than merely
 discouraged — invalid drop targets should not accept the drag.
 
-### Screens are chosen by triggers
+### Nothing is ever authored as a combination
 
-Each screen opens on a **trigger**. Planned trigger types:
+The trap this design exists to avoid: *"to show clock plus trains I make a
+screen, to show clock plus weather I make another, to show all three I make a
+third"*. That is 2^N screens for N things you own, and every new extension
+doubles the work.
 
-- time-based (window, cron, sunrise/sunset)
-- battery percentage
-- webhook
-- API result / condition on fetched data
-- extension status
+So a scene is never authored as a picture. It is **resolved** from rules, in
+two layers that answer two different questions.
 
-**Multiple triggers can be true at once.** This is the hard part and needs a
-deliberate resolution model — priority ordering, specificity, or explicit
-precedence. Do not leave it to insertion order.
+### Layer 1 — Mode: what is going on right now?
 
-Different devices may show different things, so targeting is per-device.
+A **mode** is a named situation. Modes are **exclusive**: exactly one is active
+at any moment, and there is always a `Default` mode at priority 0 whose
+condition is always true. The highest-priority mode whose *enter* condition
+holds wins. That single rule is the whole answer to "many triggers fire at
+once" for behaviour.
+
+```
+Mode: Commute                    priority 50
+  enter when   calendar.next_event starts within 30 minutes
+  exit when    calendar.next_event has started
+  while active refresh every 5 minutes   (default is 15)
+```
+
+Enter and exit are **separate conditions on purpose**. A single condition that
+flickers on its boundary would thrash the panel, and an e-ink refresh is both
+visible and expensive. Separate conditions give hysteresis: this is the finite
+state machine, and it is the part that changes *behaviour*, not just content.
+
+A mode carries: its refresh cadence, optional per-extension poll overrides, an
+optional pinned layout, and the slot rules that only apply while it is active.
+
+### Layer 2 — Rules: what fills each slot?
+
+A **rule** is one sentence:
+
+> put **{extension}** on screen when **{condition}**, at priority **{n}**
+
+Rules are **additive**, not exclusive. Several can be true at once, and they do
+not conflict because they compete slot by slot, not screen by screen.
+
+```
+Clock        priority 0    always                    ← the base
+Departures   priority 50   while mode is Commute
+Weather      priority 60   when weather is rain
+```
+
+- Ordinary day: Clock alone, full page.
+- Commuting: Departures appears, Clock keeps what is left.
+- Raining while commuting: all three, each in its own slot.
+
+**Three rules, not eight screens.** Adding a fourth extension adds one rule, not
+eight more screens. This is the answer to the combinatorics.
+
+### Elastic layout
+
+The layout is **derived, not chosen**. Each active rule asks for a slot; the
+resolver picks the smallest layout that can seat every active rule, given what
+shapes each extension declares.
+
+One active rule → `full`. Two → `split_vertical`, or `sidebar` if one of them
+only declares a narrow shape. Three → `columns`, or `banner` plus a split.
+
+This is only possible because extensions declare shapes: the resolver is a
+short search over the ten known layouts, and it can always explain itself —
+*"chose Banner and body, because Weather only declares third_height."*
+
+Pinning a mode to a fixed layout stays available as an escape hatch, but it is
+not the default. The default is that adding a thing rearranges the panel and
+you never touch a layout picker.
+
+### Conditions
+
+A condition is a flat **list of checks, all of which must hold**. Each check is
+built from dropdowns, never typed:
+
+```
+[Weather]    [condition]    [is]             [rain]
+[Calendar]   [next event]   [starts within]  [30 minutes]
+[Battery]    [level]        [below]          [20 %]
+[Time]       [clock]        [between]        [07:00] [09:30]
+[Departures] [last fetch]   [failed]
+```
+
+There is **no OR and no nesting**. Two alternatives means two rules. That
+limitation is deliberate: it keeps every rule readable at a glance and keeps
+the editor a set of dropdowns rather than an expression builder.
+
+Extensions extend the vocabulary the same way they extend shapes — by
+declaring the facts they can be asked about:
+
+```yaml
+facts:
+  - key: next_departure_in
+    label: Next departure in
+    type: duration
+```
+
+Anything declared becomes selectable in every condition editor. Built-in
+providers (Time, Battery, Device, Webhook) work identically.
+
+### Resolution, end to end
+
+1. Evaluate every mode's enter/exit condition; the active mode is the
+   highest-priority one satisfied. Hysteresis applies.
+2. Collect rules that are active: base rules plus the active mode's own.
+3. Ask the layout resolver for the smallest layout seating them all.
+4. Fill slots highest priority first; ties break on explicit rule order.
+5. A rule whose extension fails to fetch keeps its slot and renders its own
+   stale-or-empty state — a failed fetch must never silently reshuffle the
+   panel.
 
 ### Naming
 
 Current names confuse: Design → Screen → Playlist is three nouns for one idea,
-and "Playlist" implies shuffle. Proposed:
+and "Playlist" implies shuffle. Settled:
 
-| Now | Proposed | Means |
+| Now | Becomes | Means |
 |---|---|---|
-| Design | **Layout** | how blocks are arranged |
-| Screen | **View** | a layout filled with extension blocks |
-| Playlist | **Schedule** | trigger rules deciding which View a device shows |
+| — | **Shape** | a footprint an extension can be designed for |
+| Design | **Layout** | how the panel is divided into slots |
+| Screen | **Scene** | a layout with its slots filled — what the panel shows |
+| Playlist | **Mode** + **Rules** | what is going on, and what that puts on screen |
 
-Not final. The test is whether someone new understands it without help.
+"View" was rejected: `Terminus::Views` is already Hanami's view layer, so the
+domain noun would collide with the framework in every file. "Scene" also reads
+better against triggers — scenes change on cue.
 
-### Preview
+### Preview and the simulator
 
-A preview tab showing **what the device would be seeing at this moment** —
-driven by the same API the device calls. This is what makes the product
-evaluable without hardware, so it is not a nice-to-have.
+A preview showing **what the device would be seeing at this moment**, driven by
+the same path the device takes: compose, screenshot, dither. Implemented.
+
+On top of it, a **simulator**: toggles for every fact any provider declares.
+Turn on rain, put a calendar event 20 minutes out, drop the battery to 15% —
+and watch the mode stack and the panel respond. This is what makes the rule
+system understandable, and it is what makes the product evaluable with no
+hardware at all.
 
 ---
 
@@ -104,8 +209,17 @@ evaluable without hardware, so it is not a nice-to-have.
 
 ## Open questions
 
-- How do simultaneous triggers resolve? Priority, specificity, or explicit order?
-- Does a View pin to one device, a group, or all?
-- What happens when a composed View has a slot whose extension fails to fetch?
+- Does a mode pin to one device, a group, or all? Leaning per-device, with
+  rules shared across devices and modes scoped to a device.
+- How far does the layout resolver go before giving up — is there a point where
+  it should refuse and ask for a pinned layout instead?
 - Do we keep the recipe gallery (fetches trmnl.com) or replace it with our own
   library? Current inclination: delete it.
+
+## Settled, previously open
+
+- **Simultaneous triggers.** Modes are exclusive and priority-ordered with
+  hysteresis; rules are additive and resolved per slot by priority. Never
+  insertion order.
+- **A slot whose extension fails to fetch** keeps its slot and renders its own
+  empty state. The panel must not reshuffle because a fetch failed.
