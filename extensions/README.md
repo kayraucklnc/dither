@@ -64,6 +64,7 @@ ends up matching the files exactly instead of accumulating stale calls.
 | `data` | yes | Seed data. `{}` — the exchanges fill this in. |
 | `fields` | yes | The settings form. See below. |
 | `sample` | no | Representative data for previews. See below. |
+| `facts` | no | What rules may ask about. See below. |
 | `exchanges` | no | The HTTP calls. See below. |
 
 ### fields
@@ -124,6 +125,40 @@ field; one that does not, will not.
 
 Sample data is used only in previews, and only when there is no real data yet.
 A device is never served it, and the moment a real fetch succeeds it is ignored.
+
+---
+
+## Facts: what a rule can ask you about
+
+Conditions are not a fixed list. An extension declares **facts**, and every one
+becomes selectable in the rule editor — so a calendar connector gives people
+commute rules without the rule engine learning what a meeting is.
+
+```yaml
+facts:
+  - key: next_meeting_in
+    label: Next meeting starts in
+    type: duration                       # duration | number | text | boolean
+    path: source_1.next.minutes_until    # where it lives in your own data
+    unit: minutes                        # optional, shown in the editor
+```
+
+`path` is dotted, and a numeric step indexes an array:
+`transit.departures.0.delay` is the first departure's delay. It is read from
+whatever the schedule last fetched, falling back to your `sample` so a rule can
+be built and read before the first successful call.
+
+The type decides which comparisons the editor offers, so nobody can build a
+rule asking whether a duration "contains" something:
+
+| Type | Offers |
+|---|---|
+| `duration`, `number` | is less than, is at most, is more than, is at least, has any value, is empty |
+| `text` | is, is not, contains, has any value, is empty |
+| `boolean` | is, has any value, is empty |
+
+Declare the facts someone would plausibly build a rule on, not everything you
+happen to fetch. A fact nobody can act on is noise in every condition menu.
 
 ---
 
@@ -257,6 +292,7 @@ template loop; the structure stays.
 - [ ] No secrets in the file — anything user-specific is a `field`
 - [ ] `default` values make it render sensibly before configuration
 - [ ] `sample` data is present and shaped like the real response
+- [ ] `facts` declare what someone would build a rule on, and their paths resolve
 - [ ] The template handles empty and error responses
 - [ ] Rendered and eyeballed at 800×480 after dithering
 - [ ] Every declared variant eyeballed at *its own* size, not just full page

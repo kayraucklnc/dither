@@ -26,6 +26,7 @@ module Dither
               required(:start_at).filled :date_time
               optional(:variants).maybe :hash
               optional(:sample).maybe :hash
+              optional(:facts).maybe :array
               required(:exchanges).maybe(:array).each(:hash) do
                 required(:headers).maybe :hash
                 required(:verb).filled :string

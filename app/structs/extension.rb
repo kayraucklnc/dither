@@ -83,6 +83,15 @@ module Dither
 
       def sample? = sample_data.any?
 
+      # ---- Facts ---------------------------------------------------------
+      #
+      # What a rule may ask this extension about.
+
+      def declared_facts = Dither::Facts.declared self
+
+      # Values live on the exchanges rather than here, so resolving them needs
+      # a repository. See Aspects::Extensions::FactReader.
+
       def liquid_attributes
         all_fields = Array fields
 

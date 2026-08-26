@@ -405,7 +405,8 @@ CREATE TABLE public.extension (
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     mode text DEFAULT 'text'::text NOT NULL,
     variants jsonb DEFAULT '{}'::jsonb NOT NULL,
-    sample jsonb DEFAULT '{}'::jsonb NOT NULL
+    sample jsonb DEFAULT '{}'::jsonb NOT NULL,
+    facts jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -1749,4 +1750,5 @@ INSERT INTO schema_migrations (filename) VALUES
 ('20260827120000_rename_terminus_kind_to_dither.rb'),
 ('20260827140000_add_extension_sample_column.rb'),
 ('20260827160000_add_scenes_and_rules.rb'),
-('20260827180000_drop_playlists_and_designs.rb');
+('20260827180000_drop_playlists_and_designs.rb'),
+('20260827200000_add_extension_facts_column.rb');

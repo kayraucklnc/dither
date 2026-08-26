@@ -55,6 +55,27 @@ fields:
     help_text: "celsius or fahrenheit."
     optional: true
 
+# What a rule may ask this extension about. Each fact names a path into the
+# data above, so declaring one costs nothing beyond saying where it lives.
+facts:
+  - key: temperature
+    label: Current temperature
+    type: number
+    path: source_1.current.temperature_2m
+    unit: degrees
+
+  - key: rain_chance
+    label: Chance of rain today
+    type: number
+    path: source_1.daily.precipitation_probability_max.0
+    unit: percent
+
+  - key: wind_speed
+    label: Wind speed
+    type: number
+    path: source_1.current.wind_speed_10m
+    unit: km/h
+
 sample:
   source_1:
     current:

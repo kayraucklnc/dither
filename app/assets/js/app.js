@@ -41,6 +41,7 @@ import "./copy_button.js";
 import "./scene_composer.js";
 import "./rule_form.js";
 import "./transit_settings.js";
+import "./flow/mount.jsx";
 
 import Alpine from "alpinejs";
 import htmx from "htmx.org";
