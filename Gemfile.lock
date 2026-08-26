@@ -641,6 +641,7 @@ DEPENDENCIES
   simplecov (~> 1.0)
   trmnl-api (~> 0.20)
   trmnl-liquid (~> 0.8)
+  tzinfo (~> 2.0)
   versionaire (~> 15.3)
   warning (~> 1.5)
   wholeable (~> 2.1)
