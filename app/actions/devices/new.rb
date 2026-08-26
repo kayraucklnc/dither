@@ -8,14 +8,12 @@ module Dither
         include Deps[
           :htmx_layout,
           "aspects.devices.defaulter",
-          model_repository: "repositories.model",
-          playlist_repository: "repositories.playlist"
+          model_repository: "repositories.model"
         ]
 
         def handle request, response
           response.render view,
                           models: model_repository.all,
-                          playlists: playlist_repository.all,
                           fields: defaulter.call,
                           layout: htmx_layout.call(request)
         end

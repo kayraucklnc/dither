@@ -32,11 +32,23 @@ module Dither
     setting :keyvalue_url, constructor: Types::Params::String.constrained(filled: true)
     setting :model_synchronizer, constructor: Types::Params::Bool, default: true
     setting :rack_attack_allowed_subnets, constructor: Types::Params::String, default: ""
+    setting :remember_cookie_key,
+            constructor: Types::Params::String.constrained(filled: true),
+            default: "_remember"
     setting :sensors_path,
             constructor: Dither::Types::Pathname,
             default: Hanami.app.root.join("public/sensors.json")
+    setting :session_cookie_key,
+            constructor: Types::Params::String.constrained(filled: true),
+            default: "terminus.session"
     setting :session_inactivity_limit, constructor: Types::Params::Integer, default: 1_800
     setting :session_lifetime_limit, constructor: Types::Params::Integer, default: 86_400
     setting :session_expiration_enabled, constructor: Types::Params::Bool, default: true
+    # Trenord encrypts its journey planner responses under a passphrase shipped
+    # in its own JavaScript bundle. It is a setting rather than a constant so a
+    # rotation can be fixed with an environment variable instead of a release.
+    setting :trenord_passphrase,
+            constructor: Types::Params::String.constrained(filled: true),
+            default: "8hI&WK=1NQ55*f^yyZkdEGWYyN{S"
   end
 end

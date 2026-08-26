@@ -26,7 +26,7 @@ RSpec.describe "Saving a scene", :db, :js do
 
     visit routes.path(:device_rules, device_id: device.id)
 
-    select "Morning", from: "scene_id"
+    pick_scene "Morning"
     select "Always", from: "condition_kind"
     click_button "Add rule"
 

@@ -16,9 +16,11 @@ ROM::SQL.migration do
     alter_table(:device) { drop_column :playlist_id }
     alter_table(:screen) { drop_column :template_id }
 
-    drop_table :playlist_item
-    drop_table :playlist
-    drop_table :screen_template
+    # Cascade: playlist.current_item_id points back at playlist_item, so the
+    # two tables depend on each other and neither drops on its own.
+    run "DROP TABLE IF EXISTS playlist_item CASCADE;"
+    run "DROP TABLE IF EXISTS playlist CASCADE;"
+    run "DROP TABLE IF EXISTS screen_template CASCADE;"
   end
 
   down do

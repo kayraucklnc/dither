@@ -5,16 +5,15 @@ require "sidekiq/web"
 
 require "sidekiq-scheduler/web"
 
-require_relative "../app/aspects/designs/middleware"
-
 module Dither
   # The application base routes.
   # rubocop:todo-next Metrics/ClassLength
   class Routes < Hanami::Routes
     # Order matters.
     use Rack::Attack
-    use Aspects::Designs::Middleware, pattern: %r(/preview/(?<id>.+))
-    use Rack::Static, root: "public", urls: ["/.well-known/security.txt", "/downloads", "/fonts", "/uploads"]
+    use Rack::Static,
+        root: "public",
+        urls: ["/.well-known/security.txt", "/downloads", "/fonts", "/uploads"]
     use Rack::Deflater
 
     slice :authentication, at: "/" do
@@ -48,12 +47,6 @@ module Dither
       patch "/models/:id", to: "api.models.patch", as: :model
       delete "/models/:id", to: "api.models.delete", as: :model
 
-      get "/playlists", to: "api.playlists.index", as: :playlists
-      get "/playlists/:id", to: "api.playlists.show", as: :playlist
-      post "/playlists", to: "api.playlists.create", as: :playlists
-      patch "/playlists/:id", to: "api.playlists.patch", as: :playlist
-      delete "/playlists/:id", to: "api.playlists.delete", as: :playlist
-
       get "/screens", to: "api.screens.index", as: :screens
       post "/screens", to: "api.screens.create", as: :screens
       patch "/screens/:id", to: "api.screens.patch", as: :screen
@@ -78,17 +71,6 @@ module Dither
     get "/devices/:device_id/logs", to: "devices.logs.index", as: :device_logs
     get "/devices/:device_id/logs/:id", to: "devices.logs.show", as: :device_log
     delete "/devices/:device_id/logs/:id", to: "devices.logs.delete", as: :device_log
-
-    get "/designs", to: "designs.index", as: :designs
-    get "/designs/:id", to: "designs.show", as: :design
-    get "/designs/new", to: "designs.new", as: :design_new
-    post "/designs", to: "designs.create", as: :designs
-    get "/designs/:id/edit", to: "designs.edit", as: :design_edit
-    put "/designs/:id", to: "designs.update", as: :design
-    delete "/designs/:id", to: "designs.delete", as: :design
-
-    get "/designs/:design_id/export", to: "designs.export.show", as: :design_export
-    post "/designs/import", to: "designs.import.create", as: :design_import
 
     get "/extensions", to: "extensions.index", as: :extensions
     get "/extensions/new", to: "extensions.new", as: :extension_new
@@ -123,6 +105,9 @@ module Dither
            to: "extensions.exchanges.delete",
            as: :extension_exchange
 
+    get "/transit/catalog", to: "transit.catalog.index", as: :transit_catalog
+    get "/transit/stations", to: "transit.stations.index", as: :transit_stations
+
     get "/extensions/:extension_id/export", to: "extensions.export.show", as: :extension_export
     get "/extensions/:extension_id/preview", to: "extensions.preview.show", as: :extension_preview
     get "/extensions/:extension_id/sources", to: "extensions.sources.index", as: :extension_sources
@@ -155,52 +140,15 @@ module Dither
     post "/scenes", to: "scenes.create", as: :scenes
     delete "/scenes/:id", to: "scenes.delete", as: :scene
     get "/scenes/preview", to: "scenes.preview.show", as: :scene_preview
+    get "/scenes/:id/preview", to: "scenes.preview.show", as: :scene_image
 
     get "/devices/:device_id/rules", to: "devices.rules.index", as: :device_rules
     post "/devices/:device_id/rules", to: "devices.rules.create", as: :device_rules
     delete "/devices/:device_id/rules/:id", to: "devices.rules.delete", as: :device_rule
     post "/devices/:device_id/rules/:id/move", to: "devices.rules.reorder", as: :device_rule_move
-
-    get "/playlists", to: "playlists.index", as: :playlists
-    get "/playlists/:id", to: "playlists.show", as: :playlist
-    get "/playlists/new", to: "playlists.new", as: :playlist_new
-    post "/playlists", to: "playlists.create", as: :playlists
-    get "/playlists/:id/edit", to: "playlists.edit", as: :playlist_edit
-    put "/playlists/:id", to: "playlists.update", as: :playlist
-    delete "/playlists/:id", to: "playlists.delete", as: :playlist
-
-    get "/playlists/:playlist_id/clone/new", to: "playlists.clone.new", as: :playlist_clone_new
-    post "/playlists/:playlist_id/clone", to: "playlists.clone.create", as: :playlist_clone
-
-    get "/playlists/:playlist_id/items", to: "playlists.items.index", as: :playlist_items
-    get "/playlists/:playlist_id/items/:id", to: "playlists.items.show", as: :playlist_item
-    get "/playlists/:playlist_id/items/new", to: "playlists.items.new", as: :playlist_item_new
-    post "/playlists/:playlist_id/items", to: "playlists.items.create", as: :playlist_items
-    get "/playlists/:playlist_id/items/:id/edit",
-        to: "playlists.items.edit",
-        as: :playlist_item_edit
-    put "/playlists/:playlist_id/items/:id", to: "playlists.items.update", as: :playlist_item
-    delete "/playlists/:playlist_id/items/:id", to: "playlists.items.delete", as: :playlist_item
-
-    get "/playlists/:playlist_id/mirror/edit",
-        to: "playlists.mirror.edit",
-        as: :playlist_mirror_edit
-    put "/playlists/:playlist_id/mirror", to: "playlists.mirror.update", as: :playlist_mirror
-
-    get "/playlists/:playlist_id/screens", to: "playlists.screens.index", as: :playlist_screens
-    get "/playlists/:playlist_id/screens/:id", to: "playlists.screens.show", as: :playlist_screen
-
     resources :problem_details, to: "problem_details", only: :index
 
     get "/flash", to: "flash.index", as: :flash
-
-    get "/screens", to: "screens.index", as: :screens
-    get "/screens/:id", to: "screens.show", as: :screen
-    get "/screens/new", to: "screens.new", as: :screen_new
-    post "/screens", to: "screens.create", as: :screens
-    get "/screens/:id/edit", to: "screens.edit", as: :screen_edit
-    put "/screens/:id", to: "screens.update", as: :screen
-    delete "/screens/:id", to: "screens.delete", as: :screen
 
     get "/users", to: "users.index", as: :users
     get "/users/:id", to: "users.show", as: :user

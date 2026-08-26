@@ -316,3 +316,93 @@
 .device-rules-link {
   margin: var(--site-space-sm) 0 0;
 }
+
+/* ---- Seeing what you are choosing ------------------------------------
+   Every place that picks a scene shows the render rather than the name. A
+   panel is a picture; choosing one from a list of words is guesswork. */
+
+.rules-now-body {
+  align-items: center;
+  display: grid;
+  gap: var(--site-space-lg);
+  grid-template-columns: 14rem 1fr;
+}
+
+@media (max-width: 40rem) {
+  .rules-now-body { grid-template-columns: 1fr; }
+}
+
+.rules-now-panel,
+.rule-thumb,
+.scene-choice-panel {
+  background-color: var(--site-surface-sunken);
+  border: 1px solid var(--site-border-strong);
+  border-radius: var(--site-radius-sm);
+  display: block;
+  overflow: hidden;
+
+  img {
+    aspect-ratio: 5 / 3;
+    display: block;
+    inline-size: 100%;
+    object-fit: contain;
+  }
+}
+
+.rules-now-why {
+  color: var(--site-ink-muted);
+  font-size: var(--site-text-sm);
+  margin: 0.2rem 0 0;
+}
+
+.rule-thumb {
+  inline-size: 5rem;
+}
+
+/* The rule row gains a thumbnail column when the scene still exists. */
+.rule-row {
+  grid-template-columns: 2rem auto 1fr auto;
+}
+
+.scene-picker {
+  display: grid;
+  gap: var(--site-space-sm);
+}
+
+.scene-choices {
+  display: grid;
+  gap: var(--site-space-sm);
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+}
+
+.scene-choice {
+  cursor: pointer;
+  display: grid;
+  gap: 0.35rem;
+
+  input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Selection reads on the frame, so the render underneath stays honest. */
+  input:checked + .scene-choice-panel {
+    border-color: var(--site-ink);
+    box-shadow: 0 0 0 2px var(--site-ink);
+  }
+
+  input:focus-visible + .scene-choice-panel {
+    outline: 2px solid var(--site-accent);
+    outline-offset: 2px;
+  }
+}
+
+.scene-choice-name {
+  color: var(--site-ink-muted);
+  font-size: var(--site-text-xs);
+  font-weight: 600;
+  text-align: center;
+}
+
+.scene-choice input:checked ~ .scene-choice-name { color: var(--site-ink); }

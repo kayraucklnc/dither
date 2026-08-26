@@ -1,0 +1,22 @@
+{% comment %} Third height: 800x160. Three departures across, rules between. {% endcomment %}
+
+<div class="screen">
+  <div class="content content--tight">
+    {% if transit.empty %}
+      <div class="layout layout--row layout--center">
+        <p class="t-bold">No departures from {{ transit.origin }}</p>
+      </div>
+    {% else %}
+      <div class="layout layout--row layout--split divide-x">
+        {% for departure in transit.departures limit: 3 %}
+          <div class="stack stack--tight fit">
+            <span class="t-mono t-xl t-bold">
+              {% if departure.cancelled %}CANC{% else %}{{ departure.expected }}{% if departure.delayed %}<span class="t-sm">+{{ departure.delay }}</span>{% endif %}{% endif %}
+            </span>
+            <span class="t-sm truncate">{{ departure.line }} &rarr; {{ departure.direction }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+</div>

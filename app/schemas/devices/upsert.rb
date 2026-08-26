@@ -7,7 +7,6 @@ module Dither
       # Defines device upsert schema.
       Upsert = Dry::Schema.Params do
         required(:model_id).filled :integer
-        required(:playlist_id).maybe :integer
         optional(:label).filled :string
         optional(:mac_address).filled Types::MACAddress
         optional(:api_key).filled :string

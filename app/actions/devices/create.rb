@@ -10,7 +10,6 @@ module Dither
           "aspects.devices.provisioner",
           repository: "repositories.device",
           model_repository: "repositories.model",
-          playlist_repository: "repositories.playlist",
           index_view: "views.devices.index"
         ]
 
@@ -35,7 +34,6 @@ module Dither
         def error response, parameters
           response.render view,
                           models: model_repository.all,
-                          playlists: playlist_repository.all,
                           device: nil,
                           fields: parameters[:device],
                           errors: parameters.errors[:device],

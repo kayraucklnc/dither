@@ -11,6 +11,18 @@ RSpec.describe Dither::Aspects::Extensions::Generator, :db do
     let(:extension) { Factory.structs[:extension, label: "Test", data: {}] }
     let(:model) { Factory[:model] }
 
+    let :view do
+      {
+        "name" => "full",
+        "label" => "Full screen",
+        "shape" => "full",
+        "description" => "Takes the whole screen.",
+        "width" => {"min" => 200, "max" => 2_000, "ideal" => nil},
+        "height" => {"min" => 120, "max" => 2_000, "ideal" => nil},
+        "align" => %w[fill]
+      }
+    end
+
     let :context do
       {
         "extension" => {
@@ -22,7 +34,9 @@ RSpec.describe Dither::Aspects::Extensions::Generator, :db do
           "device" => {}
         },
         "screen_variables" => "",
-        "sensors" => []
+        "sensors" => [],
+        "view" => view.merge("size" => {"width" => model.width, "height" => model.height}),
+        "views" => [view]
       }
     end
 
@@ -46,7 +60,8 @@ RSpec.describe Dither::Aspects::Extensions::Generator, :db do
 
       it "delegates generator" do
         generator.call extension, model_id: model.id
-        expect(poll).to have_received(:call).with(extension, context:, template: extension.template)
+        expect(poll).to have_received(:call)
+          .with(extension, context:, template: extension.template, preview: false)
       end
     end
 

@@ -18,7 +18,8 @@ RSpec.describe "Rules", :db do
       scene
       visit routes.path(:device_rules, device_id: device.id)
 
-      select "Morning", from: "scene_id"
+      # The scene picker shows renders rather than a dropdown.
+      pick_scene "Morning"
       select "Always", from: "condition_kind"
       click_button "Add rule"
 

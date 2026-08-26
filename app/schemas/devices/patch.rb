@@ -7,7 +7,6 @@ module Dither
       # Defines device patch schema.
       Patch = Dry::Schema.Params do
         optional(:model_id).filled :integer
-        optional(:playlist_id).filled :integer
         optional(:label).filled :string
         optional(:mac_address).filled Types::MACAddress
         optional(:api_key).filled :string

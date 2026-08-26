@@ -27,7 +27,7 @@ module Dither
     # rubocop:todo-next Layout/FirstArrayElementLineBreak
     config.actions.sessions = :cookie,
                               {
-                                key: "dither.session",
+                                key: settings.session_cookie_key,
                                 secret: settings.app_secret,
                                 expire_after: 3_600 # 1 hour.
                               }

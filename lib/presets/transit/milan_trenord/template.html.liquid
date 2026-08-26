@@ -1,0 +1,366 @@
+{%- comment -%}
+  Four views, one template, named by shape rather than by where they sit:
+  "full" takes the canvas, "horizontal" is a wide band, "vertical" is a narrow
+  column, "overlay" is a card drawn over other content. Where each one is
+  anchored is the layout page's call, from the align list this extension
+  declares under data.views in configuration.yml. Nobody picks a view in the
+  settings.
+
+  They share the same data and icon set, so the board reads the same wherever
+  it lands. Everything is drawn as filled black shapes, because strokes and
+  greys turn to noise once the render is dithered to 1 bit.
+{%- endcomment -%}
+
+{%- comment -%}
+  Every glyph is a single evenodd path: the counters are real holes rather than
+  white shapes, so an icon stays legible on the inverted surfaces the compact
+  views use.
+{%- endcomment -%}
+
+{%- capture icon_train -%}
+<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M12 1c5 0 8 1 8 4v11a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V5c0-3 3-4 8-4Zm-5.5 5v4.4h4.2V6Zm6.8 0v4.4h4.2V6Zm-6.8 7v1.8h11V13ZM7 20h3l-2.4 3H4.2Zm10 0h-3l2.4 3h3.4Z"/></svg>
+{%- endcapture -%}
+
+{%- capture icon_late -%}
+<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M1 12a11 11 0 1 1 22 0 11 11 0 0 1-22 0Zm2.6 0a8.4 8.4 0 1 0 16.8 0 8.4 8.4 0 0 0-16.8 0Zm7.3-6.4h2.2v6.2h4.4v2.2h-6.6Z"/></svg>
+{%- endcapture -%}
+
+{%- capture icon_cancelled -%}
+<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M12 1.5 23.5 22H.5Zm-1.2 7.9v6.4h2.4V9.4Zm0 8v2.2h2.4v-2.2Z"/></svg>
+{%- endcapture -%}
+
+{%- capture icon_ontime -%}
+<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.4 18.6 2 11.2l2.8-2.8 4.6 4.6L19.2 3.4 22 6.2Z"/></svg>
+{%- endcapture -%}
+
+{%- capture icon_tomorrow -%}
+<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.5 15.5A9.5 9.5 0 0 1 8.5 2.5a10 10 0 1 0 13 13Z"/></svg>
+{%- endcapture -%}
+
+{%- capture icon_platform -%}
+<svg class="ic" viewBox="0 0 24 24" shape-rendering="crispEdges" aria-hidden="true"><path d="M4 1h3v22H4Zm13 0h3v22h-3ZM1 4h22v2.6H1Zm0 6.7h22v2.6H1Zm0 6.7h22v2.6H1Z"/></svg>
+{%- endcapture -%}
+
+{%- capture icon_arrow -%}
+<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 9.6h13V4.2L23 12l-9 7.8v-5.4H1Z"/></svg>
+{%- endcapture -%}
+
+<style>
+  /* Icons inherit the text colour so they invert with the surface they sit on. */
+  .ic { display: inline-block; fill: currentColor; height: 1em; vertical-align: -0.13em; width: 1em; }
+
+  .head { align-items: center; display: flex; gap: 0.4em; min-width: 0; }
+
+  /* The shared framework fixes the title bar; a board that can be handed
+     anything from a phone strip to a 1600px panel has to scale it too. */
+  .title-bar { padding: clamp(8px, 2.6vh, 30px) clamp(10px, 2vw, 30px) clamp(5px, 1.6vh, 16px); }
+  .title-bar .title { font-size: clamp(15px, 5vh, 58px); }
+  .title-bar .meta { font-size: clamp(10px, 2.8vh, 32px); }
+  .footer-bar { font-size: clamp(9px, 2.2vh, 24px); padding: clamp(5px, 1.6vh, 16px) clamp(10px, 2vw, 30px) clamp(8px, 2.6vh, 30px); }
+  .content--tight { padding: clamp(6px, 1.6vh, 20px) clamp(10px, 2vw, 30px); }
+  .head .ic { flex: none; }
+  .head-route { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ---- full view ------------------------------------------------------ */
+
+  .board { display: flex; flex-direction: column; height: 100%; }
+
+  .dep {
+    align-items: baseline;
+    border-top: 2px solid var(--ink);
+    column-gap: clamp(6px, 2vw, 18px);
+    display: grid;
+    flex: 1 1 0;
+    grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+    min-height: 0;
+    overflow: hidden;
+    padding: clamp(2px, 1vh, 8px) 0;
+  }
+
+  .dep:first-child { border-top: 0; }
+
+  /* A cancelled train keeps its slot but loses its time. */
+  .is-cancelled .dep-time,
+  .is-cancelled .chip-time,
+  .is-cancelled .rail-time { text-decoration: line-through; }
+
+  /* The next train earns the extra weight; the rest are a reference list. */
+  .dep--next .dep-time { font-size: clamp(28px, 11vh, 132px); }
+  .dep--next .dep-line { font-size: clamp(12px, 3.8vh, 44px); }
+  .dep--next .dep-where { font-size: clamp(15px, 6vh, 70px); }
+  .dep--next .dep-state { font-size: clamp(14px, 5.4vh, 62px); }
+  .dep--next .dep-platform-number { font-size: clamp(16px, 7vh, 80px); }
+
+  .dep-time {
+    font-family: var(--font-mono);
+    font-size: clamp(15px, 6vh, 72px);
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .dep-was {
+    font-family: var(--font-mono);
+    font-size: clamp(8px, 2.6vh, 30px);
+    font-weight: 500;
+    text-decoration: line-through;
+  }
+
+  .dep-line {
+    background: var(--ink);
+    color: var(--paper);
+    font-size: clamp(9px, 3vh, 34px);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 0.2em 0.45em;
+  }
+
+  .dep-where { font-size: clamp(11px, 4.2vh, 48px); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dep-state { font-size: clamp(11px, 4.2vh, 48px); font-weight: 700; white-space: nowrap; }
+  .dep-platform { text-align: right; white-space: nowrap; }
+  .dep-platform-number { font-size: clamp(12px, 4.6vh, 52px); font-weight: 700; }
+
+  /* ---- horizontal view -------------------------------------------------- */
+
+  .bar { display: flex; flex-direction: column; gap: clamp(3px, 4vh, 10px); height: 100%; padding: clamp(4px, 6vh, 14px) clamp(6px, 1.8vw, 18px); }
+  .bar-head { align-items: baseline; display: flex; font-size: clamp(9px, 9vh, 18px); font-weight: 700; gap: 10px; justify-content: space-between; letter-spacing: 0.05em; text-transform: uppercase; }
+  .bar-track { display: flex; flex: 1; gap: 8px; min-height: 0; }
+
+  .chip {
+    align-items: center;
+    border: clamp(2px, 1.6vh, 4px) solid var(--ink);
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    gap: 1px;
+    justify-content: center;
+    min-width: 0;
+    overflow: hidden;
+    padding: 2px clamp(3px, 0.8vw, 8px);
+  }
+
+  /* The next train is inverted so a glance lands on it first. */
+  .chip--next { background: var(--ink); color: var(--paper); }
+  .chip--next .chip-line { background: var(--paper); color: var(--ink); }
+
+  .chip-time { font-family: var(--font-mono); font-size: clamp(16px, 19vh, 44px); font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+  .chip-meta { align-items: center; display: flex; gap: 0.4em; min-width: 0; }
+  .chip-line { background: var(--ink); color: var(--paper); font-size: clamp(8px, 8vh, 16px); font-weight: 700; letter-spacing: 0.04em; padding: 0.1em 0.4em; }
+  .chip-state { font-size: clamp(9px, 9vh, 20px); font-weight: 700; white-space: nowrap; }
+  .chip-where { font-size: clamp(8px, 7.5vh, 16px); font-weight: 600; letter-spacing: 0.03em; max-width: 100%; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+
+  /* ---- vertical view ----------------------------------------------------- */
+
+  .rail { display: flex; flex-direction: column; height: 100%; padding: clamp(5px, 2.2vh, 16px); }
+  .rail-head { border-bottom: clamp(2px, 0.7vh, 4px) solid var(--ink); display: grid; gap: 1px; padding-bottom: clamp(3px, 1.4vh, 10px); }
+  .rail-station { font-size: clamp(12px, 3.9vh, 34px); font-weight: 700; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rail-to { align-items: center; display: flex; font-size: clamp(9px, 2.9vh, 16px); font-weight: 600; gap: 0.35em; min-width: 0; }
+  .rail-list { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+
+  .rail-dep { align-content: center; border-bottom: 2px solid var(--ink); display: grid; flex: 1 1 0; gap: 0; min-height: 0; overflow: hidden; padding: clamp(1px, 0.8vh, 8px) 0; }
+  .rail-dep:last-child { border-bottom: 0; }
+  .rail-dep--next .rail-time { font-size: clamp(20px, 8.4vh, 76px); }
+
+  .rail-top { align-items: baseline; display: flex; gap: 0.35em; justify-content: space-between; }
+  .rail-time { font-family: var(--font-mono); font-size: clamp(15px, 5.6vh, 52px); font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: -0.03em; line-height: 1.05; }
+  .rail-state { font-size: clamp(10px, 3.4vh, 32px); font-weight: 700; white-space: nowrap; }
+  .rail-bottom { align-items: center; display: flex; gap: 0.35em; min-width: 0; }
+  .rail-line { background: var(--ink); color: var(--paper); font-size: clamp(8px, 2.4vh, 20px); font-weight: 700; padding: 0.1em 0.35em; }
+  .rail-where { font-size: clamp(8px, 2.6vh, 22px); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rail-foot { border-top: clamp(2px, 0.7vh, 4px) solid var(--ink); font-family: var(--font-mono); font-size: clamp(8px, 2.4vh, 14px); padding-top: clamp(2px, 1vh, 8px); text-align: center; }
+
+  /* ---- overlay view ------------------------------------------------------ */
+
+  /* Drawn over other content, so it carries its own contrast: solid ink, a
+     hard border, and only the one thing a glance needs. */
+  .over {
+    background: var(--ink);
+    border: clamp(2px, 3vh, 5px) solid var(--paper);
+    color: var(--paper);
+    display: grid;
+    gap: 1px;
+    height: 100%;
+    overflow: hidden;
+    padding: clamp(4px, 6vh, 12px) clamp(6px, 4vw, 16px);
+    align-content: center;
+  }
+
+  .over-top { align-items: center; display: flex; gap: 0.35em; }
+  .over-time { font-family: var(--font-mono); font-size: clamp(22px, 32vh, 52px); font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: -0.04em; line-height: 1; }
+  .over-line { background: var(--paper); color: var(--ink); font-size: clamp(9px, 11vh, 18px); font-weight: 700; letter-spacing: 0.04em; padding: 0.15em 0.4em; }
+  .over-state { font-size: clamp(11px, 14vh, 24px); font-weight: 700; margin-left: auto; white-space: nowrap; }
+  .over-bottom { align-items: center; display: flex; gap: 0.4em; min-width: 0; }
+  .over-where { font-size: clamp(9px, 11vh, 18px); font-weight: 600; letter-spacing: 0.03em; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+  .over.is-cancelled .over-time { text-decoration: line-through; }
+</style>
+
+{% comment %} The layout asks for a view; the extension renders it. {% endcomment %}
+{% assign shape = view.shape | default: "full" %}
+{% assign heading = extension.values.title | default: transit.origin %}
+
+<div class="screen {{ extension.css_classes }}">
+  {% if transit.empty %}
+
+    <div class="content">
+      <div class="layout layout--col layout--center">
+        {{ icon_cancelled }}
+        <span class="t-xl t-bold">No departures</span>
+        <span class="t-sm">Nothing leaves {{ transit.origin }} in this window.</span>
+      </div>
+    </div>
+
+  {% elsif shape == "horizontal" %}
+
+    <div class="bar">
+      <div class="bar-head">
+        <span class="head">{{ icon_train }} <span class="head-route">{{ heading }} {{ icon_arrow }} {{ transit.destination }}</span></span>
+        <span class="t-mono">{{ transit.queried_at }}</span>
+      </div>
+
+      <div class="bar-track">
+        {% for departure in transit.departures limit: 4 %}
+          <div class="chip {% if forloop.first %}chip--next{% endif %} {% if departure.cancelled %}is-cancelled{% endif %}">
+            <span class="chip-time">{{ departure.expected }}</span>
+            <span class="chip-meta">
+              <span class="chip-line">{{ departure.line }}</span>
+              {% if departure.cancelled %}
+                <span class="chip-state">{{ icon_cancelled }}</span>
+              {% elsif departure.delayed %}
+                <span class="chip-state">{{ icon_late }} +{{ departure.delay }}</span>
+              {% elsif departure.day_offset > 0 %}
+                <span class="chip-state">{{ icon_tomorrow }}</span>
+              {% else %}
+                <span class="chip-state">{{ icon_ontime }}</span>
+              {% endif %}
+            </span>
+            <span class="chip-where">{{ departure.direction }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+  {% elsif shape == "overlay" %}
+
+    {% assign next = transit.departures | first %}
+    <div class="over {% if next.cancelled %}is-cancelled{% endif %}">
+      <div class="over-top">
+        <span class="over-time">{{ next.expected }}</span>
+        <span class="over-line">{{ next.line }}</span>
+        {% if next.cancelled %}
+          <span class="over-state">{{ icon_cancelled }}</span>
+        {% elsif next.delayed %}
+          <span class="over-state">{{ icon_late }} +{{ next.delay }}</span>
+        {% elsif next.day_offset > 0 %}
+          <span class="over-state">{{ icon_tomorrow }}</span>
+        {% else %}
+          <span class="over-state">{{ icon_ontime }}</span>
+        {% endif %}
+      </div>
+
+      <div class="over-bottom">
+        {{ icon_train }}
+        <span class="over-where">{{ heading }} {{ icon_arrow }} {{ next.direction }}</span>
+        {% if next.platform and extension.values.show_platform %}
+          <span class="over-where">{{ icon_platform }} {{ next.platform }}</span>
+        {% endif %}
+      </div>
+    </div>
+
+  {% elsif shape == "vertical" %}
+
+    <div class="rail">
+      <div class="rail-head">
+        <span class="head">{{ icon_train }} <span class="rail-station">{{ heading }}</span></span>
+        <span class="rail-to">{{ icon_arrow }} <span class="head-route">{{ transit.destination }}</span></span>
+      </div>
+
+      <div class="rail-list">
+        {% assign day = 0 %}
+        {% for departure in transit.departures %}
+          <div class="rail-dep {% if forloop.first %}rail-dep--next{% endif %} {% if departure.cancelled %}is-cancelled{% endif %}">
+            <span class="rail-top">
+              <span class="rail-time">{{ departure.expected }}</span>
+              {% if departure.cancelled %}
+                <span class="rail-state">{{ icon_cancelled }}</span>
+              {% elsif departure.delayed %}
+                <span class="rail-state">{{ icon_late }} +{{ departure.delay }}</span>
+              {% elsif departure.day_offset > day %}
+                <span class="rail-state">{{ icon_tomorrow }}</span>
+              {% elsif departure.live %}
+                <span class="rail-state">{{ icon_ontime }}</span>
+              {% endif %}
+            </span>
+
+            <span class="rail-bottom">
+              <span class="rail-line">{{ departure.line }}</span>
+              <span class="rail-where">{{ departure.direction }}</span>
+              {% if departure.platform and extension.values.show_platform %}
+                <span class="rail-where">{{ icon_platform }} {{ departure.platform }}</span>
+              {% endif %}
+            </span>
+            {% assign day = departure.day_offset %}
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="rail-foot">Trenord {{ transit.queried_at }}</div>
+    </div>
+
+  {% else %}
+
+    <div class="title-bar">
+      <span class="title head">{{ icon_train }} <span class="head-route">{{ heading }}</span></span>
+      <span class="meta head">{{ icon_arrow }} <span class="head-route">{{ transit.destination }}</span></span>
+    </div>
+
+    <div class="content content--tight">
+      <div class="board">
+        {% assign day = 0 %}
+        {% for departure in transit.departures %}
+          <div class="dep {% if forloop.first %}dep--next{% endif %} {% if departure.cancelled %}is-cancelled{% endif %}">
+            <span class="dep-time">{{ departure.expected }}</span>
+
+            {% if departure.delayed %}
+              <span class="dep-was">{{ departure.scheduled }}</span>
+            {% else %}
+              <span></span>
+            {% endif %}
+
+            <span class="dep-where">
+              <span class="dep-line">{{ departure.line }}</span>
+              {{ departure.direction }}
+            </span>
+
+            {% if departure.cancelled %}
+              <span class="dep-state">{{ icon_cancelled }} Cancelled</span>
+            {% elsif departure.delayed %}
+              <span class="dep-state">{{ icon_late }} +{{ departure.delay }}</span>
+            {% elsif departure.day_offset > day %}
+              <span class="dep-state">{{ icon_tomorrow }} Tomorrow</span>
+            {% elsif departure.live %}
+              <span class="dep-state">{{ icon_ontime }}</span>
+            {% else %}
+              <span></span>
+            {% endif %}
+
+            {% if departure.platform and extension.values.show_platform %}
+              <span class="dep-platform">
+                {{ icon_platform }}
+                <span class="dep-platform-number">{{ departure.platform }}</span>
+              </span>
+            {% else %}
+              <span></span>
+            {% endif %}
+            {% assign day = departure.day_offset %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="footer-bar">
+      <span class="t-upper">Trenord</span>
+      <span class="t-mono">Updated {{ transit.queried_at }}</span>
+    </div>
+
+  {% endif %}
+</div>

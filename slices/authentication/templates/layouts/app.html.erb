@@ -13,7 +13,8 @@
     </script>
     <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
 
-    <title><%= content_for :title %></title>
+    <% page_title = content_for(:title).to_s %>
+    <title><%= page_title.empty? ? "Dither" : page_title %></title>
 
     <meta charset="utf-8">
     <meta name="description" content="Dither — a self-hosted e-ink display server.">
@@ -43,32 +44,45 @@
     <%= javascript_tag "app.js" %>
   </head>
 
-  <body class="site-page site-authentication">
-    <header>
-      <%= link_to routes.path(:root), class: "site-label" do %>
-        <%= tag.img src: main_assets["logos/mark-accent.svg"], alt: "Dither", width: 30, height: 30 %>
-        <h1 class=label>dither</h1>
-      <% end %>
-    </header>
+  <body class="site-authentication">
+    <div class="auth-stage">
+      <aside class="auth-art" aria-hidden="true">
+        <canvas class="site-dither"></canvas>
 
-    <main class="site-body">
-      <% if flash[:alert] %>
-        <div class="site-alert">
-          <p><%= flash[:alert] %></p>
+        <div class="auth-art-copy">
+          <p class="auth-art-eyebrow">Self-hosted e-ink</p>
+          <p class="auth-art-headline">One bit per pixel.<br>Every pixel yours.</p>
         </div>
-      <% end %>
+      </aside>
 
-      <% if flash[:notice] %>
-        <div class="site-notice">
-          <p><%= flash[:notice] %></p>
-        </div>
-      <% end %>
+      <main class="auth-panel">
+        <div class="auth-card">
+          <div class="auth-brand">
+            <%= tag.img src: main_assets["logos/mark-accent.svg"],
+                        alt: "",
+                        width: 28,
+                        height: 28,
+                        class: "auth-brand-mark" %>
+            <span class="auth-brand-label">dither</span>
 
-      <div class="content">
-        <section class="panel">
+            <button type="button" class="site-theme-toggle" aria-label="Theme">◐</button>
+          </div>
+
+          <% if flash[:alert] %>
+            <div class="site-alert" role="alert">
+              <p><%= flash[:alert] %></p>
+            </div>
+          <% end %>
+
+          <% if flash[:notice] %>
+            <div class="site-notice" role="status">
+              <p><%= flash[:notice] %></p>
+            </div>
+          <% end %>
+
           <%= yield %>
-        </section>
-      </div>
-    </main>
+        </div>
+      </main>
+    </div>
   </body>
 </html>
