@@ -2,13 +2,13 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Actions::Playlists::Items::Create, :db do
+RSpec.describe Dither::Actions::Playlists::Items::Create, :db do
   subject(:action) { described_class.new }
 
   describe "#call" do
     let(:playlist) { Factory[:playlist] }
     let(:screen) { Factory[:screen, :with_image] }
-    let(:playlist_repository) { Terminus::Repositories::Playlist.new }
+    let(:playlist_repository) { Dither::Repositories::Playlist.new }
 
     let :params do
       {

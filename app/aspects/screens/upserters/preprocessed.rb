@@ -2,7 +2,7 @@
 
 require "dry/monads"
 
-module Terminus
+module Dither
   module Aspects
     module Screens
       module Upserters
@@ -11,7 +11,7 @@ module Terminus
           include Deps["mini_magick.image", repository: "repositories.screen"]
           include Dry::Monads[:result]
 
-          def initialize(struct: Terminus::Structs::Screen.new, **)
+          def initialize(struct: Dither::Structs::Screen.new, **)
             @struct = struct
             super(**)
           end

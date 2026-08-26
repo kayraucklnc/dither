@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Repositories
     # The extension model repository.
     class ExtensionModel < DB::Repository[:extension_model]

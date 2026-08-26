@@ -4,16 +4,16 @@
 
 :chrome_link: link:https://www.google.com/chrome[Google Chrome]
 :core_api_link: link:https://trmnl.com/api-docs/index.html[Core API]
-:devices_link: link:https://github.com/usetrmnl/terminus/blob/main/doc/devices.adoc[Devices]
-:doc_api_link: link:https://github.com/usetrmnl/terminus/blob/main/doc/api.adoc[API]
-:doc_configuration_link: link:https://github.com/usetrmnl/terminus/blob/main/doc/configuration.adoc[Configuration]
-:doc_development_link: link:https://github.com/usetrmnl/terminus/blob/main/doc/development.adoc[Development]
-:doc_docker_link: link:https://github.com/usetrmnl/terminus/blob/main/doc/docker.adoc[Docker]
-:doc_extensions_link: link:https://github.com/usetrmnl/terminus/blob/main/doc/extensions.adoc[Extensions]
-:doc_jobs_link: link:https://github.com/usetrmnl/terminus/blob/main/doc/jobs.adoc[Jobs]
-:doc_kubernetes_link: link:https://github.com/usetrmnl/terminus/blob/main/doc/kubernetes.adoc[Kubernetes]
-:doc_raspberry_pi_link: link:https://github.com/usetrmnl/terminus/blob/main/doc/raspberry_pi.adoc[Raspberry PI]
-:doc_render_link: link:[link:https://github.com/usetrmnl/terminus/blob/main/doc/render.adoc[Render]]
+:devices_link: link:https://github.com/kayraucklnc/dither/blob/main/doc/devices.adoc[Devices]
+:doc_api_link: link:https://github.com/kayraucklnc/dither/blob/main/doc/api.adoc[API]
+:doc_configuration_link: link:https://github.com/kayraucklnc/dither/blob/main/doc/configuration.adoc[Configuration]
+:doc_development_link: link:https://github.com/kayraucklnc/dither/blob/main/doc/development.adoc[Development]
+:doc_docker_link: link:https://github.com/kayraucklnc/dither/blob/main/doc/docker.adoc[Docker]
+:doc_extensions_link: link:https://github.com/kayraucklnc/dither/blob/main/doc/extensions.adoc[Extensions]
+:doc_jobs_link: link:https://github.com/kayraucklnc/dither/blob/main/doc/jobs.adoc[Jobs]
+:doc_kubernetes_link: link:https://github.com/kayraucklnc/dither/blob/main/doc/kubernetes.adoc[Kubernetes]
+:doc_raspberry_pi_link: link:https://github.com/kayraucklnc/dither/blob/main/doc/raspberry_pi.adoc[Raspberry PI]
+:doc_render_link: link:[link:https://github.com/kayraucklnc/dither/blob/main/doc/render.adoc[Render]]
 :docker_link: link:https://www.docker.com[Docker]
 :dragonfly_link: link:https://www.dragonflydb.io[Dragonfly]
 :esbuild_link: link:https://esbuild.github.io[esbuild]
@@ -51,14 +51,17 @@ can flash boards over USB straight from the dashboard.
 [NOTE]
 ====
 Dither is a fork of link:https://github.com/usetrmnl/terminus[Terminus] by TRMNL, used
-under the MIT licence; the original copyright notice is retained in `LICENSE.adoc`. The
-paired firmware is a fork of link:https://github.com/usetrmnl/trmnl-firmware[trmnl-firmware]
-(GPL-3.0). Upstream references to `trmnl.com` that remain in this codebase are deliberate:
-they are live interop endpoints (the extension rendering framework, the recipe gallery, the
-palette/model APIs), not branding.
+under the MIT licence; the original copyright notice is retained in `LICENSE.adoc`.
+
+Dither is the server only. It speaks the same device API as TRMNL hardware, so boards run
+**stock** link:https://github.com/usetrmnl/trmnl-firmware[trmnl-firmware] (GPL-3.0) with no
+changes -- point one at this server and it provisions itself. Screens render against Dither's
+own framework (`lib/dither/screen_framework.css`), so nothing off-origin is on the render
+path. The one remaining call to TRMNL infrastructure is downloading official firmware
+releases, which is the point rather than a leftover.
 ====
 
-Terminus is a {ruby_link}/{hanami_link} web server that allows you to manage {trmnl_link} devices running on your own local network or hosted cloud. This is our flagship BYOS implementation that aims to be compatible with our {trmnl_link} Core server but _also different_ since this open source solution provides features not possible in our Core application.
+Dither is a {ruby_link}/{hanami_link} web server for running e-ink displays on your own network. It implements the {trmnl_link} device API, so stock hardware and stock firmware work against it unchanged, with no subscription and nothing phoning home. Where it diverges from upstream it does so on purpose: screens are composed from extensions rather than hand-written, and what a panel shows is decided by rules rather than a fixed playlist.
 
 image:https://render.com/images/deploy-to-render-button.svg[Deploy to Render,link=https://render.com/deploy]
 
@@ -98,7 +101,7 @@ The following documents the features supported in this implementation which are 
 
 [options="header"]
 |===
-|             | Terminus | Hosted
+|             | Dither | Hosted
 | Dashboard   | 🟢       | 🟢
 | Devices     | 🟢       | 🟢
 | Sensors     | 🟢       | 🟢
@@ -130,16 +133,16 @@ The following documents the features supported in this implementation which are 
 
 == Quick Start
 
-To immediately spin up Terminus on your local machine using {docker_link}, run:
+To immediately spin up Dither on your local machine using {docker_link}, run:
 
 [source,bash]
 ----
-curl https://raw.githubusercontent.com/usetrmnl/terminus/refs/heads/main/scripts/docker/quick.sh | bash
+curl https://raw.githubusercontent.com/kayraucklnc/dither/refs/heads/main/scripts/docker/quick.sh | bash
 ----
 
 Once launched, open `http://localhost:2300` in your browser then click the _Register_ link to register and log into the system.
 
-⚠️ This script is not idempotent which means you can't run it more than once since your database credentials will be different each time. This is only meant for getting up and running quickly to explore the feature set, not permanent use. For permanent use, see the link:https://github.com/usetrmnl/terminus/blob/main/doc/docker.adoc[Docker] documentation.
+⚠️ This script is not idempotent which means you can't run it more than once since your database credentials will be different each time. This is only meant for getting up and running quickly to explore the feature set, not permanent use. For permanent use, see the link:https://github.com/kayraucklnc/dither/blob/main/doc/docker.adoc[Docker] documentation.
 
 == Setup
 
@@ -147,7 +150,7 @@ To set up this project for local development, run:
 
 [source,bash]
 ----
-git clone https://github.com/usetrmnl/terminus
+git clone https://github.com/kayraucklnc/dither
 cd terminus
 bin/setup
 ----
@@ -206,10 +209,10 @@ See {devices_link} documentation for details.
 
 === Firmware
 
-In accordance with the {unbrickable_pledge_link}, the latest version of Terminus always supports the latest version of our {firmware_link}. If you are running on older firmware, you'll need to use an older version of Terminus. Here's a rough breakdown of the Firmware version history where changes were applied that might cause issues if you haven't upgraded your devices in a while:
+In accordance with the {unbrickable_pledge_link}, the latest version of Dither always supports the latest version of our {firmware_link}. If you are running on older firmware, you'll need to use an older version of Dither. Here's a rough breakdown of the Firmware version history where changes were applied that might cause issues if you haven't upgraded your devices in a while:
 
-* *Firmware 1.6.9* (and lower): Supported by Terminus link:https://github.com/usetrmnl/terminus/releases/tag/0.41.0[0.41.0] and lower.
-* *Firmware 1.6.10* (and higher): Supported by Terminus link:https://github.com/usetrmnl/terminus/releases/tag/0.42.0[0.42.0] and higher.
+* *Firmware 1.6.9* (and lower): Supported by Dither link:https://github.com/kayraucklnc/dither/releases/tag/0.41.0[0.41.0] and lower.
+* *Firmware 1.6.10* (and higher): Supported by Dither link:https://github.com/kayraucklnc/dither/releases/tag/0.42.0[0.42.0] and higher.
 
 In case it's of interest, unofficial firmware specific Waveshare (device and display) can be found here:
 
@@ -274,7 +277,7 @@ While this project is distributed under the permissive link:/LICENSE.adoc[MIT Li
 
 == Survey
 
-link:https://docs.google.com/forms/d/1FLVa9I1u6wk6ExMYj-l9P9a_Kw7XGXCPPyC0SSvv3hs/viewform[Take our survey] to help us learn more about how you use Terminus along with any feedback you might have.
+link:https://docs.google.com/forms/d/1FLVa9I1u6wk6ExMYj-l9P9a_Kw7XGXCPPyC0SSvv3hs/viewform[Take our survey] to help us learn more about how you use Dither along with any feedback you might have.
 
 == Credits
 

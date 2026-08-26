@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Actions::Extensions::Build::Create, :db do
+RSpec.describe Dither::Actions::Extensions::Build::Create, :db do
   subject(:action) { described_class.new }
 
   describe "#call" do
@@ -19,7 +19,7 @@ RSpec.describe Terminus::Actions::Extensions::Build::Create, :db do
       Sidekiq::Testing.fake! do
         response
 
-        expect(Terminus::Jobs::Batches::Extension.jobs).to contain_exactly(
+        expect(Dither::Jobs::Batches::Extension.jobs).to contain_exactly(
           hash_including("args" => [extension.id])
         )
       end

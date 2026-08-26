@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Errors::ResultJoiner do
+RSpec.describe Dither::Aspects::Errors::ResultJoiner do
   subject(:joiner) { described_class }
 
   describe "#call" do

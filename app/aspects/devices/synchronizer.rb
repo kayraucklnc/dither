@@ -3,7 +3,7 @@
 require "dry/monads"
 require "pipeable"
 
-module Terminus
+module Dither
   module Aspects
     module Devices
       # Updates device based on firmware header information.

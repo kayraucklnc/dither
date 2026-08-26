@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Actions::Playlists::Index, :db do
+RSpec.describe Dither::Actions::Playlists::Index, :db do
   subject(:action) { described_class.new }
 
   describe "#call" do
@@ -11,7 +11,7 @@ RSpec.describe Terminus::Actions::Playlists::Index, :db do
       screen = Factory[:screen, :with_image]
       item = Factory[:playlist_item, playlist_id: playlist.id, screen_id: screen.id]
 
-      repository = Terminus::Repositories::Playlist.new
+      repository = Dither::Repositories::Playlist.new
       repository.update playlist.id, current_item_id: item.id
       repository.find playlist.id
     end

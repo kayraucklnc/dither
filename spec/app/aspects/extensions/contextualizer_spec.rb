@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Extensions::Contextualizer, :db do
+RSpec.describe Dither::Aspects::Extensions::Contextualizer, :db do
   subject(:contextualizer) { described_class.new }
 
   using Refinements::Hash

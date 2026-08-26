@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::PasswordEncryptor do
+RSpec.describe Dither::Aspects::PasswordEncryptor do
   subject(:encryptor) { described_class.new password: }
 
   let(:password) { class_spy BCrypt::Password }

@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Firmware::Headers::Transformers::Sensors do
+RSpec.describe Dither::Aspects::Firmware::Headers::Transformers::Sensors do
   subject(:parser) { described_class.new }
 
   describe "#call" do

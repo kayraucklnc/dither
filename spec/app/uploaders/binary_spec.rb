@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Uploaders::Binary do
+RSpec.describe Dither::Uploaders::Binary do
   subject(:uploader) { described_class }
 
   include_context "with temporary directory"

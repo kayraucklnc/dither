@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Extensions::Source do
+RSpec.describe Dither::Aspects::Extensions::Source do
   subject(:parser) { described_class }
 
   describe ".from_csv" do

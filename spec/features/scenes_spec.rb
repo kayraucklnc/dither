@@ -7,7 +7,7 @@ RSpec.describe "Scenes", :db do
     it "renders the layout picker with every layout" do
       visit routes.path(:scene_new)
 
-      expect(page).to have_css(".layout-option", count: Terminus::Composition::LAYOUTS.size)
+      expect(page).to have_css(".layout-option", count: Dither::Composition::LAYOUTS.size)
     end
 
     it "renders a drop target per slot of the chosen layout" do

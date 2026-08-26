@@ -7,7 +7,7 @@ require "sidekiq-scheduler/web"
 
 require_relative "../app/aspects/designs/middleware"
 
-module Terminus
+module Dither
   # The application base routes.
   # rubocop:todo-next Metrics/ClassLength
   class Routes < Hanami::Routes
@@ -97,9 +97,6 @@ module Terminus
     put "/extensions/:id", to: "extensions.update", as: :extension
     delete "/extensions/:id", to: "extensions.delete", as: :extension
 
-    get "/extensions/gallery", to: "extensions.gallery.index", as: :extensions_gallery
-    post "/extensions/gallery", to: "extensions.gallery.create", as: :extensions_gallery
-
     post "/extensions/import", to: "extensions.import.create", as: :extension_import
 
     post "/extensions/:extension_id/build", to: "extensions.build.create", as: :extension_build
@@ -150,8 +147,19 @@ module Terminus
     get "/models/:model_id/clone/new", to: "models.clone.new", as: :model_clone_new
     post "/models/:model_id/clone", to: "models.clone.create", as: :model_clone
 
-    get "/scenes/new", to: "scenes.new", as: :scene_new
+    # The composer is a tool, not a sub-resource of the library, and nesting
+    # it under /scenes made both navigation items light up at once.
+    get "/compose", to: "scenes.new", as: :scene_new
+
+    get "/scenes", to: "scenes.index", as: :scenes
+    post "/scenes", to: "scenes.create", as: :scenes
+    delete "/scenes/:id", to: "scenes.delete", as: :scene
     get "/scenes/preview", to: "scenes.preview.show", as: :scene_preview
+
+    get "/devices/:device_id/rules", to: "devices.rules.index", as: :device_rules
+    post "/devices/:device_id/rules", to: "devices.rules.create", as: :device_rules
+    delete "/devices/:device_id/rules/:id", to: "devices.rules.delete", as: :device_rule
+    post "/devices/:device_id/rules/:id/move", to: "devices.rules.reorder", as: :device_rule_move
 
     get "/playlists", to: "playlists.index", as: :playlists
     get "/playlists/:id", to: "playlists.show", as: :playlist

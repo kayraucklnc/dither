@@ -30,6 +30,44 @@ start_at: "2026-01-01T00:00:00Z"
 static_body: {}
 data: {}
 
+# What this renders before it has ever fetched - not configured yet, API down,
+# or you are still evaluating with no hardware. Previews fall back to this and
+# label it as sample; a device is never served it. Shape it exactly like the
+# real response, so a design that looks right here looks right in the field.
+sample:
+  source_1:
+    departures:
+      - when: "2026-01-01T08:12:00+01:00"
+        delay: 180
+        line: {name: "ICE 1045"}
+        destination: {name: "Munchen Hbf"}
+        stop: {name: "Berlin Hauptbahnhof"}
+      - when: "2026-01-01T08:17:00+01:00"
+        delay: 0
+        line: {name: "RE 3"}
+        destination: {name: "Stralsund Hbf"}
+        stop: {name: "Berlin Hauptbahnhof"}
+      - when: "2026-01-01T08:24:00+01:00"
+        delay: 60
+        line: {name: "S7"}
+        destination: {name: "Potsdam Hauptbahnhof"}
+        stop: {name: "Berlin Hauptbahnhof"}
+      - when: "2026-01-01T08:31:00+01:00"
+        delay: 0
+        line: {name: "IC 2432"}
+        destination: {name: "Koln Hbf"}
+        stop: {name: "Berlin Hauptbahnhof"}
+      - when: "2026-01-01T08:39:00+01:00"
+        delay: 0
+        line: {name: "RB 21"}
+        destination: {name: "Wustermark"}
+        stop: {name: "Berlin Hauptbahnhof"}
+      - when: "2026-01-01T08:46:00+01:00"
+        delay: 300
+        line: {name: "ICE 597"}
+        destination: {name: "Stuttgart Hbf"}
+        stop: {name: "Berlin Hauptbahnhof"}
+
 # Fields become the settings form the extension's owner fills in. Each keyname
 # is addressable in templates and in exchange URLs as
 # {{ extension.values.<keyname> }} - everything an extension knows about

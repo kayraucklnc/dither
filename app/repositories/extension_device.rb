@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Repositories
     # The extension device repository.
     class ExtensionDevice < DB::Repository[:extension_device]

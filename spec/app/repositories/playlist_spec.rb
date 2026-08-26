@@ -2,11 +2,11 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Repositories::Playlist, :db do
+RSpec.describe Dither::Repositories::Playlist, :db do
   subject(:repository) { described_class.new }
 
   let(:playlist) { Factory[:playlist] }
-  let(:item_repository) { Terminus::Repositories::PlaylistItem.new }
+  let(:item_repository) { Dither::Repositories::PlaylistItem.new }
 
   describe "#all" do
     it "answers all records by created date/time" do

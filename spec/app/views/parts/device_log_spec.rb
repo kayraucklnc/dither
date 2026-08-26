@@ -2,8 +2,8 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Views::Parts::DeviceLog do
-  subject(:part) { described_class.new value: log, rendering: Terminus::View.new.rendering }
+RSpec.describe Dither::Views::Parts::DeviceLog do
+  subject(:part) { described_class.new value: log, rendering: Dither::View.new.rendering }
 
   let(:log) { Factory.structs[:device_log] }
 

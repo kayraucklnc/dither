@@ -2,7 +2,7 @@
 
 require "securerandom"
 
-module Terminus
+module Dither
   module Aspects
     module Firmware
       module Models

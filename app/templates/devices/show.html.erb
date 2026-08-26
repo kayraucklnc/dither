@@ -24,6 +24,14 @@
       <%= scope(:popover_screen_content, **current_screen.popover_attributes).render %>
       <%= render "measurements", device: %>
 
+      <%# Rules are the main thing you do with a device now, so this is a
+          labelled button rather than another icon in the row. %>
+      <p class="device-rules-link">
+        <%= link_to "Rules — what this device shows",
+                    routes.path(:device_rules, device_id: device.id),
+                    class: "bit-button-accept" %>
+      </p>
+
       <div class="actions">
         <%= render "shared/actions/edit", path: routes.path(:device_edit, id: device.id) %>
         <%= render "shared/actions/logs", path: routes.path(:device_logs, device_id: device.id) %>

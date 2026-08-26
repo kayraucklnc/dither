@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Views::Helpers do
+RSpec.describe Dither::Views::Helpers do
   subject(:helper) { described_class }
 
   include_context "with application dependencies"
@@ -84,8 +84,7 @@ RSpec.describe Terminus::Views::Helpers do
                                   .and_return(latest_sha)
 
       expect(helper.git_link(kernel:)).to eq(
-        %(<a class="link" href="https://alchemists.io/projects/terminus/versions/1.2.3/">) \
-        "Version 1.2.3</a>"
+        %(<span class="link">Version 1.2.3</span>)
       )
     end
 
@@ -94,8 +93,7 @@ RSpec.describe Terminus::Views::Helpers do
                                   .and_return("different")
 
       expect(helper.git_link(kernel:)).to eq(
-        %(<a class="link" href="https://github.com/usetrmnl/terminus/commit/abcdefghijkl">) \
-        "Latest (ahead of 1.2.3)</a>"
+        %(<span class="link">Latest (ahead of 1.2.3)</span>)
       )
     end
   end
@@ -103,8 +101,7 @@ RSpec.describe Terminus::Views::Helpers do
   describe ".git_latest_link" do
     it "answers version link when latest and tag SHAs match" do
       expect(helper.git_latest_link).to eq(
-        %(<a class="link" href="https://github.com/usetrmnl/terminus/commit/abcdefghijkl">) \
-        "Latest (ahead of 1.2.3)</a>"
+        %(<span class="link">Latest (ahead of 1.2.3)</span>)
       )
     end
   end
@@ -112,8 +109,7 @@ RSpec.describe Terminus::Views::Helpers do
   describe ".git_version_link" do
     it "answers version link when latest and tag SHAs match" do
       expect(helper.git_version_link).to eq(
-        %(<a class="link" href="https://alchemists.io/projects/terminus/versions/1.2.3/">) \
-        "Version 1.2.3</a>"
+        %(<span class="link">Version 1.2.3</span>)
       )
     end
   end

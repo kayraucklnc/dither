@@ -2,7 +2,7 @@
 
 require "dry/monads"
 
-module Terminus
+module Dither
   module Aspects
     module Scenes
       # Renders a layout plus its slot assignments into one document.
@@ -30,12 +30,12 @@ module Terminus
         # already a complete page and skip inlining the stylesheet.
         BODY = %r{<body[^>]*>(?<content>.*)</body>}mi
 
-        def call layout_id, assignments = {}, model_id: nil, device_id: nil
+        def call layout_id, assignments = {}, model_id: nil, device_id: nil, preview: false
           layout = Composition.layout layout_id
 
           return Failure unknown_layout(layout_id) unless layout
 
-          collect(layout, assignments, model_id:, device_id:).fmap { document_for it }
+          collect(layout, assignments, model_id:, device_id:, preview:).fmap { document_for it }
         end
 
         private

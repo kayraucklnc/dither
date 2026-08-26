@@ -4,7 +4,7 @@ require "dry/monads"
 require "initable"
 require "uri"
 
-module Terminus
+module Dither
   module Aspects
     # A simple content downloader.
     class Downloader

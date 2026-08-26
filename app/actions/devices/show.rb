@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Actions
     module Devices
       # The show action.

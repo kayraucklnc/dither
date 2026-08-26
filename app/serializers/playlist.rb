@@ -4,7 +4,7 @@
 require "core"
 require "initable"
 
-module Terminus
+module Dither
   module Serializers
     # A playlist serializer for specific keys.
     class Playlist

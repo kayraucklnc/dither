@@ -2,19 +2,19 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Jobs::Extensions::ExchangeRefresh, :db do
+RSpec.describe Dither::Jobs::Extensions::ExchangeRefresh, :db do
   subject(:job) { described_class.new refresher: }
 
   include_context "with application dependencies"
 
-  let(:refresher) { instance_spy Terminus::Aspects::Extensions::Exchanges::Refresher }
+  let(:refresher) { instance_spy Dither::Aspects::Extensions::Exchanges::Refresher }
 
   describe "#perform" do
     let(:exchange) { Factory[:extension_exchange] }
 
     it "answers success when extension and model exist" do
       job.perform exchange.id
-      expect(refresher).to have_received(:call).with(kind_of(Terminus::Structs::ExtensionExchange))
+      expect(refresher).to have_received(:call).with(kind_of(Dither::Structs::ExtensionExchange))
     end
 
     it "logs info when enqueued" do

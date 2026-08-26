@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Relations::PlaylistItem, :db do
+RSpec.describe Dither::Relations::PlaylistItem, :db do
   subject(:relation) { Hanami.app["relations.playlist_item"] }
 
   describe "#previous" do

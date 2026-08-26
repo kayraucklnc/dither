@@ -5,7 +5,7 @@ require "hanami/db/repo"
 module Authentication
   module DB
     # The application database base repository.
-    class Repository < Terminus::DB::Repo
+    class Repository < Dither::DB::Repo
     end
   end
 end

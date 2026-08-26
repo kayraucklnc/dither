@@ -3,7 +3,7 @@
 
 require "hanami/view"
 
-module Terminus
+module Dither
   # The application base view.
   class View < Hanami::View
   end

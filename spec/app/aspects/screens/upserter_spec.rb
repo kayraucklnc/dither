@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Screens::Upserter, :db do
+RSpec.describe Dither::Aspects::Screens::Upserter, :db do
   subject(:upserter) { described_class.new }
 
   include_context "with temporary directory"

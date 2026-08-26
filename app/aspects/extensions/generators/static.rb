@@ -3,7 +3,7 @@
 require "core"
 require "dry/monads"
 
-module Terminus
+module Dither
   module Aspects
     module Extensions
       module Generators

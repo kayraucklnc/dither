@@ -1,7 +1,7 @@
 # auto_register: false
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Uploaders
     # Processes binary uploads.
     class Binary < Hanami.app[:shrine]

@@ -4,7 +4,7 @@ require "core"
 require "dry/monads"
 require "pipeable"
 
-module Terminus
+module Dither
   module Aspects
     module Devices
       # Handles the setup and default configuration of new devices.

@@ -2,7 +2,7 @@
 
 require "pipeable"
 
-module Terminus
+module Dither
   module Aspects
     module Firmware
       module Headers

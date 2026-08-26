@@ -2,7 +2,7 @@
 
 require "refinements/hash"
 
-module Terminus
+module Dither
   module Structs
     # The device sensor struct.
     class DeviceSensor < DB::Struct

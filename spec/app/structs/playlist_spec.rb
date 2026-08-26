@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Structs::Playlist, :db do
+RSpec.describe Dither::Structs::Playlist, :db do
   subject(:playlist) { Factory[:playlist] }
 
   describe "#automatic?" do
@@ -17,7 +17,7 @@ RSpec.describe Terminus::Structs::Playlist, :db do
   end
 
   describe "#current_item_position" do
-    let(:update) { Terminus::Repositories::Playlist.new.find playlist.id }
+    let(:update) { Dither::Repositories::Playlist.new.find playlist.id }
 
     it "answers default when current item is missing" do
       expect(update.current_item_position).to eq(1)

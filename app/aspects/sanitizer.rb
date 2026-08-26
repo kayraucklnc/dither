@@ -5,7 +5,7 @@ require "refinements/array"
 require "refinements/hash"
 require "sanitize"
 
-module Terminus
+module Dither
   module Aspects
     # A custom HTML sanitizer.
     class Sanitizer

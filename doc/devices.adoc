@@ -7,7 +7,7 @@
 
 = Devices
 
-The following provides additional information when automatically or manually connecting devices to Terminus.
+The following provides additional information when automatically or manually connecting devices to Dither.
 
 toc::[]
 
@@ -15,12 +15,12 @@ toc::[]
 
 Connecting devices requires using the WiFi captive portal on your mobile phone to connect your TRMNL device to your local network where this server is running. You can also delete your device, via the UI and/or API, and it'll be reconfigured for you automatically when the device next makes a link:api.adoc#display[Display API] request. For more information (including dealing with tricky WiFi situations), check out the help guides:
 
-* link:https://help.usetrmnl.com/en/articles/12263392-connect-your-device-to-terminus-byos[How to connect your device to Terminus].
+* link:https://help.usetrmnl.com/en/articles/12263392-connect-your-device-to-terminus-byos[How to connect your device to Dither].
 * link:https://help.usetrmnl.com/en/articles/11663377-setting-up-a-trmnl-on-tricky-wi-fi-situations[Dealing with tricky Wi-Fi situations].
 
 == Models
 
-Terminus supports multiple models (as found via the _Models_ page within the UI). These models are used during the device auto-provisioning process to ensure your device is associated with the correct model for rendering screens on your device. That said, some devices require special care as documented below.
+Dither supports multiple models (as found via the _Models_ page within the UI). These models are used during the device auto-provisioning process to ensure your device is associated with the correct model for rendering screens on your device. That said, some devices require special care as documented below.
 
 === CrowPanel ESP32 4.2inch E-paper
 
@@ -61,4 +61,4 @@ Provides a slim design that supports 800x480 resolutions like our TRMNL OG devic
 
 * link:https://www.xteink.com[Site]: Visit the web site to learn more.
 * link:https://www.xteink.com/products/xteink-x4[Model]: The product page.
-* link:https://trmnl.com/blog/xteink-x4-dashboard[TRMNL Article]: Walks you through setting up the X4 using our Core server but some of what is documented is useful for Terminus setup as well.
+* link:https://trmnl.com/blog/xteink-x4-dashboard[TRMNL Article]: Walks you through setting up the X4 using our Core server but some of what is documented is useful for Dither setup as well.

@@ -2,10 +2,10 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Views::Parts::IPAddress do
+RSpec.describe Dither::Views::Parts::IPAddress do
   using Refinements::Pathname
 
-  subject(:part) { described_class.new value: address, rendering: Terminus::View.new.rendering }
+  subject(:part) { described_class.new value: address, rendering: Dither::View.new.rendering }
 
   let :address do
     instance_double(

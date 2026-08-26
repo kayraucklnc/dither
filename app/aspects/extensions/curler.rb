@@ -2,13 +2,13 @@
 
 require "initable"
 
-module Terminus
+module Dither
   module Aspects
     module Extensions
       # Renders curl command for exchange and associated data.
       class Curler
         include Deps["aspects.extensions.exchanges.request_builder"]
-        include Initable[command: "curl", json_formatter: proc { Terminus::Aspects::JSONFormatter }]
+        include Initable[command: "curl", json_formatter: proc { Dither::Aspects::JSONFormatter }]
 
         def self.render_headers attributes
           return if Hash(attributes).empty?

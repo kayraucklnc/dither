@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Jobs::Extensions::Screen, :db do
+RSpec.describe Dither::Jobs::Extensions::Screen, :db do
   subject(:job) { described_class.new }
 
   include_context "with application dependencies"
@@ -23,7 +23,7 @@ RSpec.describe Terminus::Jobs::Extensions::Screen, :db do
 
     it "creates screen" do
       job.perform extension.id, model.id
-      screen = Terminus::Repositories::Screen.new.find_by name: "extension-test"
+      screen = Dither::Repositories::Screen.new.find_by name: "extension-test"
 
       expect(screen).to have_attributes(
         name: "extension-test",

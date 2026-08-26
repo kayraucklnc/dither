@@ -50,7 +50,7 @@ directories.sort.each do |directory|
 
   # Variants are declared by writing them: every templates/<shape>.html.liquid
   # is a shape this extension may occupy, and nothing else is.
-  variants = Terminus::Aspects::Extensions::Variants.call(
+  variants = Dither::Aspects::Extensions::Variants.call(
     directory.glob("templates/*.html.liquid")
              .to_h { |path| [path.relative_path_from(directory).to_s, path.read] }
   )

@@ -2,8 +2,8 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Views::Scopes::PopoverTriggerButton do
-  subject(:scope) { described_class.new locals:, rendering: Terminus::View.new.rendering }
+RSpec.describe Dither::Views::Scopes::PopoverTriggerButton do
+  subject(:scope) { described_class.new locals:, rendering: Dither::View.new.rendering }
 
   let(:locals) { {icon: :info} }
 

@@ -3,7 +3,7 @@
 require "hanami_helper"
 require "trmnl/api"
 
-RSpec.describe Terminus::Aspects::Firmware::Synchronizer, :db do
+RSpec.describe Dither::Aspects::Firmware::Synchronizer, :db do
   subject(:synchronizer) { described_class.new trmnl_api:, downloader: }
 
   let :trmnl_api do
@@ -16,7 +16,7 @@ RSpec.describe Terminus::Aspects::Firmware::Synchronizer, :db do
                     )
   end
 
-  let(:downloader) { instance_double Terminus::Aspects::Downloader, call: download_response }
+  let(:downloader) { instance_double Dither::Aspects::Downloader, call: download_response }
 
   let :download_response do
     Success(
@@ -59,7 +59,7 @@ RSpec.describe Terminus::Aspects::Firmware::Synchronizer, :db do
       subject(:synchronizer) { described_class.new trmnl_api:, downloader:, struct: }
 
       let :struct do
-        instance_double Terminus::Structs::Firmware, upload: nil, errors: ["Danger!"], valid?: false
+        instance_double Dither::Structs::Firmware, upload: nil, errors: ["Danger!"], valid?: false
       end
 
       it "answers failure" do
@@ -79,7 +79,7 @@ RSpec.describe Terminus::Aspects::Firmware::Synchronizer, :db do
 
     context "with download failure" do
       let :downloader do
-        instance_double Terminus::Aspects::Downloader, call: Failure(message: "Danger!")
+        instance_double Dither::Aspects::Downloader, call: Failure(message: "Danger!")
       end
 
       it "answers failure" do

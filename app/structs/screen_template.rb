@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Structs
     # The screen template struct.
     class ScreenTemplate < DB::Struct

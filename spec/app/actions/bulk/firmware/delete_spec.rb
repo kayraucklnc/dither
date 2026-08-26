@@ -2,12 +2,12 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Actions::Bulk::Firmware::Delete, :db do
+RSpec.describe Dither::Actions::Bulk::Firmware::Delete, :db do
   subject(:action) { described_class.new }
 
   describe "#call" do
     let(:firmware) { Factory[:firmware] }
-    let(:repository) { Terminus::Repositories::Firmware.new }
+    let(:repository) { Dither::Repositories::Firmware.new }
 
     it "deletes existing firmware" do
       firmware

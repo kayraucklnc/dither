@@ -3,7 +3,7 @@
 require "core"
 require "refinements/array"
 
-module Terminus
+module Dither
   module Structs
     # The model struct.
     class Model < DB::Struct

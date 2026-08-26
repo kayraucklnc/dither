@@ -10,9 +10,9 @@
 
 = Raspberry Pi
 
-📣 link:https://docs.google.com/forms/d/1bLbOoxDkKi5YudneeOvBUHvgvmRRuZXxvxjIHg6fq18/viewform?edit_requested=true[Sign up] to pre-order a plug-n-play version of Terminus on a Raspberry Pi. Suggestions welcome.
+📣 link:https://docs.google.com/forms/d/1bLbOoxDkKi5YudneeOvBUHvgvmRRuZXxvxjIHg6fq18/viewform?edit_requested=true[Sign up] to pre-order a plug-n-play version of Dither on a Raspberry Pi. Suggestions welcome.
 
-We support Raspberry Pi and have tested Terminus with the following hardware:
+We support Raspberry Pi and have tested Dither with the following hardware:
 
 * link:https://www.raspberrypi.com/products/raspberry-pi-5[Raspberry Pi 5]: Recommended due to great performance and feature set.
 * link:https://www.raspberrypi.com/products/raspberry-pi-zero-2-w/[Raspberry Pi Zero 2 W]: Good if you want a compact form factor and don't care about speed.
@@ -21,9 +21,9 @@ toc::[]
 
 == Setup
 
-A great project to help you manage multiple Raspberry Pi devices is the {pi_project_link} project. This project provides Bash shell scripts for formatting, installing the Raspberry Pi OS, and spinning up Terminus.
+A great project to help you manage multiple Raspberry Pi devices is the {pi_project_link} project. This project provides Bash shell scripts for formatting, installing the Raspberry Pi OS, and spinning up Dither.
 
-For Terminus, you only need to add the following as a service (i.e. `$XDG_CONFIG_HOME/pi/scripts/services/terminus`) with the following contents:
+For Dither, you only need to add the following as a service (i.e. `$XDG_CONFIG_HOME/pi/scripts/services/terminus`) with the following contents:
 
 [source,bash]
 ----
@@ -73,7 +73,7 @@ git clone https://github.com/usetrmnl/sensor_scanner
 
 == Launch
 
-With the above services in place, you can then run `bin/run s` to format and configure your micro SSD card and run a dockerized version of Terminus on your Raspberry Pi device. Finally, once your Raspberry Pi has booted, you can SSH in to launch Terminus. Example:
+With the above services in place, you can then run `bin/run s` to format and configure your micro SSD card and run a dockerized version of Dither on your Raspberry Pi device. Finally, once your Raspberry Pi has booted, you can SSH in to launch Dither. Example:
 
 [source,bash]
 ----
@@ -82,13 +82,13 @@ cd terminus
 docker compose up
 ----
 
-This would allow you to visit `http://demo.local:2300`, for example, in your browser to register/login and start using Terminus. That's it!
+This would allow you to visit `http://demo.local:2300`, for example, in your browser to register/login and start using Dither. That's it!
 
 Definitely check out the {pi_project_link} and {sensor_project_link} projects for more details.
 
 == 3D Cases
 
-For those that have a 3D printer and would like Terminus branded 3D cases to print and use with your Raspberry Pi hardware, then definitely check out the following:
+For those that have a 3D printer and would like Dither branded 3D cases to print and use with your Raspberry Pi hardware, then definitely check out the following:
 
 * link:https://www.thingiverse.com/thing:7319921[Raspberry Pi 5 Case] by {brant_herbert_link}: Comes complete with open/closed variations for GPIO ports.
 * link:https://www.thingiverse.com/thing:7319935[Raspberry Pi Zero 2 W Case] by {brant_herbert_link}: Comes complete with open/closed variations for GPIO ports.

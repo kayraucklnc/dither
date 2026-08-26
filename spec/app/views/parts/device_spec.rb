@@ -2,25 +2,25 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Views::Parts::Device, :db do
-  subject(:part) { described_class.new value: device, rendering: Terminus::View.new.rendering }
+RSpec.describe Dither::Views::Parts::Device, :db do
+  subject(:part) { described_class.new value: device, rendering: Dither::View.new.rendering }
 
   let(:device) { Factory.structs[:device] }
 
   describe "#current_screen" do
     let :device do
-      Terminus::Aspects::Devices::Provisioner.new.call(model_id: Factory[:model].id).value!
+      Dither::Aspects::Devices::Provisioner.new.call(model_id: Factory[:model].id).value!
     end
 
     it "answers screen when device is provisioned" do
-      expect(part.current_screen).to be_a(Terminus::Structs::Screen)
+      expect(part.current_screen).to be_a(Dither::Structs::Screen)
     end
 
     context "without playlist" do
       let(:device) { Factory.structs[:device] }
 
       it "answers placeholder when device has no playlist" do
-        expect(part.current_screen).to eq(Terminus::Aspects::Screens::Placeholder[id: device.id])
+        expect(part.current_screen).to eq(Dither::Aspects::Screens::Placeholder[id: device.id])
       end
     end
   end

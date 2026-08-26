@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Repositories
     # The firmware repository.
     class Firmware < DB::Repository[:firmware]

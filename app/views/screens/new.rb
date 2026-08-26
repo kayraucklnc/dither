@@ -2,7 +2,7 @@
 
 require "core"
 
-module Terminus
+module Dither
   module Views
     module Screens
       # The new view.

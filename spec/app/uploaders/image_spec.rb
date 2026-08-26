@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Uploaders::Image do
+RSpec.describe Dither::Uploaders::Image do
   subject(:uploader) { described_class }
 
   describe "#call" do

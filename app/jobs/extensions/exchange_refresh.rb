@@ -1,7 +1,7 @@
 # auto_register: false
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Jobs
     module Extensions
       # Refreshes exchange with new responses.

@@ -1,0 +1,74 @@
+# Dither bundled extension: Weather.
+#
+# Polls Open-Meteo, which needs no API key and no account. Change the exchange
+# URL and the field paths in the templates to use a different provider.
+
+version: "1.0.0"
+name: weather
+label: Weather
+description: >
+  Current temperature and today's range for a location. Open-Meteo by default,
+  which is free and needs no key.
+
+kind: poll
+mode: text
+tags:
+  - weather
+
+# Every 30 minutes. The forecast does not move faster than that, and an e-ink
+# refresh costs battery.
+interval: 30
+unit: minute
+days: []
+last_day_of_month: false
+start_at: "2026-01-01T00:00:00Z"
+
+static_body: {}
+data: {}
+
+fields:
+  - keyname: latitude
+    name: Latitude
+    field_type: string
+    default: "52.52"
+    help_text: Decimal degrees. 52.52 is Berlin.
+    optional: false
+
+  - keyname: longitude
+    name: Longitude
+    field_type: string
+    default: "13.41"
+    help_text: Decimal degrees.
+    optional: false
+
+  - keyname: place
+    name: Place name
+    field_type: string
+    default: "Berlin"
+    help_text: Shown as the heading. Purely cosmetic.
+    optional: true
+
+  - keyname: units
+    name: Units
+    field_type: string
+    default: "celsius"
+    help_text: "celsius or fahrenheit."
+    optional: true
+
+sample:
+  source_1:
+    current:
+      temperature_2m: 7.4
+      wind_speed_10m: 14.2
+      weather_code: 61
+    daily:
+      temperature_2m_max: [9.1]
+      temperature_2m_min: [3.2]
+      precipitation_probability_max: [70]
+
+exchanges:
+  - verb: get
+    template: "https://api.open-meteo.com/v1/forecast?latitude={{ extension.values.latitude }}&longitude={{ extension.values.longitude }}&current=temperature_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=1&temperature_unit={{ extension.values.units }}&timezone=auto"
+    headers:
+      Accept: application/json
+    body: {}

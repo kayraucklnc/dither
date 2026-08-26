@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Models::PaletteOptioner, :db do
+RSpec.describe Dither::Aspects::Models::PaletteOptioner, :db do
   subject(:optioner) { described_class.new }
 
   describe "#call" do

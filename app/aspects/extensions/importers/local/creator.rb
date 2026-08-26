@@ -5,7 +5,7 @@ require "dry/monads"
 require "initable"
 require "yaml"
 
-module Terminus
+module Dither
   module Aspects
     module Extensions
       module Importers

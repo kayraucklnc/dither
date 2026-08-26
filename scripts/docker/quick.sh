@@ -31,7 +31,7 @@ then
 fi
 
 if [[ "${OPERATING_SYSTEM}" != "Darwin" && "${OPERATING_SYSTEM}" != "Linux" ]]; then
-  abort "Terminus quick setup is only supported on macOS and Linux."
+  abort "Dither quick setup is only supported on macOS and Linux."
 fi
 
 if ! command -v git > /dev/null 2>&1; then
@@ -47,11 +47,11 @@ if [[ ! -w "." ]]; then
 fi
 
 if [[ -d "terminus" ]]; then
-  abort "Terminus project directory exists. Please remove or run from a different location."
+  abort "Dither project directory exists. Please remove or run from a different location."
 fi
 
-git clone https://github.com/usetrmnl/terminus
+git clone https://github.com/kayraucklnc/dither
 cd terminus
-printf "%s\n" "Terminus has been cloned into: $PWD."
+printf "%s\n" "Dither has been cloned into: $PWD."
 bin/setup docker
 docker compose up --pull always

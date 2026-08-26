@@ -2,7 +2,7 @@
 
 require "yaml"
 
-module Terminus
+module Dither
   module Aspects
     module Designs
       # Exports a design for sharing.

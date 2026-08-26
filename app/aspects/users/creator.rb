@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Aspects
     module Users
       # Validates and creates a new user complete with account and membership.

@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Designs::EventSource, :db do
+RSpec.describe Dither::Aspects::Designs::EventSource, :db do
   subject(:event_stream) { described_class.new screen.id, kernel: }
 
   include_context "with application dependencies"

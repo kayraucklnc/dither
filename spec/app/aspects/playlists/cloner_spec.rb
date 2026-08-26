@@ -2,11 +2,11 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Playlists::Cloner, :db do
+RSpec.describe Dither::Aspects::Playlists::Cloner, :db do
   subject(:cloner) { described_class.new }
 
   describe "#call" do
-    let(:repository) { Terminus::Repositories::Playlist.new }
+    let(:repository) { Dither::Repositories::Playlist.new }
     let(:playlist) { Factory[:playlist, label: "Test", name: "test"] }
     let(:item_one) { Factory[:playlist_item, playlist_id: playlist.id, position: 2] }
     let(:item_two) { Factory[:playlist_item, playlist_id: playlist.id, position: 8] }

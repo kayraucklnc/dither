@@ -1,0 +1,23 @@
+{% comment %} Quarter: 400x240. The temperature, and the day's range under it. {% endcomment %}
+
+<div class="screen">
+  {% if source_1.current %}
+    <div class="content layout layout--col" style="justify-content: space-between">
+      <div class="kv">
+        <span class="k t-xs">{{ extension.values.place | default: "Weather" }}</span>
+      </div>
+
+      <div class="stat">
+        <span class="value t-mono">{{ source_1.current.temperature_2m | round }}&deg;</span>
+        <span class="label">
+          {{ source_1.daily.temperature_2m_max[0] | round }}&deg; /
+          {{ source_1.daily.temperature_2m_min[0] | round }}&deg;
+        </span>
+      </div>
+    </div>
+  {% else %}
+    <div class="content layout layout--col layout--center">
+      <p class="t-bold">No forecast</p>
+    </div>
+  {% endif %}
+</div>

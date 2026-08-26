@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Structs::DeviceSensor do
+RSpec.describe Dither::Structs::DeviceSensor do
   subject(:sensor) { Factory.structs[:device_sensor] }
 
   describe "#liquid_attributes" do

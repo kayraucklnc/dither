@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Users::Creator, :db do
+RSpec.describe Dither::Aspects::Users::Creator, :db do
   subject(:creator) { described_class.new }
 
   include_context "with user statuses"
@@ -29,7 +29,7 @@ RSpec.describe Terminus::Aspects::Users::Creator, :db do
       it "creates default account" do
         creator.call(**attributes).value!
 
-        expect(Terminus::Repositories::Account.new.find_by(name: "default")).to have_attributes(
+        expect(Dither::Repositories::Account.new.find_by(name: "default")).to have_attributes(
           name: "default",
           label: "Default"
         )

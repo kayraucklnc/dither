@@ -3,7 +3,7 @@
 require "dry/monads"
 require "refinements/string"
 
-module Terminus
+module Dither
   module Aspects
     # A monadic compressor of zip file content.
     class Zipper

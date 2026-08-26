@@ -2,13 +2,13 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Designs::Importer, :db do
+RSpec.describe Dither::Aspects::Designs::Importer, :db do
   subject(:creator) { described_class.new }
 
   describe "#call" do
     let :io do
       manifest = {"configuration.yml" => configuration, "index.html.liquid" => "<h1>Test</h1>"}
-      Terminus::Aspects::Zipper.new.call(manifest).value!
+      Dither::Aspects::Zipper.new.call(manifest).value!
     end
 
     let :configuration do
@@ -28,7 +28,7 @@ RSpec.describe Terminus::Aspects::Designs::Importer, :db do
     end
 
     it "answers success" do
-      expect(creator.call(io)).to match(Success(kind_of(Terminus::Structs::ScreenTemplate)))
+      expect(creator.call(io)).to match(Success(kind_of(Dither::Structs::ScreenTemplate)))
     end
 
     context "with invalid configuration" do

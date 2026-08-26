@@ -1,7 +1,7 @@
 # auto_register: false
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Serializers
     # A playlist item serializer for specific keys.
     class PlaylistItem

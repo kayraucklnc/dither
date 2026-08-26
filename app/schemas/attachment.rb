@@ -1,7 +1,7 @@
 # auto_register: false
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Schemas
     # Defines attachment schema.
     Attachment = Dry::Schema.Params do

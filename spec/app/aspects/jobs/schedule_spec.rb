@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Jobs::Schedule do
+RSpec.describe Dither::Aspects::Jobs::Schedule do
   subject(:schedule) { described_class.new }
 
   let :extension do
@@ -18,7 +18,7 @@ RSpec.describe Terminus::Aspects::Jobs::Schedule do
       expect(sidekiq.get_all_schedules).to eq(
         "extension-test" => {
           "cron" => "*/1 * * * *",
-          "class" => "Terminus::Jobs::Batches::Extension",
+          "class" => "Dither::Jobs::Batches::Extension",
           "args" => [1],
           "description" => "The Test extension update schedule."
         }
@@ -32,7 +32,7 @@ RSpec.describe Terminus::Aspects::Jobs::Schedule do
         "extension-test",
         {
           cron: "* * * * *",
-          class: "Terminus::Jobs::Batches::Extension",
+          class: "Dither::Jobs::Batches::Extension",
           args: [1],
           description: "The Test extension update schedule."
         }
@@ -41,7 +41,7 @@ RSpec.describe Terminus::Aspects::Jobs::Schedule do
       expect(sidekiq.get_all_schedules).to eq(
         "extension-test" => {
           "cron" => "* * * * *",
-          "class" => "Terminus::Jobs::Batches::Extension",
+          "class" => "Dither::Jobs::Batches::Extension",
           "args" => [1],
           "description" => "The Test extension update schedule."
         }
@@ -62,7 +62,7 @@ RSpec.describe Terminus::Aspects::Jobs::Schedule do
         "extension-two",
         {
           cron: "",
-          class: "Terminus::Jobs::Batches::Extension",
+          class: "Dither::Jobs::Batches::Extension",
           args: [1],
           description: "The Test extension update schedule."
         },
@@ -72,7 +72,7 @@ RSpec.describe Terminus::Aspects::Jobs::Schedule do
       expect(sidekiq.get_all_schedules).to eq(
         "extension-two" => {
           "cron" => "",
-          "class" => "Terminus::Jobs::Batches::Extension",
+          "class" => "Dither::Jobs::Batches::Extension",
           "args" => [1],
           "description" => "The Test extension update schedule."
         }

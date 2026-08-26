@@ -2,7 +2,7 @@
 
 require "initable"
 
-module Terminus
+module Dither
   module Aspects
     module Models
       # A models synchronizer with Core server.

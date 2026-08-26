@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Devices::Synchronizer, :db do
+RSpec.describe Dither::Aspects::Devices::Synchronizer, :db do
   subject(:updater) { described_class.new }
 
   include_context "with firmware headers"

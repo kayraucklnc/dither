@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Playlists::CurrentItemAdvancer, :db do
+RSpec.describe Dither::Aspects::Playlists::CurrentItemAdvancer, :db do
   subject(:advancer) { described_class.new }
 
   describe "#call" do
@@ -25,7 +25,7 @@ RSpec.describe Terminus::Aspects::Playlists::CurrentItemAdvancer, :db do
 
     it "answers playlist" do
       expect(advancer.call(playlist.id, screen_id: item.screen_id)).to be_a(
-        Terminus::Structs::Playlist
+        Dither::Structs::Playlist
       )
     end
   end

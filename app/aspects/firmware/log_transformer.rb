@@ -4,7 +4,7 @@ require "core"
 require "initable"
 require "refinements/hash"
 
-module Terminus
+module Dither
   module Aspects
     module Firmware
       # Transforms a raw firmware log into attributes fit for creating a device log record.

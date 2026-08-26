@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Firmware::Headers::Parser do
+RSpec.describe Dither::Aspects::Firmware::Headers::Parser do
   subject(:parser) { described_class.new }
 
   include_context "with firmware headers"
@@ -35,7 +35,7 @@ RSpec.describe Terminus::Aspects::Firmware::Headers::Parser do
 
     it "answers header record when success" do
       expect(parser.call(firmware_headers)).to be_success(
-        Terminus::Aspects::Firmware::Headers::Model[
+        Dither::Aspects::Firmware::Headers::Model[
           api_key: "abc123",
           battery_charge: 85.0,
           battery_voltage: 4.74,
@@ -72,7 +72,7 @@ RSpec.describe Terminus::Aspects::Firmware::Headers::Parser do
       firmware_headers["HTTP_ID"] = "bogus"
 
       expect(parser.call(firmware_headers)).to be_failure(
-        Terminus::Schemas::Firmware::Header.call(firmware_headers)
+        Dither::Schemas::Firmware::Header.call(firmware_headers)
       )
     end
   end

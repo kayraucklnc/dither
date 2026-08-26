@@ -2,7 +2,7 @@
 
 require "dry/monads"
 
-module Terminus
+module Dither
   module Aspects
     module Extensions
       # Clones an existing extension.

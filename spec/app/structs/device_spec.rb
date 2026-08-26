@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Structs::Device, :db do
+RSpec.describe Dither::Structs::Device, :db do
   subject :device do
     Factory.structs[:device, image_timeout: 10, mac_address: "AA:BB:CC:11:22:33", refresh_rate: 20]
   end

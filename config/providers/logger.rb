@@ -2,4 +2,4 @@
 
 require_relative "../../app/providers/logger"
 
-Hanami.app.register_provider :logger, source: Terminus::Providers::Logger
+Hanami.app.register_provider :logger, source: Dither::Providers::Logger

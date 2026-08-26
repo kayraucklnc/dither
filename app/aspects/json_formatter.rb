@@ -5,7 +5,7 @@ require "core"
 require "functionable"
 require "json"
 
-module Terminus
+module Dither
   module Aspects
     # A simple JSON pretty printer.
     module JSONFormatter

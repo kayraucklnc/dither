@@ -2,14 +2,14 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Devices::MACAddressBuilder do
+RSpec.describe Dither::Aspects::Devices::MACAddressBuilder do
   subject(:builder) { described_class }
 
   describe "#call" do
     let(:randomizer) { class_double SecureRandom }
 
     it "answers random address" do
-      result = Terminus::Types::MACAddress.valid? builder.call
+      result = Dither::Types::MACAddress.valid? builder.call
       expect(result).to be(true)
     end
 

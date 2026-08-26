@@ -3,7 +3,7 @@
 require "hanami_helper"
 require "trmnl/api"
 
-RSpec.describe Terminus::Aspects::Models::Synchronizer, :db do
+RSpec.describe Dither::Aspects::Models::Synchronizer, :db do
   subject(:synchronizer) { described_class.new trmnl_api: }
 
   let :trmnl_api do
@@ -30,8 +30,8 @@ RSpec.describe Terminus::Aspects::Models::Synchronizer, :db do
                     )
   end
 
-  let(:repository) { Terminus::Repositories::Model.new }
-  let(:join_repository) { Terminus::Repositories::ModelPalette.new }
+  let(:repository) { Dither::Repositories::Model.new }
+  let(:join_repository) { Dither::Repositories::ModelPalette.new }
 
   describe "#call" do
     let(:palettes) { [Factory[:palette, name: "bw"], Factory[:palette, name: "gray-4"]] }

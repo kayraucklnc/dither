@@ -2,7 +2,7 @@
 
 require "dry/monads"
 
-module Terminus
+module Dither
   module Aspects
     module Scenes
       # Renders a scene all the way to the bytes a panel would receive.
@@ -21,8 +21,8 @@ module Terminus
 
         Render = Data.define :bytes, :mime_type, :width, :height
 
-        def call layout_id, assignments = {}, model_id: nil, device_id: nil
-          composer.call(layout_id, assignments, model_id:, device_id:)
+        def call layout_id, assignments = {}, model_id: nil, device_id: nil, preview: false
+          composer.call(layout_id, assignments, model_id:, device_id:, preview:)
                   .bind { |content| build content, layout_id, model_id:, device_id: }
                   .bind { |mold| capture mold }
         end

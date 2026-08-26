@@ -2,8 +2,8 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Views::Parts::Screen do
-  subject(:part) { described_class.new value: screen, rendering: Terminus::View.new.rendering }
+RSpec.describe Dither::Views::Parts::Screen do
+  subject(:part) { described_class.new value: screen, rendering: Dither::View.new.rendering }
 
   let(:screen) { Factory.structs[:screen, :with_image] }
 

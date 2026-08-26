@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Providers::RackAttack do
+RSpec.describe Dither::Providers::RackAttack do
   subject(:provider) { described_class.new provider_container:, target_container:, slice: }
 
   let(:provider_container) { Dry::Core::Container.new }

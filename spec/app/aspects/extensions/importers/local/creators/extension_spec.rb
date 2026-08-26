@@ -2,13 +2,13 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Extensions::Importers::Local::Creators::Extension, :db do
+RSpec.describe Dither::Aspects::Extensions::Importers::Local::Creators::Extension, :db do
   subject(:creator) { described_class.new }
 
   include_context "with application dependencies"
 
   describe "#call" do
-    let(:repository) { Terminus::Repositories::Extension.new }
+    let(:repository) { Dither::Repositories::Extension.new }
 
     let :attributes do
       {
@@ -74,7 +74,7 @@ RSpec.describe Terminus::Aspects::Extensions::Importers::Local::Creators::Extens
     end
 
     it "answers extension when success" do
-      expect(creator.call(attributes)).to match(Success(kind_of(Terminus::Structs::Extension)))
+      expect(creator.call(attributes)).to match(Success(kind_of(Dither::Structs::Extension)))
     end
 
     it "fails when missing attribute" do

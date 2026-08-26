@@ -3,7 +3,7 @@
 require "dry/monads"
 require "initable"
 
-module Terminus
+module Dither
   module Aspects
     module Firmware
       module Headers

@@ -8,6 +8,7 @@ Factory.define :extension, relation: :extension do |factory|
   factory.tags []
   factory.template "<h1>{{source_1.label}}</h1>"
   factory.variants Hash.new
+  factory.sample Hash.new
   factory.data Hash.new
   factory.fields []
   factory.start_at Time.utc(2025, 1, 1, 0, 0, 0)

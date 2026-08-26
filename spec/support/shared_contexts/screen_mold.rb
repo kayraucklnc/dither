@@ -2,7 +2,7 @@
 
 RSpec.shared_context "with screen mold" do
   let :mold do
-    Terminus::Aspects::Screens::Mold[
+    Dither::Aspects::Screens::Mold[
       name: "test",
       label: "Test",
       content: "<p>Test</p>",

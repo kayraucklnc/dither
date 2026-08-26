@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Aspects
     module Firmware
       # A firmware attachment synchronizer with Core server.

@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Screens::Upserters::Preprocessed, :db do
+RSpec.describe Dither::Aspects::Screens::Upserters::Preprocessed, :db do
   using Refinements::Struct
 
   subject(:upserter) { described_class.new }

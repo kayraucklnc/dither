@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Actions::Users::Index, :db do
+RSpec.describe Dither::Actions::Users::Index, :db do
   subject(:action) { described_class.new }
 
   include_context "with user statuses"

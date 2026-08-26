@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Relations
     # The user password hash relation.
     class UserPasswordHash < DB::Relation

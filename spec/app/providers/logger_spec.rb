@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Providers::Logger do
+RSpec.describe Dither::Providers::Logger do
   subject(:provider) { described_class.new provider_container:, target_container:, slice: }
 
   let(:provider_container) { Dry::Core::Container.new }
@@ -47,7 +47,7 @@ RSpec.describe Terminus::Providers::Logger do
         provider.start
 
         expect(cogger).to have_received(:new).with(
-          id: :terminus,
+          id: :dither,
           io: kind_of(StringIO),
           formatter: :json,
           level: :debug
@@ -71,7 +71,7 @@ RSpec.describe Terminus::Providers::Logger do
 
       it "initializes" do
         provider.start
-        expect(cogger).to have_received(:new).with(id: :terminus)
+        expect(cogger).to have_received(:new).with(id: :dither)
       end
 
       it "adds stream" do
@@ -91,7 +91,7 @@ RSpec.describe Terminus::Providers::Logger do
 
       it "initializes" do
         provider.start
-        expect(cogger).to have_received(:new).with(id: :terminus, formatter: :json)
+        expect(cogger).to have_received(:new).with(id: :dither, formatter: :json)
       end
     end
 

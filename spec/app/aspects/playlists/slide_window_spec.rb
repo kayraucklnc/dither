@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Playlists::SlideWindow, :db do
+RSpec.describe Dither::Aspects::Playlists::SlideWindow, :db do
   subject :slide_window do
     described_class.new playlist_repository.with_screens.by_pk(playlist.id).one
   end
@@ -10,7 +10,7 @@ RSpec.describe Terminus::Aspects::Playlists::SlideWindow, :db do
   let(:playlist) { Factory[:playlist] }
   let(:screen) { Factory[:screen, :with_image] }
   let(:item) { Factory[:playlist_item, playlist_id: playlist.id, screen_id: screen.id] }
-  let(:playlist_repository) { Terminus::Repositories::Playlist.new }
+  let(:playlist_repository) { Dither::Repositories::Playlist.new }
 
   describe "#item" do
     it "answers nil when playlist doesn't have current item" do

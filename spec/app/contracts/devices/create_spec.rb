@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Contracts::Devices::Create do
+RSpec.describe Dither::Contracts::Devices::Create do
   subject(:contract) { described_class.new }
 
   describe "#call" do

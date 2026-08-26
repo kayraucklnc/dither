@@ -5,7 +5,7 @@ require "htmx"
 require "refinements/hash"
 require "refinements/string"
 
-module Terminus
+module Dither
   module Views
     # The view helpers.
     module Helpers

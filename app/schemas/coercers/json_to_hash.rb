@@ -4,7 +4,7 @@
 require "json"
 require "refinements/hash"
 
-module Terminus
+module Dither
   module Schemas
     # Coerces a key's JSON value into a hash.
     module Coercers

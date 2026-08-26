@@ -2,14 +2,14 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Repositories::Screen, :db do
+RSpec.describe Dither::Repositories::Screen, :db do
   subject(:repository) { described_class.new }
 
   let(:screen) { Factory[:screen] }
   let(:model) { Factory[:model] }
 
   let :mold do
-    Terminus::Aspects::Screens::Mold[
+    Dither::Aspects::Screens::Mold[
       model_id: model.id,
       name: "test",
       label: "Test",

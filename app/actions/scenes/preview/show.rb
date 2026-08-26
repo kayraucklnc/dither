@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Actions
     module Scenes
       module Preview
@@ -21,7 +21,8 @@ module Terminus
 
             result = renderer.call request.params[:layout],
                                    slots,
-                                   model_id: request.params[:model_id]
+                                   model_id: request.params[:model_id],
+                                   preview: true
 
             result.either -> render { send_image response, render },
                           -> failure { send_failure response, failure }

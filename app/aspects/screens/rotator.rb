@@ -2,7 +2,7 @@
 
 require "dry/monads"
 
-module Terminus
+module Dither
   module Aspects
     module Screens
       # Updates a device's current playlist item by rotating to next screen.

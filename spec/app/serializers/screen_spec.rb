@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Serializers::Screen, :db do
+RSpec.describe Dither::Serializers::Screen, :db do
   subject(:serializer) { described_class.new screen }
 
   let(:screen) { Factory[:screen, :with_image, **attributes] }

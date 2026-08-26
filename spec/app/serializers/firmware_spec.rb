@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Serializers::Firmware do
+RSpec.describe Dither::Serializers::Firmware do
   subject(:serializer) { described_class.new record }
 
   let(:record) { Factory.structs[:firmware, :with_attachment, **attributes] }

@@ -12,8 +12,8 @@ RSpec.describe "/api/display", :db do
     provisioner.call(model_id: Factory[:model].id, api_key:).value!
   end
 
-  let(:provisioner) { Terminus::Aspects::Devices::Provisioner.new }
-  let(:device_repository) { Terminus::Repositories::Device.new }
+  let(:provisioner) { Dither::Aspects::Devices::Provisioner.new }
+  let(:device_repository) { Dither::Repositories::Device.new }
   let(:firmware) { Factory[:firmware, :with_attachment] }
 
   it "answers payload with all atttributes" do

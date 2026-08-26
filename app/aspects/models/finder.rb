@@ -2,7 +2,7 @@
 
 require "dry/monads"
 
-module Terminus
+module Dither
   module Aspects
     module Models
       # Finds model by model ID (primary) or device ID (fallback).

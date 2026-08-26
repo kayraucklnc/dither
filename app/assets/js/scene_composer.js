@@ -17,7 +17,11 @@ if (composer) {
   const modelSelect = document.getElementById("composer-model");
 
   const assignments = new Map();
+  const hint = document.getElementById("palette-hint");
+  const saveSlots = document.getElementById("scene-save-slots");
+  const saveButton = document.getElementById("scene-save-button");
   let dragged = null;
+  let picked = null;
   let pending = 0;
 
   const layout = () =>
@@ -34,44 +38,75 @@ if (composer) {
     status.hidden = false;
   };
 
-  // Renders through the server. Each request supersedes the last, so dropping
-  // three extensions quickly shows the final state rather than whichever
-  // render happened to finish last.
+  // Renders through the server. The image element loads the URL itself rather
+  // than going through fetch and a blob: fewer moving parts, the browser's own
+  // caching and decoding, and a real error event when something goes wrong.
+  // Each request supersedes the last, so dropping three extensions quickly
+  // shows the final state rather than whichever render finished last.
   const refresh = () => {
-    const current = ++pending;
-    const parameters = new URLSearchParams({ layout: layout() });
+    const token = ++pending;
+    const parameters = new URLSearchParams({layout: layout()});
 
     if (modelSelect?.value) parameters.set("model_id", modelSelect.value);
     assignments.forEach((id, slot) => parameters.set(`slots[${slot}]`, id));
 
+    // Detach first: removing the source fires an error event, and the handler
+    // left over from the previous render would report a failure for a panel
+    // that is merely empty.
+    image.onload = null;
+    image.onerror = null;
+
     if (assignments.size === 0) {
       image.hidden = true;
-      setStatus("Drop an extension to see it render.");
+      image.removeAttribute("src");
+      setStatus("Pick an extension, then click a slot.");
       return;
     }
 
+    // Distinguishes one render from the next so the browser does not reuse a
+    // cached response for a URL whose underlying data has moved on.
+    parameters.set("t", String(token));
+
     setStatus("Rendering…", "busy");
 
-    fetch(`${composer.dataset.previewPath}?${parameters}`, {
-      headers: { Accept: "image/png" },
-    })
-      .then(async (response) => {
-        if (!response.ok) throw new Error((await response.json()).error);
-        return response.blob();
-      })
-      .then((blob) => {
-        if (current !== pending) return;
+    image.onload = () => {
+      if (token !== pending) return;
+      image.hidden = false;
+      setStatus("");
+    };
 
-        const previous = image.src;
-        image.src = URL.createObjectURL(blob);
-        image.hidden = false;
-        setStatus("");
-        if (previous.startsWith("blob:")) URL.revokeObjectURL(previous);
-      })
-      .catch((error) => {
-        if (current !== pending) return;
-        setStatus(error.message, "error");
-      });
+    // The endpoint answers a JSON problem when a composition is refused, which
+    // arrives here as a failed image load. Re-request it to read the reason.
+    image.onerror = () => {
+      if (token !== pending) return;
+      image.hidden = true;
+
+      fetch(`${composer.dataset.previewPath}?${parameters}`)
+        .then((response) => response.json())
+        .then((body) => setStatus(body.error || "Could not render this scene.", "error"))
+        .catch(() => setStatus("Could not render this scene.", "error"));
+    };
+
+    image.src = `${composer.dataset.previewPath}?${parameters}`;
+  };
+
+  // Mirrors the assignments into the save form. Kept in sync on every change
+  // rather than gathered on submit, so the button can honestly say whether
+  // there is anything worth saving.
+  const syncSaveForm = () => {
+    if (!saveSlots) return;
+
+    saveSlots.replaceChildren();
+    assignments.forEach((id, slot) => {
+      const field = document.createElement("input");
+
+      field.type = "hidden";
+      field.name = `slots[${slot}]`;
+      field.value = id;
+      saveSlots.append(field);
+    });
+
+    if (saveButton) saveButton.disabled = assignments.size === 0;
   };
 
   const paintSlot = (slot) => {
@@ -88,6 +123,54 @@ if (composer) {
   const eachSlot = (callback) =>
     slotsHost.querySelectorAll(".slot-target").forEach(callback);
 
+  // Marks which slots this extension is allowed to fill. Shared by dragging
+  // and picking so both refuse the same things for the same reason.
+  const markDroppable = (item) => {
+    const shapes = item.dataset.shapes.split(" ");
+
+    eachSlot((slot) => {
+      slot.dataset.droppable = shapes.includes(slot.dataset.shape);
+    });
+  };
+
+  // ---- Picking (click to place) -----------------------------------------
+  //
+  // Drag is a shortcut, not the only way in. HTML5 drag is easy to get subtly
+  // wrong by hand and does not exist on touch, so the same job is always
+  // available as pick-then-place.
+
+  const clearPick = () => {
+    picked = null;
+    composer.classList.remove("is-picking");
+    composer.querySelectorAll(".palette-item").forEach((item) =>
+      item.classList.remove("is-picked"),
+    );
+    eachSlot((slot) => delete slot.dataset.droppable);
+    hint.hidden = true;
+  };
+
+  const pick = (item) => {
+    if (picked === item) return clearPick();
+
+    clearPick();
+    picked = item;
+    item.classList.add("is-picked");
+    composer.classList.add("is-picking");
+    markDroppable(item);
+    hint.textContent = `Now click a slot to place ${item.dataset.extensionLabel}.`;
+    hint.hidden = false;
+  };
+
+  const place = (slot) => {
+    if (!picked || slot.dataset.droppable !== "true") return;
+
+    assignments.set(slot.dataset.slot, picked.dataset.extensionId);
+    paintSlot(slot);
+    clearPick();
+    syncSaveForm();
+    refresh();
+  };
+
   // ---- Dragging ---------------------------------------------------------
 
   composer.querySelectorAll(".palette-item").forEach((item) => {
@@ -97,14 +180,11 @@ if (composer) {
       // Firefox will not start a drag without payload, even an unused one.
       event.dataTransfer.setData("text/plain", item.dataset.extensionId);
       item.classList.add("is-dragging");
-
-      const shapes = item.dataset.shapes.split(" ");
-
       composer.classList.add("is-dragging");
-      eachSlot((slot) => {
-        slot.dataset.droppable = shapes.includes(slot.dataset.shape);
-      });
+      markDroppable(item);
     });
+
+    item.addEventListener("click", () => pick(item));
 
     item.addEventListener("dragend", () => {
       dragged = null;
@@ -137,12 +217,17 @@ if (composer) {
       slot.classList.remove("is-over");
       assignments.set(slot.dataset.slot, dragged.dataset.extensionId);
       paintSlot(slot);
+      syncSaveForm();
       refresh();
     });
 
-    slot.querySelector(".slot-clear").addEventListener("click", () => {
+    slot.addEventListener("click", () => place(slot));
+
+    slot.querySelector(".slot-clear").addEventListener("click", (event) => {
+      event.stopPropagation();
       assignments.delete(slot.dataset.slot);
       paintSlot(slot);
+      syncSaveForm();
       refresh();
     });
   });
@@ -170,5 +255,9 @@ if (composer) {
     window.location.search = parameters.toString();
   });
 
-  setStatus("Drop an extension to see it render.");
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") clearPick();
+  });
+
+  setStatus("Pick an extension, then click a slot.");
 }

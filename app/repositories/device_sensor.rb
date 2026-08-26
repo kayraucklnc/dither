@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Repositories
     # The device sensor repository.
     class DeviceSensor < DB::Repository[:device_sensor]

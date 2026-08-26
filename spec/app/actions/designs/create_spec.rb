@@ -2,13 +2,13 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Actions::Designs::Create, :db do
+RSpec.describe Dither::Actions::Designs::Create, :db do
   subject(:action) { described_class.new }
 
   include_context "with application dependencies"
 
   describe "#call" do
-    let(:repository) { Terminus::Repositories::Screen.new }
+    let(:repository) { Dither::Repositories::Screen.new }
     let(:model) { Factory[:model] }
 
     let :parameters do

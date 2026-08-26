@@ -16,7 +16,7 @@ require "spec_helper"
 using Refinements::Pathname
 
 Factory = ROM::Factory.configure { |config| config.rom = Hanami.app["db.rom"] }
-                      .struct_namespace(Terminus::Structs)
+                      .struct_namespace(Dither::Structs)
 
 ENV["LD_PRELOAD"] = nil
 Capybara.app = Hanami.app

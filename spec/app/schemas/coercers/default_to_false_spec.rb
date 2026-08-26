@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Schemas::Coercers::DefaultToFalse do
+RSpec.describe Dither::Schemas::Coercers::DefaultToFalse do
   subject(:coercer) { described_class }
 
   let(:attributes) { {display: true} }

@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Actions::Devices::Index, :db do
+RSpec.describe Dither::Actions::Devices::Index, :db do
   subject(:action) { described_class.new }
 
   describe "#call" do

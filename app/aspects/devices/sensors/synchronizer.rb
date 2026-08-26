@@ -6,7 +6,7 @@ require "initable"
 require "refinements/array"
 require "refinements/hash"
 
-module Terminus
+module Dither
   module Aspects
     module Devices
       module Sensors
@@ -19,7 +19,7 @@ module Terminus
             sensor_repository: "repositories.device_sensor"
           ]
           include Dry::Monads[:result]
-          include Initable[schema: proc { Terminus::Schemas::Devices::Sensors::Upsert }]
+          include Initable[schema: proc { Dither::Schemas::Devices::Sensors::Upsert }]
 
           using Refinements::Array
           using Refinements::Hash

@@ -2,10 +2,10 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Jobs::Synchronizers::Sensor do
+RSpec.describe Dither::Jobs::Synchronizers::Sensor do
   subject(:job) { described_class.new synchronizer: }
 
-  let(:synchronizer) { instance_spy Terminus::Aspects::Devices::Sensors::Synchronizer }
+  let(:synchronizer) { instance_spy Dither::Aspects::Devices::Sensors::Synchronizer }
 
   describe "#perform" do
     it "calls synchronizer" do

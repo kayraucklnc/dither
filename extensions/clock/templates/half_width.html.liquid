@@ -1,0 +1,13 @@
+{% comment %} Half width: 400x480. Time over date, still the dominant element. {% endcomment %}
+
+{% assign shift = extension.values.utc_offset_hours | times: 3600 %}
+{% assign stamp = "now" | date: "%s" | plus: shift %}
+
+<div class="screen">
+  <div class="content layout layout--col layout--center">
+    <p class="t-mono t-bold" style="font-size: 96px; line-height: 1">
+      {{ stamp | date: "%H:%M" }}
+    </p>
+    <p class="t-lg">{{ stamp | date: "%a %-d %b" }}</p>
+  </div>
+</div>

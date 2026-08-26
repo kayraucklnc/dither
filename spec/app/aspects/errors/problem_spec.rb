@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Errors::Problem do
+RSpec.describe Dither::Aspects::Errors::Problem do
   subject(:problem_detail) { described_class }
 
   describe ".duplicate" do

@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Firmware::Models::Setup, :db do
+RSpec.describe Dither::Aspects::Firmware::Models::Setup, :db do
   subject(:model) { described_class.new }
 
   describe ".for" do
@@ -13,7 +13,7 @@ RSpec.describe Terminus::Aspects::Firmware::Models::Setup, :db do
         described_class[
           api_key: "abc123",
           image_url: %(#{Hanami.app[:settings].api_uri}/assets/setup.bmp),
-          message: "Welcome to Terminus!",
+          message: "Welcome to Dither!",
           status: 200
         ]
       )

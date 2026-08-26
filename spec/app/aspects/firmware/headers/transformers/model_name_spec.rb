@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Firmware::Headers::Transformers::ModelName do
+RSpec.describe Dither::Aspects::Firmware::Headers::Transformers::ModelName do
   subject(:transformer) { described_class.new }
 
   include_context "with application dependencies"

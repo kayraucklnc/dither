@@ -3,12 +3,12 @@
 require "core"
 require "refinements/hash"
 
-module Terminus
+module Dither
   module Structs
     # The screen struct.
     # :reek:TooManyMethods
     class Screen < DB::Struct
-      include Terminus::Uploaders::Image::Attachment[:image]
+      include Dither::Uploaders::Image::Attachment[:image]
 
       using Refinements::Hash
 

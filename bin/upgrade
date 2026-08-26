@@ -63,7 +63,7 @@ if [[ "${1:-}" == "docker" ]]; then
   printf "%s\n" "Setting up Docker..."
   upgrade_global_environment
 else
-  printf "%s\n\n" "Upgrading Terminus..."
+  printf "%s\n\n" "Upgrading Dither..."
 
   upgrade_global_environment
   upgrade_development_environment

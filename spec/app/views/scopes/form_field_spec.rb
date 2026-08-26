@@ -2,8 +2,8 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Views::Scopes::FormField do
-  subject(:scope) { described_class.new locals:, rendering: Terminus::View.new.rendering }
+RSpec.describe Dither::Views::Scopes::FormField do
+  subject(:scope) { described_class.new locals:, rendering: Dither::View.new.rendering }
 
   let(:locals) { {key: :label, errors: {label: %w[invalid missing]}} }
 
@@ -45,7 +45,7 @@ RSpec.describe Terminus::Views::Scopes::FormField do
     end
 
     it "answers empty string with missing local" do
-      scope = described_class.new rendering: Terminus::View.new.rendering
+      scope = described_class.new rendering: Dither::View.new.rendering
       expect(scope.error_message).to eq("")
     end
 

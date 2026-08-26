@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Unzipper do
+RSpec.describe Dither::Aspects::Unzipper do
   subject(:unzipper) { described_class.new }
 
   before { Hanami.app.start :zip }

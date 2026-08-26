@@ -3,7 +3,7 @@
 
 require "refinements/string"
 
-module Terminus
+module Dither
   module Providers
     # The Rack Attack provider.
     class RackAttack < Hanami::Provider::Source

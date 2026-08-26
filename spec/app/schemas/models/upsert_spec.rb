@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Schemas::Models::Upsert do
+RSpec.describe Dither::Schemas::Models::Upsert do
   subject(:contract) { described_class }
 
   describe "#call" do

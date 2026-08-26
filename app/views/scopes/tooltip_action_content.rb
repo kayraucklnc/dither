@@ -2,7 +2,7 @@
 
 require "refinements/string"
 
-module Terminus
+module Dither
   module Views
     module Scopes
       # Provides customized tooltip content for actions.

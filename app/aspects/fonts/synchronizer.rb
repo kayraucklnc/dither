@@ -2,7 +2,7 @@
 
 require "refinements/pathname"
 
-module Terminus
+module Dither
   module Aspects
     module Fonts
       # Synchronizes TRMNL Framework fonts for local use.

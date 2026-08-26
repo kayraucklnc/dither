@@ -3,7 +3,7 @@
 require "dry/monads"
 require "initable"
 
-module Terminus
+module Dither
   module Aspects
     module Extensions
       module Importers
@@ -12,7 +12,7 @@ module Terminus
             # Creates extension.
             class Extension
               include Deps[:logger, "aspects.jobs.schedule", repository: "repositories.extension"]
-              include Initable[error_joiner: proc { Terminus::Aspects::Errors::ResultJoiner }]
+              include Initable[error_joiner: proc { Dither::Aspects::Errors::ResultJoiner }]
               include Dry::Monads[:result]
 
               def initialize(schema: Schemas::Extension, problem: Aspects::Errors::Problem, **)

@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Playlists::ScreenOptioner, :db do
+RSpec.describe Dither::Aspects::Playlists::ScreenOptioner, :db do
   subject(:optioner) { described_class.new }
 
   describe "#call" do

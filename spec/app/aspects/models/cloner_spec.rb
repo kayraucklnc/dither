@@ -2,11 +2,11 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Models::Cloner, :db do
+RSpec.describe Dither::Aspects::Models::Cloner, :db do
   subject(:cloner) { described_class.new }
 
   describe "#call" do
-    let(:repository) { Terminus::Repositories::Model.new }
+    let(:repository) { Dither::Repositories::Model.new }
     let(:original) { Factory[:model, label: "Test", name: "test"] }
 
     it "clones model without overrides" do

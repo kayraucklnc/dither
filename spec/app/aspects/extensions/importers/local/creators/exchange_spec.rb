@@ -2,14 +2,14 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Extensions::Importers::Local::Creators::Exchange, :db do
+RSpec.describe Dither::Aspects::Extensions::Importers::Local::Creators::Exchange, :db do
   subject(:creator) { described_class.new }
 
   include_context "with application dependencies"
 
   describe "#call" do
     let(:extension) { Factory[:extension] }
-    let(:repository) { Terminus::Repositories::ExtensionExchange.new }
+    let(:repository) { Dither::Repositories::ExtensionExchange.new }
 
     let :attributes do
       {
@@ -44,7 +44,7 @@ RSpec.describe Terminus::Aspects::Extensions::Importers::Local::Creators::Exchan
       Sidekiq::Testing.fake! do
         creator.call attributes
 
-        expect(Terminus::Jobs::Extensions::ExchangeRefresh.jobs).to contain_exactly(
+        expect(Dither::Jobs::Extensions::ExchangeRefresh.jobs).to contain_exactly(
           hash_including("args" => [kind_of(Integer)])
         )
       end
@@ -52,7 +52,7 @@ RSpec.describe Terminus::Aspects::Extensions::Importers::Local::Creators::Exchan
 
     it "answers extension when success" do
       expect(creator.call(attributes)).to match(
-        Success(kind_of(Terminus::Structs::ExtensionExchange))
+        Success(kind_of(Dither::Structs::ExtensionExchange))
       )
     end
 

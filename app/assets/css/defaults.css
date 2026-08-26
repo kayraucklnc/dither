@@ -1,3 +1,8 @@
+/* [hidden] must win over any display a component sets for itself. Without
+   this, `element.hidden = true` is silently ignored by anything carrying its
+   own display rule, which is most things. */
+[hidden] { display: none !important; }
+
 *, *::after, *::before {
   box-sizing: border-box;
 }

@@ -176,7 +176,7 @@ and "Playlist" implies shuffle. Settled:
 | Screen | **Scene** | a layout with its slots filled — what the panel shows |
 | Playlist | **Mode** + **Rules** | what is going on, and what that puts on screen |
 
-"View" was rejected: `Terminus::Views` is already Hanami's view layer, so the
+"View" was rejected: `Dither::Views` is already Hanami's view layer, so the
 domain noun would collide with the framework in every file. "Scene" also reads
 better against triggers — scenes change on cue.
 

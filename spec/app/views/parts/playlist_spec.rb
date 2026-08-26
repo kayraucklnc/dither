@@ -2,21 +2,21 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Views::Parts::Playlist, :db do
+RSpec.describe Dither::Views::Parts::Playlist, :db do
   subject :part do
     playlist = Factory[:playlist]
     screen = Factory[:screen, :with_image]
     item = Factory[:playlist_item, playlist_id: playlist.id, screen_id: screen.id]
 
-    repository = Terminus::Repositories::Playlist.new
+    repository = Dither::Repositories::Playlist.new
     repository.update playlist.id, current_item_id: item.id
 
     described_class.new value: repository.find(playlist.id), rendering:
   end
 
-  let(:rendering) { Terminus::View.new.rendering }
+  let(:rendering) { Dither::View.new.rendering }
 
-  before { allow(rendering).to receive(:context).and_return Terminus::Views::Context.new }
+  before { allow(rendering).to receive(:context).and_return Dither::Views::Context.new }
 
   describe "#current_screen_pill" do
     it "answers pill when current item, screen, and image exist" do
@@ -41,7 +41,7 @@ RSpec.describe Terminus::Views::Parts::Playlist, :db do
 
   describe "#current_screen" do
     it "answers screen when current item, screen, and image exist" do
-      expect(part.current_screen).to be_a(Terminus::Structs::Screen)
+      expect(part.current_screen).to be_a(Dither::Structs::Screen)
     end
 
     it "answers placeholder when current item is missing" do
@@ -49,7 +49,7 @@ RSpec.describe Terminus::Views::Parts::Playlist, :db do
       part = described_class.new(value: playlist, rendering:)
 
       expect(part.current_screen).to eq(
-        Terminus::Aspects::Screens::Placeholder[id: playlist.id, uri: "blank.svg"]
+        Dither::Aspects::Screens::Placeholder[id: playlist.id, uri: "blank.svg"]
       )
     end
   end

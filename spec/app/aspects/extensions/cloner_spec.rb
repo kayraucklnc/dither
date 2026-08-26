@@ -2,11 +2,11 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Extensions::Cloner, :db do
+RSpec.describe Dither::Aspects::Extensions::Cloner, :db do
   subject(:cloner) { described_class.new }
 
   describe "#call" do
-    let(:repository) { Terminus::Repositories::Extension.new }
+    let(:repository) { Dither::Repositories::Extension.new }
     let(:original) { Factory[:extension, label: "Test", name: "test"] }
 
     it "clones extension without overrides" do
@@ -29,7 +29,7 @@ RSpec.describe Terminus::Aspects::Extensions::Cloner, :db do
       model = Factory[:model]
       original = repository.create_with_models({label: "Test", name: "test"}, [model.id])
       clone = cloner.call(original.id, model_ids: [model.id]).value!
-      records = Terminus::Repositories::ExtensionModel.new.where extension_id: clone.id
+      records = Dither::Repositories::ExtensionModel.new.where extension_id: clone.id
 
       expect(records.map(&:model_id)).to contain_exactly(model.id)
     end
@@ -38,7 +38,7 @@ RSpec.describe Terminus::Aspects::Extensions::Cloner, :db do
       device = Factory[:device]
       repository.update_with_devices(original.id, {}, [device.id])
       clone = cloner.call(original.id, device_ids: [device.id]).value!
-      records = Terminus::Repositories::ExtensionDevice.new.where extension_id: clone.id
+      records = Dither::Repositories::ExtensionDevice.new.where extension_id: clone.id
 
       expect(records.map(&:device_id)).to contain_exactly(device.id)
     end
@@ -46,7 +46,7 @@ RSpec.describe Terminus::Aspects::Extensions::Cloner, :db do
     it "clones extension with exchanges" do
       Factory[:extension_exchange, extension_id: original.id, template: "https://test.io"]
       clone = cloner.call(original.id).value!
-      templates = Terminus::Repositories::ExtensionExchange.new
+      templates = Dither::Repositories::ExtensionExchange.new
                                                            .where(extension_id: clone.id)
                                                            .map(&:template)
 
@@ -54,7 +54,7 @@ RSpec.describe Terminus::Aspects::Extensions::Cloner, :db do
     end
 
     it "adds Sidekiq schedule" do
-      schedule = instance_spy Terminus::Aspects::Jobs::Schedule
+      schedule = instance_spy Dither::Aspects::Jobs::Schedule
       cloner = described_class.new(schedule:)
 
       cloner.call original.id

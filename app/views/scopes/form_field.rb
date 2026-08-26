@@ -3,7 +3,7 @@
 require "core"
 require "refinements/array"
 
-module Terminus
+module Dither
   module Views
     module Scopes
       # Groups form label and input together as a single form field.

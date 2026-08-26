@@ -5,7 +5,7 @@ require "hanami/db/struct"
 module Authentication
   module DB
     # The application database base struct.
-    class Struct < Terminus::DB::Struct
+    class Struct < Dither::DB::Struct
     end
   end
 end

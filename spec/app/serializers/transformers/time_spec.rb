@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Serializers::Transformers::Time do
+RSpec.describe Dither::Serializers::Transformers::Time do
   subject(:transformer) { described_class }
 
   describe "#call" do

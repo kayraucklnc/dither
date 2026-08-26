@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Users::Updater, :db do
+RSpec.describe Dither::Aspects::Users::Updater, :db do
   subject(:updater) { described_class.new }
 
   include_context "with user statuses"

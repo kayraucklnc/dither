@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Repositories::ScreenTemplate, :db do
+RSpec.describe Dither::Repositories::ScreenTemplate, :db do
   subject(:repository) { described_class.new }
 
   let(:template) { Factory[:screen_template] }

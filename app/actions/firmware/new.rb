@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Actions
     module Firmware
       # The new action.
@@ -8,7 +8,7 @@ module Terminus
         include Deps[:htmx_layout]
 
         def handle request, response
-          response.render view, fields: {kind: "terminus"}, layout: htmx_layout.call(request)
+          response.render view, fields: {kind: "dither"}, layout: htmx_layout.call(request)
         end
       end
     end

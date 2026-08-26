@@ -2,9 +2,9 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Serializers::Playlist, :db do
+RSpec.describe Dither::Serializers::Playlist, :db do
   subject :serializer do
-    described_class.new Terminus::Repositories::Playlist.new.with_items.by_pk(item.playlist_id).one
+    described_class.new Dither::Repositories::Playlist.new.with_items.by_pk(item.playlist_id).one
   end
 
   let(:item) { Factory[:playlist_item] }

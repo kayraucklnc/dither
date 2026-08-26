@@ -1,7 +1,7 @@
 # auto_register: false
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Aspects
     module Extensions
       # Reads per-shape templates out of a file set.
@@ -15,7 +15,7 @@ module Terminus
       #   template.html.liquid              -> the full page
       #   templates/half_width.html.liquid  -> the half-width variant
       #
-      # Shape names come from Terminus::Composition. Anything else is reported
+      # Shape names come from Dither::Composition. Anything else is reported
       # rather than dropped: a typo should be a loud failure, not an extension
       # that mysteriously refuses to sit in half a screen.
       module Variants

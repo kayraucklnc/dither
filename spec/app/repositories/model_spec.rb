@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Repositories::Model, :db do
+RSpec.describe Dither::Repositories::Model, :db do
   subject(:repository) { described_class.new }
 
   let(:model) { Factory[:model] }

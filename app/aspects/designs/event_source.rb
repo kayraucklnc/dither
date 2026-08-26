@@ -3,7 +3,7 @@
 
 require "initable"
 
-module Terminus
+module Dither
   module Aspects
     module Designs
       # Writes image updates to a stream.

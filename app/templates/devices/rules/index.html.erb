@@ -1,0 +1,144 @@
+<%= render "shared/title", text: "#{device.label} rules" %>
+
+<section class="page-rules">
+  <header class="rules-head">
+    <div>
+      <h1><%= device.label %></h1>
+      <p class="sub">
+        Rules are checked top to bottom and the first one that matches wins.
+        Several being true at once is normal &mdash; order decides.
+      </p>
+    </div>
+
+    <%= link_to "Back to device", routes.path(:device, id: device.id), class: "bit-button" %>
+  </header>
+
+  <%# What the device would be showing this instant, which is the only way to
+      know the stack does what you meant. %>
+  <div class="rules-now">
+    <p class="rail-label">Showing right now</p>
+
+    <% if decision.success? %>
+      <p class="rules-now-scene">
+        <strong><%= decision.value!.scene.label %></strong>
+        &mdash; <%= decision.value!.rule.condition_label %>
+        <% if decision.value!.refresh_rate %>
+          &middot; refreshing every <%= decision.value!.refresh_rate / 60 %> min
+        <% end %>
+      </p>
+    <% else %>
+      <p class="rules-now-none"><%= decision.failure %></p>
+    <% end %>
+  </div>
+
+  <% if rules.to_a.any? %>
+    <ol class="rule-list">
+      <% rules.each_with_index do |rule, index| %>
+        <li class="rule-row" data-active="<%= decision.success? && decision.value!.rule.id == rule.id %>">
+          <span class="rule-position"><%= index + 1 %></span>
+
+          <div class="rule-body">
+            <p class="rule-sentence"><%= rule.sentence %></p>
+            <p class="rule-meta"><%= rule.always? ? "Default — always matches" : rule.condition.label %></p>
+          </div>
+
+          <div class="rule-actions">
+            <form method="post" action="<%= routes.path(:device_rule_move, device_id: device.id, id: rule.id) %>">
+              <%= tag.input name: :_csrf_token, type: :hidden, value: csrf_token %>
+              <input type="hidden" name="direction" value="up">
+              <button type="submit" class="bit-button" <%= "disabled" if index.zero? %> title="Higher priority">&uarr;</button>
+            </form>
+
+            <form method="post" action="<%= routes.path(:device_rule_move, device_id: device.id, id: rule.id) %>">
+              <%= tag.input name: :_csrf_token, type: :hidden, value: csrf_token %>
+              <input type="hidden" name="direction" value="down">
+              <button type="submit" class="bit-button" <%= "disabled" if index == rules.to_a.size - 1 %> title="Lower priority">&darr;</button>
+            </form>
+
+            <form method="post" action="<%= routes.path(:device_rule, device_id: device.id, id: rule.id) %>">
+              <%= tag.input name: :_csrf_token, type: :hidden, value: csrf_token %>
+              <input type="hidden" name="_method" value="DELETE">
+              <button type="submit" class="bit-button-reject">Remove</button>
+            </form>
+          </div>
+        </li>
+      <% end %>
+    </ol>
+  <% else %>
+    <p class="rules-empty">
+      No rules yet. Add one below &mdash; start with <strong>Always</strong> to give
+      this device something to show, then add narrower rules above it.
+    </p>
+  <% end %>
+
+  <%# Adding a rule: pick a scene, pick a question, fill in its fields. Each
+      condition declares its own fields, so this form grows with the vocabulary
+      rather than being rewritten for every new trigger. %>
+  <form class="rule-form" method="post" action="<%= routes.path(:device_rules, device_id: device.id) %>">
+    <%= tag.input name: :_csrf_token, type: :hidden, value: csrf_token %>
+    <p class="rail-label">Add a rule</p>
+
+    <% if scenes.to_a.any? %>
+      <div class="rule-form-grid">
+        <label>
+          <span>Show</span>
+          <select name="scene_id" required>
+            <% scenes.each do |scene| %>
+              <option value="<%= scene.id %>"><%= scene.label %></option>
+            <% end %>
+          </select>
+        </label>
+
+        <label>
+          <span>When</span>
+          <select name="condition_kind" id="condition-kind">
+            <% conditions.each do |condition| %>
+              <option value="<%= condition.id %>"><%= condition.label %></option>
+            <% end %>
+          </select>
+        </label>
+
+        <label>
+          <span>Refresh every</span>
+          <input type="number" name="refresh_minutes" min="0" step="1" placeholder="leave blank for device default">
+          <small>minutes</small>
+        </label>
+      </div>
+
+      <% conditions.reject { it.fields.empty? }.each do |condition| %>
+        <div class="condition-fields" data-condition="<%= condition.id %>" hidden>
+          <% condition.fields.each do |field| %>
+            <label>
+              <span><%= field.label %></span>
+
+              <% if field.kind == "days" %>
+                <span class="day-picker">
+                  <% Dither::Conditions::WEEKDAYS.each do |day| %>
+                    <label class="day">
+                      <input type="checkbox" name="settings[<%= field.key %>][]" value="<%= day %>"
+                             <%= "checked" if Array(field.default).include?(day) %>>
+                      <span><%= day[0, 3].capitalize %></span>
+                    </label>
+                  <% end %>
+                </span>
+              <% elsif field.kind == "time" %>
+                <input type="time" name="settings[<%= field.key %>]" value="<%= field.default %>">
+              <% else %>
+                <input type="number" name="settings[<%= field.key %>]" value="<%= field.default %>">
+              <% end %>
+
+              <% if field.hint %><small><%= field.hint %></small><% end %>
+            </label>
+          <% end %>
+        </div>
+      <% end %>
+
+      <button type="submit" class="bit-button-accept">Add rule</button>
+    <% else %>
+      <p class="rules-empty">
+        There are no scenes yet. <%= link_to "Compose one", routes.path(:scene_new) %>
+        first, then come back and point a rule at it.
+      </p>
+    <% end %>
+  </form>
+</section>

@@ -2,13 +2,13 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Structs::Firmware, :db do
+RSpec.describe Dither::Structs::Firmware, :db do
   subject :firmware do
     repository.create version: "1.2.3",
                       attachment_data: Hanami.app[:shrine].upload(path.open, :store).data
   end
 
-  let(:repository) { Terminus::Repositories::Firmware.new }
+  let(:repository) { Dither::Repositories::Firmware.new }
   let(:path) { temp_dir.join("test.bin").tap { it.binwrite [123].pack("N") } }
 
   include_context "with temporary directory"
@@ -20,7 +20,7 @@ RSpec.describe Terminus::Structs::Firmware, :db do
     end
 
     it "answers attributes with attachment" do
-      update = Terminus::Repositories::Firmware.new.create version: "0.0.0", attachment_data: {a: 1}
+      update = Dither::Repositories::Firmware.new.create version: "0.0.0", attachment_data: {a: 1}
       expect(update.attachment_attributes).to eq(a: 1)
     end
   end

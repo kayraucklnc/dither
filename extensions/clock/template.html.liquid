@@ -1,0 +1,21 @@
+{% comment %}
+  Full page. The whole panel is one number, because a clock you have to walk
+  towards is not doing its job.
+{% endcomment %}
+
+{% assign shift = extension.values.utc_offset_hours | times: 3600 %}
+{% assign stamp = "now" | date: "%s" | plus: shift %}
+
+<div class="screen">
+  <div class="content layout layout--col layout--center">
+    {% if extension.values.heading != blank %}
+      <p class="t-lg t-bold">{{ extension.values.heading }}</p>
+    {% endif %}
+
+    <p class="t-mono t-bold" style="font-size: 180px; line-height: 1">
+      {{ stamp | date: "%H:%M" }}
+    </p>
+
+    <p class="t-lg">{{ stamp | date: "%A, %-d %B" }}</p>
+  </div>
+</div>

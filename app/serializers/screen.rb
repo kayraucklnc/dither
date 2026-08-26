@@ -1,7 +1,7 @@
 # auto_register: false
 # frozen_string_literal: true
 
-module Terminus
+module Dither
   module Serializers
     # A screen serializer for specific keys.
     class Screen

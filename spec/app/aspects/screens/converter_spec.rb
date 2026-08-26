@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Screens::Converter do
+RSpec.describe Dither::Aspects::Screens::Converter do
   using Refinements::Struct
 
   subject(:converter) { described_class.new }

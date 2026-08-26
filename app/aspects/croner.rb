@@ -4,7 +4,7 @@
 require "core"
 require "functionable"
 
-module Terminus
+module Dither
   module Aspects
     # Parses values into cron format.
     module Croner

@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Extensions::Generator, :db do
+RSpec.describe Dither::Aspects::Extensions::Generator, :db do
   subject(:generator) { described_class.new }
 
   using Refinements::Hash
@@ -29,7 +29,7 @@ RSpec.describe Terminus::Aspects::Extensions::Generator, :db do
     context "with image kind" do
       subject(:generator) { described_class.new image: }
 
-      let(:image) { instance_spy Terminus::Aspects::Extensions::Generators::Image }
+      let(:image) { instance_spy Dither::Aspects::Extensions::Generators::Image }
 
       it "delegates to generator" do
         allow(extension).to receive(:kind).and_return("image")
@@ -42,7 +42,7 @@ RSpec.describe Terminus::Aspects::Extensions::Generator, :db do
     context "with poll kind" do
       subject(:generator) { described_class.new poll: }
 
-      let(:poll) { instance_spy Terminus::Aspects::Extensions::Generators::Poll }
+      let(:poll) { instance_spy Dither::Aspects::Extensions::Generators::Poll }
 
       it "delegates generator" do
         generator.call extension, model_id: model.id
@@ -53,7 +53,7 @@ RSpec.describe Terminus::Aspects::Extensions::Generator, :db do
     context "with static kind" do
       subject(:generator) { described_class.new static: }
 
-      let(:static) { instance_spy Terminus::Aspects::Extensions::Generators::Static }
+      let(:static) { instance_spy Dither::Aspects::Extensions::Generators::Static }
 
       it "delegates to generator" do
         allow(extension).to receive(:kind).and_return("static")

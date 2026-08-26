@@ -4,11 +4,19 @@ Self-hosted e-ink display server. Fork of usetrmnl/terminus, rebranded and
 being reshaped. Repo: github.com/kayraucklnc/dither (`upstream` remote still
 points at usetrmnl/terminus).
 
+**Server only.** Devices run *stock* trmnl-firmware, unmodified. Nothing that a
+device sees may change: `/api/setup`, `/api/display`, `/api/log` and their
+headers are a fixed contract. The dashboard above them is ours to reshape.
+
+The Ruby namespace is `Dither`, not `Terminus`. The database is still named
+`terminus` and the compose project is still `terminus-*` — renaming either
+means moving data, so it is deliberate leftover, not an oversight.
+
 ## Read this before design or architecture work
 
 **`docs/product-brief.md` is the source of truth for where this product is
 going.** Read it at the start of any session that touches the domain model,
-naming, or UI. It outranks anything inherited from upstream Terminus.
+naming, or UI. It outranks anything inherited from upstream Dither.
 
 The essentials, inline, so they survive even without opening it:
 
@@ -20,15 +28,16 @@ The essentials, inline, so they survive even without opening it:
   raw HTML. Illegal arrangements are impossible, not merely discouraged.
 - **Nothing is authored as a combination.** A scene is resolved from rules, not
   hand-built per situation, or you get 2^N screens for N extensions.
-- **Two layers decide what shows.** *Modes* are exclusive, priority-ordered and
-  have separate enter/exit conditions (hysteresis); they carry refresh cadence.
-  *Rules* are additive and compete slot by slot, by priority. Never insertion
-  order.
+- **Rules decide what shows.** A device has an ordered list of rules; the first
+  whose condition holds wins. Several matching at once is normal — priority
+  decides, never insertion order. A rule may override the refresh cadence.
+  `lib/dither/conditions.rb` is the condition vocabulary; adding a kind is an
+  entry there plus a form field, never a migration.
 - **The layout is derived, not chosen** — the resolver picks the smallest layout
   that seats every active rule, which only works because extensions declare
   shapes.
 - **Naming settled**: Shape / Layout / Scene / Mode + Rules. "View" was rejected
-  because `Terminus::Views` is Hanami's own namespace.
+  because `Dither::Views` is Hanami's own namespace.
 - **A preview showing what the device sees right now** is core, not a
   nice-to-have. The product must be evaluable before owning hardware.
 - The user has authorised **scrapping inherited code and naming freely**.
@@ -63,7 +72,7 @@ bin/dev exec web bundle exec bin/seed_extensions   # bundled extensions
 - **Screens render with no origin.** `Shoter` assigns `page.content` directly,
   so relative URLs cannot resolve. Stylesheets must be inlined; fonts are
   referenced by installed family name (Inter, DejaVu, Noto CJK).
-- **Views must inherit `Terminus::View`**, not `Hanami::View`, or they render
+- **Views must inherit `Dither::View`**, not `Hanami::View`, or they render
   without the app layout and the navigation silently differs on that page.
 - **`relations.*` returns Hashes**; use `repositories.*` for structs with
   associations.
@@ -76,4 +85,4 @@ bin/dev exec web bundle exec bin/seed_extensions   # bundled extensions
   `extension.data`. Settings are `{{ extension.values.x }}`, not
   `{{ values.x }}`.
 - **`expose :layout` in a view never reaches the template** — Hanami views own
-  that name. Same trap as `Terminus::Views`.
+  that name. Same trap as `Dither::Views`.

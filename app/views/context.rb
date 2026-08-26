@@ -3,7 +3,7 @@
 
 require "hanami/view"
 
-module Terminus
+module Dither
   module Views
     # The application custom view context.
     class Context < Hanami::View::Context

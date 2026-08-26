@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Designs::Middleware do
+RSpec.describe Dither::Aspects::Designs::Middleware do
   subject(:middleware) { described_class.new application, pattern: %r(/preview/(?<id>.+)) }
 
   let(:application) { proc { [200, {}, []] } }
@@ -20,13 +20,13 @@ RSpec.describe Terminus::Aspects::Designs::Middleware do
             "Content-Type" => "text/event-stream",
             "X-Accel-Buffering" => "no"
           },
-          instance_of(Terminus::Aspects::Designs::EventSource)
+          instance_of(Dither::Aspects::Designs::EventSource)
         )
       )
     end
 
     it "passes ID to event stream" do
-      event_stream = class_spy Terminus::Aspects::Designs::EventSource
+      event_stream = class_spy Dither::Aspects::Designs::EventSource
 
       middleware = described_class.new(
         application,

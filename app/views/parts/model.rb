@@ -4,7 +4,7 @@ require "hanami/view"
 require "initable"
 require "refinements/array"
 
-module Terminus
+module Dither
   module Views
     module Parts
       # The model presenter.

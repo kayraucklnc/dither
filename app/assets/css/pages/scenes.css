@@ -76,6 +76,11 @@
   font-size: var(--site-text-xs);
   line-height: 1.5;
   margin: var(--site-space-xs) 0 0;
+
+  code {
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
 }
 
 /* ---- Layout picker --------------------------------------------------- */
@@ -101,8 +106,9 @@
   &:hover { border-color: var(--site-border-strong); }
 
   &.is-active {
-    background-color: var(--site-accent-soft);
-    border-color: var(--site-accent);
+    background-color: var(--site-surface-sunken);
+    border-color: var(--site-ink-muted);
+    box-shadow: inset 0 0 0 1px var(--site-ink-muted);
   }
 }
 
@@ -110,17 +116,22 @@
    cannot drift from what the layout actually does. */
 .layout-diagram {
   aspect-ratio: 5 / 3;
-  background-color: var(--site-border);
+  background-color: var(--site-ink-subtle);
+  border: 1px solid var(--site-ink-subtle);
   display: grid;
-  gap: 1px;
+  gap: 2px;
 
   span {
-    background-color: var(--site-surface-sunken);
+    background-color: var(--site-surface);
   }
 }
 
-.layout-option.is-active .layout-diagram span {
-  background-color: var(--site-surface);
+/* Selection is carried by the card, not by repainting the diagram: the
+   diagram's job is to show the shape, and recolouring it made a grid of ten
+   options read as a wall of colour. */
+.layout-option.is-active .layout-diagram {
+  background-color: var(--site-ink-muted);
+  border-color: var(--site-ink-muted);
 }
 
 .layout-name {
@@ -137,10 +148,15 @@
 .composer-stage {
   display: grid;
   gap: var(--site-space-sm);
+  justify-items: center;
 }
 
 .panel-frame {
   background-color: var(--site-surface-sunken);
+  /* A panel preview should read as a device, not a poster. 640px is close to
+     life size for a 7.5 inch display on a normal monitor. */
+  inline-size: 100%;
+  max-inline-size: 40rem;
   /* Checkerboard, so a mostly-white e-ink render still reads as an image
      rather than a hole in the page. */
   background-image:
@@ -161,6 +177,10 @@
     inline-size: 100%;
     object-fit: contain;
   }
+
+  /* display: block above outranks the user agent's [hidden] rule, which is
+     how an empty panel ended up showing a broken image icon. */
+  img[hidden] { display: none; }
 }
 
 .panel-slots {
@@ -199,6 +219,12 @@
 }
 
 .slot-target.is-filled .slot-shape { display: none; }
+
+/* Once a render is on screen it labels its own empty slots, so the overlay
+   would be saying the same thing twice on top of itself. */
+.panel-frame:has(img:not([hidden])) .slot-target:not(.is-filled) .slot-shape {
+  display: none;
+}
 
 .slot-filled {
   background-color: var(--site-surface);
@@ -333,11 +359,26 @@
 
 .shape-chip {
   background-color: var(--site-surface-sunken);
+  border: 1px solid var(--site-border);
   border-radius: var(--site-radius-sm);
-  color: var(--site-ink-subtle);
+  color: var(--site-ink-muted);
   font-size: 0.65rem;
   font-weight: 600;
-  padding: 0.1rem 0.3rem;
+  padding: 0.1rem 0.35rem;
+}
+
+/* Click to place: the palette item you picked, and the slots that will take
+   it. Drag is the shortcut; this is the path that always works. */
+.palette-item.is-picked {
+  background-color: var(--site-accent-soft);
+  border-color: var(--site-accent);
+}
+
+.palette-hint {
+  color: var(--site-accent);
+  font-size: var(--site-text-xs);
+  font-weight: 600;
+  margin: 0;
 }
 
 .palette-empty {

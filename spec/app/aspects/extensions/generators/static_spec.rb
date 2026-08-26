@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Extensions::Generators::Static do
+RSpec.describe Dither::Aspects::Extensions::Generators::Static do
   subject(:generator) { described_class.new }
 
   describe "#call" do

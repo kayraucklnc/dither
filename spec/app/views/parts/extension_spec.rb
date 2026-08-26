@@ -2,8 +2,8 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Views::Parts::Extension do
-  subject(:part) { described_class.new value: extension, rendering: Terminus::View.new.rendering }
+RSpec.describe Dither::Views::Parts::Extension do
+  subject(:part) { described_class.new value: extension, rendering: Dither::View.new.rendering }
 
   let :extension do
     Factory.structs[:extension, kind: "poll", unit: "none"]

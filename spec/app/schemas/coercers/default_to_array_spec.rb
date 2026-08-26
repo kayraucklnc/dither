@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Schemas::Coercers::DefaultToArray do
+RSpec.describe Dither::Schemas::Coercers::DefaultToArray do
   subject(:coercer) { described_class }
 
   let(:attributes) { {days: %w[monday friday]} }

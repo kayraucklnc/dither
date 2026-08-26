@@ -2,7 +2,7 @@
 
 require "refinements/time"
 
-module Terminus
+module Dither
   module Structs
     # The extension struct.
     class Extension < DB::Struct
@@ -56,6 +56,16 @@ module Terminus
 
       def variant_count = shape_ids.size
 
+      # ---- Sample data ---------------------------------------------------
+      #
+      # What this extension renders before it has ever fetched anything. Used
+      # only by previews, and only when there is no real data - a device is
+      # never served sample data.
+
+      def sample_data = Hash(sample).transform_keys(&:to_s)
+
+      def sample? = sample_data.any?
+
       def liquid_attributes
         all_fields = Array fields
 
@@ -89,7 +99,7 @@ module Terminus
           screen_name,
           {
             cron: to_cron,
-            class: Terminus::Jobs::Batches::Extension.name,
+            class: Dither::Jobs::Batches::Extension.name,
             args: [id],
             description: "The #{label} extension update schedule."
           }

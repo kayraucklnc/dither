@@ -34,8 +34,8 @@ RSpec.describe "Designs", :db do
 
   it "imports", :aggregate_failures, :js do
     model
-    exporter = Terminus::Aspects::Designs::Exporter.new
-    importer = Terminus::Aspects::Designs::Importer.new
+    exporter = Dither::Aspects::Designs::Exporter.new
+    importer = Dither::Aspects::Designs::Importer.new
     screen_template = Factory.structs[:screen_template, label: "Design Import Test"]
     path = exporter.call(screen_template).bind { |io| temp_dir.join("test.zip").write io.read }
 

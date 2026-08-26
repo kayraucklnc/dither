@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Structs::ScreenTemplate do
+RSpec.describe Dither::Structs::ScreenTemplate do
   subject(:screen_template) { Factory.structs[:screen_template, label: "Test", name: "test"] }
 
   describe "#export_attributes" do

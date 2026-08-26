@@ -4,7 +4,7 @@ require "hanami/view"
 require "initable"
 require "refinements/string"
 
-module Terminus
+module Dither
   module Views
     module Parts
       # The extension exchange presenter.

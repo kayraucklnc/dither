@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Models::Finder, :db do
+RSpec.describe Dither::Aspects::Models::Finder, :db do
   subject(:finder) { described_class.new }
 
   using Refinements::Hash

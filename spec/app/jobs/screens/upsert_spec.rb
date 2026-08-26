@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Jobs::Screens::Upsert, :db do
+RSpec.describe Dither::Jobs::Screens::Upsert, :db do
   subject(:job) { described_class.new }
 
   include_context "with application dependencies"
@@ -10,7 +10,7 @@ RSpec.describe Terminus::Jobs::Screens::Upsert, :db do
   describe "#perform" do
     let(:model) { Factory[:model] }
     let(:screen) { Factory[:screen, model_id: model.id, label: "First", name: "first"] }
-    let(:repository) { Terminus::Repositories::Screen.new }
+    let(:repository) { Dither::Repositories::Screen.new }
 
     it "creates screen" do
       job.perform model.id, name: "test", label: "Test", content: "<h1>Test</h1>"

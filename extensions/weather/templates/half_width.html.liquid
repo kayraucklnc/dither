@@ -1,0 +1,37 @@
+{% comment %} Half width: 400x480. Temperature large, the rest stacked beneath. {% endcomment %}
+
+<div class="screen">
+  <div class="title-bar">
+    <div class="title">{{ extension.values.place | default: "Weather" }}</div>
+  </div>
+
+  <div class="content content--tight">
+    {% if source_1.current %}
+      <div class="stack">
+        <div class="stat">
+          <span class="value t-mono" style="font-size: 84px">
+            {{ source_1.current.temperature_2m | round }}&deg;
+          </span>
+          <span class="label">Now</span>
+        </div>
+
+        <div class="kv">
+          <span class="k">High / low</span>
+          <span class="v t-mono t-bold">
+            {{ source_1.daily.temperature_2m_max[0] | round }}&deg; /
+            {{ source_1.daily.temperature_2m_min[0] | round }}&deg;
+          </span>
+        </div>
+
+        <div class="kv">
+          <span class="k">Rain</span>
+          <span class="v t-mono t-bold">{{ source_1.daily.precipitation_probability_max[0] }}%</span>
+        </div>
+      </div>
+    {% else %}
+      <div class="layout layout--col layout--center">
+        <p class="t-bold">No forecast</p>
+      </div>
+    {% endif %}
+  </div>
+</div>

@@ -2,7 +2,7 @@
 
 require "hanami_helper"
 
-RSpec.describe Terminus::Aspects::Screens::Placeholder do
+RSpec.describe Dither::Aspects::Screens::Placeholder do
   subject(:placeholder) { described_class.new }
 
   describe "#initialize" do
