@@ -1,0 +1,180 @@
+{% comment %}
+  Contact sheet - the whole collection at once, with the one that is up ringed.
+
+  A gallery that only ever shows one picture gives you no way of knowing what
+  else is in it, and a folder you cannot see the contents of is a folder you
+  stop putting things in. This is the index: every picture in the collection,
+  small, in the order it is filed, with a heavy rule round whichever one the
+  wallpaper beside it is showing.
+
+  Each cell is a real crop at its own size rather than the same image scaled
+  down five times, because scaling a stipple is how you get moire and because
+  a thumbnail wants a *tighter* crop than a wallpaper does, not a smaller one.
+  How many it draws is decided by the box: what does not fit is counted, never
+  silently dropped.
+{% endcomment %}
+
+{%- assign fit = extension.values.fit | default: "fill" -%}
+{%- assign turn = extension.values.turn | default: 0 -%}
+{%- assign focus = extension.values.focus | default: "auto" -%}
+{%- assign contrast = extension.values.contrast | default: 0 -%}
+{%- assign brightness = extension.values.brightness | default: 0 -%}
+{%- assign screen = extension.values.screen | default: "panel" -%}
+{%- assign marks = extension.values.marks | default: 4 -%}
+{%- assign invert = extension.values.invert -%}
+{%- assign current = source_1.picture.id -%}
+
+{%- assign short = shape.width | at_most: shape.height | at_least: 80 -%}
+{%- assign pad = short | divided_by: 16 | at_least: 8 | at_most: 18 -%}
+{%- assign gap = pad | divided_by: 2 | at_least: 4 | at_most: 10 -%}
+
+{%- assign across = 3 -%}
+{%- if shape.columns > 7 %}{% assign across = 4 %}{% endif -%}
+{%- if shape.columns > 10 %}{% assign across = 5 %}{% endif -%}
+
+{%- assign down = 2 -%}
+{%- if shape.rows > 6 %}{% assign down = 3 %}{% endif -%}
+{%- if shape.rows > 9 %}{% assign down = 4 %}{% endif -%}
+
+{%- assign headed = false -%}
+{%- assign head = 0 -%}
+{%- if shape.rows > 5 and shape.columns > 6 -%}
+  {%- assign headed = true -%}
+  {%- assign head = 26 -%}
+{%- endif -%}
+
+{%- assign notice_h = 0 -%}
+{%- if notices.size > 0 %}{% assign notice_h = 30 %}{% endif -%}
+
+{%- assign cap = across | times: down -%}
+{%- assign total = source_1.sheet | size -%}
+{%- assign spare = total | minus: cap -%}
+
+{%- comment %} The last cell becomes the counter when there is more behind it,
+  so the sheet never quietly claims to be the whole collection. {% endcomment -%}
+{%- assign shown = cap -%}
+{%- if spare > 0 %}{% assign shown = cap | minus: 1 %}{% endif -%}
+
+{%- comment %} And where the collection does not reach the bottom row, the
+  bottom row is not reserved. The grid is laid out in real pixels rather than
+  fractions - it has to be, or a screened thumbnail lands on a half pixel - so
+  a row nothing goes in is a band of blank paper under the sheet rather than
+  slack the tracks absorb. Nine pictures across five is two rows, not four.
+{% endcomment -%}
+{%- if spare <= 0 -%}
+  {%- assign needed = total | divided_by: across -%}
+  {%- assign trailing = total | modulo: across -%}
+  {%- if trailing > 0 %}{% assign needed = needed | plus: 1 %}{% endif -%}
+  {%- assign down = needed | at_least: 1 | at_most: down -%}
+{%- endif -%}
+
+{%- assign gaps_across = across | minus: 1 | times: gap -%}
+{%- assign gaps_down = down | minus: 1 | times: gap -%}
+{%- assign cell_w = shape.width | minus: pad | minus: pad | minus: gaps_across | divided_by: across | at_least: 24 -%}
+{%- assign cell_h = shape.height | minus: pad | minus: pad | minus: head | minus: notice_h | minus: gaps_down | divided_by: down | at_least: 20 -%}
+
+{% if total == 0 %}
+{%- comment %} Nothing to hang.
+
+  On a panel this is the state that matters most, because the alternative to
+  drawing it well is a white rectangle - and a white rectangle is exactly what
+  a broken server looks like from across a room. So it draws the mark a missing
+  picture has always been drawn with, and says where to put one.
+{% endcomment -%}
+{%- assign short = shape.width | at_most: shape.height | at_least: 40 -%}
+{%- assign mark = short | divided_by: 3 | at_least: 20 | at_most: 88 -%}
+{%- assign pad = short | divided_by: 10 | at_least: 6 | at_most: 22 -%}
+
+<div class="screen" style="align-items: center; justify-content: center; text-align: center;
+                           gap: {{ pad }}px; padding: {{ pad }}px">
+  <div style="flex: none; width: {{ mark | times: 1.5 | round }}px; height: {{ mark }}px;
+              border: 3px solid var(--ink);
+              background: linear-gradient(to top right, var(--paper) calc(50% - 2px),
+                          var(--ink) calc(50% - 2px), var(--ink) calc(50% + 2px),
+                          var(--paper) calc(50% + 2px))"></div>
+
+  {% if short > 110 %}
+    <p class="t-bold t-upper" style="flex: none; font-size: {{ short | divided_by: 14 | at_least: 11 | at_most: 17 }}px; letter-spacing: 0.08em">
+      No pictures yet
+    </p>
+  {% endif %}
+  {% if short > 190 %}
+    <p class="t-xs" style="flex: none; max-width: 82%">
+      Put some in your gallery folder - see docs/gallery.md
+    </p>
+  {% endif %}
+</div>
+{% else %}
+<div class="screen">
+  <div class="content layout layout--col" style="padding: {{ pad }}px; gap: {{ gap }}px; min-height: 0">
+    {% if headed %}
+      <div style="flex: none; display: flex; align-items: baseline; gap: 8px; min-width: 0">
+        <p class="t-bold truncate" style="font-size: 14px; letter-spacing: 0.06em; text-transform: uppercase; flex: 1 1 auto; min-width: 0">
+          {{ source_1.collection_label }}
+        </p>
+        <p class="t-mono" style="flex: none; font-size: 12px">{{ source_1.count }}</p>
+      </div>
+    {% endif %}
+
+    {%- comment %} Tracks in real pixels, not fractions. A screened thumbnail
+      is already black and white, and a fractional track puts it on a half
+      pixel - where the browser resamples the marks back into greys and the
+      page dither finds them again. {% endcomment -%}
+    <div style="flex: none; display: grid; gap: {{ gap }}px;
+                grid-template-columns: repeat({{ across }}, {{ cell_w }}px);
+                grid-template-rows: repeat({{ down }}, {{ cell_h }}px)">
+      {% for entry in source_1.sheet limit: shown %}
+        {%- assign ring = 1 -%}
+        {%- if entry.id == current %}{% assign ring = 4 %}{% endif -%}
+        {%- comment %} Inside the rule, not including it: the cell is
+          box-sized, so a heavier ring leaves a smaller picture. {% endcomment -%}
+        {%- assign thumb_w = cell_w | minus: ring | minus: ring | at_least: 8 -%}
+        {%- assign thumb_h = cell_h | minus: ring | minus: ring | at_least: 8 -%}
+
+        {%- assign thumb = entry.id
+              | as_image: width: thumb_w, height: thumb_h,
+                          fit: fit, turn: turn, focus: focus, contrast: contrast,
+                          brightness: brightness, screen: screen, marks: marks, invert: invert -%}
+
+        <div style="overflow: hidden; border: {{ ring }}px solid var(--ink); background: var(--paper)">
+          {% if thumb != "" %}
+            <img src="{{ thumb }}" alt=""
+                 style="display: block; width: 100%; height: 100%; object-fit: cover">
+          {% else %}
+            <div class="layout layout--center" style="height: 100%">
+              <span class="i i-close"></span>
+            </div>
+          {% endif %}
+        </div>
+      {% endfor %}
+
+      {% if spare > 0 %}
+        {%- comment %} Not a picture - a count. A sheet that stopped at twelve
+          without saying so reads as a collection of twelve. {% endcomment -%}
+        <div class="layout layout--col layout--center"
+             style="border: 1px solid var(--ink);
+                    background: repeating-linear-gradient(45deg, var(--paper) 0 5px, #dcdcdc 5px 10px)">
+          <p class="t-bold" style="font-size: {{ cell_h | divided_by: 3 | at_least: 12 | at_most: 26 }}px">+{{ spare }}</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if notices.size > 0 %}
+    <div class="notice-strip" style="padding: 5px {{ pad }}px">
+      {% for notice in notices %}
+        {% if notice.overflow %}
+          <span class="notice notice--more">+{{ notice.overflow }}</span>
+        {% else %}
+          <span class="notice notice--{{ notice.level }}" title="{{ notice.text }}">
+            <span class="i i-{{ notice.icon }}"></span>
+          </span>
+        {% endif %}
+      {% endfor %}
+      {% if shape.wide and notices[0].text != blank %}
+        <span class="notice-said">{{ notices[0].text }}</span>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+{% endif %}

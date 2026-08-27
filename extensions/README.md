@@ -60,6 +60,7 @@ unit: minute                   # none | minute | hour | day
 | `poll` | the URLs in `exchanges` | `exchanges` |
 | `connection` | an account linked under Connections | `connection: <provider>` |
 | `transit` | a provider built into Dither | — |
+| `gallery` | the pictures in `DITHER_GALLERY_DIR` | — |
 
 ## Settings
 
@@ -323,6 +324,31 @@ Filters that save a hundred lines of `{% case %}`:
 
 `weather_icon` · `weather_label` · `weather_short` · `compass` · `in_words` ·
 `clock_of` · `hour_of` · `as_percent` · `at_least` · `at_most`
+
+And one that reads the disk:
+
+```liquid
+<img src="{{ shot.id | as_image: width: shape.width, height: shape.height }}">
+```
+
+`as_image` turns a picture id from the `gallery` provider into a data URI,
+cropped to the box you hand it. It also takes `fit` (`fill` or `whole`), `turn`
+(a quarter turn clockwise, applied before the crop), `focus`, `brightness`,
+`contrast`, `invert`, and a `screen` - `panel`, `diffusion`, `atkinson`,
+`ordered`, `halftone` or `noise` - with `marks` for how many pixels one mark of
+that screen covers.
+
+**Always hand it the real pixel size of the box.** With no screen it returns
+grey and the page dither does the rest, so a rough size only costs sharpness.
+With one, it returns black and white, and that only survives if the design
+places it one pixel for one - anything else resamples the marks back into greys
+for the page dither to find. It is why the contact sheet lays its grid out in
+pixels rather than in `1fr`.
+
+An id that no longer resolves renders empty - a folder someone tidied should
+leave a gap in a design rather than take the screen down. A screenshotted page
+has no origin, which is why it is inlined rather than linked. See
+docs/gallery.md.
 
 And for anything that draws time or geometry:
 

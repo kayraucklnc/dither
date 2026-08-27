@@ -1,6 +1,8 @@
 import { Liquid } from "liquidjs";
 
 import { refusal } from "@/lib/designs";
+import { DEFAULT_LOOK, prepareById } from "@/lib/gallery/prepare";
+import { isScreen, type Screen } from "@/lib/gallery/screen";
 import { daysInWords, partOfDay, spanInWords, throughDay, timeInWords } from "@/lib/timewords";
 import { templateFor, type Extension } from "@/lib/extensions/registry";
 import { COLUMNS, ROWS, sizeLabel, type Size } from "@/lib/shapes";
@@ -216,6 +218,67 @@ function register(engine: Liquid): void {
   engine.registerFilter("minutes_of", (value: unknown) => {
     const match = /(\d{1,2}):(\d{2})/.exec(String(value ?? ""));
     return match ? Number(match[1]) * 60 + Number(match[2]) : 0;
+  });
+
+  /**
+   * A picture from the gallery, cropped to the box asking for it.
+   *
+   * The only filter here that touches the disk, and the only asynchronous one.
+   * It exists because cropping is a decision that cannot be made any earlier:
+   * a design covers a range of sizes, and the rectangle worth taking out of a
+   * photograph for a 12x12 wallpaper is not the one worth taking for a 2x12
+   * strip. The template is the first thing that knows which it is.
+   *
+   * What comes back is a data URI. A screenshotted page has no origin, so a
+   * URL - even our own - has nothing to resolve against; the same reason the
+   * brand mark is inlined into the empty panel.
+   *
+   *   {{ shot.id | as_image: width: shape.width, height: shape.height,
+   *                             contrast: 40, screen: "halftone" }}
+   *
+   * `width` and `height` are not optional in spirit even though they default:
+   * a chosen screen comes back already reduced to the panel's two values, and
+   * that only survives if the design places it one pixel for one. Ask for a
+   * size other than the box and the browser resamples the marks back into
+   * greys for the page dither to find, which is the moire this avoids.
+   *
+   * An id that no longer resolves renders as empty, which templates test for.
+   * A missing folder should leave a gap in a gallery, not take a screen down.
+   */
+  engine.registerFilter("as_image", async (id: unknown, ...args: unknown[]) => {
+    const wanted = String(id ?? "").trim();
+    if (!wanted) return "";
+
+    // liquidjs hands keyword arguments over as [key, value] pairs and
+    // positional ones as bare values, so both spellings are accepted: the
+    // keyword form because five positional arguments is a puzzle, and
+    // `width, height` because that is all most calls need.
+    const named: Record<string, unknown> = {};
+    const loose: unknown[] = [];
+
+    for (const argument of args) {
+      if (Array.isArray(argument) && argument.length === 2 && typeof argument[0] === "string") {
+        named[argument[0]] = argument[1];
+      } else {
+        loose.push(argument);
+      }
+    }
+
+    const prepared = await prepareById(wanted, {
+      ...DEFAULT_LOOK,
+      width: Number(named.width ?? loose[0] ?? 0) || 0,
+      height: Number(named.height ?? loose[1] ?? 0) || 0,
+      fit: named.fit === "whole" ? "whole" : "fill",
+      turn: Number(named.turn ?? 0) || 0,
+      focus: String(named.focus ?? "auto"),
+      brightness: Number(named.brightness ?? 0) || 0,
+      contrast: Number(named.contrast ?? 0) || 0,
+      screen: isScreen(String(named.screen)) ? (String(named.screen) as Screen) : "panel",
+      marks: Number(named.marks ?? 0) || DEFAULT_LOOK.marks,
+      invert: named.invert === true || named.invert === "true",
+    });
+
+    return prepared?.source ?? "";
   });
 }
 

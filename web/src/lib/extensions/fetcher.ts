@@ -15,6 +15,7 @@ import {
   type Answer,
   type Question,
 } from "@/lib/extensions/observations";
+import { shelf } from "@/lib/gallery";
 import { environment } from "@/lib/settings";
 import { board } from "@/lib/transit/board";
 
@@ -157,7 +158,9 @@ export async function ask(
         ? await fromConnection(extension, asked, now)
         : extension.manifest.kind === "poll"
           ? await poll(extension, asked)
-          : await board(asked, now);
+          : extension.manifest.kind === "gallery"
+            ? await shelf(asked, now)
+            : await board(asked, now);
 
     await record(extensionName, asked, payload, now);
     return { key, payload };

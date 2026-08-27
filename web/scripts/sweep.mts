@@ -5,6 +5,7 @@ import { DEFAULT_PANEL } from "../src/lib/panel";
 import { renderSolo } from "../src/lib/render";
 import { closeBrowser } from "../src/lib/render/browser";
 import { supportsSize } from "../src/lib/designs";
+import { previewData } from "../src/lib/widget-data";
 import { sizeToken, type Size } from "../src/lib/shapes";
 
 /**
@@ -54,7 +55,10 @@ for (const extension of await all()) {
           extension.name,
           size,
           defaultSettings(extension),
-          extension.manifest.sample as Record<string, unknown>,
+          // The same data a thumbnail would draw with: real where there is
+          // any, the sample where there is not. Sweeping a gallery against its
+          // empty sample only ever proves the empty state fits.
+          await previewData(extension, defaultSettings(extension)),
           DEFAULT_PANEL,
           [],
           design.key,
