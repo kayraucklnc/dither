@@ -269,7 +269,9 @@ function register(engine: Liquid): void {
       width: Number(named.width ?? loose[0] ?? 0) || 0,
       height: Number(named.height ?? loose[1] ?? 0) || 0,
       fit: named.fit === "whole" ? "whole" : "fill",
-      turn: Number(named.turn ?? 0) || 0,
+      // "auto" travels as itself: which way to turn is a question about this
+      // widget's box, and only `prepare` knows how big that is.
+      turn: String(named.turn ?? "").trim() === "auto" ? "auto" : Number(named.turn ?? 0) || 0,
       focus: String(named.focus ?? "auto"),
       brightness: Number(named.brightness ?? 0) || 0,
       contrast: Number(named.contrast ?? 0) || 0,
