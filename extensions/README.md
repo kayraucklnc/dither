@@ -1,301 +1,240 @@
-# Bundled extensions
+# Writing an extension
 
-An extension turns data from somewhere else into a screen on your display.
-This directory holds the ones that ship with Dither. Anything here is loaded
-with `bin/seed_extensions`.
-
-**If you are an agent or script generating an extension: produce one directory
-containing `configuration.yml` and `template.html.liquid`, drop it in here, and
-run the loader. That is the entire integration contract — nothing in the app
-needs to change.** Add `templates/<shape>.html.liquid` files if you want the
-extension to be placeable in less than a whole panel; see
-[Layout variants](#layout-variants).
-
----
-
-## The shape
+An extension is a directory. Drop one in here and Dither picks it up on the
+next request — there is no registration step, no database row, and no button
+in the dashboard that creates one. That is deliberate: an extension is code.
 
 ```
-extensions/
-  your_extension/
-    configuration.yml               metadata, settings fields, schedule, HTTP calls
-    template.html.liquid            the whole panel — required
-    templates/
-      half_width.html.liquid        optional: the same extension, half the width
-      quarter.html.liquid           optional: one corner
-    README.md                       optional: notes for whoever installs it
+extensions/tide/
+├── configuration.yml           the manifest
+├── template.html.liquid        the full-screen design
+└── templates/
+    ├── half_width.html.liquid
+    ├── quarter.html.liquid
+    ├── third_height.html.liquid
+    └── third_width.html.liquid
 ```
 
-That set is the same format the zip importer accepts, so a bundled extension is
-also a valid export. Zip the directory and someone else can load it through
-**Extensions → Import** without touching the filesystem.
-
-## Installing
+Scaffold one:
 
 ```bash
-bin/seed_extensions                    # install anything not present yet
-bin/seed_extensions --force            # replace what is already installed
-bin/seed_extensions public_transport   # just one
+cd web && npx tsx scripts/new-extension.mts tide "Tide times"
 ```
 
-Run it inside the dev stack with `bin/dev exec web bundle exec bin/seed_extensions`.
+## The two things an extension can be
 
-Replacing deletes the existing row first. Exchanges cascade, so the database
-ends up matching the files exactly instead of accumulating stale calls.
+An extension can be **shown**, **decided on**, or both.
 
----
+- It is **shown** if it has templates. Each one draws a shape.
+- It is **decided on** if it declares `facts`. Each fact becomes something a
+  device can branch on, and something a notice can fire from.
 
-## configuration.yml
+A trigger-only extension with no templates is fine. So is a display-only one
+with no facts — the clock is exactly that, because everything you would branch
+on about the time is already reported by the built-in Time source, and two
+answers to one question is worse than none.
 
-| Key | Required | Notes |
+## The manifest
+
+```yaml
+version: "1.0.0"
+name: tide                     # the directory name, and how widgets refer to it
+label: Tide times
+description: >
+  High and low water for a port, and how long until the next one.
+
+kind: poll                     # static | poll | transit | connection
+mode: text
+tags: [sea]
+
+interval: 30                   # how often data is refetched
+unit: minute                   # none | minute | hour | day
+```
+
+`kind` decides where data comes from:
+
+| kind | data from | needs |
 |---|---|---|
-| `version` | yes | Format version. Use `"1.0.0"`. |
-| `name` | yes | Unique machine name. Lowercase, underscores. |
-| `label` | yes | Human name shown in the UI. |
-| `description` | yes | One or two sentences. May be null. |
-| `kind` | yes | `poll` (we call the API on a schedule) or `webhook` (they post to us). |
-| `mode` | yes | `text` for HTML-rendered screens. |
-| `tags` | yes | Array of strings, may be empty. |
-| `interval` / `unit` | yes | Schedule. Units: `none`, `minute`, `hour`, `day`, `week`, `month`. |
-| `days` | yes | Weekday names when `unit: week`, otherwise `[]`. |
-| `last_day_of_month` | yes | Boolean. |
-| `start_at` | yes | RFC 3339 timestamp the schedule counts from. |
-| `static_body` | yes | Fixed data merged into the template. `{}` if unused. |
-| `data` | yes | Seed data. `{}` — the exchanges fill this in. |
-| `fields` | yes | The settings form. See below. |
-| `sample` | no | Representative data for previews. See below. |
-| `facts` | no | What rules may ask about. See below. |
-| `exchanges` | no | The HTTP calls. See below. |
+| `static` | nothing; the template draws from settings | — |
+| `poll` | the URLs in `exchanges` | `exchanges` |
+| `connection` | an account linked under Connections | `connection: <provider>` |
+| `transit` | a provider built into Dither | — |
 
-### fields
+## Settings
 
-Each entry becomes one input on the extension's settings page. Whoever installs
-the extension fills these in; you never hardcode their API key or stop ID.
+Every field becomes a control in the widget inspector *and* in the trigger
+editor. They are per placement: two tide widgets on one screen are two ports.
 
 ```yaml
 fields:
-  - keyname: stop_id          # address it as {{ extension.values.stop_id }}
-    name: Stop ID             # label on the form
-    field_type: string        # string, number, select, time, password...
-    default: "8011160"        # prefilled value
-    help_text: Which stop to show.
+  - keyname: port
+    name: Port
+    field_type: select        # string | text | number | boolean | select | time | url
+    default: dover
+    options:
+      - { value: dover, label: Dover }
+      - { value: newlyn, label: Newlyn }
+    help_text: Which port these times are for.
     optional: false
 ```
 
-### exchanges
+There is no dashboard code to write for a new field. Declare it and the form
+grows a control.
 
-One HTTP call each. The URL, headers and body are **all Liquid-rendered**, so
-field values interpolate directly. Each exchange's parsed response arrives in
-the template as `{{ source_1 }}`, `{{ source_2 }}`, numbered in the order the
-exchanges are listed.
+## Fetching
+
+The URL is a Liquid template over *this widget's* settings, which is what lets
+two placements fetch two different things:
 
 ```yaml
 exchanges:
   - verb: get
-    template: "{{ extension.values.api_base }}/stops/{{ extension.values.stop_id }}/departures"
+    template: https://api.example.com/tides?port={{ extension.values.port }}
     headers:
       Accept: application/json
-      Authorization: "Bearer {{ extension.values.api_key }}"
-    body: {}
 ```
 
-Multiple exchanges are allowed and run in order — useful when one call fetches
-an ID that the next one needs.
+Answers arrive in the template as `source_1`, `source_2`, … numbered by order.
 
----
+## Facts, which are triggers
+
+```yaml
+facts:
+  - key: minutes_to_high
+    label: Next high water in
+    type: duration            # duration | number | text | boolean | time | weekday
+    path: source_1.next_high.minutes
+    unit: minutes
+```
+
+`path` is dotted, and a numeric step indexes an array:
+`source_1.events.0.height`.
+
+The **type decides which comparisons the editor offers**, so a duration is
+never offered "contains" and a rule that could not possibly be true cannot be
+built. Every source also reports `minutes_since_update` for free.
+
+## Notices
+
+A notice is something said on top of whatever screen is showing. Suggest your
+own and they appear as one-click additions when someone adds your extension as
+a source:
+
+```yaml
+notices:
+  - key: spring_tide
+    label: Spring tide
+    icon: droplet
+    loud: true                # inverted, for the ones that matter
+    text: "Spring tide — {{ source_1.next_high.height }}m at {{ source_1.next_high.at }}"
+    when:
+      fact: range_metres
+      operator: gte
+      value: 6
+```
+
+To *receive* notices from other extensions, say so and render them:
+
+```yaml
+accepts_notices: true
+```
+
+```liquid
+{% if notices.size > 0 %}
+  <div class="notice-strip">
+    {% for notice in notices %}
+      <span class="notice{% if notice.loud %} notice--loud{% endif %}">
+        <span class="i i-{{ notice.icon }}"></span>{{ notice.text }}
+      </span>
+    {% endfor %}
+  </div>
+{% endif %}
+```
+
+A template that ignores `notices` simply never shows them. The hook is offered,
+not imposed.
 
 ## Sample data
-
-An extension that has never fetched anything renders its empty state, which
-means a fresh install shows a blank panel and there is nothing to judge. So
-every extension should ship representative data:
 
 ```yaml
 sample:
   source_1:
-    departures:
-      - when: "2026-01-01T08:12:00+01:00"
-        line: {name: "ICE 1045"}
-        destination: {name: "Munchen Hbf"}
+    next_high: { at: "14:12", minutes: 96, height: 6.4 }
 ```
 
-Shape it **exactly like the real response**, keyed the same way the template
-reads it. A design that looks right against the sample looks right in the
-field; one that does not, will not.
+Used in previews until something real has been fetched, and never sent to a
+device. It is what lets a screen be designed before anyone owns the hardware or
+has an API key — so make it plausible, and make it exercise the awkward cases.
 
-Sample data is used only in previews, and only when there is no real data yet.
-A device is never served it, and the moment a real fetch succeeds it is ignored.
+## Templates
 
----
+Plain Liquid. The context is:
 
-## Facts: what a rule can ask you about
-
-Conditions are not a fixed list. An extension declares **facts**, and every one
-becomes selectable in the rule editor — so a calendar connector gives people
-commute rules without the rule engine learning what a meeting is.
-
-```yaml
-facts:
-  - key: next_meeting_in
-    label: Next meeting starts in
-    type: duration                       # duration | number | text | boolean
-    path: source_1.next.minutes_until    # where it lives in your own data
-    unit: minutes                        # optional, shown in the editor
-```
-
-`path` is dotted, and a numeric step indexes an array:
-`transit.departures.0.delay` is the first departure's delay. It is read from
-whatever the schedule last fetched, falling back to your `sample` so a rule can
-be built and read before the first successful call.
-
-The type decides which comparisons the editor offers, so nobody can build a
-rule asking whether a duration "contains" something:
-
-| Type | Offers |
+| | |
 |---|---|
-| `duration`, `number` | is less than, is at most, is more than, is at least, has any value, is empty |
-| `text` | is, is not, contains, has any value, is empty |
-| `boolean` | is, has any value, is empty |
+| `extension.values.<field>` | this widget's settings |
+| `source_1`, `source_2`, … | what each exchange answered |
+| `notices` | things another extension wants said here |
+| `shape` | the box you are drawing into: `.id`, `.columns`, `.rows` (out of six) |
+| `dither` | `.locale`, `.timezone`, `.offset_hours` from Settings |
 
-Declare the facts someone would plausibly build a rule on, not everything you
-happen to fetch. A fact nobody can act on is noise in every condition menu.
+### Shapes
 
----
+A template is named for the shape it draws. `template.html.liquid` is the
+full screen; everything else lives in `templates/<shape>.html.liquid`:
 
-## Layout variants
+`full` · `half_width` · `half_height` · `quarter` · `third_width` ·
+`two_thirds_width` · `third_height` · `two_thirds_height`
 
-A scene divides the panel into slots and drops one extension into each. An
-extension may only be placed in a slot whose **shape** it has designed for.
+You do not need all eight. A design covers its **family** — wide bands
+(`third_height`, `half_height`, `two_thirds_height`), tall columns
+(`third_width`, `half_width`, `two_thirds_width`), `quarter`, and `full` —
+so four templates usually cover everything. An exact template always wins over
+a family match, and `shape.rows` lets one design fill a taller box:
 
-**You declare a shape by writing its template.** There is no list to keep in
-sync: `templates/half_width.html.liquid` means "this extension can occupy half
-the width", and its absence means it cannot. Nothing is ever scaled down to
-fit — an extension that was not designed for a corner is simply not offered
-for that corner.
-
-`template.html.liquid` at the root is the full-page shape and is always
-required. Everything else is optional.
-
-### The shapes
-
-| File | Covers | At 800×480 | Good for |
-|---|---|---|---|
-| `template.html.liquid` | the whole panel | 800×480 | required, always |
-| `templates/half_width.html.liquid` | ½ w × full h | 400×480 | a tall list beside something else |
-| `templates/half_height.html.liquid` | full w × ½ h | 800×240 | a wide band |
-| `templates/quarter.html.liquid` | ½ w × ½ h | 400×240 | one corner: a number and a label |
-| `templates/third_width.html.liquid` | ⅓ w × full h | 267×480 | a narrow column of short rows |
-| `templates/two_thirds_width.html.liquid` | ⅔ w × full h | 533×480 | the wide side of a sidebar split |
-| `templates/third_height.html.liquid` | full w × ⅓ h | 800×160 | a status strip |
-| `templates/two_thirds_height.html.liquid` | full w × ⅔ h | 800×320 | the tall side of a banner split |
-
-A name outside this list is a load error, not a silently ignored file. The
-canonical list lives in `lib/dither/composition.rb`.
-
-### The scenes they unlock
-
-Declaring a shape is what makes an arrangement selectable. An extension that
-only has the full-page template can only ever be a whole scene by itself.
-
-| Scene layout | Slots |
-|---|---|
-| Full page | `full` |
-| Side by side | `half_width` ×2 |
-| Stacked | `half_height` ×2 |
-| Quadrants | `quarter` ×4 |
-| Three columns | `third_width` ×3 |
-| Three rows | `third_height` ×3 |
-| Sidebar, left / right | `third_width` + `two_thirds_width` |
-| Banner and body | `third_height` + `two_thirds_height` |
-| Body and strip | `two_thirds_height` + `third_height` |
-
-Mixed scenes work the same way: to sit in the narrow side of a sidebar you
-need `third_width`, whatever fills the other side needs `two_thirds_width`.
-
-### Designing one
-
-A variant is a **different design, not the same design smaller**. The
-full-page departures board lists six rows with a title bar and a footer; the
-quarter shows one large time and one follow-up line, because that is all
-anyone can read from a corner. If a shape cannot carry your content
-meaningfully, do not write it — the extension is more useful refusing the slot
-than filling it with unreadable text.
-
-Each variant renders into a box of exactly its own size, so `100vh` and `100%`
-mean the slot, not the panel. Small shapes get tighter padding and smaller
-headings automatically; you do not have to fight the full-page defaults.
-
-Compare `public_transport/template.html.liquid` with
-`public_transport/templates/quarter.html.liquid` for a worked pair.
-
----
-
-## template.html.liquid
-
-Standard Liquid. What you get:
-
-| Variable | Contents |
-|---|---|
-| `{{ source_1 }}`, `{{ source_2 }}` … | Parsed JSON from each exchange, in order |
-| `{{ extension.values }}` | The settings the installer filled in |
-| `{{ extension.fields }}` | Field definitions, if you need metadata |
-| `{{ extension.data }}` | The extension's own editable data |
-| `{{ extension.label }}` | This extension's label |
-
-Exchange responses land in `source_N`, **not** in `extension.data` — that trips
-up everyone once. `extension.data` is the hand-editable blob on the settings
-page.
-
-Use the **Dither screen framework** classes (`lib/dither/screen_framework.css`).
-Do not link external stylesheets: the renderer has no origin, so relative URLs
-cannot resolve and a remote fetch would put someone else's CDN on the critical
-path of every render.
-
-Design for the medium. The render is dithered to 1 bit, so:
-
-- Pure black on white. Mid-greys become noise.
-- No shadows, gradients or opacity — they dither to speckle.
-- Rules at 2–3px. Hairlines disappear.
-- Big type steps. 800×480 is not much room.
-
-Useful classes:
-
-```
-.screen .screen--invert          root, and its inverted variant
-.title-bar .footer-bar           top and bottom bars
-.content                         main area
-.cols--2 .cols--3 .cols--sidebar column grids
-.stack .stack--tight .fit        vertical flow
-.list .list-item                 rows with rules between
-.stat .value .label              one big number
-.kv .k .v                        key/value line
-.badge .box .rule                inverted pill, bordered box, divider
-.t-xxl … .t-xs .t-bold .t-mono   type scale
-.truncate .clamp-2 .clamp-3      overflow control
+```liquid
+{% if shape.rows > 2 %}
+  ...the extra detail that only fits in a taller band...
+{% endif %}
 ```
 
-Always handle the empty case. An API that returns nothing should render a
-readable message, not a blank panel — you will not be there to see it fail.
+Cross-family is *refused*, not scaled: a full-screen design will never be
+crammed into a corner.
 
----
+### Drawing for 1 bit
 
-## Worked example
+The panel is black and white. There are no tints, so weight and space do the
+work opacity would elsewhere.
 
-`public_transport/` is complete and installed by default. It polls a transit
-API every five minutes and renders the next departures. To adapt it to a
-different provider, change only the exchange URL and the field paths in the
-template loop; the structure stays.
+Classes worth knowing — see `web/src/lib/render/screen-framework.css`:
 
-## Checklist before shipping one
+- Structure: `.screen`, `.title-bar`, `.content`, `.footer-bar`
+- Layout: `.layout--col`, `.layout--row`, `.layout--center`, `.cols--2/3`,
+  `.split-detail`, `.stack`, `.fit`
+- Type: `.t-xxl` … `.t-xs`, `.t-bold`, `.t-mono`, `.t-upper`, `.truncate`,
+  `.clamp-2`
+- Components: `.metric`, `.facts`, `.list`, `.timeline`, `.bars`, `.gauge`,
+  `.badge` (solid), `.chip` (outline), `.hero`, `.notice-strip`
+- Icons: `<span class="i i-rain i-lg"></span>` — 47 of them, sized `i-xs`
+  through `i-xxl`, taking the ink colour of whatever they sit in
 
-- [ ] `name` is unique and lowercase
-- [ ] No secrets in the file — anything user-specific is a `field`
-- [ ] `default` values make it render sensibly before configuration
-- [ ] `sample` data is present and shaped like the real response
-- [ ] `facts` declare what someone would build a rule on, and their paths resolve
-- [ ] The template handles empty and error responses
-- [ ] Rendered and eyeballed at 800×480 after dithering
-- [ ] Every declared variant eyeballed at *its own* size, not just full page
-- [ ] No variant written that cannot carry the content honestly
-- [ ] `bin/seed_extensions <name> --force` loads it cleanly and reports the
-      shapes you expected
+Filters that save a hundred lines of `{% case %}`:
+
+`weather_icon` · `weather_label` · `weather_short` · `compass` · `in_words` ·
+`clock_of` · `hour_of` · `as_percent` · `at_least`
+
+Two traps that have already cost time: a bar's fill must be a **block**
+element for a percentage height to apply, and a chart drawn from zero when
+every value sits between 2980 and 4260 is seven identical bars — scale between
+the low and the high instead.
+
+## Checking your work
+
+```bash
+cd web
+npx tsx --env-file=.env.local scripts/sweep.mts   # renders every extension at every shape
+```
+
+It flags anything that throws or comes back near-blank. Images land in
+`/tmp/dither-sweep` — look at them. Every layout bug in this codebase was
+found by looking.
