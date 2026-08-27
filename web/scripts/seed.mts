@@ -24,28 +24,28 @@ const WEATHER = { place: "Milan", latitude: "45.4642", longitude: "9.19", units:
 
 const home = await screenNamed("Morning", "Trains down the left, clock and weather on the right.");
 await db.insert(widgets).values([
-  { screenId: home.id, extension: "public_transport", label: "Cadorna to Saronno", settings: TRANSIT, column: 1, row: 1, columnSpan: 3, rowSpan: 6 },
-  { screenId: home.id, extension: "clock", label: "Local time", settings: { utc_offset_hours: "2", heading: "Milan" }, column: 4, row: 1, columnSpan: 3, rowSpan: 3 },
-  { screenId: home.id, extension: "weather", label: "Milan weather", settings: WEATHER, column: 4, row: 4, columnSpan: 3, rowSpan: 3 },
+  { screenId: home.id, extension: "public_transport", label: "Cadorna to Saronno", settings: TRANSIT, column: 1, row: 1, columnSpan: 6, rowSpan: 12 },
+  { screenId: home.id, extension: "clock", label: "Local time", settings: { utc_offset_hours: "2", heading: "Milan" }, column: 7, row: 1, columnSpan: 6, rowSpan: 6 },
+  { screenId: home.id, extension: "weather", label: "Milan weather", settings: WEATHER, column: 7, row: 7, columnSpan: 6, rowSpan: 6 },
 ]);
 
 const leaving = await screenNamed("Leaving now", "Departures full screen, for when a train is close.");
 await db.insert(widgets).values({
   screenId: leaving.id, extension: "public_transport", label: "Cadorna to Saronno",
-  settings: TRANSIT, column: 1, row: 1, columnSpan: 6, rowSpan: 6,
+  settings: TRANSIT, column: 1, row: 1, columnSpan: 12, rowSpan: 12,
 });
 
 const wet = await screenNamed("Wet weather", "The forecast, full screen, for when it is raining.");
 await db.insert(widgets).values({
   screenId: wet.id, extension: "weather", label: "Milan weather",
-  settings: WEATHER, column: 1, row: 1, columnSpan: 6, rowSpan: 6,
+  settings: WEATHER, column: 1, row: 1, columnSpan: 12, rowSpan: 12,
 });
 
 const meetings = await screenNamed("Meetings", "What is next, with the day's list beside it.");
 await db.insert(widgets).values({
   screenId: meetings.id, extension: "google_calendar", label: "My calendar",
   settings: { calendar: "primary", horizon_hours: 12, heading: "Today", show_location: true },
-  column: 1, row: 1, columnSpan: 6, rowSpan: 6,
+  column: 1, row: 1, columnSpan: 12, rowSpan: 12,
 });
 
 const [device] = await db

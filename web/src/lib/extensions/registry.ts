@@ -4,7 +4,15 @@ import type { Dirent } from "node:fs";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 
-import { isShapeId, SHAPES, standIn, type ShapeId } from "@/lib/shapes";
+import {
+  chooseDesign,
+  designsFor,
+  largestDrawable,
+  presetDesign,
+  supportsSize as sizeIsDrawable,
+  type Design,
+} from "@/lib/designs";
+import { PRESETS, type Size } from "@/lib/shapes";
 import { manifestSchema, type Manifest } from "./manifest";
 
 /**
@@ -27,13 +35,11 @@ export interface Extension {
   name: string;
   directory: string;
   /**
-   * Sizes this extension can be drawn at: the ones it authored, plus the rest
-   * of each family it authored into. See `standIn` in lib/shapes.
+   * The looks it offers, each with the range of sizes it draws. Assembled from
+   * the templates on disk plus whatever the manifest declares about them.
    */
-  shapes: ShapeId[];
-  /** Sizes it has a template of its own for. */
-  authored: ShapeId[];
-  /** Template source per shape, already read. */
+  designs: Design[];
+  /** Template source per design key, already read. */
   templates: Record<string, string>;
   /**
    * A short hash of the manifest and every template.
@@ -58,9 +64,8 @@ let problems: ExtensionProblem[] = [];
 
 async function readTemplates(directory: string) {
   const templates: Record<string, string> = {};
-  const unknown: string[] = [];
 
-  // A root template.html.liquid is the full-screen design.
+  // A root template.html.liquid is the design key `full`.
   try {
     templates.full = await readFile(path.join(directory, FULL_TEMPLATE), "utf8");
   } catch {
@@ -71,25 +76,84 @@ async function readTemplates(directory: string) {
   try {
     entries = await readdir(path.join(directory, "templates"));
   } catch {
-    return { templates, unknown };
+    return templates;
   }
 
   for (const entry of entries) {
     if (!entry.endsWith(TEMPLATE_SUFFIX)) continue;
+    templates[entry.slice(0, -TEMPLATE_SUFFIX.length)] = await readFile(
+      path.join(directory, "templates", entry),
+      "utf8",
+    );
+  }
 
-    const shape = entry.slice(0, -TEMPLATE_SUFFIX.length);
+  return templates;
+}
 
-    // An unrecognised name is reported rather than ignored: a typo that
-    // silently drops a design is the kind of bug that wastes an afternoon.
-    if (!isShapeId(shape)) {
-      unknown.push(entry);
+/**
+ * Turning templates on disk into designs.
+ *
+ * A template earns a size range one of two ways: the manifest declares one for
+ * it, or its filename is one of the original shape names and it inherits that
+ * shape's range. A template that is neither is reported rather than ignored,
+ * because a typo that silently drops a design is the kind of bug that wastes
+ * an afternoon.
+ *
+ * A declaration for a template that does not exist is reported too, and for
+ * the same reason in reverse.
+ */
+function assemble(manifest: Manifest, templates: Record<string, string>) {
+  const designs: Design[] = [];
+  const complaints: string[] = [];
+  const declared = new Map(manifest.designs.map((design) => [design.template, design]));
+
+  for (const [key, declaration] of declared) {
+    if (key in templates) continue;
+    complaints.push(
+      `designs declares "${key}" but there is no templates/${key}${TEMPLATE_SUFFIX}` +
+        (key === "full" ? ` or ${FULL_TEMPLATE}` : "") +
+        `, so "${declaration.label}" was not loaded.`,
+    );
+  }
+
+  for (const key of Object.keys(templates).sort()) {
+    const declaration = declared.get(key);
+
+    if (declaration) {
+      const nominal = declaration.nominal ?? [
+        Math.round((declaration.columns[0] + declaration.columns[1]) / 2),
+        Math.round((declaration.rows[0] + declaration.rows[1]) / 2),
+      ];
+
+      designs.push({
+        key,
+        label: declaration.label,
+        hint: declaration.hint,
+        range: {
+          minColumns: Math.min(...declaration.columns),
+          maxColumns: Math.max(...declaration.columns),
+          minRows: Math.min(...declaration.rows),
+          maxRows: Math.max(...declaration.rows),
+        },
+        nominal: { columns: nominal[0], rows: nominal[1] },
+        declared: true,
+      });
       continue;
     }
 
-    templates[shape] = await readFile(path.join(directory, "templates", entry), "utf8");
+    const fallback = presetDesign(key);
+    if (fallback) {
+      designs.push(fallback);
+      continue;
+    }
+
+    complaints.push(
+      `templates/${key}${TEMPLATE_SUFFIX} is not one of the original shape names and no ` +
+        `designs entry gives it a size range, so it was not loaded.`,
+    );
   }
 
-  return { templates, unknown };
+  return { designs, complaints };
 }
 
 async function load(): Promise<Map<string, Extension>> {
@@ -126,23 +190,18 @@ async function load(): Promise<Map<string, Extension>> {
       continue;
     }
 
-    const { templates, unknown } = await readTemplates(directory);
-    const authored = (Object.keys(templates) as ShapeId[]).filter(isShapeId);
-    const shapes = SHAPES.map((shape) => shape.id).filter(
-      (shape) => standIn(shape, authored) !== undefined,
-    );
+    const templates = await readTemplates(directory);
+    const { designs, complaints } = assemble(parsed.data, templates);
 
-    const extensionProblems = unknown.map(
-      (file) => `templates/${file} is not a shape Dither knows; it was not loaded.`,
-    );
-    if (!authored.length && !parsed.data.facts.length) {
-      extensionProblems.push("No templates and no facts, so it can neither be shown nor decided on.");
+    const extensionProblems = [...complaints];
+    if (!designs.length && !parsed.data.facts.length) {
+      extensionProblems.push("No designs and no facts, so it can neither be shown nor decided on.");
     }
     extensionProblems.forEach((message) => problems.push({ extension: entry.name, message }));
 
     const digest = createHash("sha256")
       .update(JSON.stringify(parsed.data))
-      .update(Object.entries(templates).sort().map(([shape, source]) => shape + source).join(""))
+      .update(Object.entries(templates).sort().map(([key, source]) => key + source).join(""))
       .digest("hex")
       .slice(0, 12);
 
@@ -151,8 +210,7 @@ async function load(): Promise<Map<string, Extension>> {
       digest,
       name: parsed.data.name,
       directory,
-      shapes,
-      authored,
+      designs,
       templates,
       problems: extensionProblems,
     });
@@ -184,27 +242,61 @@ export function defaultSettings(extension: Extension): Record<string, unknown> {
   );
 }
 
-export function supportsShape(extension: Extension, shape: string): boolean {
-  return extension.shapes.includes(shape as ShapeId);
+/** Whether this extension will draw itself at this size at all. */
+export function supportsSize(extension: Extension, size: Size): boolean {
+  return sizeIsDrawable(extension.designs, size);
 }
 
-/** The template that should draw `shape`, exact or the nearest in its family. */
-export function templateFor(extension: Extension, shape: string): string | undefined {
-  const chosen = standIn(shape as ShapeId, extension.authored);
-  return chosen ? extension.templates[chosen] : undefined;
+/** The looks available at a size, least strained first. Empty means refused. */
+export function stylesAt(extension: Extension, size: Size): Design[] {
+  return designsFor(extension.designs, size);
+}
+
+/** The design that will actually draw this widget. */
+export function designAt(extension: Extension, size: Size, wanted?: string): Design | undefined {
+  return chooseDesign(extension.designs, size, wanted);
+}
+
+/** The template that should draw a size, honouring the style asked for. */
+export function templateFor(
+  extension: Extension,
+  size: Size,
+  wanted?: string,
+): { design: Design; source: string } | undefined {
+  const design = designAt(extension, size, wanted);
+  if (!design) return undefined;
+
+  const source = extension.templates[design.key];
+  return source === undefined ? undefined : { design, source };
 }
 
 /**
- * Whether the design that draws this shape has somewhere to put a notice.
+ * The biggest size it can draw, for a catalogue thumbnail.
+ *
+ * Cards show the largest design, because a corner design shrunk into a card is
+ * unreadable and tells you nothing about the extension.
+ */
+export function headlineSize(extension: Extension): Size {
+  return largestDrawable(extension.designs) ?? { columns: 12, rows: 12 };
+}
+
+/** The named sizes this extension can be drawn at, for pickers and catalogues. */
+export function presetsFor(extension: Extension): string[] {
+  return PRESETS.filter((entry) => supportsSize(extension, entry)).map((entry) => entry.id);
+}
+
+/**
+ * Whether the design that draws this size has somewhere to put a notice.
  *
  * `accepts_notices` on the manifest is the author's intent; this is whether
  * the template that will actually run renders them. The two can differ,
- * because a shape may be drawn by a stand-in from its family, and because an
- * author can forget the block. What matters to a screen is the second one.
+ * because a size may be drawn by a design authored for a different one, and
+ * because an author can forget the block. What matters to a screen is the
+ * second one.
  */
-export function rendersNotices(extension: Extension, shape: string): boolean {
+export function rendersNotices(extension: Extension, size: Size, wanted?: string): boolean {
   if (!extension.manifest.accepts_notices) return false;
 
-  const template = templateFor(extension, shape);
-  return template !== undefined && /\bnotices\b/.test(template);
+  const chosen = templateFor(extension, size, wanted);
+  return chosen !== undefined && /\bnotices\b/.test(chosen.source);
 }

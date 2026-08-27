@@ -12,7 +12,7 @@ import {
 } from "./compose";
 import { find as findExtension } from "@/lib/extensions/registry";
 import { floydSteinberg, grayPalette, paletteFromCodes } from "./dither";
-import { COLUMNS, ROWS, pixelsFor, shape } from "@/lib/shapes";
+import { COLUMNS, ROWS, pixelsFor, type Size } from "@/lib/shapes";
 import { environment } from "@/lib/settings";
 
 /**
@@ -82,6 +82,9 @@ export async function fingerprint(
         extension: widget.extension,
         settings: widget.settings,
         data: widget.data,
+        // The style is a choice, and a different choice is a different
+        // picture at the same size - so it belongs in the key.
+        design: widget.design ?? "",
         at: [widget.column, widget.row, widget.columnSpan, widget.rowSpan],
       }))
       .sort((a, b) => a.at[0] - b.at[0] || a.at[1] - b.at[1]),
@@ -173,11 +176,12 @@ export async function renderEmpty(
  */
 export async function renderSolo(
   extensionName: string,
-  shapeId: string,
+  size: Size,
   settings: Record<string, unknown>,
   data: Record<string, unknown>,
   panel: Panel,
   notices: Notice[] = [],
+  design?: string,
 ): Promise<Rendered> {
   const widget: PlacedWidget = {
     id: 0,
@@ -185,22 +189,20 @@ export async function renderSolo(
     label: extensionName,
     settings,
     data,
+    design,
     column: 1,
     row: 1,
     columnSpan: COLUMNS,
     rowSpan: ROWS,
   };
 
-  const shaped = shape(shapeId);
-  if (!shaped) throw new Error(`Unknown shape: ${shapeId}`);
-
-  const [width, height] = pixelsFor(shaped, panel.width, panel.height);
+  const [width, height] = pixelsFor(size, panel.width, panel.height);
 
   // The solo panel *is* the widget's box, so the widget fills the grid and the
-  // shape it renders at comes from the size of the panel, not from its span.
+  // size it renders at comes from the panel, not from its span.
   const { html, problems } = await composeSolo(
     widget,
-    shapeId,
+    size,
     width,
     height,
     await environment(),

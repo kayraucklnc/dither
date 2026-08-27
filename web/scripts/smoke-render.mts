@@ -16,7 +16,7 @@ const panel: Panel = {
 };
 
 const extensions = await all();
-console.log("loaded:", extensions.map((e) => `${e.name} [${e.shapes.join(", ")}]`).join("\n        "));
+console.log("loaded:", extensions.map((e) => `${e.name} [${e.designs.map((d) => d.key).join(", ")}]`).join("\n        "));
 
 const widget = (
   name: string,

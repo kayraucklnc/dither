@@ -4,8 +4,9 @@ import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { screens, widgets } from "@/lib/db/schema";
-import { find as findExtension } from "@/lib/extensions/registry";
-import { COLUMNS, ROWS, fits, overlaps, shapeForSize } from "@/lib/shapes";
+import { find as findExtension, supportsSize } from "@/lib/extensions/registry";
+import { refusal } from "@/lib/designs";
+import { COLUMNS, ROWS, fits, overlaps, sizeOf } from "@/lib/shapes";
 
 const widgetSchema = z.object({
   id: z.number().optional(),
@@ -16,6 +17,8 @@ const widgetSchema = z.object({
   row: z.number().int().min(1).max(ROWS),
   columnSpan: z.number().int().min(1).max(COLUMNS),
   rowSpan: z.number().int().min(1).max(ROWS),
+  /** Which of the extension's designs draws it. Empty means "whichever fits". */
+  design: z.string().default(""),
   /** Pinned as the screen's alert area. */
   hostsNotices: z.boolean().default(false),
 });
@@ -44,20 +47,14 @@ async function problemsIn(incoming: z.infer<typeof widgetSchema>[]): Promise<str
       continue;
     }
 
-    const shape = shapeForSize(widget.columnSpan, widget.rowSpan);
-    if (!shape) {
-      problems.push(`${name} is ${widget.columnSpan}x${widget.rowSpan}, which is not a shape.`);
-      continue;
-    }
-
     const extension = await findExtension(widget.extension);
     if (!extension) {
       problems.push(`${widget.extension} is not installed.`);
       continue;
     }
 
-    if (!extension.shapes.includes(shape.id)) {
-      problems.push(`${extension.manifest.label} has no ${shape.label.toLowerCase()} design.`);
+    if (!supportsSize(extension, sizeOf(widget))) {
+      problems.push(refusal(extension.manifest.label, sizeOf(widget), extension.designs));
     }
 
     const collision = incoming
@@ -116,6 +113,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         row: widget.row,
         columnSpan: widget.columnSpan,
         rowSpan: widget.rowSpan,
+        design: widget.design,
         hostsNotices: widget.hostsNotices,
         updatedAt: new Date(),
       };

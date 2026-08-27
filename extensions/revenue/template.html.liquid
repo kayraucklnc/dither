@@ -1,95 +1,142 @@
-{% comment %} Full: 800x480. Today's number, the week behind it, the breakdown. {% endcomment %}
+{% comment %}
+  Board — the whole account at once, for a box that has the room for it.
 
-{% assign money = revenue %}
-{% assign rich = true %}
-{% if extension.values.style == "compact" %}{% assign rich = false %}{% endif %}
+  The headline the widget was pointed at on the left, everything else the
+  account can say on the right, and a month of trading underneath. Declared for
+  8x8 upwards, which at 800x480 is 533x320 pixels; below that the rows stop
+  being readable and the Ledger or Figure design takes over instead.
+{% endcomment %}
+
+{%- assign money = revenue -%}
+{%- assign metric = extension.values.metric | default: "taken" -%}
+{%- assign period = extension.values.window | default: "today" -%}
+{%- if metric == "taken" -%}
+  {%- assign card = money.windows[period] -%}
+{%- elsif metric == "next_subscriber" and extension.values.basis == "renewal" -%}
+  {%- assign card = money.cards.next_renewal -%}
+{%- else -%}
+  {%- assign card = money.cards[metric] -%}
+{%- endif -%}
+
+{%- assign chart = extension.values.chart | default: "auto" -%}
+{%- if chart == "week" -%}
+  {%- assign series = money.week -%}
+{%- elsif chart == "month" -%}
+  {%- assign series = money.days -%}
+{%- elsif card.bars == "week" -%}
+  {%- assign series = money.week -%}
+{%- else -%}
+  {%- assign series = money.days -%}
+{%- endif -%}
+
+{%- assign box_h = shape.height | at_least: 240 -%}
 
 <div class="screen">
-  <div class="title-bar">
+  <div class="title-bar" style="padding: {{ box_h | divided_by: 26 | at_least: 10 | at_most: 24 }}px 24px 10px">
     <div class="title">{{ extension.values.heading | default: "Revenue" }}</div>
     <div class="chip self-start">
-      <span class="i i-card"></span>{{ money.currency }}
+      <span class="i i-card"></span>{{ money.currency | default: "Stripe" }}
     </div>
   </div>
 
-  {% if money == nil %}
+  {%- unless card -%}
     <div class="content layout layout--col layout--center" style="gap: 8px">
       <span class="i i-card i-xl"></span>
       <p class="t-lg t-bold">Not connected</p>
-      <p class="t-sm">Link Stripe under Connections.</p>
+      <p class="t-sm">Paste a Stripe secret key under Connections and this fills in.</p>
     </div>
-  {% else %}
-    <div class="content">
+  {%- else -%}
+    {%- assign shown = card.symbol | append: card.figure -%}
+    {%- assign chars = shown | size | at_least: 3 -%}
+    {%- comment %} The left column is a little over half the panel. {% endcomment -%}
+    {%- assign by_width = shape.width | at_least: 400 | times: 52 | divided_by: 100 | times: 100 | divided_by: chars | divided_by: 56 -%}
+    {%- assign figure_size = by_width | at_most: 82 | at_least: 22 -%}
+
+    <div class="content" style="padding: 16px 24px">
       <div class="split-detail">
         <div class="stack fit" style="justify-content: center; gap: 8px">
-          <p class="caption">Taken today</p>
-          <p class="t-bold" style="font-size: 76px; line-height: 1; letter-spacing: -0.03em">
-            {{ money.symbol }}{{ money.today }}
+          <p class="caption t-bold t-upper" style="font-size: 14px; letter-spacing: 0.06em">{{ card.caption }}</p>
+          <p class="t-bold" style="font-size: {{ figure_size }}px; line-height: 1; letter-spacing: -0.03em">
+            {{ shown }}
           </p>
-          <p class="with-icon t-md t-bold">
-            <span class="i i-trending-{% if money.change_percent >= 0 %}up{% else %}down{% endif %} i-sm"></span>
-            {{ money.change_percent }}% on yesterday
-          </p>
-          <p class="t-sm">{{ money.payments_today }} payments</p>
+          {% if extension.values.compare != false and card.delta != blank %}
+            <p class="with-icon t-md t-bold">
+              <span class="i i-trending-{% if card.rising %}up{% else %}down{% endif %} i-sm"></span>
+              {{ card.delta }}
+            </p>
+          {% endif %}
+          {% if card.detail != blank %}<p class="t-sm">{{ card.detail }}</p>{% endif %}
         </div>
 
         <div class="stack fit" style="justify-content: center">
           <div class="facts">
             <div class="row">
-              <span class="name"><span class="i i-chart i-xs"></span>Month to date</span>
-              <span class="figure">{{ money.symbol }}{{ money.month_to_date }}</span>
+              <span class="name"><span class="i i-refresh i-xs"></span>MRR</span>
+              <span class="figure">{{ money.mrr_text }}</span>
             </div>
             <div class="row">
-              <span class="name"><span class="i i-users i-xs"></span>New customers</span>
-              <span class="figure">{{ money.new_customers }}</span>
+              <span class="name"><span class="i i-users i-xs"></span>Subscribers</span>
+              <span class="figure">{{ money.cards.subscribers.figure }}</span>
             </div>
             <div class="row">
-              <span class="name"><span class="i i-close i-xs"></span>Failed</span>
-              <span class="figure">{{ money.failed_today }}</span>
+              <span class="name"><span class="i i-users i-xs"></span>Customers</span>
+              <span class="figure">{{ money.cards.customers.figure }}</span>
             </div>
             <div class="row">
-              <span class="name"><span class="i i-receipt i-xs"></span>Yesterday</span>
-              <span class="figure">{{ money.symbol }}{{ money.yesterday }}</span>
+              <span class="name"><span class="i i-hourglass i-xs"></span>Next subscriber</span>
+              <span class="figure">{{ money.next_subscriber.in_words }}</span>
             </div>
+            <div class="row">
+              <span class="name"><span class="i i-chart i-xs"></span>30 days</span>
+              <span class="figure">{{ money.windows.last_30d.text }}</span>
+            </div>
+            {% if shape.rows > 9 %}
+              <div class="row">
+                <span class="name"><span class="i i-close i-xs"></span>Failed today</span>
+                <span class="figure">{{ money.failed_today }}</span>
+              </div>
+            {% endif %}
           </div>
         </div>
       </div>
     </div>
 
-    {% if rich and extension.values.show_week and money.week %}
-      {% comment %}
-        Scaled between the quietest and the busiest day, not from zero. A week
-        that runs 2980 to 4260 drawn from zero is seven bars of the same
-        height, which says nothing about the week.
-      {% endcomment %}
-      {% assign peak = 0 %}
-      {% assign trough = 99999999 %}
-      {% for day in money.week %}
-        {% if day.amount > peak %}{% assign peak = day.amount %}{% endif %}
-        {% if day.amount < trough %}{% assign trough = day.amount %}{% endif %}
-      {% endfor %}
-      {% assign span = peak | minus: trough %}
-      {% if span <= 0 %}{% assign span = 1 %}{% endif %}
+    {%- assign peak = 0 -%}
+    {%- assign trough = 999999999 -%}
+    {%- for point in series -%}
+      {%- if point.amount > peak %}{% assign peak = point.amount %}{% endif -%}
+      {%- if point.amount < trough %}{% assign trough = point.amount %}{% endif -%}
+    {%- endfor -%}
+    {%- assign span = peak | minus: trough -%}
+    {%- if span <= 0 %}{% assign span = 1 %}{% endif -%}
+    {%- assign count = series | size -%}
 
-      <div style="border-top: var(--rule) solid var(--ink); height: 116px; padding: 10px var(--pad) 8px">
-        <div class="bars">
-          {% for day in money.week %}
-            <div class="bar">
-              <span class="tick t-bold">{{ day.amount }}</span>
-              <span class="fill{% if forloop.last %}{% else %} fill--hatch{% endif %}"
-                    style="height: {{ day.amount | minus: trough | times: 76 | divided_by: span | plus: 18 }}%"></span>
-              <span class="tick">{{ day.day }}</span>
-            </div>
-          {% endfor %}
-        </div>
+    <div style="border-top: var(--rule) solid var(--ink); height: {{ box_h | divided_by: 4 | at_least: 88 | at_most: 130 }}px; padding: 10px var(--pad) 8px">
+      <div class="bars" style="gap: {% if count > 12 %}2{% else %}4{% endif %}px">
+        {% for point in series %}
+          <div class="bar">
+            {% if count <= 8 %}<span class="tick t-bold">{{ point.amount }}</span>{% endif %}
+            <span class="fill{% unless forloop.last %} fill--hatch{% endunless %}"
+                  style="height: {{ point.amount | minus: trough | times: 74 | divided_by: span | plus: 16 }}%"></span>
+            {%- comment %} A filter cannot appear inside an `if`, so the test is
+              assigned first. Every fifth day is labelled when there are thirty
+              of them; a week gets every one. {% endcomment -%}
+            {%- assign nth = forloop.index0 | modulo: 5 -%}
+            {% if count <= 8 or nth == 0 %}
+              <span class="tick">{{ point.day }}</span>
+            {% else %}
+              <span class="tick">&nbsp;</span>
+            {% endif %}
+          </div>
+        {% endfor %}
       </div>
-    {% endif %}
-  {% endif %}
+    </div>
+  {%- endunless -%}
 
   {% comment %}
     Where another extension gets to say something on this screen. Glyphs like
     dashboard warning lights, with the loudest one's words beside them when the
-    shape is wide enough to carry them.
+    box is wide enough to carry them.
   {% endcomment %}
   {% if notices.size > 0 %}
     <div class="notice-strip">
@@ -103,7 +150,7 @@
         {% endif %}
       {% endfor %}
 
-      {% if shape.columns >= 6 and notices[0].text != blank %}
+      {% if shape.wide and notices[0].text != blank %}
         <span class="notice-said">{{ notices[0].text }}</span>
       {% endif %}
     </div>

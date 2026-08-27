@@ -30,6 +30,15 @@ const body = z.object({
       row: z.number(),
       columnSpan: z.number(),
       rowSpan: z.number(),
+      /**
+       * The style chosen for this widget.
+       *
+       * It has to be declared here or zod strips it, and then the editor draws
+       * the design it would have chosen anyway - so picking a style changes
+       * the thumbnail beside the picker and nothing on the canvas.
+       */
+      design: z.string().default(""),
+      hostsNotices: z.boolean().default(false),
     }),
   ),
 });

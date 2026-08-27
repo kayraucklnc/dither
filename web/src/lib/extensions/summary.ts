@@ -1,6 +1,12 @@
 import { requiredBy } from "@/lib/connections";
-import { all, rendersNotices, type Extension } from "@/lib/extensions/registry";
-import type { ShapeId } from "@/lib/shapes";
+import {
+  all,
+  headlineSize,
+  presetsFor,
+  rendersNotices,
+  type Extension,
+} from "@/lib/extensions/registry";
+import { PRESETS, type Size } from "@/lib/shapes";
 
 /** What a page needs to know about an extension, without its templates. */
 export interface ExtensionSummary {
@@ -10,21 +16,19 @@ export interface ExtensionSummary {
   kind: "static" | "poll" | "transit" | "connection";
   interval: number;
   unit: string;
-  shapes: ShapeId[];
-  /** The largest shape it can draw, which is what a card shows. */
-  headline: ShapeId;
+  /** The named sizes it can be drawn at. Only ever for counting and pickers. */
+  presets: string[];
+  /** How many looks it offers, which is the number worth showing on a card. */
+  designCount: number;
+  /** The largest size it can draw, which is what a card shows. */
+  headline: Size;
   settingCount: number;
   factCount: number;
-  /** How many of its sizes have somewhere to show another extension's alert. */
+  /** How many of its named sizes have somewhere to show another extension's alert. */
   noticeShapes: number;
   connection?: { id: string; label: string; mocked: boolean };
   problems: string[];
 }
-
-const AREA: Record<string, number> = {
-  full: 36, two_thirds_height: 24, half_width: 18, half_height: 18,
-  two_thirds_width: 24, quarter: 9, third_height: 12, third_width: 12,
-};
 
 export function summarise(extension: Extension): ExtensionSummary {
   const connection = requiredBy(extension.manifest);
@@ -36,13 +40,16 @@ export function summarise(extension: Extension): ExtensionSummary {
     kind: extension.manifest.kind,
     interval: extension.manifest.interval,
     unit: extension.manifest.unit,
-    shapes: extension.shapes,
-    // Cards show the biggest design, because a quarter shrunk into a card is
-    // unreadable and tells you nothing about the extension.
-    headline: [...extension.shapes].sort((a, b) => (AREA[b] ?? 0) - (AREA[a] ?? 0))[0],
+    presets: presetsFor(extension),
+    designCount: extension.designs.length,
+    // Cards show the biggest design, because a corner design shrunk into a card
+    // is unreadable and tells you nothing about the extension.
+    headline: headlineSize(extension),
     settingCount: extension.manifest.fields.length,
     factCount: extension.manifest.facts.length,
-    noticeShapes: extension.shapes.filter((shape) => rendersNotices(extension, shape)).length,
+    noticeShapes: PRESETS.filter(
+      (size) => presetsFor(extension).includes(size.id) && rendersNotices(extension, size),
+    ).length,
     connection: connection
       ? { id: connection.id, label: connection.label, mocked: connection.mocked }
       : undefined,

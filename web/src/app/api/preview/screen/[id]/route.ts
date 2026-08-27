@@ -68,6 +68,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     row: row.row,
     columnSpan: row.columnSpan,
     rowSpan: row.rowSpan,
+    design: row.design,
     hostsNotices: row.hostsNotices,
   }));
 

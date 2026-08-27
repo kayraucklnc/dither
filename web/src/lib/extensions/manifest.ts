@@ -57,6 +57,20 @@ export const fieldSchema = z.object({
    * the operator ignores is worse than a missing one.
    */
   needs_capability: z.string().optional(),
+  /**
+   * Hide this field unless another answer has one of these values.
+   *
+   * This is what makes a settings form follow the choice already made rather
+   * than showing every question at once: pick "money taken" and a window
+   * appears; pick "how many subscribers" and it does not, because there is no
+   * such thing as subscribers over the last seven days.
+   *
+   * `field` is another field's keyname, or the reserved word `design` for the
+   * style the widget is drawn with - so a design can bring its own settings.
+   */
+  visible_when: z
+    .object({ field: z.string().min(1), any_of: z.array(z.string()).min(1) })
+    .optional(),
   min: z.number().optional(),
   max: z.number().optional(),
 });
@@ -124,6 +138,30 @@ export const noticeSchema = z.object({
 
 export type NoticeSuggestion = z.infer<typeof noticeSchema>;
 
+/**
+ * One design: a template, and the sizes it will be drawn at.
+ *
+ * A design is not a size - it is a look, offered across a range of sizes. Two
+ * designs whose ranges overlap are two styles of the same widget at the same
+ * size, and the widget picks between them. Where a manifest declares nothing,
+ * a template named after one of the original shapes gets that shape's range,
+ * so every extension written before this kept working unedited.
+ *
+ * `columns` and `rows` are [smallest, largest] out of twelve.
+ */
+export const designSchema = z.object({
+  /** Template stem under templates/, or `full` for the root template. */
+  template: z.string().min(1),
+  label: z.string().min(1),
+  hint: z.string().default(""),
+  columns: z.tuple([z.number().int().min(1).max(12), z.number().int().min(1).max(12)]),
+  rows: z.tuple([z.number().int().min(1).max(12), z.number().int().min(1).max(12)]),
+  /** The size it was really drawn for. Decides which design wins a tie. */
+  nominal: z.tuple([z.number().int().min(1).max(12), z.number().int().min(1).max(12)]).optional(),
+});
+
+export type DesignDeclaration = z.infer<typeof designSchema>;
+
 export const manifestSchema = z.object({
   version: z.string().default("1.0.0"),
   name: z.string().min(1),
@@ -148,6 +186,13 @@ export const manifestSchema = z.object({
   /** How often data is refetched. `unit: none` means never. */
   interval: z.number().default(15),
   unit: z.enum(["none", "minute", "hour", "day"]).default("minute"),
+
+  /**
+   * The looks this extension offers, and the sizes each covers. Empty means
+   * every template is named after one of the original shapes and takes that
+   * shape's range.
+   */
+  designs: z.array(designSchema).default([]),
 
   fields: z.array(fieldSchema).default([]),
   /** Where "what can these settings do" is answered, for `needs_capability`. */
