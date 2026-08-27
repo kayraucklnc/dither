@@ -175,13 +175,26 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
   morning the clocks change, the naive answer is an hour into the previous day.
   See `web/src/lib/clock.ts`.
 
-- **A picture is dithered once, at the end, or it is moire.** The render
-  pipeline finishes in Floyd-Steinberg over the whole panel, so `as_image`
-  hands the template *grey* - as many levels as the source has. Dither it on
-  the way in and the browser resamples a stipple that then gets stippled
-  again. Same rule as gradients, applied to a photograph. And enlarge pixel
-  art with `nearest`: Lanczos turns a 524-pixel drawing into a blur, and a
-  blur dithers into mush. See `web/src/lib/gallery/prepare.ts`.
+- **A picture is dithered once, and only where it is placed one pixel for
+  one.** The pipeline finishes in Floyd-Steinberg over the whole panel, so by
+  default `as_image` hands the template *grey*. A picture may be reduced
+  earlier - that is what the gallery's screens are, and a dot screen has to
+  land on the picture's own pixels to be a dot screen at all - but only
+  because every design asks for its crop at the exact size of its box. At any
+  other size the browser resamples the marks back into greys and the page
+  dither finds them again, which is the moire. It is why the contact sheet
+  lays its grid out in pixels rather than in `1fr`, and why the print design's
+  arithmetic has to include the gap under the plate. And enlarge pixel art
+  with `nearest`: Lanczos turns a 524-pixel drawing into a blur, and a blur
+  dithers into mush. See `web/src/lib/gallery/screen.ts`.
+- **A dot screen measures a region, and its geometry is counted, not
+  derived.** Sampling the middle pixel of each cell turns a picture that is
+  already a printed halftone into confetti - the middle pixel is black or
+  white at random - so the tone is a box average. And "area of a circle" gets
+  the dot size wrong at both ends: a circle cannot fill a square, so solid
+  black prints 92% black with paper in the corners, and enlarging the radius
+  until it can makes every mid tone muddy. The table of radii is built by
+  sorting sampled distances, so coverage is linear by construction.
 - **A picture is cropped to the widget, not to the panel.** Sizes are free, so
   the rectangle worth taking out of a photograph at 12x12 is not the one worth
   taking at 3x12. The template is the first thing that knows which box it got,

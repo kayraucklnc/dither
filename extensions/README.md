@@ -332,11 +332,22 @@ And one that reads the disk:
 ```
 
 `as_image` turns a picture id from the `gallery` provider into a data URI,
-cropped to the box you hand it and left as grey for the panel's own dither.
-It takes `fit` (`fill` or `whole`), `tone` and `invert` as well, and renders
-empty for an id that no longer resolves - a folder someone tidied should leave
-a gap in a design rather than take the screen down. A screenshotted page has no
-origin, which is why it is inlined rather than linked. See docs/gallery.md.
+cropped to the box you hand it. It also takes `fit` (`fill` or `whole`),
+`focus`, `brightness`, `contrast`, `invert`, and a `screen` - `panel`,
+`diffusion`, `atkinson`, `ordered`, `halftone` or `noise` - with `marks` for
+how many pixels one mark of that screen covers.
+
+**Always hand it the real pixel size of the box.** With no screen it returns
+grey and the page dither does the rest, so a rough size only costs sharpness.
+With one, it returns black and white, and that only survives if the design
+places it one pixel for one - anything else resamples the marks back into greys
+for the page dither to find. It is why the contact sheet lays its grid out in
+pixels rather than in `1fr`.
+
+An id that no longer resolves renders empty - a folder someone tidied should
+leave a gap in a design rather than take the screen down. A screenshotted page
+has no origin, which is why it is inlined rather than linked. See
+docs/gallery.md.
 
 And for anything that draws time or geometry:
 

@@ -101,13 +101,56 @@ fields:
       is a collection too, called Loose.
     optional: true
 
+  - keyname: pick
+    name: Show
+    field_type: select
+    default: rotate
+    options:
+      - value: rotate
+        label: A rotation through the collection
+      - value: one
+        label: Just one picture, that I choose
+    optional: true
+
+  - keyname: pinned
+    name: Which picture
+    field_type: select
+    default: ""
+    options_from: gallery.pictures
+    visible_when:
+      field: pick
+      any_of: [one]
+    help_text: Leave it blank and it shows the first in the collection.
+    optional: true
+
+  - keyname: orientation
+    name: Only pictures that are
+    field_type: select
+    default: any
+    options:
+      - value: any
+        label: Any shape
+      - value: landscape
+        label: Landscape - wider than tall
+      - value: portrait
+        label: Portrait - taller than wide
+      - value: square
+        label: Square
+    visible_when:
+      field: pick
+      any_of: [rotate]
+    help_text: >
+      The most useful filter here, because nearly everything in this idiom was
+      made portrait for a phone and a panel is widescreen. A rotation of
+      portrait pictures on a landscape wallpaper is a rotation of crops, and
+      the honest fix is not a cleverer crop.
+    optional: true
+
   - keyname: hold
-    name: Change the picture
+    name: Change it
     field_type: select
     default: hour
     options:
-      - value: never
-        label: Never - show one picture
       - value: quarter
         label: Every quarter of an hour
       - value: hour
@@ -116,23 +159,13 @@ fields:
         label: Twice a day
       - value: day
         label: Daily
+    visible_when:
+      field: pick
+      any_of: [rotate]
     help_text: >
       A panel is only redrawn every quarter of an hour or so, so nothing faster
       than that is worth asking for - and every change costs the device a redraw
       and a little battery.
-    optional: true
-
-  - keyname: pinned
-    name: Which one
-    field_type: select
-    default: ""
-    options_from: gallery.pictures
-    visible_when:
-      field: hold
-      any_of: [never]
-    help_text: >
-      Leave it blank and the collection picks for you and then stops. Name one
-      and it is that one until you say otherwise.
     optional: true
 
   - keyname: order
@@ -145,8 +178,8 @@ fields:
       - value: sequence
         label: In turn - the order they are filed in
     visible_when:
-      field: hold
-      any_of: [quarter, hour, half_day, day]
+      field: pick
+      any_of: [rotate]
     optional: true
 
   # Everything below only changes how the picture is drawn, never which one is
@@ -163,28 +196,100 @@ fields:
         label: Fill it - crop to the shape of the box
       - value: whole
         label: Whole picture - fit it in, paper either side
-    help_text: >
-      Filling crops around whatever is most detailed in the picture, which is
-      what makes a portrait photograph work on a widescreen panel.
     optional: true
 
-  - keyname: tone
-    name: Tone
+  - keyname: focus
+    name: What to keep
     field_type: select
-    default: as_is
+    default: auto
     presentation: true
     options:
-      - value: as_is
-        label: As it is
-      - value: lift
-        label: Lift - for anything that comes out muddy
-      - value: deepen
-        label: Deepen - harder contrast, fewer greys
-      - value: flatten
-        label: Flatten - softer, more of the middle
+      - value: auto
+        label: Whatever is busiest
+      - value: centre
+        label: The middle
+      - value: top
+        label: The top
+      - value: bottom
+        label: The bottom
+      - value: left
+        label: The left
+      - value: right
+        label: The right
+    visible_when:
+      field: fit
+      any_of: [fill]
     help_text: >
-      The panel's paper is brighter and its ink weaker than any screen's, so a
-      photograph that looked right on a phone often wants lifting into it.
+      Which part survives when a portrait picture has to become a landscape
+      one. "Busiest" is right most of the time and wrong on a poster, where
+      the busiest thing is the lettering.
+    optional: true
+
+  - keyname: contrast
+    name: Contrast
+    field_type: number
+    default: 0
+    min: -100
+    max: 100
+    presentation: true
+    help_text: >
+      The most useful control here by a distance. A one-bit panel has no tints,
+      so contrast decides how much of the picture survives at all - and the top
+      of the range is where a photograph stops being a photograph and becomes a
+      graphic.
+    optional: true
+
+  - keyname: brightness
+    name: Brightness
+    field_type: number
+    default: 0
+    min: -100
+    max: 100
+    presentation: true
+    help_text: >
+      The panel's paper is brighter and its ink weaker than any screen's, so
+      anything that looked right on a phone usually wants lifting into it.
+    optional: true
+
+  - keyname: screen
+    name: How it is reduced to ink
+    field_type: select
+    default: panel
+    presentation: true
+    options:
+      - value: panel
+        label: Leave it to the panel
+      - value: diffusion
+        label: Diffusion - fine and photographic
+      - value: atkinson
+        label: Atkinson - crisp, blown highlights
+      - value: ordered
+        label: Ordered - a crosshatch laid over it
+      - value: halftone
+        label: Halftone - printed dots, at 45 degrees
+      - value: noise
+        label: Noise - grainy, like a photocopy
+    help_text: >
+      The panel turns grey into black and white on its own, and this decides
+      whether it gets to. Choosing a screen puts the marks on the picture's own
+      pixels instead - which is most of how a picture *feels* here, since there
+      is no colour and no motion to carry it.
+    optional: true
+
+  - keyname: marks
+    name: How big the marks are
+    field_type: number
+    default: 4
+    min: 1
+    max: 12
+    presentation: true
+    visible_when:
+      field: screen
+      any_of: [ordered, halftone, noise]
+    help_text: >
+      In panel pixels. Small enough and a screen is a texture you have to look
+      for; large enough and it is the first thing you see, which on a picture
+      hung on a wall is usually the point.
     optional: true
 
   - keyname: invert

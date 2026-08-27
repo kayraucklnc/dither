@@ -14,11 +14,17 @@
 
 {%- assign shot = source_1.picture -%}
 {%- assign fit = extension.values.fit | default: "fill" -%}
-{%- assign tone = extension.values.tone | default: "as_is" -%}
+{%- assign focus = extension.values.focus | default: "auto" -%}
+{%- assign contrast = extension.values.contrast | default: 0 -%}
+{%- assign brightness = extension.values.brightness | default: 0 -%}
+{%- assign screen = extension.values.screen | default: "panel" -%}
+{%- assign marks = extension.values.marks | default: 4 -%}
+{%- assign invert = extension.values.invert -%}
 
 {%- assign plate = shot.id
       | as_image: width: shape.width, height: shape.height,
-                  fit: fit, tone: tone, invert: extension.values.invert -%}
+                  fit: fit, focus: focus, contrast: contrast,
+                  brightness: brightness, screen: screen, marks: marks, invert: invert -%}
 
 {%- assign pad = shape.width | at_most: shape.height | divided_by: 16 | at_least: 8 | at_most: 20 -%}
 

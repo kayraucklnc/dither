@@ -1,7 +1,8 @@
 import { Liquid } from "liquidjs";
 
 import { refusal } from "@/lib/designs";
-import { prepareById } from "@/lib/gallery/prepare";
+import { DEFAULT_LOOK, prepareById } from "@/lib/gallery/prepare";
+import { isScreen, type Screen } from "@/lib/gallery/screen";
 import { daysInWords, partOfDay, spanInWords, throughDay, timeInWords } from "@/lib/timewords";
 import { templateFor, type Extension } from "@/lib/extensions/registry";
 import { COLUMNS, ROWS, sizeLabel, type Size } from "@/lib/shapes";
@@ -232,7 +233,14 @@ function register(engine: Liquid): void {
    * URL - even our own - has nothing to resolve against; the same reason the
    * brand mark is inlined into the empty panel.
    *
-   *   {{ shot.id | as_image: width: shape.width, height: shape.height }}
+   *   {{ shot.id | as_image: width: shape.width, height: shape.height,
+   *                             contrast: 40, screen: "halftone" }}
+   *
+   * `width` and `height` are not optional in spirit even though they default:
+   * a chosen screen comes back already reduced to the panel's two values, and
+   * that only survives if the design places it one pixel for one. Ask for a
+   * size other than the box and the browser resamples the marks back into
+   * greys for the page dither to find, which is the moire this avoids.
    *
    * An id that no longer resolves renders as empty, which templates test for.
    * A missing folder should leave a gap in a gallery, not take a screen down.
@@ -257,10 +265,15 @@ function register(engine: Liquid): void {
     }
 
     const prepared = await prepareById(wanted, {
+      ...DEFAULT_LOOK,
       width: Number(named.width ?? loose[0] ?? 0) || 0,
       height: Number(named.height ?? loose[1] ?? 0) || 0,
       fit: named.fit === "whole" ? "whole" : "fill",
-      tone: String(named.tone ?? "as_is"),
+      focus: String(named.focus ?? "auto"),
+      brightness: Number(named.brightness ?? 0) || 0,
+      contrast: Number(named.contrast ?? 0) || 0,
+      screen: isScreen(String(named.screen)) ? (String(named.screen) as Screen) : "panel",
+      marks: Number(named.marks ?? 0) || DEFAULT_LOOK.marks,
       invert: named.invert === true || named.invert === "true",
     });
 

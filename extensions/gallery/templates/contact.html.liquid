@@ -15,7 +15,12 @@
 {% endcomment %}
 
 {%- assign fit = extension.values.fit | default: "fill" -%}
-{%- assign tone = extension.values.tone | default: "as_is" -%}
+{%- assign focus = extension.values.focus | default: "auto" -%}
+{%- assign contrast = extension.values.contrast | default: 0 -%}
+{%- assign brightness = extension.values.brightness | default: 0 -%}
+{%- assign screen = extension.values.screen | default: "panel" -%}
+{%- assign marks = extension.values.marks | default: 4 -%}
+{%- assign invert = extension.values.invert -%}
 {%- assign current = source_1.picture.id -%}
 
 {%- assign short = shape.width | at_most: shape.height | at_least: 80 -%}
@@ -48,6 +53,19 @@
   so the sheet never quietly claims to be the whole collection. {% endcomment -%}
 {%- assign shown = cap -%}
 {%- if spare > 0 %}{% assign shown = cap | minus: 1 %}{% endif -%}
+
+{%- comment %} And where the collection does not reach the bottom row, the
+  bottom row is not reserved. The grid is laid out in real pixels rather than
+  fractions - it has to be, or a screened thumbnail lands on a half pixel - so
+  a row nothing goes in is a band of blank paper under the sheet rather than
+  slack the tracks absorb. Nine pictures across five is two rows, not four.
+{% endcomment -%}
+{%- if spare <= 0 -%}
+  {%- assign needed = total | divided_by: across -%}
+  {%- assign trailing = total | modulo: across -%}
+  {%- if trailing > 0 %}{% assign needed = needed | plus: 1 %}{% endif -%}
+  {%- assign down = needed | at_least: 1 | at_most: down -%}
+{%- endif -%}
 
 {%- assign gaps_across = across | minus: 1 | times: gap -%}
 {%- assign gaps_down = down | minus: 1 | times: gap -%}
@@ -97,15 +115,25 @@
       </div>
     {% endif %}
 
-    <div style="flex: 1 1 auto; min-height: 0; display: grid; gap: {{ gap }}px;
-                grid-template-columns: repeat({{ across }}, 1fr);
-                grid-template-rows: repeat({{ down }}, 1fr)">
+    {%- comment %} Tracks in real pixels, not fractions. A screened thumbnail
+      is already black and white, and a fractional track puts it on a half
+      pixel - where the browser resamples the marks back into greys and the
+      page dither finds them again. {% endcomment -%}
+    <div style="flex: none; display: grid; gap: {{ gap }}px;
+                grid-template-columns: repeat({{ across }}, {{ cell_w }}px);
+                grid-template-rows: repeat({{ down }}, {{ cell_h }}px)">
       {% for entry in source_1.sheet limit: shown %}
-        {%- assign thumb = entry.id
-              | as_image: width: cell_w, height: cell_h,
-                          fit: fit, tone: tone, invert: extension.values.invert -%}
         {%- assign ring = 1 -%}
         {%- if entry.id == current %}{% assign ring = 4 %}{% endif -%}
+        {%- comment %} Inside the rule, not including it: the cell is
+          box-sized, so a heavier ring leaves a smaller picture. {% endcomment -%}
+        {%- assign thumb_w = cell_w | minus: ring | minus: ring | at_least: 8 -%}
+        {%- assign thumb_h = cell_h | minus: ring | minus: ring | at_least: 8 -%}
+
+        {%- assign thumb = entry.id
+              | as_image: width: thumb_w, height: thumb_h,
+                          fit: fit, focus: focus, contrast: contrast,
+                          brightness: brightness, screen: screen, marks: marks, invert: invert -%}
 
         <div style="overflow: hidden; border: {{ ring }}px solid var(--ink); background: var(--paper)">
           {% if thumb != "" %}
