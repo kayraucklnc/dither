@@ -79,9 +79,18 @@ async function fromConnection(
   const [linked] = await db.select().from(connections).where(eq(connections.provider, source.id));
 
   // A mocked provider answers without a link, so screens can be designed before
-  // anyone has signed in. A real one must not.
-  if (!linked && !source.mocked) {
-    throw new Error(`Link your ${source.label} account to use ${extension.manifest.label}.`);
+  // anyone has signed in. A real one must not - and for a provider whose link
+  // finishes in the browser, a row is not a link: the client credentials are
+  // stored the moment they are pasted, and nobody has consented to anything
+  // yet. Saying so beats a widget that fails with "no refresh token".
+  if (!source.mocked) {
+    if (!linked) {
+      throw new Error(`Link your ${source.label} account to use ${extension.manifest.label}.`);
+    }
+
+    if (source.handshake && !source.handshake.complete(linked.credentials)) {
+      throw new Error(`Finish signing in to ${source.label} under Connections.`);
+    }
   }
 
   // The installation's zone, not the server's. "What did we take today" is a

@@ -6,9 +6,11 @@
 # look, per placement - so "work calendar, next 8 hours" and "family calendar,
 # today" can sit on the same screen.
 #
-# The Google provider is mocked for now: it answers plausible meetings so the
-# screens and the triggers can be designed and tested before the OAuth flow
-# exists. Swapping the mock for the real API changes one file and nothing else.
+# The Google provider is real. Linking is two steps rather than one, because
+# Google will not let an unpublished application ask for calendar access: the
+# installation registers its own OAuth client, pastes the two halves of it in
+# under Connections, and then goes through Google's own consent screen. See
+# docs/google-calendar.md.
 
 version: "1.0.0"
 name: google_calendar
@@ -38,13 +40,9 @@ fields:
     name: Calendar
     field_type: select
     default: primary
-    options:
-      - value: primary
-        label: Primary
-      - value: work
-        label: Work
-      - value: family
-        label: Family
+    # Listed from the linked account rather than written down here: a calendar's
+    # id is an address, and typing one from memory is a quiz, not a form.
+    options_from: google.calendars
     help_text: Which calendar from the linked account.
     optional: false
 
@@ -132,6 +130,20 @@ facts:
     path: calendar.free_minutes
     unit: minutes
 
+  - key: in_meeting
+    label: In a meeting right now
+    type: boolean
+    path: calendar.in_meeting
+    unit: ""
+
+  # All-day entries are kept out of the timeline - they have no start time to
+  # place on one - but "am I off today" is still a question worth branching on.
+  - key: all_day_today
+    label: All-day entries today
+    type: number
+    path: calendar.all_day_today
+    unit: ""
+
 # Used for previews until the connection has answered once. Never sent to a
 # device.
 sample:
@@ -139,14 +151,21 @@ sample:
     remaining_today: 3
     free_minutes: 24
     empty: false
+    in_meeting: false
+    all_day_today: 0
+    all_day: []
     next:
       title: "Design review"
       minutes_until: 24
+      minutes_left: 69
+      in_progress: false
       start: "10:30"
       end: "11:15"
       location: "Milano Centrale, Sala 4"
       remote: false
       accepted: true
+      day: "Thu"
+      today: true
     events:
       - title: "Design review"
         start: "10:30"

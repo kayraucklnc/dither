@@ -17,10 +17,24 @@
   </div>
 
   {% if calendar.empty or next == nil %}
+    {% comment %}
+      An all-day entry has no start time, so it is not on the timeline - but
+      "Nothing scheduled" on the day you are on annual leave is the wrong
+      answer, and this is the one design with room to say so.
+    {% endcomment %}
     <div class="content layout layout--col layout--center" style="gap: 10px">
       <span class="i i-calendar-check i-xl"></span>
-      <p class="t-xl t-bold">Nothing scheduled</p>
-      <p class="t-sm">The rest of the day is yours.</p>
+      {% if calendar.all_day_today > 0 %}
+        {% for entry in calendar.all_day limit: 2 %}
+          {% if entry.today %}
+            <p class="t-xl t-bold clamp-2">{{ entry.title }}</p>
+          {% endif %}
+        {% endfor %}
+        <p class="t-sm">All day. Nothing else scheduled.</p>
+      {% else %}
+        <p class="t-xl t-bold">Nothing scheduled</p>
+        <p class="t-sm">The rest of the day is yours.</p>
+      {% endif %}
     </div>
   {% else %}
     <div class="content">

@@ -1,3 +1,6 @@
+import { calendars } from "@/lib/connections/google/api";
+import { isLinked, stored } from "@/lib/connections/link";
+import { provider } from "@/lib/connections";
 import { capabilitiesFor, cities, countries, providers } from "@/lib/transit/catalog";
 import { search as searchStations } from "@/lib/transit/trenord";
 
@@ -29,6 +32,40 @@ export interface Source {
 }
 
 const SOURCES: Source[] = [
+  {
+    /**
+     * The calendars on the linked Google account.
+     *
+     * A calendar's id is an address - `en.uk#holiday@group.v.calendar.google.com`
+     * or the address of whoever shared it with you - so listing them is the
+     * difference between picking "Work" and remembering that. `primary` is
+     * offered first because it is the one almost everybody means and the only
+     * id that is the same on every account.
+     */
+    id: "google.calendars",
+    async list() {
+      const google = provider("google");
+      if (!google) return [];
+
+      const row = await stored("google");
+      if (!isLinked(google, row)) {
+        throw new Error("Link a Google account under Connections to choose a calendar.");
+      }
+
+      const found = await calendars(row!.credentials);
+
+      return [
+        { value: "primary", label: "Primary", hint: found.find((one) => one.primary)?.id ?? "" },
+        ...found
+          .filter((one) => !one.primary)
+          .map((one) => ({
+            value: one.id,
+            label: one.summaryOverride?.trim() || one.summary?.trim() || one.id,
+            hint: one.accessRole === "owner" ? "" : "shared",
+          })),
+      ];
+    },
+  },
   {
     id: "transit.countries",
     async list() {

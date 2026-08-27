@@ -53,6 +53,12 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
   on one screen is the whole point of the distinction.
 - **A trigger is a source, not a borrowed widget.** Sources belong to a device,
   so you can decide on a station you are not displaying.
+- **A connection is an account, linked once, used by every placement.** An
+  extension says "I need Google Calendar" and the linked account answers on
+  every screen; credentials never live in a widget's settings. Stripe takes a
+  pasted key. Google takes an OAuth client this installation registers itself,
+  then a consent screen - see `docs/google-calendar.md`. Markets and Home are
+  still stand-ins and say so on the card.
 - **There is one kind of check: compare a value from a source.** The device is
   a source, the clock is a source, every trigger is a source. A connection
   that reports whether a laptop is awake declares `online: boolean` and the
@@ -125,6 +131,25 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
 - **"Today" is a local day, and midnight's offset is not always now's.** On the
   morning the clocks change, the naive answer is an hour into the previous day.
   See `web/src/lib/clock.ts`.
+
+- **A Google grant issues one refresh token, not one per handshake.** Drop
+  `prompt=consent` from the authorize URL and re-linking an account that has
+  already said yes returns an access token and nothing durable, so the
+  connection dies quietly an hour later. Access tokens are never stored - they
+  are minted from the refresh token and held in memory.
+- **The redirect URI is the address a browser reaches, not the one the
+  container listens on.** It has to match what is registered character for
+  character, so it is read from `API_URI` or the forwarded headers, and shown
+  on the connections page to be copied. Guessing it is `redirect_uri_mismatch`
+  on Google's error page, not ours.
+- **A row is not a link when the link finishes in the browser.** The client
+  credentials are stored the moment they are pasted; only a stored refresh
+  token means anyone consented. `isLinked` in `web/src/lib/connections/link.ts`
+  is the one answer, and the fetcher, the page and the field sources all ask
+  it.
+- **An all-day calendar entry has no start time**, so it cannot go on a
+  timeline. Placed there as 00:00 it takes the hero slot and fires the
+  about-to-start notice at midnight. They are counted separately.
 
 ## Checking the work
 
