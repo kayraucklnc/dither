@@ -48,7 +48,7 @@ import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/cn";
 import { defaultOperator, defaultValue } from "@/lib/facts";
 import { summarise, type Condition } from "@/lib/flow/conditions";
-import { reachableFrom, wouldCycle } from "@/lib/flow/graph";
+import { reachableFrom, removeNodes, wouldCycle } from "@/lib/flow/graph";
 import { COLUMN_GAP, layout, NODE_WIDTH } from "@/lib/flow/layout";
 import type { Source } from "@/lib/flow/sources";
 import type { Node } from "@/lib/flow/tree";
@@ -369,58 +369,23 @@ function TreeCanvas({
     [nextId, screens, sources],
   );
 
-  /** Removing a check splices it out, keeping its "no" branch. */
-  const removeQuestion = useCallback(
-    (id: number) => {
-      const question = byId.get(id);
-      if (!question || question.kind !== "question") return;
+  /**
+   * Take nodes out of the tree.
+   *
+   * A check is spliced out and a screen is unhooked - `removeNodes` knows
+   * which - and every route to a deletion comes through here, including the
+   * Backspace key, which React Flow would otherwise apply to its own copy of
+   * the canvas alone.
+   */
+  const remove = useCallback(
+    (ids: number[]) => {
+      const after = removeNodes(nodes, rootId, ids);
 
-      const survivor = question.noNodeId;
-
-      // The "yes" branch goes with it, so collect everything only it reached.
-      const doomed = new Set<number>([id]);
-      const collect = (from: number | null) => {
-        if (from === null || doomed.has(from) || from === survivor) return;
-        doomed.add(from);
-        const node = byId.get(from);
-        collect(node?.yesNodeId ?? null);
-        collect(node?.noNodeId ?? null);
-      };
-      collect(question.yesNodeId);
-
-      setNodes((current) =>
-        current
-          .filter((node) => !doomed.has(node.id))
-          .map((node) => ({
-            ...node,
-            yesNodeId: node.yesNodeId === id ? survivor : node.yesNodeId,
-            noNodeId: node.noNodeId === id ? survivor : node.noNodeId,
-          })),
-      );
-
-      if (rootId === id) setRootId(survivor);
-      setSelectedId(null);
+      setNodes(after.nodes);
+      setRootId(after.rootId);
+      if (selectedId !== null && ids.includes(selectedId)) setSelectedId(null);
     },
-    [byId, rootId],
-  );
-
-  /** Remove any node, and unhook whatever pointed at it. */
-  const removeNode = useCallback(
-    (id: number) => {
-      setNodes((current) =>
-        current
-          .filter((node) => node.id !== id)
-          .map((node) => ({
-            ...node,
-            yesNodeId: node.yesNodeId === id ? null : node.yesNodeId,
-            noNodeId: node.noNodeId === id ? null : node.noNodeId,
-          })),
-      );
-
-      if (rootId === id) setRootId(null);
-      setSelectedId(null);
-    },
-    [rootId],
+    [nodes, rootId, selectedId],
   );
 
   /**
@@ -819,7 +784,7 @@ function TreeCanvas({
             icon: Trash2,
             danger: true,
             hint: rootId === id ? "It is the start; the tree would have none" : undefined,
-            onSelect: () => removeNode(id),
+            onSelect: () => remove([id]),
           },
         ];
       }
@@ -842,10 +807,10 @@ function TreeCanvas({
         },
         { id: "up", label: "Ask this earlier", icon: ChevronUp, disabled: !moves.up, onSelect: () => move(id, "up") },
         { id: "down", label: "Ask this later", icon: ChevronDown, disabled: !moves.down, onSelect: () => move(id, "down") },
-        { id: "delete", label: "Remove this check", icon: Trash2, danger: true, onSelect: () => removeQuestion(id) },
+        { id: "delete", label: "Remove this check", icon: Trash2, danger: true, onSelect: () => remove([id]) },
       ];
     },
-    [byId, canMove, addCheck, addLoose, addScreen, move, removeQuestion, removeNode, rootId, tidy],
+    [byId, canMove, addCheck, addLoose, addScreen, move, remove, rootId, tidy],
   );
 
   /* ------------------------------------------------------------------- view */
@@ -866,6 +831,17 @@ function TreeCanvas({
             }}
             onConnect={connect}
             onEdgesDelete={disconnect}
+            onBeforeDelete={async ({ nodes: doomed, edges: cut }) => {
+              // Backspace over a selected node is a tree edit, not a canvas
+              // one. Left to React Flow it removes the node from *its* copy,
+              // where nothing saves it and the next trace refresh derives it
+              // straight back - and it sweeps the incident edges on the way,
+              // which would undo the splice. So it is refused here and done
+              // against `nodes`, which is what gets written.
+              if (!doomed.length) return { nodes: [], edges: cut };
+              remove(doomed.map((node) => Number(node.id)));
+              return false;
+            }}
             onNodeDragStop={(_event, dragged) => {
               dragging.current = undefined;
               setNodes((current) =>
@@ -1057,7 +1033,7 @@ function TreeCanvas({
               <p className="text-[13px] font-semibold">This check</p>
               <button
                 type="button"
-                onClick={() => removeQuestion(selected.id)}
+                onClick={() => remove([selected.id])}
                 title="Remove this check and everything on its yes branch"
                 className="rounded-md p-1.5 text-faint hover:bg-danger/15 hover:text-danger"
               >
