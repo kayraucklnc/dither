@@ -64,9 +64,26 @@ into. Two things always happen to it, and everything after that is a choice.
   pixel drawing on an 800-pixel panel grows with `nearest`, because Lanczos
   grows it into a blur and a blur dithers into mush.
 
+### Turning it, and keeping all of it
+
+A tall picture on a wide panel has two answers before it has a crop.
+
+**Turn it** a quarter, and a 1182×1674 poster becomes 1674×1182 — within a
+whisker of the panel's own shape, so almost nothing is lost. You read it
+sideways, which is a trade only you can make, which is why it is a setting and
+not a rule. It happens before the crop, so everything below still applies.
+
+**How it fills the box → whole picture** stops cropping altogether and
+letterboxes instead. The bars take their tone from the picture: paper for a
+light one, ink for a dark one, decided by reading the source down to a single
+pixel. Almost everything in this idiom is white marks on black, and a black
+poster in a white surround reads as a mistake on a panel whose bezel is already
+white.
+
 ### What to keep
 
-A portrait picture on a landscape panel has to lose something. *Whatever is
+A portrait picture on a landscape panel that is being cropped has to lose
+something. *Whatever is
 busiest* finds the most detailed region, which is right most of the time —
 it is what turns a portrait photograph into a widescreen portrait rather than a
 widescreen waistcoat. It is also the setting that surprises people, because

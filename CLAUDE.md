@@ -293,6 +293,15 @@ introduces itself again afterwards, as a new device with a new key.
   black prints 92% black with paper in the corners, and enlarging the radius
   until it can makes every mid tone muddy. The table of radii is built by
   sorting sampled distances, so coverage is linear by construction.
+- **Before a crop there are two other answers, and the panel's bezel decides
+  one of them.** A tall picture on a wide panel can be turned a quarter -
+  1182x1674 becomes 1674x1182, which is nearly the panel's own shape - or
+  letterboxed whole. The bars are ink where the picture is dark and paper where
+  it is light, read from the source down to a single pixel: this idiom is white
+  marks on black, and a black poster in a white surround reads as a mistake on
+  a device whose bezel is already white. The turn happens before the resize, so
+  which way the picture is long has to be settled before anything asks whether
+  it is being enlarged.
 - **A picture is cropped to the widget, not to the panel.** Sizes are free, so
   the rectangle worth taking out of a photograph at 12x12 is not the one worth
   taking at 3x12. The template is the first thing that knows which box it got,

@@ -13,6 +13,7 @@
 
 {%- assign shot = source_1.picture -%}
 {%- assign fit = extension.values.fit | default: "fill" -%}
+{%- assign turn = extension.values.turn | default: 0 -%}
 {%- assign focus = extension.values.focus | default: "auto" -%}
 {%- assign contrast = extension.values.contrast | default: 0 -%}
 {%- assign brightness = extension.values.brightness | default: 0 -%}
@@ -49,7 +50,7 @@
 
 {%- assign plate = shot.id
       | as_image: width: plate_w, height: plate_h,
-                  fit: fit, focus: focus, contrast: contrast,
+                  fit: fit, turn: turn, focus: focus, contrast: contrast,
                   brightness: brightness, screen: screen, marks: marks, invert: invert -%}
 
 {%- assign title_size = caption_h | times: 45 | divided_by: 100 | at_least: 11 | at_most: 20 -%}

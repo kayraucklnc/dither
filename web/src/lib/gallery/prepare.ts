@@ -51,10 +51,15 @@ export const FOCUS: Record<string, string | number> = {
   right: "east",
 };
 
+/** Quarter turns, clockwise. */
+export const TURNS = [0, 90, 180, 270] as const;
+
 export interface Look {
   width: number;
   height: number;
   fit: Fit;
+  /** Quarter turns clockwise, applied before anything is cropped. */
+  turn: number;
   /** A key of FOCUS. */
   focus: string;
   /** -100 to 100, zero being the picture as it is. */
@@ -70,6 +75,7 @@ export const DEFAULT_LOOK: Look = {
   width: 0,
   height: 0,
   fit: "fill",
+  turn: 0,
   focus: "auto",
   brightness: 0,
   contrast: 0,
@@ -142,9 +148,16 @@ function levels(brightness: number, contrast: number): { slope: number; offset: 
   return { slope, offset: 128 - 128 * slope + lift };
 }
 
+/** Quarter turns clockwise, whatever the caller spelled it as. */
+export function quarterTurn(value: unknown): number {
+  const degrees = Math.round((Number(value) || 0) / 90) * 90;
+  return ((degrees % 360) + 360) % 360;
+}
+
 export async function prepare(picture: Picture, look: Look): Promise<Prepared> {
   const box = boxOf(look);
   const screen: Screen = isScreen(look.screen) ? look.screen : "panel";
+  const turn = quarterTurn(look.turn);
 
   const key = [
     picture.file,
@@ -152,6 +165,7 @@ export async function prepare(picture: Picture, look: Look): Promise<Prepared> {
     box.width,
     box.height,
     look.fit,
+    turn,
     look.focus,
     look.brightness,
     look.contrast,
@@ -174,21 +188,65 @@ export async function prepare(picture: Picture, look: Look): Promise<Prepared> {
    * little small is still resampled properly.
    */
   const source = await sharp(picture.file).metadata();
-  const enlarging =
-    (source.width ?? 0) * 1.4 < box.width && (source.height ?? 0) * 1.4 < box.height;
+
+  // A quarter turn swaps which way the picture is long, so the shape it will
+  // actually be drawn at is what decides whether this is an enlargement.
+  const upright = (source.orientation ?? 1) >= 5;
+  const standing = {
+    width: upright ? (source.height ?? 0) : (source.width ?? 0),
+    height: upright ? (source.width ?? 0) : (source.height ?? 0),
+  };
+  const turned = turn % 180 === 90 ? { width: standing.height, height: standing.width } : standing;
+
+  const enlarging = turned.width * 1.4 < box.width && turned.height * 1.4 < box.height;
+
+  /**
+   * What the bars either side of a whole picture are made of.
+   *
+   * Paper, unless the picture is dark - and most of these are, because the
+   * whole idiom is white marks on ink. A black poster in a white surround
+   * reads as a mistake on a panel whose bezel is already white; the same
+   * poster on black reads as a picture that happens not to be the shape of the
+   * screen. Taken from the source rather than offered as a setting, because
+   * nobody has ever wanted the other answer.
+   *
+   * Read by resizing to a single pixel, which is what that costs.
+   */
+  const matte =
+    look.fit === "whole"
+      ? (await sharp(picture.file).greyscale().resize(1, 1, { fit: "fill" }).raw().toBuffer())[0] < 110
+        ? 0
+        : 255
+      : 255;
 
   const { slope, offset } = levels(look.brightness, look.contrast);
 
   let pipeline = sharp(picture.file, { animated: false })
     // Phones write the orientation in EXIF rather than in the pixels, so a
-    // holiday photograph arrives on its side unless this is asked for.
-    .rotate()
+    // holiday photograph arrives on its side unless this is undone first.
+    // Separate from the turn below because sharp applies one rotation only,
+    // and these are two different reasons to rotate.
+    .autoOrient();
+
+  /**
+   * Turning the picture rather than cropping it harder.
+   *
+   * The crop settings decide what to *lose*; this decides whether anything has
+   * to be lost at all. A 1182x1674 poster on an 800x480 panel loses most of
+   * itself either way round, but turned a quarter it is 1674x1182 - which is
+   * within a whisker of the panel's own shape, so nearly all of it survives.
+   * Whether reading it sideways is what you wanted is not something a server
+   * can know, which is why it is a setting and not a rule.
+   */
+  if (turn) pipeline = pipeline.rotate(turn, { background: { r: matte, g: matte, b: matte } });
+
+  pipeline = pipeline
     .resize({
       width: box.width,
       height: box.height,
       fit: look.fit === "whole" ? "contain" : "cover",
       position: look.fit === "whole" ? "centre" : (FOCUS[look.focus] ?? FOCUS.auto),
-      background: { r: 255, g: 255, b: 255 },
+      background: { r: matte, g: matte, b: matte },
       kernel: enlarging ? "nearest" : "lanczos3",
     })
     .greyscale();

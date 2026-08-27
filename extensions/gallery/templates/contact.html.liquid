@@ -15,6 +15,7 @@
 {% endcomment %}
 
 {%- assign fit = extension.values.fit | default: "fill" -%}
+{%- assign turn = extension.values.turn | default: 0 -%}
 {%- assign focus = extension.values.focus | default: "auto" -%}
 {%- assign contrast = extension.values.contrast | default: 0 -%}
 {%- assign brightness = extension.values.brightness | default: 0 -%}
@@ -132,7 +133,7 @@
 
         {%- assign thumb = entry.id
               | as_image: width: thumb_w, height: thumb_h,
-                          fit: fit, focus: focus, contrast: contrast,
+                          fit: fit, turn: turn, focus: focus, contrast: contrast,
                           brightness: brightness, screen: screen, marks: marks, invert: invert -%}
 
         <div style="overflow: hidden; border: {{ ring }}px solid var(--ink); background: var(--paper)">

@@ -332,10 +332,11 @@ And one that reads the disk:
 ```
 
 `as_image` turns a picture id from the `gallery` provider into a data URI,
-cropped to the box you hand it. It also takes `fit` (`fill` or `whole`),
-`focus`, `brightness`, `contrast`, `invert`, and a `screen` - `panel`,
-`diffusion`, `atkinson`, `ordered`, `halftone` or `noise` - with `marks` for
-how many pixels one mark of that screen covers.
+cropped to the box you hand it. It also takes `fit` (`fill` or `whole`), `turn`
+(a quarter turn clockwise, applied before the crop), `focus`, `brightness`,
+`contrast`, `invert`, and a `screen` - `panel`, `diffusion`, `atkinson`,
+`ordered`, `halftone` or `noise` - with `marks` for how many pixels one mark of
+that screen covers.
 
 **Always hand it the real pixel size of the box.** With no screen it returns
 grey and the page dither does the rest, so a rough size only costs sharpness.
