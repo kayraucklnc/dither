@@ -27,9 +27,32 @@ export interface CredentialField {
   secret: boolean;
 }
 
+/** One linked account, ready to use. */
+export interface Account {
+  /** The account's own address, which is how a widget names it. */
+  account: string;
+  /** What to call it on screen. */
+  label: string;
+  /** The grant, over the installation's client credentials. */
+  credentials: Record<string, unknown>;
+}
+
 /** What a provider is told when it is asked for data. */
 export interface FetchContext {
-  /** Whatever was stored when the account was linked. Empty when unlinked. */
+  /**
+   * Every linked account, in address order.
+   *
+   * A provider that can hold several - two Google accounts, work and personal
+   * - reads this and decides which the widget asked for. One that cannot has
+   * exactly one entry here.
+   */
+  accounts: Account[];
+  /**
+   * The first account's credentials.
+   *
+   * What a single-account provider wants, and all Stripe has ever needed.
+   * Empty when nothing is linked.
+   */
   credentials: Record<string, unknown>;
   /** IANA zone of the installation, so "today" means the right day. */
   timezone: string;
@@ -63,12 +86,19 @@ export interface Handshake {
     redirectUri: string,
     state: string,
   ): string;
-  /** Turn the code the browser came back with into credentials worth keeping. */
+  /**
+   * Turn the code the browser came back with into a grant worth keeping.
+   *
+   * `account` identifies whose it is and must be stable - the address, not a
+   * number we made up - because it is what a widget's settings name. `grant`
+   * is only the durable half; the client credentials are already stored and
+   * are not copied onto every account.
+   */
   exchange(
     code: string,
     credentials: Record<string, unknown>,
     redirectUri: string,
-  ): Promise<{ credentials: Record<string, unknown>; label: string }>;
+  ): Promise<{ account: string; label: string; grant: Record<string, unknown> }>;
   /**
    * Whether what is stored is a finished handshake or only the first half.
    *
@@ -95,6 +125,13 @@ export interface Provider {
   icon: string;
   /** True while the real integration is not written yet. */
   mocked: boolean;
+  /**
+   * Whether this provider can hold more than one account at a time.
+   *
+   * A person can have a work Google account and a personal one and want both
+   * on one panel. A Stripe key is one account by construction.
+   */
+  multiple?: boolean;
   /** What linking it asks for. Empty means one click and no credentials. */
   credentials?: CredentialField[];
   /** Where to get the credentials, linked from the connections page. */

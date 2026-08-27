@@ -75,7 +75,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
 
   try {
     const linked = await source.handshake.exchange(code, row.credentials, redirectUri(origin, id));
-    await save(id, linked.label, linked.credentials);
+
+    // The grant goes on its own row, named by the account it turned out to be
+    // - so signing in a second account adds one rather than replacing the
+    // first. The client credentials stay where they are, because the OAuth
+    // client identifies this server and is the same whoever signs in.
+    await save(id, linked.label, linked.grant, linked.account);
+
+    // And the client row stops carrying whatever refusal it was last told
+    // about, now that something has worked.
+    await save(id, source.label, row.credentials);
   } catch (error) {
     await note(id, error instanceof Error ? error.message : String(error));
   }

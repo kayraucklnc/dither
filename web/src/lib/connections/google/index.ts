@@ -2,6 +2,7 @@ import type { FetchContext, Provider, Verification } from "@/lib/connections/pro
 
 import { agenda } from "./agenda";
 import { calendars, events, type EventsResult } from "./api";
+import { resolveFeeds, selectedFeeds } from "./feeds";
 import { windowFor } from "./range";
 import {
   CLIENT_ID,
@@ -66,90 +67,92 @@ async function verify(credentials: Record<string, unknown>): Promise<Verificatio
 
 /* -------------------------------------------------------------------------- */
 
-/**
- * Which feeds a widget was pointed at.
- *
- * One widget can show several - work and family on one panel is the ordinary
- * case, and two overlapping widgets is not how anybody would ask for it. The
- * list is sorted and deduplicated because the settings become the key an
- * answer is cached under, and "work then family" must not be a different
- * question from "family then work".
- *
- * A string is what a widget saved before this holds, and still means one
- * calendar.
- */
-const MAX_CALENDARS = 8;
-
-export function calendarIds(settings: Record<string, unknown>): string[] {
-  const raw = settings.calendar;
-  const listed = Array.isArray(raw) ? raw : [raw];
-
-  const ids = [
-    ...new Set(
-      listed
-        .map((one) => String(one ?? "").trim())
-        .filter((one) => one.length > 0),
-    ),
-  ].sort();
-
-  // Every calendar is a request, and a person who ticked forty of them wants
-  // a wall of text rather than a panel. Bounded, and the bound is reported.
-  return (ids.length ? ids : ["primary"]).slice(0, MAX_CALENDARS);
-}
-
 /** One feed that answered, and one that did not. */
-interface Feed extends EventsResult {
-  id: string;
+interface Read extends EventsResult {
+  account: string;
+  calendar: string;
 }
 
 interface Missed {
-  id: string;
+  account: string;
+  calendar: string;
   failed: string;
 }
 
-const isFeed = (answer: Feed | Missed): answer is Feed => !("failed" in answer);
+const isRead = (answer: Read | Missed): answer is Read => !("failed" in answer);
+
+/**
+ * What to call a feed on screen.
+ *
+ * The calendar's own title is enough until two accounts are in play, at which
+ * point "Family" is two different calendars and the account has to be said.
+ */
+const feedLabel = (feed: Read, acrossAccounts: boolean): string => {
+  const name = feed.name || feed.calendar;
+  return acrossAccounts ? `${name} · ${feed.account}` : name;
+};
 
 async function fetchCalendar(
   settings: Record<string, unknown>,
   now: Date,
   context: FetchContext,
 ): Promise<Record<string, unknown>> {
-  const ids = calendarIds(settings);
-  const { timezone, locale } = context;
+  const { timezone, locale, accounts } = context;
+
+  // Which calendar, on which account. With two accounts linked "primary" is
+  // ambiguous, so a selection carries both - and one naming an account that is
+  // no longer linked is dropped rather than guessed at.
+  const { resolved, unknown } = resolveFeeds(
+    selectedFeeds(settings),
+    accounts.map((one) => one.account),
+  );
+
+  if (!resolved.length) {
+    throw new Error(
+      unknown.length
+        ? "The calendars this widget names are on an account that is no longer linked."
+        : "No Google account is linked.",
+    );
+  }
 
   // "The rest of today" is a boundary in a place, not a duration - so the
   // window is resolved against the installation's zone before anything is
   // asked of Google.
   const window = windowFor(settings, now, timezone, locale);
+  const byAccount = new Map(accounts.map((one) => [one.account, one]));
 
   const answers = await Promise.all(
-    ids.map(async (id): Promise<Feed | Missed> => {
+    resolved.map(async (feed): Promise<Read | Missed> => {
+      const owner = byAccount.get(feed.account)!;
+
       try {
-        const answered = await events(id, window.from, window.to, context.credentials);
-        return { id, ...answered };
+        const answered = await events(feed.calendar, window.from, window.to, owner.credentials);
+        return { ...feed, ...answered };
       } catch (error) {
-        return { id, failed: error instanceof Error ? error.message : String(error) };
+        return { ...feed, failed: error instanceof Error ? error.message : String(error) };
       }
     }),
   );
 
-  const read = answers.filter(isFeed);
-  const missing = answers.filter((answer): answer is Missed => !isFeed(answer));
+  const read = answers.filter(isRead);
+  const missing = answers.filter((answer): answer is Missed => !isRead(answer));
 
   // Every one of them failed, so there is nothing to draw and the reason is
   // worth having. One of several failing is different: a shared calendar
   // somebody stopped sharing should not blank the four that still work.
   if (!read.length) throw new Error(missing[0]?.failed ?? "No calendar answered.");
 
+  // Several feeds, or one calendar drawn from two accounts - either way the
+  // entries need saying apart. With a single feed the label is noise.
   const many = read.length > 1;
+  /** Whether the label has to name the account as well as the calendar. */
+  const acrossAccounts = new Set(read.map((one) => one.account)).size > 1;
 
   const day = agenda(
     read.flatMap((feed) =>
       feed.events.map((event) => ({
         ...event,
-        // Only when there are several. Labelling every event with the name of
-        // the one calendar it could possibly be from is noise.
-        calendarName: many ? feed.name || feed.id : undefined,
+        calendarName: many ? feedLabel(feed, acrossAccounts) : undefined,
       })),
     ),
     {
@@ -162,24 +165,21 @@ async function fetchCalendar(
     },
   );
 
-  const names = read.map((answer) => answer.name || answer.id);
-
   return {
     calendar: {
       ...day,
       connected: true,
-      name: names.join(", "),
-      names,
+      name: read.map((feed) => feedLabel(feed, acrossAccounts)).join(", "),
+      names: read.map((feed) => feedLabel(feed, acrossAccounts)),
+      accounts: [...new Set(read.map((one) => one.account))],
       /** True when a feed was asked for and did not answer. */
       incomplete: missing.length > 0,
       unread: missing.length,
-      /** More than one feed is being shown, so a design may want to say which. */
       many,
+      across_accounts: acrossAccounts,
     },
   };
 }
-
-/* -------------------------------------------------------------------------- */
 
 export const google: Provider = {
   id: "google",
@@ -188,6 +188,7 @@ export const google: Provider = {
   unlocks: "Calendar",
   icon: "calendar",
   mocked: false,
+  multiple: true,
   help: {
     label: "Google Cloud credentials",
     url: "https://console.cloud.google.com/apis/credentials",
@@ -228,7 +229,10 @@ export const google: Provider = {
         );
       }
 
-      const stored = {
+      // Enough to ask Google who this is, once. The client credentials are not
+      // kept here - they live on the installation's own row, and copying them
+      // onto every account would make rotating a secret an N-row job.
+      const usable = {
         [CLIENT_ID]: credentials[CLIENT_ID],
         [CLIENT_SECRET]: credentials[CLIENT_SECRET],
         [REFRESH_TOKEN]: tokens.refresh_token,
@@ -236,10 +240,21 @@ export const google: Provider = {
 
       // Named by the account it turned out to be, which is worth one extra
       // request exactly once - a card reading "kayra@ratel.sh" is how you tell
-      // you linked the right one of three Google accounts.
-      const name = await accountName(stored).catch(() => "");
+      // you linked the right one of three Google accounts, and it is what a
+      // widget's settings name from then on.
+      const address = await accountName(usable).catch(() => "");
+      if (!address) {
+        throw new Error(
+          "Google would not say which account that was, so it cannot be told apart from another. " +
+            "Check the Calendar API is enabled and try again.",
+        );
+      }
 
-      return { credentials: stored, label: name || "Google Calendar" };
+      return {
+        account: address,
+        label: address,
+        grant: { [REFRESH_TOKEN]: tokens.refresh_token },
+      };
     },
   },
   verify,

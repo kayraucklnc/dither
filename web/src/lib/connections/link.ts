@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { connections } from "@/lib/db/schema";
@@ -8,10 +8,14 @@ import type { Provider } from "./provider";
  * Storing a link, and knowing when there is one.
  *
  * Shared by the connections page and by the OAuth callback, because both write
- * the same row and both have to agree about what "linked" means. A provider
+ * the same rows and both have to agree about what "linked" means. A provider
  * that finishes in the browser has a row from the moment its client
  * credentials are pasted, and a page that read "linked" from the row existing
  * would say linked before anyone had consented to anything.
+ *
+ * A provider holds one row per linked account, plus one for the installation's
+ * own client credentials under the empty account name. So "is Google linked"
+ * is a question about the *grants*, not about the client.
  */
 
 /** The prefix a failed attempt is remembered under, in the row's own label. */
@@ -29,47 +33,105 @@ export const STATE_COOKIE = "dither_link_state";
 /** The path the cookie is scoped to - both routes, and nothing else. */
 export const STATE_PATH = "/api/connections";
 
+/**
+ * The empty account: the installation's own credentials for a provider.
+ *
+ * The OAuth client identifies *this server* to Google and is the same
+ * whichever account signs in, so it is stored once rather than copied onto
+ * every grant. Deleting one account cannot take the client with it.
+ */
+export const CLIENT = "";
+
 export interface Linked {
+  account: string;
   label: string;
   credentials: Record<string, unknown>;
 }
 
-/** What is stored for a provider, if anything. */
-export async function stored(providerId: string): Promise<Linked | undefined> {
-  const [row] = await db.select().from(connections).where(eq(connections.provider, providerId));
-  return row ? { label: row.label, credentials: row.credentials } : undefined;
+/** One row, by provider and account. */
+export async function stored(providerId: string, account = CLIENT): Promise<Linked | undefined> {
+  const [row] = await db
+    .select()
+    .from(connections)
+    .where(and(eq(connections.provider, providerId), eq(connections.account, account)));
+
+  return row ? { account: row.account, label: row.label, credentials: row.credentials } : undefined;
+}
+
+/** Every account linked for a provider, the installation's client aside. */
+export async function accountsOf(providerId: string): Promise<Linked[]> {
+  const rows = await db.select().from(connections).where(eq(connections.provider, providerId));
+
+  return rows
+    .filter((row) => row.account !== CLIENT)
+    .map((row) => ({ account: row.account, label: row.label, credentials: row.credentials }))
+    .sort((a, b) => a.account.localeCompare(b.account));
+}
+
+/**
+ * What a provider is handed for an account: the grant, over the installation's
+ * client credentials.
+ *
+ * Merged here rather than stored merged, so rotating a client secret is one
+ * row and not one row per account.
+ */
+export async function credentialsFor(providerId: string, account: string): Promise<Record<string, unknown>> {
+  const [client, grant] = await Promise.all([stored(providerId, CLIENT), stored(providerId, account)]);
+  return { ...(client?.credentials ?? {}), ...(grant?.credentials ?? {}) };
+}
+
+/** Every linked account with its credentials ready to use. */
+export async function readyAccounts(providerId: string): Promise<Linked[]> {
+  const [client, accounts] = await Promise.all([stored(providerId, CLIENT), accountsOf(providerId)]);
+
+  return accounts.map((one) => ({
+    ...one,
+    credentials: { ...(client?.credentials ?? {}), ...one.credentials },
+  }));
 }
 
 export async function save(
   providerId: string,
   label: string,
   credentials: Record<string, unknown>,
+  account = CLIENT,
 ): Promise<void> {
   await db
     .insert(connections)
-    .values({ provider: providerId, label, credentials })
+    .values({ provider: providerId, account, label, credentials })
     .onConflictDoUpdate({
-      target: connections.provider,
+      target: [connections.provider, connections.account],
       set: { label, credentials, connectedAt: new Date() },
     });
+}
+
+/** Forget one account, or - with no account named - the whole provider. */
+export async function forgetConnection(providerId: string, account?: string): Promise<void> {
+  await db
+    .delete(connections)
+    .where(
+      account === undefined
+        ? eq(connections.provider, providerId)
+        : and(eq(connections.provider, providerId), eq(connections.account, account)),
+    );
 }
 
 /**
  * A refusal, remembered.
  *
  * Server actions and redirects cannot hand a message back to a page that
- * re-renders from the database, so the reason lives in the row that failed.
- * Credentials already stored are kept: a handshake that came back wrong should
- * not make you paste the client ID again.
+ * re-renders from the database, so the reason lives on the provider's client
+ * row - which is the one row that always exists once anything has been
+ * pasted, and the one the page renders the message beside.
  */
 export async function note(providerId: string, message: string): Promise<void> {
-  const existing = await stored(providerId);
+  const existing = await stored(providerId, CLIENT);
 
   await db
     .insert(connections)
-    .values({ provider: providerId, label: `${FAILED}${message}`, credentials: {} })
+    .values({ provider: providerId, account: CLIENT, label: `${FAILED}${message}`, credentials: {} })
     .onConflictDoUpdate({
-      target: connections.provider,
+      target: [connections.provider, connections.account],
       set: { label: `${FAILED}${message}`, credentials: existing?.credentials ?? {} },
     });
 }
@@ -79,23 +141,26 @@ export const failure = (label: string): string | undefined =>
   label.startsWith(FAILED) ? label.slice(FAILED.length) : undefined;
 
 /**
- * Whether these credentials are a finished link.
+ * Whether a provider is usable.
  *
  * A provider that only wants a key is linked as soon as it has one. A provider
- * with a handshake is linked when the handshake finished, and half of one is
- * not a link.
+ * with a handshake is linked when at least one account has finished one - half
+ * a handshake is not a link, and neither is a client with nobody signed in.
  */
-export function isLinked(source: Provider, row: Linked | undefined): boolean {
-  if (!row || failure(row.label)) return false;
-  return source.handshake ? source.handshake.complete(row.credentials) : true;
+export function isLinked(source: Provider, client: Linked | undefined, accounts: Linked[] = []): boolean {
+  if (source.handshake) {
+    return accounts.some((one) => source.handshake!.complete(one.credentials));
+  }
+
+  return Boolean(client) && !failure(client!.label);
 }
 
-/** True when the client credentials are in but the browser step is not done. */
-export function isHalfway(source: Provider, row: Linked | undefined): boolean {
-  if (!source.handshake || !row) return false;
-  if (source.handshake.complete(row.credentials)) return false;
+/** True when the client credentials are in but nobody has signed in yet. */
+export function isHalfway(source: Provider, client: Linked | undefined, accounts: Linked[] = []): boolean {
+  if (!source.handshake || !client) return false;
+  if (accounts.some((one) => source.handshake!.complete(one.credentials))) return false;
 
-  return (source.credentials ?? []).every((field) => Boolean(row.credentials[field.key]));
+  return (source.credentials ?? []).every((field) => Boolean(client.credentials[field.key]));
 }
 
 /* -- where this installation is, as far as a browser is concerned ----------- */

@@ -8,6 +8,7 @@ import {
   serial,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -301,15 +302,37 @@ export const renders = pgTable("renders", {
 /**
  * An account linked once and used by every widget that names it. Credentials
  * live here, never in a widget's settings.
+ *
+ * A provider can hold several rows, because a person can have two Google
+ * accounts and want both on one panel - work and personal is the ordinary
+ * case. `account` is what tells them apart, and it is the account's own
+ * address rather than a number we made up, so a widget's settings survive the
+ * row being deleted and relinked.
+ *
+ * The empty `account` is reserved and means *the installation's own
+ * credentials for this provider*: the OAuth client Google was told about,
+ * which identifies this server and is the same whichever account signs in. It
+ * is one thing and it is stored once, rather than copied onto every grant.
  */
-export const connections = pgTable("connections", {
-  id: serial("id").primaryKey(),
-  provider: text("provider").notNull().unique(),
-  label: text("label").notNull().default(""),
-  /** Whatever the provider needs. Opaque above this table. */
-  credentials: jsonb("credentials").$type<Record<string, unknown>>().notNull().default({}),
-  connectedAt: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const connections = pgTable(
+  "connections",
+  {
+    id: serial("id").primaryKey(),
+    provider: text("provider").notNull(),
+    /** The account's own address, or "" for the installation's client. */
+    account: text("account").notNull().default(""),
+    label: text("label").notNull().default(""),
+    /** Whatever the provider needs. Opaque above this table. */
+    credentials: jsonb("credentials").$type<Record<string, unknown>>().notNull().default({}),
+    connectedAt: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // One row per account per provider. Not a unique on `provider` alone any
+    // more - that was the constraint that made a second Google account
+    // impossible.
+    uniqueIndex("connections_provider_account").on(table.provider, table.account),
+  ],
+);
 
 /**
  * One row, holding the things that are true of this whole installation.

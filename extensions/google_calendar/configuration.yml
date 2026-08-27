@@ -99,10 +99,11 @@ designs:
     nominal: [6, 6]
 
 fields:
-  # Several at once, because work and family on one panel is the ordinary case
-  # and two overlapping widgets is not how anybody would ask for it. Listed from
-  # the linked account rather than written down here: a calendar's id is an
-  # address, and typing one from memory is a quiz, not a form.
+  # Several at once, across as many Google accounts as are linked - work and
+  # personal on one panel is the ordinary case, and two overlapping widgets is
+  # not how anybody would ask for it. Listed from the accounts themselves
+  # rather than written down here: a calendar's id is an address, and typing
+  # one from memory is a quiz, not a form.
   - keyname: calendar
     name: Calendars
     field_type: multiselect
@@ -110,8 +111,9 @@ fields:
       - primary
     options_from: google.calendars
     help_text: >
-      Which calendars from the linked account. Tick more than one and they are
-      merged into a single list, each entry marked with where it came from.
+      Which calendars, from any linked Google account. Tick more than one and
+      they are merged into a single list in time order, each entry marked with
+      where it came from.
     optional: false
 
   # A boundary in a place, not a duration. At 22:00 "the rest of today" is two

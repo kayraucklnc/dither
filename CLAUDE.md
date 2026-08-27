@@ -145,6 +145,14 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
   `DITHER_OAUTH_ORIGIN` for a proxy that reveals neither, and shown on the
   connections page to be copied. Guessing it is `redirect_uri_mismatch` on
   Google's error page, not ours.
+- **A connection is one row per account, plus one for the installation.** The
+  empty `account` holds the OAuth client, which identifies *this server* and is
+  the same whoever signs in; each real account holds only its refresh token,
+  merged over the client at fetch time. Copy the client onto every grant and
+  rotating a secret becomes an N-row job. A widget names `account|calendar`,
+  because "primary" is a calendar on both of two accounts, and a selection
+  naming an account that is gone is refused rather than pointed at whoever
+  sorts first.
 - **A row is not a link when the link finishes in the browser.** The client
   credentials are stored the moment they are pasted; only a stored refresh
   token means anyone consented. `isLinked` in `web/src/lib/connections/link.ts`
