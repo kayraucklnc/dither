@@ -4,8 +4,10 @@ import { DAY } from "@/lib/clock";
 import {
   afterDiscounts,
   bucketByDay,
+  bucketByHour,
   forecastNext,
   monthlyValue,
+  runningTotal,
   sumBetween,
   sumSince,
   windowStarts,
@@ -162,5 +164,51 @@ describe("forecasting the next subscriber", () => {
     // elapsed, and "expected two weeks ago" is not a forecast.
     const forecast = forecastNext([daysAgo(29), daysAgo(28)], 30, now);
     expect(forecast.expectedAt!.getTime()).toBe(now.getTime());
+  });
+});
+
+describe("bucketByHour", () => {
+  const zone = "Europe/Rome";
+  const at = (hour: number, minute = 0) => new Date(Date.UTC(2026, 7, 27, hour - 2, minute));
+
+  it("buckets today's takings by local hour", () => {
+    const hours = bucketByHour(
+      [
+        { at: at(9, 10), amount: 1000 },
+        { at: at(9, 50), amount: 500 },
+        { at: at(14), amount: 2000 },
+      ],
+      zone,
+      at(0),
+      at(15),
+    );
+
+    expect(hours).toHaveLength(24);
+    expect(hours[9].amount).toBe(1500);
+    expect(hours[14].amount).toBe(2000);
+    expect(hours[10].amount).toBe(0);
+  });
+
+  it("marks the hours that have not happened yet", () => {
+    const hours = bucketByHour([], zone, at(0), at(15, 30));
+
+    expect(hours[15].ahead).toBe(false);
+    expect(hours[16].ahead).toBe(true);
+  });
+
+  it("ignores anything before today", () => {
+    const hours = bucketByHour([{ at: at(-6), amount: 900 }], zone, at(0), at(12));
+
+    expect(hours.reduce((total, hour) => total + hour.amount, 0)).toBe(0);
+  });
+});
+
+describe("runningTotal", () => {
+  it("carries each day into the next", () => {
+    expect(runningTotal([10, 20, 5])).toEqual([10, 30, 35]);
+  });
+
+  it("answers an empty series with an empty one", () => {
+    expect(runningTotal([])).toEqual([]);
   });
 });

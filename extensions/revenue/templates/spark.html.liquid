@@ -1,0 +1,111 @@
+{% comment %}
+  Figure and spark - one number with a hairline of history beside it.
+
+  For a shallow band, where a real chart has no room for its own scale and a
+  bar chart is six bars of eight pixels. A spark makes no claim about
+  magnitude - there are no axes and no labels, and it is not pretending to have
+  them. It says which way the last week or month went, which is exactly as much
+  as thirty pixels of height can honestly carry.
+{% endcomment %}
+
+{%- assign money = revenue -%}
+{%- assign metric = extension.values.metric | default: "taken" -%}
+{%- assign period = extension.values.window | default: "today" -%}
+{%- if metric == "taken" -%}
+  {%- assign card = money.windows[period] -%}
+{%- elsif metric == "next_subscriber" and extension.values.basis == "renewal" -%}
+  {%- assign card = money.cards.next_renewal -%}
+{%- else -%}
+  {%- assign card = money.cards[metric] -%}
+{%- endif -%}
+
+{%- assign chart = extension.values.chart | default: "auto" -%}
+{%- if chart == "pace" -%}
+  {%- assign series = money.pace.current -%}
+{%- elsif chart == "month" -%}
+  {%- assign series = money.days -%}
+{%- elsif chart == "today" -%}
+  {%- assign series = "" | split: "" -%}
+  {%- for hour in money.hours -%}
+    {%- unless hour.ahead %}{% assign series = series | concat: hour %}{% endunless -%}
+  {%- endfor -%}
+{%- elsif card.bars == "days" and chart == "auto" -%}
+  {%- assign series = money.days -%}
+{%- else -%}
+  {%- assign series = money.week -%}
+{%- endif -%}
+
+{%- assign box_w = shape.width | at_least: 180 -%}
+{%- assign box_h = shape.height | at_least: 60 -%}
+{%- assign pad = box_h | divided_by: 5 | at_least: 8 | at_most: 18 -%}
+
+<div class="screen">
+  {%- unless card -%}
+    <div class="content layout layout--row layout--center" style="gap: 10px; padding: {{ pad }}px">
+      <span class="i i-card i-lg"></span>
+      <p class="t-sm t-bold">Not connected — link Stripe under Connections.</p>
+    </div>
+  {%- else -%}
+    {%- assign digits = card.figure -%}
+    {%- if extension.values.compact_figures == false and card.figure_full != blank -%}
+      {%- assign digits = card.figure_full -%}
+    {%- endif -%}
+    {%- assign shown = card.symbol | append: digits -%}
+    {%- assign chars = shown | size | at_least: 3 -%}
+
+    {%- comment %} The figure takes at most half the band; the spark takes the
+      rest. Sized by whichever of the two runs out first. {% endcomment -%}
+    {%- assign by_height = box_h | times: 46 | divided_by: 100 -%}
+    {%- assign half_w = box_w | times: 46 | divided_by: 100 -%}
+    {%- assign by_width = half_w | times: 100 | divided_by: chars | divided_by: 56 -%}
+    {%- assign figure_size = by_width | at_most: by_height | at_most: 62 | at_least: 15 -%}
+
+    {%- assign peak = 0 -%}
+    {%- assign trough = 999999999 -%}
+    {%- for point in series -%}
+      {%- if point.amount > peak %}{% assign peak = point.amount %}{% endif -%}
+      {%- if point.amount < trough %}{% assign trough = point.amount %}{% endif -%}
+    {%- endfor -%}
+    {%- assign spread = peak | minus: trough -%}
+    {%- if spread <= 0 %}{% assign spread = 1 %}{% endif -%}
+
+    {%- assign count = series | size | at_least: 2 -%}
+    {%- assign last = count | minus: 1 -%}
+    {%- assign points = "" -%}
+    {%- for point in series -%}
+      {%- assign height = point.amount | minus: trough | times: 84 | divided_by: spread -%}
+      {%- assign y = 92 | minus: height -%}
+      {%- assign x = forloop.index0 | times: 1000 | divided_by: last -%}
+      {%- assign points = points | append: x | append: "," | append: y | append: " " -%}
+    {%- endfor -%}
+
+    <div class="content layout layout--row" style="align-items: center; gap: {{ pad }}px; padding: {{ pad }}px {{ pad | times: 1.6 | round }}px">
+      <div style="flex: none; min-width: 0">
+        {% if shape.rows > 2 %}
+          <p class="t-bold t-upper truncate" style="font-size: {{ figure_size | divided_by: 4 | at_least: 9 | at_most: 13 }}px; letter-spacing: 0.06em">
+            {{ extension.values.heading | default: card.caption }}
+          </p>
+        {% endif %}
+        <p class="t-bold truncate" style="font-size: {{ figure_size }}px; line-height: 1.05; letter-spacing: -0.03em">
+          {{ shown }}
+        </p>
+      </div>
+
+      <div class="fit" style="min-width: 60px; height: {{ box_h | times: 52 | divided_by: 100 | at_least: 22 }}px">
+        <svg viewBox="0 0 1000 100" preserveAspectRatio="none" width="100%" height="100%"
+             fill="none" stroke="black" style="display: block">
+          <line x1="0" y1="96" x2="1000" y2="96" stroke-width="1" vector-effect="non-scaling-stroke"/>
+          <polyline points="{{ points }}" stroke-width="3" stroke-linejoin="round"
+                    stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+        </svg>
+      </div>
+
+      {% if extension.values.compare != false and card.delta_short != blank %}
+        <p class="with-icon t-bold" style="flex: none; font-size: {{ figure_size | divided_by: 2.6 | round | at_least: 12 | at_most: 22 }}px">
+          <span class="i i-trending-{% if card.rising %}up{% else %}down{% endif %} i-sm"></span>
+          {{ card.delta_short }}
+        </p>
+      {% endif %}
+    </div>
+  {%- endunless -%}
+</div>

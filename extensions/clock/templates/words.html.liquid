@@ -1,0 +1,134 @@
+{% comment %}
+  In words - the time as a sentence, hedged by exactly what the refresh costs.
+
+  "Just gone half past ten" is true at 10:31 and still true at 10:44, which is
+  the whole span this picture has to survive. The wording is chosen in code
+  rather than here, because the rule that makes it honest - never name a mark
+  that has not happened, and drop "just" once the window outlives it - is worth
+  a test, and because a hundred lines of case statements in a template is not
+  a rule anybody can check. See lib/timewords.ts.
+
+  Under it, a strip of the hour with the same span marked on it. Words alone
+  cannot be both safe and precise; words with a picture of their own vagueness
+  can be both at once, and it takes eight pixels of height to say so.
+{% endcomment %}
+
+{%- assign shift = 0 -%}
+{%- if extension.values.utc_offset_hours != blank -%}
+  {%- assign shift = extension.values.utc_offset_hours | times: 3600 | minus: dither.offset_seconds -%}
+{%- endif -%}
+{%- assign stamp = "now" | date: "%s" | plus: shift -%}
+
+{%- assign hour24 = stamp | date: "%H" | times: 1 -%}
+{%- assign minute = stamp | date: "%M" | times: 1 -%}
+{%- assign mins = hour24 | times: 60 | plus: minute -%}
+{%- assign window = dither.window_minutes | at_least: 1 -%}
+
+{%- assign said = mins | time_in_words: window -%}
+{%- assign next_hour = hour24 | plus: 1 | modulo: 24 -%}
+
+{%- assign box_w = shape.width | at_least: 160 -%}
+{%- assign box_h = shape.height | at_least: 60 -%}
+{%- assign pad = box_w | divided_by: 22 | at_least: 10 | at_most: 26 -%}
+
+{%- comment %} The sentence is long and wraps, so it is fitted by area rather
+  than by character count: roughly, how many characters fit on a line at a
+  given size, against how many lines the box has room for. {% endcomment -%}
+{%- assign chars = said | size | at_least: 10 -%}
+{%- assign usable_w = box_w | minus: pad | minus: pad -%}
+{%- assign lines = 1 -%}
+{%- if chars > 18 and box_w < 460 %}{% assign lines = 2 %}{% endif -%}
+{%- if chars > 26 and box_w < 320 %}{% assign lines = 3 %}{% endif -%}
+{%- assign per_line = chars | divided_by: lines | plus: 1 -%}
+
+{%- comment %} Everything that is not the sentence, counted with the gaps it
+  brings with it - a strip is fourteen pixels and a gap, a date is a line and
+  a gap. Leaving the gaps out of this is what clipped the descenders off
+  "Thursday 27 August" in a nine-by-four box. {% endcomment -%}
+{%- assign gap = pad | divided_by: 2 -%}
+{%- assign spent = 0 -%}
+{%- assign strip = 0 -%}
+{%- if extension.values.show_window != false and box_h > 110 -%}
+  {%- assign strip = 14 -%}
+  {%- assign spent = spent | plus: 14 | plus: gap -%}
+  {%- if box_h > 170 and shape.columns > 5 %}{% assign spent = spent | plus: 19 %}{% endif -%}
+{%- endif -%}
+{%- assign dated = false -%}
+{%- if extension.values.show_date != false and box_h > 150 -%}
+  {%- assign dated = true -%}
+  {%- assign spent = spent | plus: 26 | plus: gap -%}
+{%- endif -%}
+{%- if extension.values.heading != blank and box_h > 130 -%}
+  {%- assign spent = spent | plus: 17 | plus: gap -%}
+{%- endif -%}
+{%- if notices.size > 0 %}{% assign spent = spent | plus: 34 %}{% endif -%}
+
+{%- assign room_h = box_h | minus: pad | minus: pad | minus: spent | at_least: 24 -%}
+{%- assign by_height = room_h | times: 92 | divided_by: 100 | divided_by: lines -%}
+{%- assign by_width = usable_w | times: 100 | divided_by: per_line | divided_by: 52 -%}
+{%- assign size = by_width | at_most: by_height | at_most: 72 | at_least: 15 -%}
+
+{%- comment %} Where in the hour we are, and how much of it this reading
+  covers. Both as percentages of the strip, which is exactly one hour wide. {% endcomment -%}
+{%- assign at = minute | times: 100 | divided_by: 60 -%}
+{%- assign covers = window | times: 100 | divided_by: 60 | at_most: 100 -%}
+{%- assign overrun = at | plus: covers | minus: 100 -%}
+{%- if overrun > 0 %}{% assign covers = covers | minus: overrun %}{% endif -%}
+
+<div class="screen">
+  <div class="content layout layout--col" style="justify-content: center; gap: {{ pad | divided_by: 2 }}px; padding: {{ pad }}px">
+    {% if extension.values.heading != blank and box_h > 130 %}
+      <p class="t-bold t-upper truncate" style="font-size: 13px">{{ extension.values.heading }}</p>
+    {% endif %}
+
+    <p class="t-bold" style="font-size: {{ size }}px; line-height: 1.06; letter-spacing: -0.02em">
+      {{ said }}
+    </p>
+
+    {% if strip > 0 %}
+      {%- comment %} The hour, with this reading's span marked on it. The mark
+        is where the clock is now and how far it will have gone before the
+        panel is redrawn - the same span the sentence is hedging by. {% endcomment -%}
+      <div style="position: relative; height: 14px; width: 100%; border-bottom: 2px solid var(--ink)">
+        {% for mark in (0..11) %}
+          <span style="position: absolute; bottom: 0; left: {{ mark | times: 100 | divided_by: 12 }}%;
+                       width: 2px; height: {% if mark == 0 or mark == 6 %}11{% elsif mark == 3 or mark == 9 %}8{% else %}5{% endif %}px;
+                       background: var(--ink)"></span>
+        {% endfor %}
+        <span style="position: absolute; bottom: 0; left: {{ at }}%; width: {{ covers | at_least: 2 }}%;
+                     height: 14px; background: var(--ink)"></span>
+      </div>
+      {% if shape.columns > 5 and box_h > 170 %}
+        {%- comment %} The strip is an hour wide, and saying which hour is the
+          difference between a diagram and a decoration. {% endcomment -%}
+        <div style="display: flex; justify-content: space-between; margin-top: 3px">
+          <span class="t-xs">{{ stamp | date: "%H" }}:00</span>
+          <span class="t-xs">{{ next_hour }}:00</span>
+        </div>
+      {% endif %}
+    {% endif %}
+
+    {% if dated %}
+      <p class="truncate" style="font-size: {{ size | divided_by: 3 | at_least: 12 | at_most: 20 }}px">
+        {{ stamp | date: "%A %-d %B" }}
+      </p>
+    {% endif %}
+  </div>
+
+  {% if notices.size > 0 %}
+    <div class="notice-strip" style="padding: 6px {{ pad }}px">
+      {% for notice in notices %}
+        {% if notice.overflow %}
+          <span class="notice notice--more">+{{ notice.overflow }}</span>
+        {% else %}
+          <span class="notice notice--{{ notice.level }}" title="{{ notice.text }}">
+            <span class="i i-{{ notice.icon }}"></span>
+          </span>
+        {% endif %}
+      {% endfor %}
+      {% if shape.wide and notices[0].text != blank %}
+        <span class="notice-said">{{ notices[0].text }}</span>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>

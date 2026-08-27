@@ -1,0 +1,154 @@
+{% comment %}
+  Agenda - the day as a list, with the gaps between things marked.
+
+  A list of meetings is not a day. The holes are half of it: three meetings
+  back to back and three spread over eight hours are the same list and
+  completely different afternoons, and the only difference on screen is whether
+  anything says so. So the empty stretches are drawn as entries in their own
+  right.
+
+  How many rows fit is arithmetic on the box, not a number per size: at four
+  rows the list holds two meetings and at twelve it holds eight, and the entry
+  that will not fit is counted rather than clipped.
+{% endcomment %}
+
+{%- assign day = calendar -%}
+{%- assign hh = "now" | date: "%H" | times: 60 -%}
+{%- assign now_mins = "now" | date: "%M" | plus: hh -%}
+
+{%- assign box_w = shape.width | at_least: 160 -%}
+{%- assign box_h = shape.height | at_least: 140 -%}
+{%- assign pad = box_w | divided_by: 24 | at_least: 10 | at_most: 22 -%}
+
+{%- comment %} Everything still to come, plus what is already done when the
+  widget was told to keep it - which is the setting for a wall somebody walks
+  past all day, where a day that empties itself reads as a broken screen. {% endcomment -%}
+{%- assign shown = day.upcoming -%}
+{%- if extension.values.show_done %}{% assign shown = day.events %}{% endif -%}
+
+{%- assign located = false -%}
+{%- if extension.values.show_location != false and box_w > 240 %}{% assign located = true %}{% endif -%}
+
+{%- assign row_h = 34 -%}
+{%- if located %}{% assign row_h = 48 %}{% endif -%}
+{%- if box_h < 220 %}{% assign row_h = 30 %}{% endif -%}
+
+{%- assign header = 46 -%}
+{%- if day.all_day.size > 0 and box_h > 200 %}{% assign header = header | plus: 28 %}{% endif -%}
+{%- if notices.size > 0 %}{% assign header = header | plus: 34 %}{% endif -%}
+{%- assign slots = box_h | minus: header | minus: pad | divided_by: row_h | at_least: 1 | at_most: 9 -%}
+{%- assign hidden = shown | size | minus: slots -%}
+
+<div class="screen{% if box_w < 260 %} dense{% endif %}">
+  <div class="title-bar" style="padding: {{ pad }}px {{ pad }}px 8px">
+    <div class="title" style="font-size: {{ box_w | divided_by: 18 | at_least: 16 | at_most: 30 }}px">
+      {{ extension.values.heading | default: "Today" }}
+    </div>
+    {% if box_w > 210 %}
+      <div class="chip">
+        <span class="i i-calendar"></span>{{ day.today.remaining }} left
+      </div>
+    {% else %}
+      <div class="t-sm t-bold">{{ day.today.remaining }}</div>
+    {% endif %}
+  </div>
+
+  {% if day.all_day.size > 0 and box_h > 200 %}
+    <div style="border-bottom: 2px solid var(--ink); padding: 5px {{ pad }}px">
+      <p class="with-icon t-xs truncate" style="gap: 6px">
+        <span class="i i-calendar-check i-xs"></span>
+        <span class="truncate t-bold">{% for entry in day.all_day %}{{ entry.title }}{% unless forloop.last %} &middot; {% endunless %}{% endfor %}</span>
+      </p>
+    </div>
+  {% endif %}
+
+  {%- if shown.size == 0 -%}
+    <div class="content layout layout--col layout--center" style="gap: 8px">
+      <span class="i i-calendar-check i-lg"></span>
+      <p class="t-md t-bold t-center">Nothing left today</p>
+      {% if day.tomorrow.count > 0 and box_h > 200 %}
+        <p class="t-sm t-center truncate" style="width: 100%">
+          Tomorrow: {{ day.tomorrow.first.start }} {{ day.tomorrow.first.title }}
+        </p>
+      {% endif %}
+    </div>
+  {%- else -%}
+    <div class="content content--tight" style="padding: 6px {{ pad }}px">
+      <div class="timeline">
+        {%- assign edge = 0 -%}
+        {% for event in shown limit: slots %}
+          {%- comment %} The hole between the last thing and this one, when it
+            is long enough to be worth crossing a room for. `edge` is where the
+            day had got to; before the first entry it is now. {% endcomment -%}
+          {%- if forloop.first -%}
+            {%- assign edge = now_mins -%}
+            {%- if event.start_minutes < edge %}{% assign edge = event.start_minutes %}{% endif -%}
+          {%- endif -%}
+          {%- assign hole = event.start_minutes | minus: edge -%}
+
+          {% if extension.values.show_gaps != false and hole >= 25 and box_h > 190 %}
+            <div class="entry" style="padding: 2px 0">
+              <span class="at t-xs" style="font-weight: 400">{{ hole | span_in_words }}</span>
+              <span class="spine">
+                <span style="border-left: 2px dashed var(--ink); flex: 1; width: 0"></span>
+              </span>
+              <span class="t-xs" style="align-self: center">free</span>
+            </div>
+          {% endif %}
+
+          {%- assign until = event.start_minutes | minus: now_mins -%}
+          {%- assign running = false -%}
+          {%- if until <= 0 and event.end_minutes > now_mins %}{% assign running = true %}{% endif -%}
+          {%- assign done = false -%}
+          {%- if event.end_minutes <= now_mins %}{% assign done = true %}{% endif -%}
+
+          <div class="entry" style="padding: {{ row_h | minus: 26 | divided_by: 2 | at_least: 2 }}px 0">
+            <span class="at" style="font-size: {{ box_w | divided_by: 26 | at_least: 12 | at_most: 17 }}px{% if done %}; text-decoration: line-through{% endif %}">
+              {% if event.start_minutes >= 1440 %}+{{ event.start }}{% else %}{{ event.start }}{% endif %}
+            </span>
+            <span class="spine">
+              <span class="node{% if running %} node--now{% endif %}"></span>
+            </span>
+            <span class="body">
+              <span class="what truncate" style="display: block; font-size: {{ box_w | divided_by: 24 | at_least: 13 | at_most: 19 }}px{% if done %}; text-decoration: line-through{% endif %}">
+                {{ event.title }}
+              </span>
+              {% if located and event.location != blank %}
+                <span class="where">
+                  <span class="i i-{% if event.remote %}video{% else %}pin{% endif %} i-xs"></span>
+                  <span class="truncate">{{ event.location }}</span>
+                  {% if event.conflict %}<span class="i i-alert i-xs"></span>{% endif %}
+                </span>
+              {% elsif running %}
+                <span class="where"><span class="i i-dot i-xs"></span>on now</span>
+              {% endif %}
+            </span>
+          </div>
+
+          {%- assign edge = event.end_minutes -%}
+        {% endfor %}
+      </div>
+
+      {% if hidden > 0 %}
+        <p class="t-xs t-bold" style="margin-top: 4px">+{{ hidden }} more</p>
+      {% endif %}
+    </div>
+  {%- endif -%}
+
+  {% if notices.size > 0 %}
+    <div class="notice-strip" style="padding: 6px {{ pad }}px">
+      {% for notice in notices %}
+        {% if notice.overflow %}
+          <span class="notice notice--more">+{{ notice.overflow }}</span>
+        {% else %}
+          <span class="notice notice--{{ notice.level }}" title="{{ notice.text }}">
+            <span class="i i-{{ notice.icon }}"></span>
+          </span>
+        {% endif %}
+      {% endfor %}
+      {% if shape.wide and notices[0].text != blank %}
+        <span class="notice-said">{{ notices[0].text }}</span>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
