@@ -87,9 +87,14 @@ export function clockSource(now: Date): Source {
   };
 }
 
-export function triggerSource(trigger: Trigger, facts: Fact[], now: Date): Source {
-  const age = trigger.fetchedAt
-    ? Math.floor((now.getTime() - trigger.fetchedAt.getTime()) / 60_000)
+export function triggerSource(
+  trigger: Trigger,
+  facts: Fact[],
+  answer: { payload: Record<string, unknown>; fetchedAt: Date | null; error?: string },
+  now: Date,
+): Source {
+  const age = answer.fetchedAt
+    ? Math.floor((now.getTime() - answer.fetchedAt.getTime()) / 60_000)
     : null;
 
   return {
@@ -98,8 +103,8 @@ export function triggerSource(trigger: Trigger, facts: Fact[], now: Date): Sourc
     group: "trigger",
     extension: trigger.extension,
     facts: [...facts, FRESHNESS_FACT],
-    fetchedAt: trigger.fetchedAt,
-    error: trigger.error ?? undefined,
-    payload: { ...trigger.payload, _dither: { minutes_since_update: age } },
+    fetchedAt: answer.fetchedAt,
+    error: answer.error,
+    payload: { ...answer.payload, _dither: { minutes_since_update: age } },
   };
 }

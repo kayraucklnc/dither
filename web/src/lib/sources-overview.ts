@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { decisionNodes, devices, notices, triggers } from "@/lib/db/schema";
+import { answersFor, observationKey } from "@/lib/extensions/observations";
 import { all, find } from "@/lib/extensions/registry";
 import { valueAt, type Fact } from "@/lib/facts";
 import type { Field } from "@/lib/extensions/manifest";
@@ -62,14 +63,18 @@ export async function sourcesOverview(): Promise<SourceOverview[]> {
   }
 
   const now = Date.now();
+  const answers = await answersFor(rows);
   const overview: SourceOverview[] = [];
 
   for (const row of rows) {
     const extension = await find(row.extension);
-    const age = row.fetchedAt ? Math.floor((now - row.fetchedAt.getTime()) / 60_000) : null;
+    const answer = answers.get(observationKey(row.extension, row.settings));
+    const age = answer?.fetchedAt
+      ? Math.floor((now - answer.fetchedAt.getTime()) / 60_000)
+      : null;
 
     const facts = [...(extension?.manifest.facts ?? []), FRESHNESS_FACT];
-    const payload = { ...row.payload, _dither: { minutes_since_update: age } };
+    const payload = { ...(answer?.payload ?? {}), _dither: { minutes_since_update: age } };
     const values: Record<string, string> = {};
 
     for (const fact of facts) {
@@ -97,8 +102,8 @@ export async function sourcesOverview(): Promise<SourceOverview[]> {
       capabilitiesFrom: extension?.manifest.capabilities_from,
       facts,
       values,
-      fetchedAt: row.fetchedAt ? row.fetchedAt.toISOString() : null,
-      error: row.error ?? undefined,
+      fetchedAt: answer?.fetchedAt ? answer.fetchedAt.toISOString() : null,
+      error: answer?.error,
       usedBy: uses.get(String(row.id)) ?? 0,
       usedOn: [...(usedOn.get(String(row.id)) ?? [])],
     });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, Check, Loader2, Plus, Trash2, TriangleAlert } from "lucide-react";
+import { Bell, Check, Loader2, Plus, Radio, Trash2, TriangleAlert } from "lucide-react";
 
 import { LayoutPicker } from "@/components/composer/layout-picker";
 import { SettingsForm } from "@/components/composer/settings-form";
@@ -30,6 +30,8 @@ export interface PaletteEntry {
   headline: ShapeId;
   /** Sizes whose design has somewhere to show another extension's alert. */
   noticeShapes: ShapeId[];
+  /** How many values it reports, so "also watch this" is only offered when it does. */
+  factCount: number;
   /** Where "what can these settings do" is answered, for hiding fields. */
   capabilitiesFrom?: string;
 }
@@ -85,12 +87,48 @@ export function ScreenEditor({
   const [nextId, setNextId] = useState(-1);
   const [dragging, setDragging] = useState(false);
   const [dataVersion, setDataVersion] = useState(0);
+  const [watched, setWatched] = useState<{ extension: string; settings: unknown }[]>([]);
   const [fetching, setFetching] = useState(false);
   const [armed, setArmed] = useState<Layout | undefined>(() => matching(initialWidgets));
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const selected = widgets.find((widget) => widget.id === selectedId);
   const byName = useMemo(() => new Map(palette.map((entry) => [entry.name, entry])), [palette]);
+
+  /**
+   * Which questions are already being watched.
+   *
+   * A widget draws; a source lets a rule decide. They stay separate on purpose
+   * - you can decide on a station you never display - but wanting both for the
+   * same thing is the common case, and it should be one click rather than a
+   * second trip through a different page to retype the same settings.
+   */
+  useEffect(() => {
+    fetch("/api/sources")
+      .then((response) => (response.ok ? response.json() : undefined))
+      .then((body) => body && setWatched(body.sources));
+  }, [dataVersion]);
+
+  const isWatched = (widget: EditorWidget) =>
+    watched.some(
+      (source) =>
+        source.extension === widget.extension &&
+        JSON.stringify(source.settings) === JSON.stringify(widget.settings),
+    );
+
+  const watch = async (widget: EditorWidget) => {
+    await fetch("/api/sources", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        extension: widget.extension,
+        label: widget.label || undefined,
+        settings: widget.settings,
+      }),
+    });
+
+    setDataVersion((value) => value + 1);
+  };
 
   /* ---------------------------------------------------------------- preview */
 
@@ -732,6 +770,33 @@ export function ScreenEditor({
                 </div>
               );
             })()}
+
+            {selectedEntry.factCount > 0 && (
+              <div className="mb-5 rounded-lg border border-line bg-ground/40 p-3">
+                {isWatched(selected) ? (
+                  <p className="flex items-start gap-2 text-[11px] leading-relaxed text-faint">
+                    <Radio size={12} className="mt-0.5 shrink-0 text-accent-bright" />
+                    Also watched, so any device can decide on it. Showing and deciding share one
+                    fetch.
+                  </p>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => watch(selected)}
+                      className="flex w-full items-center justify-center gap-2 rounded-md border border-line bg-raised px-3 py-1.5 text-[12px] text-muted transition-colors hover:text-ink"
+                    >
+                      <Radio size={12} />
+                      Also watch this
+                    </button>
+                    <p className="mt-2 text-[11px] leading-relaxed text-faint">
+                      Drawing it and deciding on it are separate - you can branch on a station you
+                      never display. This adds a source with these settings, sharing the same fetch.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
 
             <div className="border-t border-line pt-5">
               <SettingsForm

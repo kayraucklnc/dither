@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Loader2, Plus, RefreshCw, Settings2, Trash2 } from "lucide-react";
 
@@ -52,13 +52,39 @@ export function SourcesList({
     router.refresh();
   };
 
-  const save = async (id: string, settings: Record<string, unknown>) => {
-    await fetch("/api/sources", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: Number(id), settings }),
-    });
-    router.refresh();
+  /**
+   * Typing edits a local copy; the server hears about it once you stop.
+   *
+   * Saving on every keystroke meant a round trip, a refetch of the source, and
+   * a full server re-render per character - which is exactly as slow as it
+   * sounds. The draft is what the form shows until the save lands.
+   */
+  const [drafts, setDrafts] = useState<Record<string, Record<string, unknown>>>({});
+  const [saving, setSaving] = useState<Record<string, boolean>>({});
+  const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  useEffect(() => {
+    const held = timers.current;
+    return () => Object.values(held).forEach(clearTimeout);
+  }, []);
+
+  const edit = (id: string, settings: Record<string, unknown>) => {
+    setDrafts((current) => ({ ...current, [id]: settings }));
+    setSaving((current) => ({ ...current, [id]: true }));
+
+    clearTimeout(timers.current[id]);
+    timers.current[id] = setTimeout(async () => {
+      await fetch("/api/sources", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: Number(id), settings }),
+      });
+
+      setSaving((current) => ({ ...current, [id]: false }));
+      // The values it reports change with its settings, so the page catches up
+      // once - not once per character.
+      router.refresh();
+    }, 700);
   };
 
   const remove = async (id: string) => {
@@ -117,6 +143,12 @@ export function SourcesList({
                   <h2 className="text-[14px] font-medium">{source.label}</h2>
                   <span className="text-[11px] text-faint">{source.extensionLabel}</span>
                   <span className="text-[11px] text-faint">· {ago(source.fetchedAt)}</span>
+                  {saving[source.id] && (
+                    <span className="flex items-center gap-1 text-[11px] text-faint">
+                      <Loader2 size={10} className="animate-spin" />
+                      saving
+                    </span>
+                  )}
                 </div>
 
                 <p className="mt-1 text-[12px] text-faint">
@@ -180,8 +212,10 @@ export function SourcesList({
                 <SettingsForm
                   fields={source.fields}
                   capabilitiesFrom={source.capabilitiesFrom}
-                  values={source.settings}
-                  onChange={(key, value) => save(source.id, { ...source.settings, [key]: value })}
+                  values={drafts[source.id] ?? source.settings}
+                  onChange={(key, value) =>
+                    edit(source.id, { ...(drafts[source.id] ?? source.settings), [key]: value })
+                  }
                 />
               </div>
             )}

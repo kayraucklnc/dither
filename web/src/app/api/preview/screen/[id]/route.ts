@@ -53,7 +53,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     : DEFAULT_PANEL;
 
   const rows = await db.select().from(widgets).where(eq(widgets.screenId, id));
-  const data = await dataFor(rows.map((row) => ({ id: row.id, extension: row.extension })));
+  const data = await dataFor(
+    rows.map((row) => ({ id: row.id, extension: row.extension, settings: row.settings })),
+  );
 
   const placed = rows.map((row) => ({
     id: row.id,

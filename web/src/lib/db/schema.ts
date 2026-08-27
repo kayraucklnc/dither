@@ -89,14 +89,22 @@ export const widgets = pgTable("widgets", {
 });
 
 /**
- * The last answer a widget got from its data source, plus whatever went wrong
- * getting it. Kept separate from the widget so a failed fetch never destroys
- * the configuration that produced it.
+ * One answer, for one question, however many things asked it.
+ *
+ * Keyed by the extension and its settings rather than by whoever wanted it.
+ * Showing the Cadorna board on a screen and deciding on it in a rule are two
+ * declarations of intent, but they are the same question - and asking Trenord
+ * twice for one answer is rude and slow. A widget and a source configured
+ * identically share this row, so the second is fresh the moment it exists.
+ *
+ * Kept apart from both so a failed fetch never destroys the configuration that
+ * produced it.
  */
-export const widgetData = pgTable("widget_data", {
-  widgetId: integer("widget_id")
-    .primaryKey()
-    .references(() => widgets.id, { onDelete: "cascade" }),
+export const observations = pgTable("observations", {
+  /** Hash of the extension and its settings. See observationKey. */
+  key: text("key").primaryKey(),
+  extension: text("extension").notNull(),
+  settings: jsonb("settings").$type<Record<string, unknown>>().notNull(),
   payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
   fetchedAt: timestamp("fetched_at", { withTimezone: true }),
   error: text("error"),
@@ -166,11 +174,6 @@ export const triggers = pgTable("triggers", {
   /** What it is called in the check editor: "Cadorna departures", "Milan rain". */
   label: text("label").notNull().default(""),
   settings: jsonb("settings").$type<Record<string, unknown>>().notNull().default({}),
-
-  payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
-  fetchedAt: timestamp("fetched_at", { withTimezone: true }),
-  error: text("error"),
-
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -329,7 +332,6 @@ export const screensRelations = relations(screens, ({ many }) => ({
 
 export const widgetsRelations = relations(widgets, ({ one }) => ({
   screen: one(screens, { fields: [widgets.screenId], references: [screens.id] }),
-  data: one(widgetData, { fields: [widgets.id], references: [widgetData.widgetId] }),
 }));
 
 export const devicesRelations = relations(devices, ({ one, many }) => ({
@@ -347,7 +349,7 @@ export const decisionNodesRelations = relations(decisionNodes, ({ one }) => ({
 export type Model = typeof models.$inferSelect;
 export type Screen = typeof screens.$inferSelect;
 export type Widget = typeof widgets.$inferSelect;
-export type WidgetData = typeof widgetData.$inferSelect;
+export type Observation = typeof observations.$inferSelect;
 export type Device = typeof devices.$inferSelect;
 export type DecisionNode = typeof decisionNodes.$inferSelect;
 export type Trigger = typeof triggers.$inferSelect;
