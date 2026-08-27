@@ -617,7 +617,7 @@ function TreeCanvas({
               setMenu({ at: { x: pointer.clientX, y: pointer.clientY }, items: menuFor(null) });
             }}
             fitView
-            fitViewOptions={{ padding: 0.2 }}
+            fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
             proOptions={{ hideAttribution: true }}
             className="bg-ground"
           >

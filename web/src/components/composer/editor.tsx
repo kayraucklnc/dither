@@ -255,6 +255,27 @@ export function ScreenEditor({
     });
   };
 
+  /* -------------------------------------------------------------- shortcuts */
+
+  useEffect(() => {
+    const keys = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      // Never steal a key from something being typed into.
+      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+
+      if (event.key === "Escape") return setSelectedId(null);
+
+      if ((event.key === "Backspace" || event.key === "Delete") && selectedId !== null) {
+        event.preventDefault();
+        remove(selectedId);
+      }
+    };
+
+    window.addEventListener("keydown", keys);
+    return () => window.removeEventListener("keydown", keys);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+
   /* ---------------------------------------------------------------- pointer */
 
   const cellSize = () => {
@@ -500,7 +521,8 @@ export function ScreenEditor({
             </div>
 
             <p className="mt-3 text-center text-[12px] text-faint">
-              {panel.width}x{panel.height}, dithered exactly as the device will receive it.
+              {panel.width}×{panel.height}, dithered exactly as the device will receive it.
+              {selected && <span className="ml-2 opacity-70">Backspace removes the selection.</span>}
             </p>
 
             {problems.length > 0 && (
