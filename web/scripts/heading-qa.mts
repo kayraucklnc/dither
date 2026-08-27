@@ -6,7 +6,7 @@ import { scratch } from "./scratch.mts";
  * The transit templates never looked at the heading, so typing one did
  * nothing - and there was no way to tell that from a slow save.
  */
-const base = "http://localhost:3000";
+const base = process.env.DITHER_URL ?? "http://localhost:3000";
 const { screenId } = await scratch();
 
 const { widgets } = await (await fetch(`${base}/api/screens-widgets?screenId=${screenId}`)).json();

@@ -4,20 +4,20 @@
 # workspace works for anybody who clones this — not only on the machine where
 # somebody once clicked through the settings panel.
 #
-# There is no `setup` script: dependencies live in the Docker image, and
-# `make up` prepares the workspace's database on first start. The gitignored
-# `.env` arrives via `.worktreeinclude` at the repository root.
+# There is no `setup` script: `make up` installs dependencies and prepares the
+# database itself. The gitignored `.env` arrives via `.worktreeinclude` at the
+# repository root, and without it there are no database credentials.
 "$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
 
 [scripts]
-# Concurrent because each workspace takes its own Compose project and its own
-# port trio — see bin/dev. Several stacks running at once is the point.
+# Concurrent because each workspace serves on a port of its own — see bin/dev.
+# They share one database, so several running at once is the point.
 run_mode = "concurrent"
 
 [scripts.run.dev]
-# `make up` starts the stack detached and prints the workspace's URL; the logs
-# that follow are what makes it a useful long-running script.
-command = "make up && make logs"
+# `make up` prepares this workspace and prints its URL; `make dev` is the dev
+# server itself, which is what makes it a useful long-running script.
+command = "make up && make dev"
 # Needs Docker, so local only.
 available_in = [ "local" ]
 default = true
