@@ -153,6 +153,11 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
 - **An all-day calendar entry has no start time**, so it cannot go on a
   timeline. Placed there as 00:00 it takes the hero slot and fires the
   about-to-start notice at midnight. They are counted separately.
+- **An all-day date floats, and must be compared as a date.** "2026-08-28" is
+  the 28th wherever you are, with no instant behind it. Read as midnight UTC
+  and compared against local midnights, a one-day birthday draws on two days
+  everywhere east of Greenwich - and every test written in UTC passes. ISO date
+  strings compare correctly on their own; use them.
 - **A fetch that failed has to reach the renderer, or the panel lies.** An
   extension that has never answered draws a *fault* rather than its sample -
   four invented meetings look exactly like four real ones. One that answered
