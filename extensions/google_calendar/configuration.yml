@@ -1,0 +1,153 @@
+# Dither bundled extension: Google Calendar.
+#
+# The first extension backed by a *connection* rather than a URL: you link a
+# Google account once under Connections, and every calendar widget on every
+# screen uses it. Settings here choose which calendar and how far ahead to
+# look, per placement - so "work calendar, next 8 hours" and "family calendar,
+# today" can sit on the same screen.
+#
+# The Google provider is mocked for now: it answers plausible meetings so the
+# screens and the triggers can be designed and tested before the OAuth flow
+# exists. Swapping the mock for the real API changes one file and nothing else.
+
+version: "1.0.0"
+name: google_calendar
+label: Calendar
+description: >
+  What is next in your day, and what is after that. Links to a Google account
+  once and works on every screen.
+
+kind: connection
+connection: google
+mode: text
+tags:
+  - calendar
+  - time
+
+interval: 10
+unit: minute
+days: []
+last_day_of_month: false
+start_at: "2026-01-01T00:00:00Z"
+
+static_body: {}
+data: {}
+
+fields:
+  - keyname: calendar
+    name: Calendar
+    field_type: select
+    default: primary
+    options:
+      - value: primary
+        label: Primary
+      - value: work
+        label: Work
+      - value: family
+        label: Family
+    help_text: Which calendar from the linked account.
+    optional: false
+
+  - keyname: horizon_hours
+    name: Look ahead
+    field_type: number
+    default: 12
+    min: 1
+    max: 72
+    help_text: Hours ahead to consider. Meetings past this are ignored.
+    optional: false
+
+  - keyname: heading
+    name: Heading
+    field_type: string
+    default: "Today"
+    help_text: Label above the list. Leave blank to hide it.
+    optional: true
+
+  - keyname: hide_declined
+    name: Hide declined
+    field_type: boolean
+    default: true
+    help_text: Leave out events you have declined.
+    optional: true
+
+  - keyname: show_location
+    name: Show location
+    field_type: boolean
+    default: true
+    help_text: Room, address or video link under each meeting.
+    optional: true
+
+# Everything below becomes a trigger you can build a rule from. The declared
+# type decides which comparisons the editor offers.
+facts:
+  - key: next_meeting_in
+    label: Next meeting starts in
+    type: duration
+    path: calendar.next.minutes_until
+    unit: minutes
+
+  - key: next_meeting_title
+    label: Next meeting
+    type: text
+    path: calendar.next.title
+    unit: ""
+
+  - key: next_meeting_location
+    label: Next meeting location
+    type: text
+    path: calendar.next.location
+    unit: ""
+
+  - key: next_meeting_is_remote
+    label: Next meeting is a video call
+    type: boolean
+    path: calendar.next.remote
+    unit: ""
+
+  - key: meetings_today
+    label: Meetings left today
+    type: number
+    path: calendar.remaining_today
+    unit: ""
+
+  - key: free_until
+    label: Free for
+    type: duration
+    path: calendar.free_minutes
+    unit: minutes
+
+# Used for previews until the connection has answered once. Never sent to a
+# device.
+sample:
+  calendar:
+    remaining_today: 3
+    free_minutes: 24
+    empty: false
+    next:
+      title: "Design review"
+      minutes_until: 24
+      start: "10:30"
+      end: "11:15"
+      location: "Milano Centrale, Sala 4"
+      remote: false
+      accepted: true
+    events:
+      - title: "Design review"
+        start: "10:30"
+        end: "11:15"
+        location: "Milano Centrale, Sala 4"
+        remote: false
+        minutes_until: 24
+      - title: "Standup"
+        start: "11:30"
+        end: "11:45"
+        location: "Meet"
+        remote: true
+        minutes_until: 84
+      - title: "1:1 with Ana"
+        start: "15:00"
+        end: "15:30"
+        location: "Sala 2"
+        remote: false
+        minutes_until: 294

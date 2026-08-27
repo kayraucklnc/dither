@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 
 import { db } from "@/lib/db";
-import { devices, flowStates, models } from "@/lib/db/schema";
+import { decisionNodes, devices, models } from "@/lib/db/schema";
 import { readDevice } from "@/lib/device-headers";
 
 /**
@@ -53,15 +53,14 @@ export async function GET(request: Request) {
     })
     .returning();
 
-  // A device with no flow can never show anything, so it gets a home state on
-  // arrival rather than waiting for someone to notice.
-  await db
-    .insert(flowStates)
-    .values({ deviceId: device.id, name: "Home", screenId: null, isInitial: true, x: 80, y: 160 })
-    .returning()
-    .then(([state]) =>
-      db.update(devices).set({ currentStateId: state.id }).where(eq(devices.id, device.id)),
-    );
+  // A device with no tree can never show anything, so it arrives with a
+  // one-leaf tree rather than waiting for someone to notice.
+  const [root] = await db
+    .insert(decisionNodes)
+    .values({ deviceId: device.id, kind: "screen", label: "Home", x: 40, y: 40 })
+    .returning();
+
+  await db.update(devices).set({ rootNodeId: root.id }).where(eq(devices.id, device.id));
 
   return answer(apiKey);
 }

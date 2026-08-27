@@ -1,7 +1,7 @@
 import { eq, inArray } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { flowStates, screens, widgets } from "@/lib/db/schema";
+import { decisionNodes, screens, widgets } from "@/lib/db/schema";
 import { find as findExtension } from "@/lib/extensions/registry";
 import type { Fact } from "@/lib/extensions/manifest";
 import type { Context } from "@/lib/flow/conditions";
@@ -12,7 +12,7 @@ import { dataFor } from "@/lib/widget-data";
  * Everything a device's flow can ask about, gathered once.
  *
  * The facts available to a device are the facts of the widgets on the screens
- * its flow can reach - because a fact belongs to a *placement*, not to an
+ * its tree can reach - because a fact belongs to a *placement*, not to an
  * extension. "Cadorna to Saronno leaves in under ten minutes" is a different
  * trigger from "Centrale to Bergamo leaves in under ten minutes", and both can
  * exist at once.
@@ -27,8 +27,10 @@ export interface WidgetFacts {
 }
 
 export async function widgetsForDevice(deviceId: number): Promise<WidgetFacts[]> {
-  const states = await db.select().from(flowStates).where(eq(flowStates.deviceId, deviceId));
-  const screenIds = [...new Set(states.map((state) => state.screenId).filter((id): id is number => id !== null))];
+  const nodes = await db.select().from(decisionNodes).where(eq(decisionNodes.deviceId, deviceId));
+  const screenIds = [
+    ...new Set(nodes.map((node) => node.screenId).filter((id): id is number => id !== null)),
+  ];
 
   if (!screenIds.length) return [];
 

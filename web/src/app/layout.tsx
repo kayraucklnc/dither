@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { Mark } from "@/components/mark";
 import { Nav } from "@/components/nav";
 import "./globals.css";
 
@@ -16,12 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="flex min-h-screen">
           <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-line bg-surface">
             <Link href="/" className="flex items-center gap-2.5 px-5 py-5">
-              <span
-                aria-hidden
-                className="grid h-7 w-7 place-items-center rounded-md bg-ink text-[13px] font-bold text-ground"
-              >
-                D
-              </span>
+              <Mark className="h-6 w-6 shrink-0 text-accent-bright" />
               <span className="text-[15px] font-semibold tracking-tight">Dither</span>
             </Link>
 

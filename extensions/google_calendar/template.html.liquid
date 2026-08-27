@@ -1,0 +1,44 @@
+{% comment %} Full: 800x480. The next meeting large, the rest as a list. {% endcomment %}
+
+<div class="screen">
+  <div class="title-bar">
+    <div class="title">{{ extension.values.heading | default: "Today" }}</div>
+    <div class="t-sm">{{ calendar.remaining_today }} left</div>
+  </div>
+
+  {% if calendar.empty or calendar.next == nil %}
+    <div class="content layout layout--col layout--center">
+      <p class="t-xl t-bold">Nothing scheduled</p>
+      <p class="t-sm muted">The rest of the day is yours.</p>
+    </div>
+  {% else %}
+    <div class="content cols cols--sidebar">
+      <div class="stack">
+        <p class="t-xs t-upper muted">
+          {% if calendar.next.minutes_until <= 0 %}Now{% else %}In {{ calendar.next.minutes_until }} min{% endif %}
+        </p>
+        <p class="t-xxl t-bold clamp-2">{{ calendar.next.title }}</p>
+        <p class="t-md t-mono">{{ calendar.next.start }} – {{ calendar.next.end }}</p>
+        {% if extension.values.show_location and calendar.next.location != blank %}
+          <p class="t-sm clamp-2">
+            {% if calendar.next.remote %}Video · {% endif %}{{ calendar.next.location }}
+          </p>
+        {% endif %}
+      </div>
+
+      <div class="list">
+        {% for event in calendar.events offset: 1 limit: 4 %}
+          <div class="list-item">
+            <div class="kv">
+              <span class="k t-sm t-bold truncate">{{ event.title }}</span>
+              <span class="v t-sm t-mono">{{ event.start }}</span>
+            </div>
+            {% if extension.values.show_location and event.location != blank %}
+              <p class="t-xs muted truncate">{{ event.location }}</p>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+</div>

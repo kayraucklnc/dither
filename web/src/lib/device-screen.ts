@@ -2,10 +2,9 @@ import { desc, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import {
+  decisionNodes,
   devices,
   firmwares,
-  flowStates,
-  flowTransitions,
   models,
   renders,
   screens,
@@ -14,68 +13,77 @@ import {
 import type { Device } from "@/lib/db/schema";
 import type { Condition } from "@/lib/flow/conditions";
 import { contextFor } from "@/lib/flow/context";
-import { decide, type Decision } from "@/lib/flow/machine";
+import { walk, type Node, type Walk } from "@/lib/flow/tree";
 import { panelFor } from "@/lib/panel";
 import { fingerprint, renderScreen } from "@/lib/render";
 import { store } from "@/lib/storage";
+import { refreshScreen } from "@/lib/extensions/fetcher";
 import { dataFor } from "@/lib/widget-data";
 
 /**
- * Decide what this device should show, render it, and remember where the
- * device now is.
+ * Decide what this device should show, render it, and remember the leaf it
+ * landed on so a hold can be honoured next time.
  *
- * Advancing the flow is a side effect of being asked, which is deliberate: the
+ * Walking the tree is a side effect of being asked, which is deliberate: the
  * device waking up *is* the clock of this system. Nothing else ticks.
  */
 export interface Served {
   storageKey: string;
   filename: string;
   refreshSeconds: number;
-  decision?: Decision;
+  walk: Walk;
   screenName: string;
+}
+
+export function toNodes(rows: (typeof decisionNodes.$inferSelect)[]): Node[] {
+  return rows.map((row) => ({
+    id: row.id,
+    kind: row.kind === "question" ? "question" : "screen",
+    label: row.label,
+    condition: (row.condition as unknown as Condition | null) ?? null,
+    yesNodeId: row.yesNodeId,
+    noNodeId: row.noNodeId,
+    screenId: row.screenId,
+    refreshSeconds: row.refreshSeconds,
+    holdSeconds: row.holdSeconds,
+  }));
 }
 
 export async function serve(device: Device, now = new Date()): Promise<Served> {
   const [panel] = await db.select().from(models).where(eq(models.id, device.modelId));
 
-  const states = await db.select().from(flowStates).where(eq(flowStates.deviceId, device.id));
-  const transitions = await db
-    .select()
-    .from(flowTransitions)
-    .where(eq(flowTransitions.deviceId, device.id));
+  const rows = await db.select().from(decisionNodes).where(eq(decisionNodes.deviceId, device.id));
 
-  const decision = decide(
-    states,
-    transitions.map((transition) => ({
-      id: transition.id,
-      fromStateId: transition.fromStateId,
-      toStateId: transition.toStateId,
-      condition: transition.condition as unknown as Condition,
-      priority: transition.priority,
-    })),
-    { currentStateId: device.currentStateId, stateEnteredAt: device.stateEnteredAt },
+  const result = walk(
+    toNodes(rows),
+    device.rootNodeId,
+    { currentNodeId: device.currentNodeId, nodeEnteredAt: device.nodeEnteredAt },
     await contextFor(device, now),
     device.refreshRate,
   );
 
-  if (decision?.moved) {
+  if (result.leaf && result.leaf.id !== device.currentNodeId) {
     await db
       .update(devices)
-      .set({ currentStateId: decision.state.id, stateEnteredAt: now })
+      .set({ currentNodeId: result.leaf.id, nodeEnteredAt: now })
       .where(eq(devices.id, device.id));
   }
 
-  const screenId = decision?.state.screenId ?? null;
+  const screenId = result.leaf?.screenId ?? null;
   const [screen] = screenId
     ? await db.select().from(screens).where(eq(screens.id, screenId))
     : [undefined];
 
-  const rows = screenId
+  // The device asking is the only clock in this system, so this is where stale
+  // data gets refreshed - before the picture it is about to receive is drawn.
+  if (screenId) await refreshScreen(screenId, now);
+
+  const placedRows = screenId
     ? await db.select().from(widgets).where(eq(widgets.screenId, screenId))
     : [];
 
-  const data = await dataFor(rows.map((row) => ({ id: row.id, extension: row.extension })));
-  const placed = rows.map((row) => ({
+  const data = await dataFor(placedRows.map((row) => ({ id: row.id, extension: row.extension })));
+  const placed = placedRows.map((row) => ({
     id: row.id,
     extension: row.extension,
     label: row.label,
@@ -111,8 +119,8 @@ export async function serve(device: Device, now = new Date()): Promise<Served> {
     // The device caches by filename, so it must change when the picture does
     // and must not change when it does not. The fingerprint gives both.
     filename: `${name}-${key.slice(0, 10)}`,
-    refreshSeconds: decision?.refreshSeconds ?? device.refreshRate,
-    decision,
+    refreshSeconds: result.refreshSeconds,
+    walk: result,
     screenName: screen?.name ?? "Nothing set up",
   };
 }
