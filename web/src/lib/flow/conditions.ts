@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { compare, describe, valueAt, type Fact } from "@/lib/facts";
+import { compare, describe, readFact, showFact } from "@/lib/facts";
 import type { Source } from "./sources";
 
 /**
@@ -99,7 +99,9 @@ export function evaluate(condition: Condition, context: Context): Trace {
     return { holds: false, sentence: `${source.label}: unknown value "${condition.factKey}"` };
   }
 
-  const actual = valueAt(source.payload, fact.path);
+  // Read against `context.now`, never straight out of the payload: a countdown
+  // in a fetched row stopped counting when it was fetched. See lib/facts.
+  const actual = readFact(fact, source.payload, context.now);
 
   return {
     holds: compare(actual, condition.operator, condition.value),
@@ -107,16 +109,8 @@ export function evaluate(condition: Condition, context: Context): Trace {
     actual:
       actual === null || actual === undefined
         ? "no value yet"
-        : `${formatFact(fact, actual)}${fact.unit ? ` ${fact.unit}` : ""}`,
+        : `${showFact(fact, actual)}${fact.unit ? ` ${fact.unit}` : ""}`,
   };
-}
-
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-function formatFact(fact: Fact, value: unknown): string {
-  if (fact.type === "boolean") return value ? "yes" : "no";
-  if (fact.type === "weekday") return DAYS[Number(value)] ?? String(value);
-  return String(value);
 }
 
 /** The one-line form shown on a node in the canvas. */

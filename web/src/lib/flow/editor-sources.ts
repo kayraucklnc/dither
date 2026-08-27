@@ -4,10 +4,8 @@ import type { EditorSource, SourceKind } from "@/components/flow/condition-edito
 import { db } from "@/lib/db";
 import { decisionNodes, devices, notices, triggers, type Device } from "@/lib/db/schema";
 import { all, find } from "@/lib/extensions/registry";
-import { valueAt } from "@/lib/facts";
+import { readFact, showFact } from "@/lib/facts";
 import { sourcesFor } from "@/lib/flow/context";
-
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /**
  * The sources as the check editor needs them: facts, what each currently reads,
@@ -53,20 +51,12 @@ export async function editorSources(device: Device, now = new Date()): Promise<E
     const trigger = byId.get(source.id);
     const extension = trigger ? await find(trigger.extension) : undefined;
 
+    // Exactly what a check would see at this instant, which is the point: a
+    // countdown shown here and a countdown decided on there have to be the
+    // same number, or the canvas explains a screen the panel is not showing.
     const values: Record<string, string> = {};
     for (const fact of source.facts) {
-      const raw = valueAt(source.payload, fact.path);
-
-      values[fact.key] =
-        raw === null || raw === undefined
-          ? "—"
-          : fact.type === "boolean"
-            ? raw
-              ? "yes"
-              : "no"
-            : fact.type === "weekday"
-              ? (DAYS[Number(raw)] ?? String(raw))
-              : String(raw);
+      values[fact.key] = showFact(fact, readFact(fact, source.payload, now));
     }
 
     result.push({

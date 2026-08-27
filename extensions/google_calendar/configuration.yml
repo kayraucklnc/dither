@@ -274,10 +274,16 @@ notices:
       value: 0
 
 facts:
+  # `until`, not just `path`: `minutes_until` was worked out when Google was
+  # asked and stops moving the moment it is stored, so a rule reading it says
+  # "in twenty minutes" for as long as the row survives - including after the
+  # meeting has been and gone. The instant is what is true; the countdown is
+  # taken from it when the question is asked. See lib/facts.
   - key: next_meeting_in
     label: Next meeting starts in
     type: duration
     path: calendar.next.minutes_until
+    until: calendar.next.at_epoch
     unit: minutes
 
   - key: next_meeting_title
@@ -320,6 +326,7 @@ facts:
     label: Out of this meeting in
     type: duration
     path: calendar.current.minutes_left
+    until: calendar.current.ends_epoch
     unit: minutes
 
   - key: meetings_left
