@@ -314,7 +314,17 @@ introduces itself again afterwards, as a new device with a new key.
   marks on black, and a black poster in a white surround reads as a mistake on
   a device whose bezel is already white. The turn happens before the resize, so
   which way the picture is long has to be settled before anything asks whether
-  it is being enlarged.
+  it is being enlarged. `auto` asks whether the picture is long the other way
+  from the *widget's* box rather than the panel's, so it cannot be answered at
+  fetch time, only at the moment of drawing - one photograph turns as a strip
+  and stays upright as a wallpaper. It compares aspect ratios rather than
+  orientations and wants a fifth off square before it fires: the library calls
+  anything within a twentieth of square "square", which is the right grain for
+  filing a picture and far too fine for spinning one. It is deliberately not
+  the default. Turned, a portrait keeps nearly all its pixels and has to be
+  read sideways; cropped, it loses two-thirds of them and the attention crop
+  finds the subject - which is better on everything except a poster or a
+  texture, and which of those is hanging there is not in the file.
 - **A picture is cropped to the widget, not to the panel.** Sizes are free, so
   the rectangle worth taking out of a photograph at 12x12 is not the one worth
   taking at 3x12. The template is the first thing that knows which box it got,
