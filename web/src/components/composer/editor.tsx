@@ -5,9 +5,11 @@ import { Bell, Check, Loader2, Plus, Radio, Trash2, TriangleAlert } from "lucide
 
 import { LayoutPicker } from "@/components/composer/layout-picker";
 import { SettingsForm } from "@/components/composer/settings-form";
+import { SizePicker } from "@/components/composer/size-picker";
+import { StylePicker } from "@/components/composer/style-picker";
 import { ScreenPreview } from "@/components/screen-preview";
-import { ShapeGlyph } from "@/components/shape-badge";
 import { cn } from "@/lib/cn";
+import { chooseDesign, nearestDrawable, supportsSize, type Design } from "@/lib/designs";
 import { layout as findLayout, matching, type Layout } from "@/lib/layouts";
 import type { Field } from "@/lib/extensions/manifest";
 import {
@@ -15,21 +17,23 @@ import {
   ROWS,
   fits,
   overlaps,
-  shape as findShape,
-  shapeForSize,
-  type ShapeId,
+  sizeLabel,
+  sizeOf,
+  sizeToken,
+  type Size,
 } from "@/lib/shapes";
 
 export interface PaletteEntry {
   name: string;
   label: string;
-  shapes: ShapeId[];
+  /** The looks it offers and the sizes each covers. The whole size vocabulary. */
+  designs: Design[];
   fields: Field[];
   defaults: Record<string, unknown>;
-  /** The biggest shape it draws, so the palette can show what it looks like. */
-  headline: ShapeId;
-  /** Sizes whose design has somewhere to show another extension's alert. */
-  noticeShapes: ShapeId[];
+  /** The biggest size it draws, so the palette can show what it looks like. */
+  headline: Size;
+  /** Designs whose template has somewhere to show another extension's alert. */
+  noticeDesigns: string[];
   /** How many values it reports, so "also watch this" is only offered when it does. */
   factCount: number;
   /** Where "what can these settings do" is answered, for hiding fields. */
@@ -45,6 +49,8 @@ export interface EditorWidget {
   row: number;
   columnSpan: number;
   rowSpan: number;
+  /** The style chosen for it. Empty means "whichever design fits best". */
+  design: string;
   /** Pinned as this screen's alert area. */
   hostsNotices: boolean;
 }
@@ -246,7 +252,7 @@ export function ScreenEditor({
     }, 700);
 
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [widgets, name, screenId]);
 
   /* -------------------------------------------------------------- mutations */
@@ -265,17 +271,26 @@ export function ScreenEditor({
       (candidate) => !widgets.some((widget) => overlaps(candidate, widget)),
     );
 
+    // With no layout armed, a new widget lands at whatever size the extension
+    // was really designed for and there is room for. Sizes are free, so
+    // "biggest first" would drop every widget in as a full screen.
     const spot =
-      slot ??
+      (slot && supportsSize(entry.designs, sizeOf(slot)) ? slot : undefined) ??
       (() => {
-        const shape = findShape(entry.shapes[0]);
-        return shape ? firstFreeSpot(widgets, shape.columns, shape.rows) : undefined;
+        for (const design of [...entry.designs].sort(
+          (a, b) =>
+            b.nominal.columns * b.nominal.rows - a.nominal.columns * a.nominal.rows,
+        )) {
+          const found = firstFreeSpot(widgets, design.nominal.columns, design.nominal.rows);
+          if (found) return found;
+        }
+        return undefined;
       })();
 
     if (!spot) {
       setProblems([
         armed
-          ? `Every slot in ${armed.label.toLowerCase()} is taken. Remove something, or pick another layout.`
+          ? `${entry.label} does not fit any free slot in ${armed.label.toLowerCase()}. Remove something, or pick another layout.`
           : "No room left. Remove something first.",
       ]);
       return;
@@ -286,6 +301,7 @@ export function ScreenEditor({
       extension: entry.name,
       label: entry.label,
       settings: { ...entry.defaults },
+      design: "",
       hostsNotices: false,
       ...spot,
     };
@@ -322,17 +338,32 @@ export function ScreenEditor({
     setWidgets((current) => {
       if (!current.length) return current;
 
-      const seated = current.slice(0, chosen.slots.length).map((widget, index) => ({
-        ...widget,
-        ...chosen.slots[index],
-      }));
+      const refused: string[] = [];
+
+      const seated = current.slice(0, chosen.slots.length).map((widget, index) => {
+        const slot = chosen.slots[index];
+        const entry = byName.get(widget.extension);
+
+        // A layout is a starting point, not a mould. If a slot is a size this
+        // extension refuses to draw, it keeps the size it had rather than
+        // becoming a hatched gap nobody asked for.
+        if (entry && !supportsSize(entry.designs, sizeOf(slot))) {
+          refused.push(
+            `${widget.label || entry.label} has no design for ${sizeLabel(sizeOf(slot))}, so it kept its size.`,
+          );
+          return widget;
+        }
+
+        return { ...widget, ...slot };
+      });
 
       const dropped = current.length - seated.length;
-      setProblems(
-        dropped > 0
+      setProblems([
+        ...refused,
+        ...(dropped > 0
           ? [`${chosen.label} has ${chosen.slots.length} slots; ${dropped} widget${dropped === 1 ? " was" : "s were"} left off.`]
-          : [],
-      );
+          : []),
+      ]);
 
       return seated;
     });
@@ -395,9 +426,14 @@ export function ScreenEditor({
   };
 
   /**
-   * Resizing snaps to the shapes this extension actually has a design for.
-   * You cannot drag a widget to a size it cannot draw, so the refusal never
-   * needs to be explained - it simply is not reachable.
+   * Resizing follows the pointer, cell by cell, and only stops where the
+   * extension has a design.
+   *
+   * It used to snap between eight fixed shapes, which is why a widget felt
+   * like it jumped rather than resized. Now the grid is free: the drag asks
+   * for a size, and the nearest one this extension will actually draw - and
+   * that nothing else is sitting on - is what it gets. The refusal never needs
+   * explaining, because it is simply not reachable.
    */
   const startResize = (event: React.PointerEvent, widget: EditorWidget) => {
     event.preventDefault();
@@ -406,8 +442,8 @@ export function ScreenEditor({
     setDragging(true);
 
     const entry = byName.get(widget.extension);
-    const available = (entry?.shapes ?? []).map((id) => findShape(id)!).filter(Boolean);
-    if (!available.length) return;
+    const designs = entry?.designs ?? [];
+    if (!designs.length) return;
 
     const cell = cellSize();
     const origin = { x: event.clientX, y: event.clientY };
@@ -415,29 +451,32 @@ export function ScreenEditor({
 
     const move = (moveEvent: PointerEvent) => {
       const wanted = {
-        columns: start.columnSpan + (moveEvent.clientX - origin.x) / cell.width,
-        rows: start.rowSpan + (moveEvent.clientY - origin.y) / cell.height,
+        columns: Math.round(start.columnSpan + (moveEvent.clientX - origin.x) / cell.width),
+        rows: Math.round(start.rowSpan + (moveEvent.clientY - origin.y) / cell.height),
       };
 
-      const best = available
-        .map((shape) => ({
-          shape,
-          distance: (shape.columns - wanted.columns) ** 2 + (shape.rows - wanted.rows) ** 2,
-        }))
-        .sort((a, b) => a.distance - b.distance)
-        .map(({ shape }) => ({
+      const best = nearestDrawable(designs, wanted, (size) => {
+        const candidate = {
           column: widget.column,
           row: widget.row,
-          columnSpan: shape.columns,
-          rowSpan: shape.rows,
-        }))
-        .find(
-          (candidate) =>
-            fits(candidate) &&
-            !widgets.some((other) => other.id !== widget.id && overlaps(candidate, other)),
-        );
+          columnSpan: size.columns,
+          rowSpan: size.rows,
+        };
 
-      if (best) place(widget.id, best);
+        return (
+          fits(candidate) &&
+          !widgets.some((other) => other.id !== widget.id && overlaps(candidate, other))
+        );
+      });
+
+      if (best) {
+        place(widget.id, {
+          column: widget.column,
+          row: widget.row,
+          columnSpan: best.columns,
+          rowSpan: best.rows,
+        });
+      }
     };
 
     const stop = () => {
@@ -453,6 +492,22 @@ export function ScreenEditor({
   /* ------------------------------------------------------------------- view */
 
   const selectedEntry = selected ? byName.get(selected.extension) : undefined;
+
+  /**
+   * Whether the design that will actually draw this widget renders alerts.
+   *
+   * Not "does the extension accept them" - a design does or does not have the
+   * strip, and which design draws a widget now depends on its size *and* on
+   * the style chosen for it. Getting this wrong routes an alert to a widget
+   * that silently drops it.
+   */
+  const hostsAlerts = (widget: EditorWidget) => {
+    const entry = byName.get(widget.extension);
+    if (!entry) return false;
+
+    const design = chooseDesign(entry.designs, sizeOf(widget), widget.design || undefined);
+    return design !== undefined && entry.noticeDesigns.includes(design.key);
+  };
 
   return (
     <div className="flex h-screen">
@@ -470,7 +525,7 @@ export function ScreenEditor({
               className="group w-full rounded-lg p-1.5 text-left transition-colors hover:bg-raised"
             >
               <ScreenPreview
-                src={`/api/preview/extension/${entry.name}?shape=${entry.headline}`}
+                src={`/api/preview/extension/${entry.name}?size=${sizeToken(entry.headline)}`}
                 width={panel.width}
                 height={panel.height}
                 alt={entry.label}
@@ -655,43 +710,55 @@ export function ScreenEditor({
             </div>
 
             <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-faint">Size</p>
-            <div className="mb-5 flex flex-wrap gap-1.5">
-              {selectedEntry.shapes.map((id) => {
-                const shape = findShape(id)!;
-                const current = shapeForSize(selected.columnSpan, selected.rowSpan)?.id === id;
+            <div className="mb-5">
+              <SizePicker
+                designs={selectedEntry.designs}
+                value={sizeOf(selected)}
+                blocked={(size) =>
+                  !fits({
+                    column: selected.column,
+                    row: selected.row,
+                    columnSpan: size.columns,
+                    rowSpan: size.rows,
+                  }) ||
+                  widgets.some(
+                    (other) =>
+                      other.id !== selected.id &&
+                      overlaps(
+                        {
+                          column: selected.column,
+                          row: selected.row,
+                          columnSpan: size.columns,
+                          rowSpan: size.rows,
+                        },
+                        other,
+                      ),
+                  )
+                }
+                onChange={(size) =>
+                  place(selected.id, {
+                    column: selected.column,
+                    row: selected.row,
+                    columnSpan: size.columns,
+                    rowSpan: size.rows,
+                  })
+                }
+              />
+            </div>
 
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() =>
-                      place(selected.id, {
-                        column: selected.column,
-                        row: selected.row,
-                        columnSpan: shape.columns,
-                        rowSpan: shape.rows,
-                      })
-                    }
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-[11px] transition-colors",
-                      current
-                        ? "border-accent/60 bg-accent/10 text-ink"
-                        : "border-line bg-raised text-muted hover:text-ink",
-                    )}
-                  >
-                    <ShapeGlyph
-                      shape={shape}
-                      className={cn("h-3 w-3", current ? "text-accent" : "text-faint")}
-                    />
-                    {shape.label}
-                  </button>
-                );
-              })}
+            <div className="mb-5">
+              <StylePicker
+                extension={selected.extension}
+                designs={selectedEntry.designs}
+                size={sizeOf(selected)}
+                settings={selected.settings}
+                value={selected.design}
+                onChange={(design) => update(selected.id, { design })}
+              />
             </div>
 
             {(() => {
-              const shape = shapeForSize(selected.columnSpan, selected.rowSpan);
-              const takesAlerts = shape ? selectedEntry.noticeShapes.includes(shape.id) : false;
+              const takesAlerts = hostsAlerts(selected);
               const pinnedElsewhere = widgets.some(
                 (widget) => widget.hostsNotices && widget.id !== selected.id,
               );
@@ -700,11 +767,7 @@ export function ScreenEditor({
               // because room is what an alert needs. Saying so is the point:
               // where they land should never be a mystery.
               const auto = [...widgets]
-                .filter((widget) => {
-                  const at = shapeForSize(widget.columnSpan, widget.rowSpan);
-                  const entry = byName.get(widget.extension);
-                  return at && entry?.noticeShapes.includes(at.id);
-                })
+                .filter(hostsAlerts)
                 .sort(
                   (a, b) =>
                     b.columnSpan * b.rowSpan - a.columnSpan * a.rowSpan ||
@@ -802,6 +865,13 @@ export function ScreenEditor({
               <SettingsForm
                 fields={selectedEntry.fields}
                 capabilitiesFrom={selectedEntry.capabilitiesFrom}
+                design={
+                  chooseDesign(
+                    selectedEntry.designs,
+                    sizeOf(selected),
+                    selected.design || undefined,
+                  )?.key ?? ""
+                }
                 values={selected.settings}
                 onChange={(key, value) =>
                   update(selected.id, { settings: { ...selected.settings, [key]: value } })

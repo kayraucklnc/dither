@@ -1,124 +1,117 @@
 /**
- * The composition vocabulary.
+ * The composition grid.
  *
- * A screen is a 6x6 grid. Six is the smallest number of tracks where halves
- * and thirds both divide evenly, which is why a widget can be half a screen
- * or a third of one without any fractional columns.
+ * A screen is a 12x12 grid. Twelve is the smallest number that divides evenly
+ * by two, three, four and six, so halves, thirds, quarters and sixths all land
+ * on whole tracks - and at 800x480 one cell is 67x40 pixels, fine enough that
+ * a widget can be nudged a cell at a time rather than jumping between eight
+ * fixed sizes.
  *
- * A widget does not choose a "shape" from a menu. It is dragged to a size on
- * the grid, and the shape is whatever that size means. Shapes exist so an
- * extension can say which sizes it knows how to draw - and so we can refuse
- * the ones it does not, rather than scaling a design that was never meant to
- * be that size.
+ * A widget does not pick a "shape" from a menu. It is drawn at a size on this
+ * grid, and *any* size is expressible. What decides whether a size is allowed
+ * is the extension: it declares designs, each covering a range of sizes, and a
+ * size no design covers is refused rather than scaled. See lib/designs.ts.
+ *
+ * Presets below are shortcuts, not a vocabulary. They exist so "half width" is
+ * one click; they constrain nothing.
  */
 
-export const COLUMNS = 6;
-export const ROWS = 6;
+export const COLUMNS = 12;
+export const ROWS = 12;
 
-export type ShapeId =
-  | "full"
-  | "half_width"
-  | "half_height"
-  | "quarter"
-  | "third_width"
-  | "two_thirds_width"
-  | "third_height"
-  | "two_thirds_height";
-
-export interface Shape {
-  readonly id: ShapeId;
-  readonly label: string;
+export interface Size {
   readonly columns: number;
   readonly rows: number;
+}
+
+export interface Preset extends Size {
+  readonly id: string;
+  readonly label: string;
   readonly hint: string;
 }
 
-export const SHAPES: readonly Shape[] = [
-  { id: "full", label: "Full screen", columns: 6, rows: 6, hint: "The whole panel." },
-  { id: "half_width", label: "Half width", columns: 3, rows: 6, hint: "Left or right half, full height." },
-  { id: "half_height", label: "Half height", columns: 6, rows: 3, hint: "Top or bottom half, full width." },
-  { id: "quarter", label: "Quarter", columns: 3, rows: 3, hint: "One corner." },
-  { id: "third_width", label: "Third width", columns: 2, rows: 6, hint: "A narrow full-height column." },
-  { id: "two_thirds_width", label: "Two thirds width", columns: 4, rows: 6, hint: "The wide side of a sidebar." },
-  { id: "third_height", label: "Third height", columns: 6, rows: 2, hint: "A full-width band." },
-  { id: "two_thirds_height", label: "Two thirds height", columns: 6, rows: 4, hint: "The tall side of a banner." },
+/**
+ * One-click sizes.
+ *
+ * The eight original names are kept, at their twelfth-grid equivalents, so
+ * `templates/quarter.html.liquid` still means what it always meant and a
+ * preview URL of `?size=quarter` still resolves. The rest are sizes the finer
+ * grid made worth naming.
+ */
+export const PRESETS: readonly Preset[] = [
+  { id: "full", label: "Full screen", columns: 12, rows: 12, hint: "The whole panel." },
+  { id: "half_width", label: "Half width", columns: 6, rows: 12, hint: "Left or right half, full height." },
+  { id: "half_height", label: "Half height", columns: 12, rows: 6, hint: "Top or bottom half, full width." },
+  { id: "quarter", label: "Quarter", columns: 6, rows: 6, hint: "One corner." },
+  { id: "third_width", label: "Third width", columns: 4, rows: 12, hint: "A narrow full-height column." },
+  { id: "two_thirds_width", label: "Two thirds width", columns: 8, rows: 12, hint: "The wide side of a sidebar." },
+  { id: "third_height", label: "Third height", columns: 12, rows: 4, hint: "A full-width band." },
+  { id: "two_thirds_height", label: "Two thirds height", columns: 12, rows: 8, hint: "The tall side of a banner." },
+  { id: "narrow_column", label: "Narrow column", columns: 3, rows: 12, hint: "A quarter-width full-height strip." },
+  { id: "slim_band", label: "Slim band", columns: 12, rows: 3, hint: "A shallow full-width band." },
+  { id: "card", label: "Card", columns: 6, rows: 4, hint: "A wide box, a third of the height." },
+  { id: "tile", label: "Tile", columns: 4, rows: 4, hint: "A small square." },
+  { id: "sixth", label: "Sixth", columns: 4, rows: 6, hint: "A narrow half-height box." },
 ] as const;
 
-const BY_ID = new Map(SHAPES.map((shape) => [shape.id, shape]));
-const BY_SIZE = new Map(SHAPES.map((shape) => [`${shape.columns}x${shape.rows}`, shape]));
+const BY_ID = new Map(PRESETS.map((entry) => [entry.id, entry]));
+const BY_SIZE = new Map(PRESETS.map((entry) => [`${entry.columns}x${entry.rows}`, entry]));
 
-export function shape(id: string): Shape | undefined {
-  return BY_ID.get(id as ShapeId);
+export function preset(id: string): Preset | undefined {
+  return BY_ID.get(id);
 }
 
-export function isShapeId(id: string): id is ShapeId {
-  return BY_ID.has(id as ShapeId);
+export function isPresetId(id: string): boolean {
+  return BY_ID.has(id);
 }
 
-/** The shape a widget takes on because of the size it was drawn at. */
-export function shapeForSize(columns: number, rows: number): Shape | undefined {
+/** The preset a size happens to be, if it is exactly one. Only ever a label. */
+export function presetFor(columns: number, rows: number): Preset | undefined {
   return BY_SIZE.get(`${columns}x${rows}`);
 }
 
-/** Pixel size of a shape on a given panel. */
-export function pixelsFor(shape: Shape, panelWidth: number, panelHeight: number): [number, number] {
+export const sameSize = (one: Size, other: Size) =>
+  one.columns === other.columns && one.rows === other.rows;
+
+/**
+ * A size out of a token: a preset id, or "6x4".
+ *
+ * Preview URLs and scripts name sizes as text, and both spellings have to work
+ * - the named one because it reads, the numeric one because with a free grid
+ * most sizes have no name.
+ */
+export function parseSize(token: string | null | undefined): Size | undefined {
+  if (!token) return undefined;
+
+  const named = BY_ID.get(token);
+  if (named) return { columns: named.columns, rows: named.rows };
+
+  const match = /^(\d{1,2})x(\d{1,2})$/.exec(token.trim());
+  if (!match) return undefined;
+
+  const columns = Number(match[1]);
+  const rows = Number(match[2]);
+
+  if (columns < 1 || columns > COLUMNS || rows < 1 || rows > ROWS) return undefined;
+  return { columns, rows };
+}
+
+/** The canonical text for a size. A preset id where there is one, else "6x4". */
+export function sizeToken(size: Size): string {
+  return presetFor(size.columns, size.rows)?.id ?? `${size.columns}x${size.rows}`;
+}
+
+/** What to call a size in a sentence. */
+export function sizeLabel(size: Size): string {
+  return presetFor(size.columns, size.rows)?.label ?? `${size.columns}×${size.rows}`;
+}
+
+/** Pixel size of a grid size on a given panel. */
+export function pixelsFor(size: Size, panelWidth: number, panelHeight: number): [number, number] {
   return [
-    Math.round((panelWidth * shape.columns) / COLUMNS),
-    Math.round((panelHeight * shape.rows) / ROWS),
+    Math.round((panelWidth * size.columns) / COLUMNS),
+    Math.round((panelHeight * size.rows) / ROWS),
   ];
-}
-
-/**
- * Shapes that share an aspect class.
- *
- * A design authored for one wide band works in a taller wide band: it is the
- * same markup reflowing in a box of a similar proportion, which the layout
- * primitives already handle. That is not the same as scaling a full-page
- * design into a corner, which is what the refusal rule exists to prevent - so
- * an extension covers its family, and only its family, for free.
- *
- * An author who wants a different design at a different height still writes
- * one; an exact template always wins over a family match.
- */
-export const FAMILIES: Record<string, ShapeId[]> = {
-  full: ["full"],
-  band: ["third_height", "half_height", "two_thirds_height"],
-  column: ["third_width", "half_width", "two_thirds_width"],
-  block: ["quarter"],
-};
-
-const FAMILY_OF = new Map<ShapeId, string>(
-  Object.entries(FAMILIES).flatMap(([family, members]) =>
-    members.map((member) => [member, family] as [ShapeId, string]),
-  ),
-);
-
-export function familyOf(id: ShapeId): string | undefined {
-  return FAMILY_OF.get(id);
-}
-
-/**
- * Which authored shape should draw `wanted`: itself if it exists, otherwise
- * the nearest one in its family by area.
- */
-export function standIn(wanted: ShapeId, authored: ShapeId[]): ShapeId | undefined {
-  if (authored.includes(wanted)) return wanted;
-
-  const family = FAMILY_OF.get(wanted);
-  const target = shape(wanted);
-  if (!family || !target) return undefined;
-
-  const area = target.columns * target.rows;
-
-  return authored
-    .filter((candidate) => FAMILY_OF.get(candidate) === family)
-    .map((candidate) => ({ candidate, shape: shape(candidate)! }))
-    .sort(
-      (a, b) =>
-        Math.abs(a.shape.columns * a.shape.rows - area) -
-        Math.abs(b.shape.columns * b.shape.rows - area),
-    )
-    .map(({ candidate }) => candidate)[0];
 }
 
 export interface Rect {
@@ -128,18 +121,29 @@ export interface Rect {
   rowSpan: number;
 }
 
+/** The size a rect occupies. Rects carry their span; everything else wants a size. */
+export const sizeOf = (rect: { columnSpan: number; rowSpan: number }): Size => ({
+  columns: rect.columnSpan,
+  rows: rect.rowSpan,
+});
+
 /** Whether a rect sits inside the grid. */
-export function fits(rect: Rect): boolean {
+export function fits(rect: { column: number; row: number; columnSpan: number; rowSpan: number }): boolean {
   return (
     rect.column >= 1 &&
     rect.row >= 1 &&
+    rect.columnSpan >= 1 &&
+    rect.rowSpan >= 1 &&
     rect.column + rect.columnSpan - 1 <= COLUMNS &&
     rect.row + rect.rowSpan - 1 <= ROWS
   );
 }
 
 /** Whether two rects share any cell. Used to stop widgets landing on each other. */
-export function overlaps(one: Rect, other: Rect): boolean {
+export function overlaps(
+  one: { column: number; row: number; columnSpan: number; rowSpan: number },
+  other: { column: number; row: number; columnSpan: number; rowSpan: number },
+): boolean {
   return (
     one.column < other.column + other.columnSpan &&
     other.column < one.column + one.columnSpan &&
@@ -149,7 +153,11 @@ export function overlaps(one: Rect, other: Rect): boolean {
 }
 
 /** Pixel rectangle of a placed widget on a panel, for cropping a render. */
-export function rectPixels(rect: Rect, panelWidth: number, panelHeight: number) {
+export function rectPixels(
+  rect: { column: number; row: number; columnSpan: number; rowSpan: number },
+  panelWidth: number,
+  panelHeight: number,
+) {
   const cell = { width: panelWidth / COLUMNS, height: panelHeight / ROWS };
 
   return {

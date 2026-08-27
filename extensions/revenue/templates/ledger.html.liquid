@@ -1,0 +1,137 @@
+{% comment %}
+  Ledger — the headline figure, then every other window as a row.
+
+  The design for a tall narrow box, where one enormous number wastes the height
+  and a chart is too cramped to read. Rows are cheap vertically and stay legible
+  at three columns wide, which is the whole reason this exists as its own design
+  rather than as the figure design squeezed.
+{% endcomment %}
+
+{%- assign money = revenue -%}
+{%- assign metric = extension.values.metric | default: "taken" -%}
+{%- assign period = extension.values.window | default: "today" -%}
+{%- if metric == "taken" -%}
+  {%- assign card = money.windows[period] -%}
+{%- elsif metric == "next_subscriber" and extension.values.basis == "renewal" -%}
+  {%- assign card = money.cards.next_renewal -%}
+{%- else -%}
+  {%- assign card = money.cards[metric] -%}
+{%- endif -%}
+
+{%- assign box_w = shape.width | at_least: 120 -%}
+{%- assign box_h = shape.height | at_least: 60 -%}
+{%- assign pad = box_w | divided_by: 16 | at_least: 10 | at_most: 24 -%}
+{%- assign row_size = box_w | divided_by: 20 | at_least: 11 | at_most: 17 -%}
+
+<div class="screen">
+  {%- unless card -%}
+    <div class="content layout layout--col layout--center" style="gap: 8px; padding: {{ pad }}px">
+      <span class="i i-card i-xl"></span>
+      <p class="t-md t-bold">Not connected</p>
+      <p class="t-sm t-center">Link Stripe under Connections.</p>
+    </div>
+  {%- else -%}
+    {%- assign shown = card.symbol | append: card.figure -%}
+    {%- assign chars = shown | size | at_least: 3 -%}
+    {%- assign by_width = box_w | minus: pad | minus: pad | times: 100 | divided_by: chars | divided_by: 56 -%}
+    {%- assign by_height = box_h | times: 18 | divided_by: 100 -%}
+    {%- assign figure_size = by_width | at_most: by_height | at_most: 72 | at_least: 15 -%}
+    {%- assign caption = extension.values.heading | default: card.caption -%}
+
+    <div class="content layout layout--col" style="gap: {{ pad }}px; padding: {{ pad }}px">
+      <div class="stack stack--tight">
+        <p class="t-bold t-upper truncate" style="font-size: {{ row_size | minus: 1 }}px; letter-spacing: 0.06em">
+          {{ caption }}
+        </p>
+        <p class="t-bold" style="font-size: {{ figure_size }}px; line-height: 1; letter-spacing: -0.03em">{{ shown }}</p>
+        {% if extension.values.compare != false and card.delta != blank %}
+          <p class="with-icon t-bold" style="font-size: {{ row_size }}px">
+            <span class="i i-trending-{% if card.rising %}up{% else %}down{% endif %} i-sm"></span>
+            {{ card.delta }}
+          </p>
+        {% endif %}
+      </div>
+
+      {%- comment %} The rest of what the account can say, in whatever order fits.
+        Every row is one line, so how many appear is a matter of height rather
+        than of a second design. {% endcomment -%}
+      <div class="facts fit" style="font-size: {{ row_size }}px">
+        {% unless metric == "taken" and period == "today" %}
+          <div class="row">
+            <span class="name"><span class="i i-receipt i-xs"></span>Today</span>
+            <span class="figure">{{ money.windows.today.text }}</span>
+          </div>
+        {% endunless %}
+        {% unless metric == "taken" and period == "last_24h" %}
+          <div class="row">
+            <span class="name"><span class="i i-clock i-xs"></span>24 hours</span>
+            <span class="figure">{{ money.windows.last_24h.text }}</span>
+          </div>
+        {% endunless %}
+        {% if shape.rows > 6 %}
+          {% unless metric == "taken" and period == "last_15d" %}
+            <div class="row">
+              <span class="name"><span class="i i-chart i-xs"></span>15 days</span>
+              <span class="figure">{{ money.windows.last_15d.text }}</span>
+            </div>
+          {% endunless %}
+        {% endif %}
+        {% unless metric == "taken" and period == "last_30d" %}
+          <div class="row">
+            <span class="name"><span class="i i-chart i-xs"></span>30 days</span>
+            <span class="figure">{{ money.windows.last_30d.text }}</span>
+          </div>
+        {% endunless %}
+        {% unless metric == "mrr" %}
+          <div class="row">
+            <span class="name"><span class="i i-refresh i-xs"></span>MRR</span>
+            <span class="figure">{{ money.mrr_text }}</span>
+          </div>
+        {% endunless %}
+        {% unless metric == "subscribers" %}
+          <div class="row">
+            <span class="name"><span class="i i-users i-xs"></span>Subscribers</span>
+            <span class="figure">{{ money.cards.subscribers.figure }}</span>
+          </div>
+        {% endunless %}
+        {% if shape.rows > 7 %}
+          {% unless metric == "customers" %}
+            <div class="row">
+              <span class="name"><span class="i i-users i-xs"></span>Customers</span>
+              <span class="figure">{{ money.cards.customers.figure }}</span>
+            </div>
+          {% endunless %}
+          {% unless metric == "next_subscriber" %}
+            <div class="row">
+              <span class="name"><span class="i i-hourglass i-xs"></span>Next subscriber</span>
+              <span class="figure">{{ money.next_subscriber.in_words }}</span>
+            </div>
+          {% endunless %}
+        {% endif %}
+        {% if shape.rows > 9 %}
+          <div class="row">
+            <span class="name"><span class="i i-close i-xs"></span>Failed today</span>
+            <span class="figure">{{ money.failed_today }}</span>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if notices.size > 0 %}
+      <div class="notice-strip" style="padding: 6px {{ pad }}px">
+        {% for notice in notices %}
+          {% if notice.overflow %}
+            <span class="notice notice--more">+{{ notice.overflow }}</span>
+          {% else %}
+            <span class="notice notice--{{ notice.level }}" title="{{ notice.text }}">
+              <span class="i i-{{ notice.icon }}"></span>
+            </span>
+          {% endif %}
+        {% endfor %}
+        {% if shape.wide and notices[0].text != blank %}
+          <span class="notice-said">{{ notices[0].text }}</span>
+        {% endif %}
+      </div>
+    {% endif %}
+  {%- endunless -%}
+</div>

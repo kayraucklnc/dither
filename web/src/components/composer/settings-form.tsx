@@ -167,16 +167,36 @@ function SearchField({
   );
 }
 
+/**
+ * Whether a field's `visible_when` is satisfied.
+ *
+ * A settings form should follow the choice already made rather than asking
+ * every question at once: pick "money taken" and a period appears, pick "how
+ * many subscribers" and it does not, because there is no such thing as
+ * subscribers over the last seven days. `design` is the reserved name for the
+ * style the widget is drawn in, so a design can bring its own settings.
+ */
+function visible(field: Field, values: Record<string, unknown>, design: string): boolean {
+  const rule = field.visible_when;
+  if (!rule) return true;
+
+  const actual = rule.field === "design" ? design : values[rule.field];
+  return rule.any_of.includes(String(actual ?? ""));
+}
+
 export function SettingsForm({
   fields,
   values,
   capabilitiesFrom,
+  design = "",
   onChange,
 }: {
   fields: Field[];
   values: Record<string, unknown>;
   /** Where "what can these settings do" is answered, for `needs_capability`. */
   capabilitiesFrom?: string;
+  /** The style actually drawing this widget, for `visible_when: {field: design}`. */
+  design?: string;
   onChange: (key: string, value: unknown) => void;
 }) {
   const [remote, setRemote] = useState<Record<string, Choice[]>>({});
@@ -232,6 +252,7 @@ export function SettingsForm({
         // A field for something the chosen operator ignores is worse than a
         // missing one, because it looks like it works.
         if (field.needs_capability && !can.includes(field.needs_capability)) return null;
+        if (!visible(field, values, design)) return null;
 
         const value = values[field.keyname] ?? "";
         const id = `field-${field.keyname}`;

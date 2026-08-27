@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { defaultSettings, find } from "@/lib/extensions/registry";
+import { defaultSettings, find, supportsSize } from "@/lib/extensions/registry";
 import { DEFAULT_PANEL } from "@/lib/panel";
 import { fingerprint, renderSolo } from "@/lib/render";
 import { store } from "@/lib/storage";
-import { COLUMNS, ROWS, pixelsFor, shape as findShape } from "@/lib/shapes";
+import { refusal } from "@/lib/designs";
+import { COLUMNS, ROWS, parseSize, pixelsFor } from "@/lib/shapes";
 
 /**
  * A thumbnail of one extension at one shape.
@@ -15,23 +16,48 @@ import { COLUMNS, ROWS, pixelsFor, shape as findShape } from "@/lib/shapes";
  * store is checked first, and the browser gets an ETag so a revisit costs a
  * 304 rather than a render.
  */
+/**
+ * Settings passed in the URL, so a thumbnail can preview a *choice*.
+ *
+ * The style picker shows what each design looks like with the settings this
+ * widget already has, not with the extension's defaults - picking between five
+ * revenue designs is useless if all five are drawn showing today's takings
+ * when the widget is set to MRR.
+ */
+function settingsFromQuery(url: URL): Record<string, unknown> {
+  const raw = url.searchParams.get("settings");
+  if (!raw) return {};
+
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ name: string }> },
 ) {
   const { name } = await params;
   const url = new URL(request.url);
-  const shapeId = url.searchParams.get("shape") ?? "quarter";
+
+  // A preset name or a plain "6x4". Both spellings have to work: the named one
+  // because it reads, the numeric one because with a free grid most sizes have
+  // no name at all.
+  const size = parseSize(url.searchParams.get("size") ?? url.searchParams.get("shape") ?? "quarter");
+  if (!size) return NextResponse.json({ error: "No such size." }, { status: 400 });
+
+  /** Which style to draw. Empty means whichever design fits the size best. */
+  const design = url.searchParams.get("design") ?? undefined;
 
   const extension = await find(name);
   if (!extension) return NextResponse.json({ error: "No such extension." }, { status: 404 });
 
-  const shape = findShape(shapeId);
-  if (!shape) return NextResponse.json({ error: "No such shape." }, { status: 400 });
-
-  if (!extension.shapes.includes(shape.id)) {
+  if (!supportsSize(extension, size)) {
     return NextResponse.json(
-      { error: `${extension.manifest.label} has no ${shape.label.toLowerCase()} design.` },
+      { error: refusal(extension.manifest.label, size, extension.designs) },
       { status: 404 },
     );
   }
@@ -64,14 +90,14 @@ export async function GET(
         }))
     : [];
 
-  const settings = defaultSettings(extension);
+  const settings = { ...defaultSettings(extension), ...settingsFromQuery(url) };
   const data = extension.manifest.sample as Record<string, unknown>;
-  const [width, height] = pixelsFor(shape, DEFAULT_PANEL.width, DEFAULT_PANEL.height);
+  const [width, height] = pixelsFor(size, DEFAULT_PANEL.width, DEFAULT_PANEL.height);
 
   // Same material the renderer would hash, computed without rendering.
   const key = await fingerprint(
     [{
-      id: 0, extension: name, label: name, settings, data,
+      id: 0, extension: name, label: name, settings, data, design,
       column: 1, row: 1, columnSpan: COLUMNS, rowSpan: ROWS,
     }],
     { ...DEFAULT_PANEL, width, height },
@@ -84,7 +110,7 @@ export async function GET(
 
   const cached = await store().get(`${key}.png`);
   const bytes =
-    cached ?? (await renderSolo(name, shape.id, settings, data, DEFAULT_PANEL, notices)).bytes;
+    cached ?? (await renderSolo(name, size, settings, data, DEFAULT_PANEL, notices, design)).bytes;
 
   if (!cached) await store().put(`${key}.png`, bytes, "image/png");
 

@@ -3,3 +3,8 @@ node_modules
 .storage
 .env.local
 next-env.d.ts
+
+# TypeScript's incremental build cache. It was tracked, and being one 300KB
+# line it conflicts on every merge with no meaningful way to resolve it -
+# the only correct content is whatever tsc writes next.
+tsconfig.tsbuildinfo

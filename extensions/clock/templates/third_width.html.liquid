@@ -39,7 +39,7 @@
         {% endif %}
       {% endfor %}
 
-      {% if shape.columns >= 6 and notices[0].text != blank %}
+      {% if shape.wide and notices[0].text != blank %}
         <span class="notice-said">{{ notices[0].text }}</span>
       {% endif %}
     </div>

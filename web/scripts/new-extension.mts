@@ -5,7 +5,7 @@ import path from "node:path";
  * Scaffold an extension.
  *
  * The point is not saving typing - it is that the file it writes is a *working*
- * extension with sample data, four shapes and a fact, so the first thing you
+ * extension with sample data, four designs and a fact, so the first thing you
  * see is a render rather than an error. Nobody learns a format from an empty
  * directory.
  */
@@ -151,10 +151,15 @@ await writeFile(path.join(root, "templates", "quarter.html.liquid"), corner);
 
 console.log(`extensions/${name} written.
 
-Four templates cover all eight shapes: full, a wide band, a tall column and a
-corner, each standing in for the rest of its family.
+Four templates, named after the original shapes, so each inherits that shape's
+range of sizes without the manifest saying anything. Between them they cover
+most of the 12x12 grid: the whole panel, a wide band, a tall column and a box.
+
+Give a template a \`designs\` entry when you want a different range, or a second
+design over the same range - that is what makes a style something a widget can
+be switched between.
 
 Next:
   1. Open http://localhost:3000/extensions - it is already there and rendering.
   2. Point it at real data: set kind to poll and add an exchange.
-  3. npx tsx --env-file=.env.local scripts/sweep.mts   to see every shape.`);
+  3. npx tsx --env-file=.env.local scripts/sweep.mts   to render every design.`);
