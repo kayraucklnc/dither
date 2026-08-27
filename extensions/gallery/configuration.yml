@@ -198,6 +198,26 @@ fields:
         label: Whole picture - fit it in, paper either side
     optional: true
 
+  - keyname: turn
+    name: Turn it
+    field_type: select
+    default: "0"
+    presentation: true
+    options:
+      - value: "0"
+        label: Not at all
+      - value: "90"
+        label: A quarter turn clockwise
+      - value: "180"
+        label: Upside down
+      - value: "270"
+        label: A quarter turn anticlockwise
+    help_text: >
+      The crop decides what to lose; this decides whether anything has to be
+      lost. A tall poster turned a quarter is within a whisker of the panel's
+      own shape, so nearly all of it survives - read sideways.
+    optional: true
+
   - keyname: focus
     name: What to keep
     field_type: select

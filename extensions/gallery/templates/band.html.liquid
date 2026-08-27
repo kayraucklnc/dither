@@ -13,6 +13,7 @@
 
 {%- assign shot = source_1.picture -%}
 {%- assign fit = extension.values.fit | default: "fill" -%}
+{%- assign turn = extension.values.turn | default: 0 -%}
 {%- assign focus = extension.values.focus | default: "auto" -%}
 {%- assign contrast = extension.values.contrast | default: 0 -%}
 {%- assign brightness = extension.values.brightness | default: 0 -%}
@@ -30,7 +31,7 @@
 {%- assign plate_w = shape.width | minus: label_w | at_least: 40 -%}
 {%- assign plate = shot.id
       | as_image: width: plate_w, height: shape.height,
-                  fit: fit, focus: focus, contrast: contrast,
+                  fit: fit, turn: turn, focus: focus, contrast: contrast,
                   brightness: brightness, screen: screen, marks: marks, invert: invert -%}
 
 {% if plate == "" %}
