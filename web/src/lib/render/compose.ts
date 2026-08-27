@@ -30,6 +30,21 @@ export interface PlacedWidget {
   label: string;
   settings: Record<string, unknown>;
   data: Record<string, unknown>;
+  /**
+   * What the last fetch failed with, if it failed. A widget that cannot say
+   * this draws stale or invented data and looks perfectly healthy doing it.
+   */
+  problem?: string;
+  /**
+   * True when `data` is the extension's sample rather than anything real.
+   *
+   * The difference decides how loud to be. An extension that was working and
+   * has gone quiet keeps its last answer with a note over it - a departure
+   * board from twenty minutes ago is still worth reading. One that has *never*
+   * answered has nothing worth protecting, and drawing its sample is the panel
+   * telling a plausible lie.
+   */
+  standIn?: boolean;
   column: number;
   row: number;
   columnSpan: number;
@@ -41,6 +56,11 @@ export interface PlacedWidget {
   design?: string;
   /** Pinned as the screen's alert area. */
   hostsNotices?: boolean;
+}
+
+interface Size2D {
+  width: number;
+  height: number;
 }
 
 export interface Composition {
@@ -87,6 +107,63 @@ const escape = (value: string) =>
 
 function gap(placement: string, message: string): string {
   return `<div class="cell cell--gap" style="${placement}"><p>${escape(message)}</p></div>`;
+}
+
+/**
+ * A widget that has never had a real answer, and cannot get one.
+ *
+ * Drawn instead of the extension's sample, not beside it. The sample exists so
+ * a screen can be laid out before anyone owns an API key, and it is exactly
+ * the wrong thing to put on a wall when a fetch is failing: four invented
+ * meetings look like four real meetings, and the only place the truth appeared
+ * was a page nobody was looking at.
+ *
+ * So this says the name of the thing, that it has never answered, and what the
+ * provider said - which is nearly always actionable, because providers explain
+ * themselves better than we can guess. "Google Calendar API has not been used
+ * in project 193338348023 before or it is disabled" is a sentence that fixes
+ * itself.
+ */
+function fault(placement: string, name: string, message: string, box: Size2D): string {
+  // How many lines of the reason actually fit, given the name, the label, the
+  // gaps and the padding above it. A cell too short for even one is told the
+  // name and that it is broken, and stops there - half a clipped sentence
+  // reads as a rendering bug rather than as an explanation.
+  const NAME = 21;
+  const LABEL = 14;
+  const CHROME = 20 + 6;
+  const LINE = 15;
+
+  // "HAS NEVER ANSWERED" is about 125px of tracked 10px capitals, so below
+  // roughly a three-column cell it wraps and costs a second line. Counting it
+  // as one was the arithmetic that left a two-row cell showing a five-pixel
+  // sliver of a sentence.
+  const labelLines = box.width - 20 >= 130 ? 1 : 2;
+
+  const lines = Math.min(4, Math.floor((box.height - NAME - LABEL * labelLines - CHROME) / LINE));
+
+  return (
+    `<div class="cell cell--fault" style="${placement}">` +
+    `<p class="fault-name">${escape(name)}</p>` +
+    `<p class="fault-what">has never answered</p>` +
+    (lines > 0
+      ? `<p class="fault-why" style="-webkit-line-clamp:${lines}">${escape(message)}</p>`
+      : "") +
+    `</div>`
+  );
+}
+
+/**
+ * The last good answer, with the truth over it.
+ *
+ * A provider being down should leave the previous answer on screen rather than
+ * blanking the panel - a departure board from twenty minutes ago still tells
+ * you roughly when the train is. But it must not pretend to be current, so the
+ * note goes *over* the widget, in the outer document rather than the iframe,
+ * which is what keeps it out of every extension's templates.
+ */
+function staleNote(message: string): string {
+  return `<div class="stale"><span class="stale-mark"></span><span class="stale-why">${escape(message)}</span></div>`;
 }
 
 export interface Notice {
@@ -246,6 +323,20 @@ export async function compose(
       continue;
     }
 
+    // Nothing real has ever come back, and the last attempt said why. Drawing
+    // the sample here is how a panel ends up showing four meetings that do not
+    // exist, so it does not get drawn.
+    if (widget.standIn && widget.problem) {
+      problems.push(`${name}: ${widget.problem}`);
+      cells.push(
+        fault(placement, name, widget.problem, {
+          width: widget.columnSpan * cellWidth,
+          height: widget.rowSpan * cellHeight,
+        }),
+      );
+      continue;
+    }
+
     // The iframe is sized in pixels rather than percentages so the extension's
     // viewport units mean what its author intended.
     const box = {
@@ -275,10 +366,16 @@ export async function compose(
       `.screen{height:${box.height}px;width:${box.width}px}</style></head>` +
       `<body>${rendered.html}</body></html>`;
 
+    // It drew, from a real answer, but the newest attempt failed - so the
+    // picture is older than it looks and has to say so.
+    if (widget.problem) problems.push(`${name}: ${widget.problem}`);
+
     cells.push(
       `<div class="cell" style="${placement}">` +
         `<iframe scrolling="no" width="${box.width}" height="${box.height}" ` +
-        `srcdoc="${escape(document)}"></iframe></div>`,
+        `srcdoc="${escape(document)}"></iframe>` +
+        (widget.problem ? staleNote(widget.problem) : "") +
+        `</div>`,
     );
   }
 
@@ -309,6 +406,62 @@ export async function compose(
     background: repeating-linear-gradient(45deg, var(--paper) 0 6px, #e6e6e6 6px 12px);
   }
   .cell--gap p { margin: 0; }
+
+  /* A widget that has never had a real answer. Bordered rather than hatched:
+     a gap is an empty space on purpose, this is a thing that is broken. */
+  .cell--fault {
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+    font: 12px/1.35 Inter, "DejaVu Sans", sans-serif;
+    gap: 3px;
+    justify-content: center;
+    padding: 10px;
+    text-align: center;
+  }
+  .cell--fault p { margin: 0; }
+  .fault-name { font-size: 15px; font-weight: 700; }
+  .fault-what {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  /* The provider's own words, which are usually the fix. Clamped rather than
+     shrunk - four lines of readable type beats ten of unreadable. */
+  .fault-why {
+    -webkit-box-orient: vertical;
+    display: -webkit-box;
+    font-size: 11px;
+    overflow: hidden;
+  }
+
+  /* Drawn over a widget whose last answer was real but whose newest attempt
+     failed. Inverted, because on a one-bit panel that is the only emphasis
+     there is, and a note this one must not read as part of the design. */
+  .stale {
+    align-items: center;
+    background: var(--ink);
+    bottom: 0;
+    color: var(--paper);
+    display: flex;
+    font: 10px/1.2 Inter, "DejaVu Sans", sans-serif;
+    gap: 5px;
+    left: 0;
+    padding: 3px 6px;
+    position: absolute;
+    right: 0;
+  }
+  .stale-mark {
+    background: var(--paper);
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+    flex: none;
+    height: 9px;
+    width: 9px;
+  }
+  .stale-why { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style></head>
 <body><div class="panel">${cells.join("")}</div></body></html>`;
 

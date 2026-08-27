@@ -45,9 +45,10 @@ export interface Rendered {
  * It has to cover everything that can change the picture and nothing that
  * cannot, or the device is handed a new filename on every wake and redraws for
  * no reason. That is: the panel, each widget's settings, its fetched data, its
- * placement - and the *design*, meaning the extension's templates and the
- * stylesheet they render against. Leaving the design out is the bug where you
- * edit a template, reload, and see the old picture forever.
+ * placement, whether that data is any good - and the *design*, meaning the
+ * extension's templates and the stylesheet they render against. Leaving the
+ * design out is the bug where you edit a template, reload, and see the old
+ * picture forever.
  */
 export async function fingerprint(
   widgets: PlacedWidget[],
@@ -82,6 +83,12 @@ export async function fingerprint(
         extension: widget.extension,
         settings: widget.settings,
         data: widget.data,
+        // A fault changes the picture as surely as the data does - it puts a
+        // note over the widget, or replaces it. Leave it out and a screen that
+        // starts failing keeps serving the healthy-looking picture from before
+        // it broke, which is the exact bug this was added to stop.
+        problem: widget.problem ?? "",
+        standIn: widget.standIn ?? false,
         // The style is a choice, and a different choice is a different
         // picture at the same size - so it belongs in the key.
         design: widget.design ?? "",
