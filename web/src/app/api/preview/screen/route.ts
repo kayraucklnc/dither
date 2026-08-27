@@ -48,7 +48,13 @@ export async function POST(request: Request) {
         .then(([model]) => (model ? panelFor(model) : DEFAULT_PANEL))
     : DEFAULT_PANEL;
 
-  const data = await dataFor(widgets.map((widget) => ({ id: widget.id, extension: widget.extension })));
+  const data = await dataFor(
+    widgets.map((widget) => ({
+      id: widget.id,
+      extension: widget.extension,
+      settings: widget.settings,
+    })),
+  );
 
   const placed: PlacedWidget[] = widgets.map((widget) => ({
     ...widget,

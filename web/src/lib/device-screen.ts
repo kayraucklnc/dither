@@ -96,7 +96,9 @@ export async function serve(device: Device, now = new Date()): Promise<Served> {
     ? await db.select().from(widgets).where(eq(widgets.screenId, screenId))
     : [];
 
-  const data = await dataFor(placedRows.map((row) => ({ id: row.id, extension: row.extension })));
+  const data = await dataFor(
+    placedRows.map((row) => ({ id: row.id, extension: row.extension, settings: row.settings })),
+  );
   const placed = placedRows.map((row) => ({
     id: row.id,
     extension: row.extension,

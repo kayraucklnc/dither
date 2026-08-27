@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { triggers, type Device } from "@/lib/db/schema";
+import { answersFor, observationKey } from "@/lib/extensions/observations";
 import { find as findExtension } from "@/lib/extensions/registry";
 import type { Context } from "@/lib/flow/conditions";
 import { setAt } from "@/lib/facts";
@@ -20,9 +21,20 @@ export async function sourcesFor(device: Device, now = new Date()): Promise<Sour
   const rows = await db.select().from(triggers);
   const built: Source[] = [deviceSource(device, now), clockSource(now)];
 
+  const answers = await answersFor(rows);
+
   for (const trigger of rows) {
     const extension = await findExtension(trigger.extension);
-    built.push(triggerSource(trigger, extension?.manifest.facts ?? [], now));
+    const answer = answers.get(observationKey(trigger.extension, trigger.settings));
+
+    built.push(
+      triggerSource(
+        trigger,
+        extension?.manifest.facts ?? [],
+        answer ?? { payload: {}, fetchedAt: null },
+        now,
+      ),
+    );
   }
 
   return built;

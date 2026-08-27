@@ -1,17 +1,17 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { widgets } from "@/lib/db/schema";
-import { refresh } from "@/lib/extensions/fetcher";
+import { refreshWidgets } from "@/lib/extensions/fetcher";
 
 /**
- * Fetch now, on demand.
+ * Ask again, now.
  *
- * Previews never fetch on their own - a preview that waits on a third party is
- * one nobody uses - so this exists for the button that says "get the real
- * numbers".
+ * Previews never fetch on their own - a preview waiting on a third party is one
+ * nobody uses - so this is what the editor calls after settings settle, and
+ * what the "get the real numbers" button calls.
  */
 const body = z.object({ widgetIds: z.array(z.number()).min(1).max(24) });
 
@@ -19,10 +19,7 @@ export async function POST(request: Request) {
   const parsed = body.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: "Bad request." }, { status: 400 });
 
-  const rows = await db.select().from(widgets).where(inArray(widgets.id, parsed.data.widgetIds));
-  const results = await Promise.all(rows.map((widget) => refresh(widget)));
-
-  return NextResponse.json({ results });
+  return NextResponse.json({ results: await refreshWidgets(parsed.data.widgetIds) });
 }
 
 export async function GET(request: Request) {
@@ -30,7 +27,5 @@ export async function GET(request: Request) {
   if (!Number.isInteger(screenId)) return NextResponse.json({ error: "Bad screen." }, { status: 400 });
 
   const rows = await db.select().from(widgets).where(eq(widgets.screenId, screenId));
-  const results = await Promise.all(rows.map((widget) => refresh(widget)));
-
-  return NextResponse.json({ results });
+  return NextResponse.json({ results: await refreshWidgets(rows.map((row) => row.id)) });
 }
