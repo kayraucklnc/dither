@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { reachableFrom, wouldCycle } from "./graph";
+import { reachableFrom, removeNodes, wouldCycle } from "./graph";
 
 const node = (id: number, yes: number | null = null, no: number | null = null) => ({
   id,
@@ -63,5 +63,72 @@ describe("connections that would loop", () => {
   it("allows wiring up a loose node", () => {
     expect(wouldCycle(nodes, 5, 9)).toBe(false);
     expect(wouldCycle(nodes, 9, 1)).toBe(false);
+  });
+});
+
+describe("removing nodes", () => {
+  const check = (id: number, yes: number | null, no: number | null) => ({
+    ...node(id, yes, no),
+    kind: "question" as const,
+  });
+  const screen = (id: number) => ({ ...node(id), kind: "screen" as const });
+
+  /*
+   *  1 --yes--> 2
+   *   |no
+   *   3 --yes--> 4
+   *      |no
+   *      5
+   */
+  const tree = [check(1, 2, 3), screen(2), check(3, 4, 5), screen(4), screen(5)];
+
+  it("splices a check out, keeping its no branch", () => {
+    const after = removeNodes(tree, 1, [1]);
+
+    expect(after.rootId).toBe(3);
+    expect(after.nodes.map((one) => one.id).sort((a, b) => a - b)).toEqual([3, 4, 5]);
+  });
+
+  it("takes a check's yes branch with it", () => {
+    expect(removeNodes(tree, 1, [3]).nodes.some((one) => one.id === 4)).toBe(false);
+  });
+
+  it("re-points whatever asked the question at the survivor", () => {
+    const after = removeNodes(tree, 1, [3]);
+    expect(after.nodes.find((one) => one.id === 1)?.noNodeId).toBe(5);
+  });
+
+  it("unhooks a screen rather than splicing it", () => {
+    const after = removeNodes(tree, 1, [2]);
+
+    expect(after.rootId).toBe(1);
+    expect(after.nodes.find((one) => one.id === 1)?.yesNodeId).toBe(null);
+    expect(after.nodes.map((one) => one.id)).not.toContain(2);
+  });
+
+  it("leaves nothing pointing at an id that has gone", () => {
+    const ids = new Set(removeNodes(tree, 1, [3]).nodes.map((one) => one.id));
+
+    for (const one of removeNodes(tree, 1, [3]).nodes) {
+      for (const link of [one.yesNodeId, one.noNodeId]) {
+        if (link !== null) expect(ids.has(link)).toBe(true);
+      }
+    }
+  });
+
+  it("takes several at once", () => {
+    const after = removeNodes(tree, 1, [2, 5]);
+
+    expect(after.nodes.map((one) => one.id).sort((a, b) => a - b)).toEqual([1, 3, 4]);
+    expect(after.nodes.find((one) => one.id === 1)?.yesNodeId).toBe(null);
+    expect(after.nodes.find((one) => one.id === 3)?.noNodeId).toBe(null);
+  });
+
+  it("clears the root when the root itself goes with no survivor", () => {
+    expect(removeNodes([screen(1)], 1, [1])).toEqual({ nodes: [], rootId: null });
+  });
+
+  it("ignores an id that is not there", () => {
+    expect(removeNodes(tree, 1, [99]).nodes).toHaveLength(tree.length);
   });
 });

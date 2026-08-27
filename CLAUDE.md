@@ -156,6 +156,13 @@ introduces itself again afterwards, as a new device with a new key.
 - **A partial unique index, not a plain one**, for "one initial per device" -
   a plain unique on `(device, flag)` also forbids two rows where the flag is
   false.
+- **A canvas that keeps its own copy of the nodes can only delete from that
+  copy.** React Flow's Backspace key removes the selected node from
+  `flowNodes`, which is *derived* from the tree - so it vanishes, nothing
+  saves, and the twenty-second trace refresh re-derives it. It also sweeps the
+  incident edges into `onEdgesDelete`, which would undo the splice a removed
+  check needs. `onBeforeDelete` refuses the node deletion and hands it to
+  `removeNodes`, which every route to a deletion goes through.
 - **Adopt server ids exactly once.** An autosave effect that writes state
   unconditionally retriggers itself and saves forever; the first version of
   this scrambled widget ids by index and corrupted a screen.
