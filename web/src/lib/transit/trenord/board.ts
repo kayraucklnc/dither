@@ -74,6 +74,8 @@ export interface Departure {
   scheduled: string;
   expected: string;
   minutes_until: number | null;
+  /** The same departure as epoch seconds, which is what a check counts down to. */
+  at_epoch: number | null;
   delay: number;
   delayed: boolean;
   platform: string;
@@ -142,13 +144,25 @@ export function departureFrom(
   const cancelled = solution.cancelled === true || train.status === "S";
   const changes = Number(solution.change ?? 0) || 0;
 
+  const away = minutesUntil(expected, zoned(now, settings.timezone), dayOffset);
+
   return {
     line: String(train.line ?? train.train_category ?? ""),
     number: String(train.train_name ?? train.train_id ?? ""),
     direction: String(train.direction ?? ""),
     scheduled,
     expected,
-    minutes_until: minutesUntil(expected, zoned(now, settings.timezone), dayOffset),
+    minutes_until: away,
+    /*
+     * The same departure as an instant, so a check can count down to it.
+     *
+     * Taken from `minutes_until` rather than from `dep_date_time`, which
+     * carries no zone and so parses as whatever the *server* is set to. The
+     * minutes are already worked out in the station's zone and against the
+     * right calendar day, which is the hard half; adding them to the moment
+     * the board was read is the easy half and cannot be wrong about a place.
+     */
+    at_epoch: away === null ? null : Math.floor(now.getTime() / 1000) + away * 60,
     delay,
     delayed: delay > 0,
     platform: String(stop.platform ?? "").trim(),
