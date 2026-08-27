@@ -1,6 +1,14 @@
 {% comment %} Quarter: 400x240. The time, and the date under it. {% endcomment %}
 
-{% assign shift = extension.values.utc_offset_hours | times: 3600 %}
+{% comment %}
+  Dates already render in the installation time zone, so no offset is needed
+  for the common case. A value here means "this clock is somewhere else", and
+  shifts relative to the installation rather than from UTC.
+{% endcomment %}
+{% assign shift = 0 %}
+{% if extension.values.utc_offset_hours != blank %}
+  {% assign shift = extension.values.utc_offset_hours | times: 3600 | minus: dither.offset_seconds %}
+{% endif %}
 {% assign stamp = "now" | date: "%s" | plus: shift %}
 {% if extension.values.twenty_four_hour == false %}
   {% assign face = stamp | date: "%I:%M" %}

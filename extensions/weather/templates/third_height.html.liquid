@@ -30,8 +30,39 @@
           <span class="name"><span class="i i-umbrella i-xs"></span>Rain</span>
           <span class="figure">{{ today.precipitation_probability_max[0] }}%</span>
         </div>
+        {% comment %} Only room for these in a band taller than two rows. {% endcomment %}
+        {% if shape.rows > 2 %}
+          <div class="row">
+            <span class="name"><span class="i i-wind i-xs"></span>Wind</span>
+            <span class="figure">
+              {{ now.wind_speed_10m | round }} km/h {{ now.wind_direction_10m | compass }}
+            </span>
+          </div>
+          <div class="row">
+            <span class="name"><span class="i i-sunrise i-xs"></span>Sun</span>
+            <span class="figure">
+              {{ today.sunrise[0] | clock_of }}&ndash;{{ today.sunset[0] | clock_of }}
+            </span>
+          </div>
+        {% endif %}
       </div>
     </div>
+
+    {% if shape.rows > 3 and source_1.hourly %}
+      <div style="border-top: var(--rule) solid var(--ink); flex: 1; min-height: 0; padding: 10px var(--pad) 8px">
+        <div class="bars">
+          {% for at in source_1.hourly.time limit: 12 %}
+            {% assign chance = source_1.hourly.precipitation_probability[forloop.index0] %}
+            <div class="bar">
+              <span class="tick t-bold">{{ source_1.hourly.temperature_2m[forloop.index0] | round }}&deg;</span>
+              <span class="fill{% if chance < 5 %} fill--empty{% endif %}"
+                    style="height: {{ chance | as_percent: 100 | at_least: 3 }}%"></span>
+              <span class="tick">{{ at | hour_of }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
   {% else %}
     <div class="content layout layout--row layout--center">
       <span class="i i-cloud i-md"></span>

@@ -109,15 +109,18 @@ export async function serve(device: Device, now = new Date()): Promise<Served> {
   // the panel - and "blank" is indistinguishable from "broken".
   const nothing = placed.length === 0;
 
-  const key = nothing
-    ? `empty-${await fingerprint([], spec, said)}.png`
-    : `${await fingerprint(placed, spec, said)}.png`;
+  const heading = device.name;
+  const detail = result.leaf
+    ? `"${result.leaf.label}" has no screen chosen yet. Pick one on this device's page.`
+    : "No decision tree yet. Open this device in Dither to set one up.";
+
+  // The key doubles as the image's filename, so it stays a plain hash - what
+  // makes an empty panel distinct goes into the hash, not into a prefix.
+  const key = `${await fingerprint(placed, spec, said, nothing ? { empty: [heading, detail] } : undefined)}.png`;
 
   if (!(await store().has(key))) {
     const rendered = nothing
-      ? await renderEmpty(spec, device.name, result.leaf
-          ? `"${result.leaf.label}" has no screen chosen yet. Pick one on this device's page.`
-          : "No decision tree yet. Open this device in Dither to set one up.")
+      ? await renderEmpty(spec, heading, detail)
       : await renderScreen(placed, spec, said);
     await store().put(key, rendered.bytes, "image/png");
 

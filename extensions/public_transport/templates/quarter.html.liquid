@@ -1,30 +1,32 @@
 {% comment %} Quarter: 400x240. The next train, and the one after it. {% endcomment %}
 
-<div class="screen">
-  {% if transit.empty %}
-    <div class="content layout layout--col layout--center">
-      <p class="t-bold">No departures</p>
+{% assign board = transit %}
+{% assign next = board.departures[0] %}
+
+<div class="screen dense">
+  {% if board.empty or next == nil %}
+    <div class="content layout layout--col layout--center" style="gap: 6px">
+      <span class="i i-train i-md"></span>
+      <p class="t-sm t-bold">No departures</p>
     </div>
   {% else %}
-    {% assign next = transit.departures[0] %}
     <div class="content layout layout--col" style="justify-content: space-between">
       <div class="kv">
-        <span class="k t-xs">{{ transit.origin | truncate: 16 }}</span>
-        <span class="v t-xs">{{ next.line }}</span>
+        <span class="k t-xs t-upper truncate">{{ board.origin | truncate: 18 }}</span>
+        <span class="v t-xs">{{ next.minutes_until | in_words }}</span>
       </div>
 
-      <div class="stat">
-        <span class="value t-mono">{% if next.cancelled %}CANC{% else %}{{ next.expected }}{% endif %}</span>
-        <span class="label truncate">{{ next.direction }}</span>
+      <div class="with-icon" style="gap: 10px">
+        <span class="t-bold" style="font-size: 32px; line-height: 1">{{ next.line }}</span>
+        <span class="t-mono t-bold" style="font-size: 30px; line-height: 1">
+          {% if next.cancelled %}CANC{% else %}{{ next.expected }}{% endif %}
+        </span>
       </div>
 
-      {% if transit.departures.size > 1 %}
-        {% assign following = transit.departures[1] %}
-        <div class="kv t-sm">
-          <span class="k truncate">then {{ following.line }}</span>
-          <span class="v t-mono t-bold">{{ following.expected }}</span>
-        </div>
-      {% endif %}
+      <p class="t-xs truncate">
+        {{ next.direction }}
+        {% if board.departures[1] %} &middot; then {{ board.departures[1].expected }}{% endif %}
+      </p>
     </div>
   {% endif %}
 

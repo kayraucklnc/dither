@@ -264,6 +264,22 @@ export const connections = pgTable("connections", {
   connectedAt: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * One row, holding the things that are true of this whole installation.
+ *
+ * Locale and time zone live here because otherwise they leak from the server:
+ * a box running in Istanbul renders every date in Turkish, which is a
+ * confusing thing to discover on a wall clock.
+ */
+export const appSettings = pgTable("app_settings", {
+  id: integer("id").primaryKey().default(1),
+  /** BCP 47, e.g. "en-GB". Used for day and month names. */
+  locale: text("locale").notNull().default("en-GB"),
+  /** IANA zone, e.g. "Europe/Rome". */
+  timezone: text("timezone").notNull().default("UTC"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /** Firmware images offered to devices over the air. */
 export const firmwares = pgTable("firmwares", {
   id: serial("id").primaryKey(),
@@ -316,4 +332,5 @@ export type Device = typeof devices.$inferSelect;
 export type DecisionNode = typeof decisionNodes.$inferSelect;
 export type Trigger = typeof triggers.$inferSelect;
 export type Notice = typeof notices.$inferSelect;
+export type AppSettings = typeof appSettings.$inferSelect;
 export type Render = typeof renders.$inferSelect;

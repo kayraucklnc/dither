@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { find as findExtension } from "@/lib/extensions/registry";
 import { COLUMNS, ROWS, shapeForSize } from "@/lib/shapes";
-import { renderWidget } from "./liquid";
+import { DEFAULT_ENVIRONMENT, renderWidget, type Environment } from "./liquid";
 
 /**
  * Turn a screen into one HTML document the size of the panel.
@@ -147,6 +147,7 @@ export async function compose(
   width: number,
   height: number,
   notices: Notice[] = [],
+  environment: Environment = DEFAULT_ENVIRONMENT,
 ): Promise<Composition> {
   const problems: string[] = [];
   const cells: string[] = [];
@@ -184,6 +185,7 @@ export async function compose(
       widget.settings,
       widget.data,
       widget.id === host ? notices : [],
+      environment,
     );
 
     if ("problem" in rendered) {
@@ -255,6 +257,7 @@ export async function composeSolo(
   shapeId: string,
   width: number,
   height: number,
+  environment: Environment = DEFAULT_ENVIRONMENT,
 ): Promise<Composition> {
   const extension = await findExtension(widget.extension);
   const css = await framework();
@@ -271,7 +274,14 @@ export async function composeSolo(
     };
   }
 
-  const rendered = await renderWidget(extension, shapeId, widget.settings, widget.data);
+  const rendered = await renderWidget(
+    extension,
+    shapeId,
+    widget.settings,
+    widget.data,
+    [],
+    environment,
+  );
 
   if ("problem" in rendered) {
     return {

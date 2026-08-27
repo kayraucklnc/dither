@@ -13,6 +13,7 @@ import {
 import { find as findExtension } from "@/lib/extensions/registry";
 import { floydSteinberg, grayPalette, paletteFromCodes } from "./dither";
 import { COLUMNS, ROWS, pixelsFor, shape } from "@/lib/shapes";
+import { environment } from "@/lib/settings";
 
 /**
  * Compose, screenshot, dither. This is the path a device takes, and the same
@@ -52,6 +53,13 @@ export async function fingerprint(
   widgets: PlacedWidget[],
   panel: Panel,
   notices: Notice[] = [],
+  /**
+   * Anything else that changes the picture but is not a widget - the wording
+   * of the "nothing set up" panel, for instance. It goes into the hash rather
+   * than into a key prefix, because the key is also the image's filename and
+   * that has to stay a plain hash.
+   */
+  extra?: unknown,
 ): Promise<string> {
   const digests: Record<string, string> = {};
 
@@ -63,8 +71,12 @@ export async function fingerprint(
   const material = JSON.stringify({
     panel,
     design: await frameworkDigest(),
+    // The locale and offset change what a date renders as, so they belong in
+    // the key like any other input to the picture.
+    environment: await environment(),
     digests,
     notices,
+    extra,
     widgets: widgets
       .map((widget) => ({
         extension: widget.extension,
@@ -88,7 +100,13 @@ export async function renderScreen(
   panel: Panel,
   notices: Notice[] = [],
 ): Promise<Rendered> {
-  const { html, problems } = await compose(widgets, panel.width, panel.height, notices);
+  const { html, problems } = await compose(
+    widgets,
+    panel.width,
+    panel.height,
+    notices,
+    await environment(),
+  );
   const screenshot = await shoot(html, panel.width, panel.height);
 
   const rotated = panel.rotation ? sharp(screenshot).rotate(panel.rotation) : sharp(screenshot);
@@ -179,7 +197,13 @@ export async function renderSolo(
 
   // The solo panel *is* the widget's box, so the widget fills the grid and the
   // shape it renders at comes from the size of the panel, not from its span.
-  const { html, problems } = await composeSolo(widget, shapeId, width, height);
+  const { html, problems } = await composeSolo(
+    widget,
+    shapeId,
+    width,
+    height,
+    await environment(),
+  );
   const screenshot = await shoot(html, width, height);
 
   const { data: raw, info } = await sharp(screenshot).raw().toBuffer({ resolveWithObject: true });
