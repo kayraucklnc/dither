@@ -61,7 +61,48 @@ describe("what the editor may offer", () => {
   });
 
   it("reads a condition back as a sentence", () => {
-    expect(sentence("Next meeting starts in", "lt", 30)).toBe("Next meeting starts in is less than 30");
-    expect(sentence("Service alert", "present", null)).toBe("Service alert has any value");
+    const duration = { key: "m", label: "Next meeting starts in", type: "duration" as const, path: "m", unit: "min" };
+    const text = { key: "a", label: "Service alert", type: "text" as const, path: "a", unit: "" };
+
+    expect(sentence(duration, "lt", 30)).toBe("Next meeting starts in is less than 30");
+    expect(sentence(text, "present", null)).toBe("Service alert has any value");
+  });
+});
+
+describe("time of day", () => {
+  it("matches inside a window", () => {
+    expect(compare("08:15", "between", ["07:00", "09:00"])).toBe(true);
+    expect(compare("06:30", "between", ["07:00", "09:00"])).toBe(false);
+  });
+
+  it("handles a window that wraps past midnight", () => {
+    expect(compare("23:30", "between", ["22:00", "06:00"])).toBe(true);
+    expect(compare("02:00", "between", ["22:00", "06:00"])).toBe(true);
+    expect(compare("12:00", "between", ["22:00", "06:00"])).toBe(false);
+  });
+
+  it("compares before and after", () => {
+    expect(compare("07:59", "before", "08:00")).toBe(true);
+    expect(compare("08:00", "after", "08:00")).toBe(true);
+  });
+});
+
+describe("weekday and boolean", () => {
+  it("matches a set of days", () => {
+    expect(compare(1, "is_one_of", [1, 2, 3, 4, 5])).toBe(true);
+    expect(compare(0, "is_one_of", [1, 2, 3, 4, 5])).toBe(false);
+  });
+
+  it("asks yes or no rather than comparing to a literal", () => {
+    expect(compare(true, "is_true", null)).toBe(true);
+    expect(compare(false, "is_true", null)).toBe(false);
+    expect(compare(false, "is_false", null)).toBe(true);
+    // No value at all is not the same as "no".
+    expect(compare(undefined, "is_false", null)).toBe(false);
+  });
+
+  it("names the day rather than printing its number", () => {
+    const weekday = { key: "d", label: "Day of week", type: "weekday" as const, path: "d", unit: "" };
+    expect(sentence(weekday, "is_one_of", [1, 2, 3])).toBe("Day of week is one of Monday, Tuesday or Wednesday");
   });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { CircleHelp, Flag, Lock, Timer } from "lucide-react";
+import { ChevronDown, ChevronUp, CircleHelp, Flag, Lock, Timer } from "lucide-react";
 
 import { ScreenPreview } from "@/components/screen-preview";
 import { cn } from "@/lib/cn";
@@ -16,6 +16,9 @@ export interface QuestionData extends Record<string, unknown> {
   /** undefined when this node was not reached on the current walk. */
   answer?: boolean;
   isRoot: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMove: (direction: "up" | "down") => void;
 }
 
 export function QuestionNode({ data, selected }: NodeProps & { data: QuestionData }) {
@@ -33,12 +36,46 @@ export function QuestionNode({ data, selected }: NodeProps & { data: QuestionDat
 
       <div className="flex items-center gap-1.5">
         {data.isRoot ? (
-          <Flag size={11} className="shrink-0 text-accent" />
+          <Flag size={11} className="shrink-0 text-accent-bright" />
         ) : (
           <CircleHelp size={11} className="shrink-0 text-faint" />
         )}
         <span className="text-[10px] font-medium uppercase tracking-wide text-faint">
-          {data.isRoot ? "Start — ask first" : "If"}
+          {data.isRoot ? "Asked first" : "Then if"}
+        </span>
+
+        {/* Priority is depth, so raising a check is literally moving it up. */}
+        <span className="ml-auto flex items-center gap-0.5">
+          <button
+            type="button"
+            title="Ask this earlier"
+            disabled={!data.canMoveUp}
+            onClick={(event) => {
+              event.stopPropagation();
+              data.onMove("up");
+            }}
+            className={cn(
+              "rounded p-0.5 transition-colors",
+              data.canMoveUp ? "text-faint hover:bg-surface hover:text-ink" : "text-faint/30",
+            )}
+          >
+            <ChevronUp size={13} />
+          </button>
+          <button
+            type="button"
+            title="Ask this later"
+            disabled={!data.canMoveDown}
+            onClick={(event) => {
+              event.stopPropagation();
+              data.onMove("down");
+            }}
+            className={cn(
+              "rounded p-0.5 transition-colors",
+              data.canMoveDown ? "text-faint hover:bg-surface hover:text-ink" : "text-faint/30",
+            )}
+          >
+            <ChevronDown size={13} />
+          </button>
         </span>
       </div>
 
@@ -48,25 +85,40 @@ export function QuestionNode({ data, selected }: NodeProps & { data: QuestionDat
         <p className="mt-1 font-mono text-[11px] text-faint">now: {data.actual}</p>
       )}
 
-      {/* Two exits, labelled, so the branch you are looking at is unambiguous. */}
-      <div className="mt-2.5 flex items-center justify-end gap-3 text-[10px] font-medium">
-        <span className={cn(data.answer === true ? "text-live" : "text-faint")}>yes ↗</span>
-        <span className={cn(data.answer === false ? "text-live" : "text-faint")}>no ↘</span>
+      {/* Two exits, coloured and labelled, so the branch you are looking at is
+          unambiguous even when the tree is zoomed out. */}
+      <div className="mt-2.5 flex items-center justify-end gap-2 text-[10px] font-medium">
+        <span
+          className={cn(
+            "rounded px-1.5 py-0.5 transition-colors",
+            data.answer === true ? "bg-live/20 text-live" : "bg-live/10 text-live/60",
+          )}
+        >
+          yes
+        </span>
+        <span
+          className={cn(
+            "rounded px-1.5 py-0.5 transition-colors",
+            data.answer === false ? "bg-no/20 text-no" : "bg-no/10 text-no/60",
+          )}
+        >
+          no
+        </span>
       </div>
 
       <Handle
         id="yes"
         type="source"
         position={Position.Right}
-        style={{ top: "62%" }}
+        style={{ top: "64%" }}
         className="!h-2 !w-2 !border-0 !bg-live"
       />
       <Handle
         id="no"
         type="source"
         position={Position.Right}
-        style={{ top: "86%" }}
-        className="!h-2 !w-2 !border-0 !bg-line-strong"
+        style={{ top: "88%" }}
+        className="!h-2 !w-2 !border-0 !bg-[oklch(0.72_0.13_20)]"
       />
     </div>
   );

@@ -1,52 +1,95 @@
-import type { FactType } from "@/lib/extensions/manifest";
-
 /**
- * Facts are how an extension makes itself available to triggers.
+ * Facts are how anything makes itself available to a check.
  *
- * The flow engine knows nothing about trains, weather or calendars. It knows
- * that a widget publishes named, typed values, and that you can compare them.
- * A calendar connector that declares `next_meeting_in` gets "show the commute
- * when a meeting starts within thirty minutes" for free, without the engine
- * learning what a meeting is.
+ * There is exactly one kind of check in Dither: compare a value from a source.
+ * Not "battery below", not "between two times", not "data is stale" - those
+ * were separate check kinds once, and the list read as a grab bag because it
+ * mixed device telemetry, the clock, and fetched data into one dropdown while
+ * still being unable to express anything new.
  *
- * The declared type decides which comparisons are offered, so the editor
- * cannot build a rule that asks whether a duration "contains" something - a
- * condition that could never be true is not constructible.
+ * Now the device is a source, the clock is a source, and every trigger you add
+ * is a source. A connection that reports whether your laptop is awake declares
+ * `online: boolean` and you can branch on it immediately - no new check kind,
+ * no change to the editor, no change to the engine.
+ *
+ * The declared type decides which comparisons are offered, so a rule that could
+ * never be true is not constructible.
  */
+
+export const FACT_TYPES = ["duration", "number", "text", "boolean", "time", "weekday"] as const;
+export type FactType = (typeof FACT_TYPES)[number];
+
+export interface Fact {
+  key: string;
+  label: string;
+  type: FactType;
+  /** Dotted path into the source's payload. A numeric step indexes an array. */
+  path: string;
+  unit: string;
+}
+
+/** How many operands the editor should ask for. */
+export type Arity = "none" | "one" | "range" | "set";
 
 export interface Operator {
   id: string;
   label: string;
-  /** Whether the editor should ask for a value to compare against. */
-  needsValue: boolean;
+  arity: Arity;
 }
 
 export const OPERATORS: Record<string, Operator> = {
-  lt: { id: "lt", label: "is less than", needsValue: true },
-  lte: { id: "lte", label: "is at most", needsValue: true },
-  gt: { id: "gt", label: "is more than", needsValue: true },
-  gte: { id: "gte", label: "is at least", needsValue: true },
-  eq: { id: "eq", label: "is", needsValue: true },
-  neq: { id: "neq", label: "is not", needsValue: true },
-  contains: { id: "contains", label: "contains", needsValue: true },
-  present: { id: "present", label: "has any value", needsValue: false },
-  absent: { id: "absent", label: "is empty", needsValue: false },
+  lt: { id: "lt", label: "is less than", arity: "one" },
+  lte: { id: "lte", label: "is at most", arity: "one" },
+  gt: { id: "gt", label: "is more than", arity: "one" },
+  gte: { id: "gte", label: "is at least", arity: "one" },
+  eq: { id: "eq", label: "is", arity: "one" },
+  neq: { id: "neq", label: "is not", arity: "one" },
+  contains: { id: "contains", label: "contains", arity: "one" },
+  present: { id: "present", label: "has any value", arity: "none" },
+  absent: { id: "absent", label: "is empty", arity: "none" },
+  is_true: { id: "is_true", label: "is yes", arity: "none" },
+  is_false: { id: "is_false", label: "is no", arity: "none" },
+  between: { id: "between", label: "is between", arity: "range" },
+  before: { id: "before", label: "is before", arity: "one" },
+  after: { id: "after", label: "is after", arity: "one" },
+  is_one_of: { id: "is_one_of", label: "is one of", arity: "set" },
 };
 
 const OPERATORS_FOR: Record<FactType, string[]> = {
   duration: ["lt", "lte", "gt", "gte", "present", "absent"],
   number: ["lt", "lte", "gt", "gte", "eq", "neq", "present", "absent"],
-  text: ["eq", "neq", "contains", "present", "absent"],
-  boolean: ["eq", "present", "absent"],
+  text: ["contains", "eq", "neq", "present", "absent"],
+  boolean: ["is_true", "is_false"],
+  time: ["between", "before", "after"],
+  weekday: ["is_one_of"],
 };
 
 export function operatorsFor(type: FactType): Operator[] {
   return (OPERATORS_FOR[type] ?? []).map((id) => OPERATORS[id]);
 }
 
+export function defaultOperator(type: FactType): string {
+  return OPERATORS_FOR[type]?.[0] ?? "present";
+}
+
+/** A sensible starting operand, so a new check is never in a broken state. */
+export function defaultValue(type: FactType): unknown {
+  switch (type) {
+    case "time":
+      return ["07:00", "09:00"];
+    case "weekday":
+      return [1, 2, 3, 4, 5];
+    case "duration":
+    case "number":
+      return 0;
+    default:
+      return "";
+  }
+}
+
 /**
- * Resolve a dotted path against fetched data. A numeric step indexes an array,
- * so `source_1.departures.0.minutes_until` reads the next train.
+ * Resolve a dotted path against a source's payload. A numeric step indexes an
+ * array, so `transit.departures.0.minutes_until` reads the next train.
  */
 export function valueAt(data: unknown, path: string): unknown {
   return path.split(".").reduce<unknown>((current, step) => {
@@ -69,17 +112,26 @@ function asNumber(value: unknown): number | undefined {
   return undefined;
 }
 
-function asBoolean(value: unknown): boolean {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "string") return value === "true" || value === "1" || value === "yes";
-  return Boolean(value);
+const asBoolean = (value: unknown): boolean =>
+  typeof value === "boolean"
+    ? value
+    : typeof value === "string"
+      ? value === "true" || value === "1" || value === "yes"
+      : Boolean(value);
+
+/** Minutes past midnight, from "HH:MM" or a number already in minutes. */
+export function asMinutes(value: unknown): number | undefined {
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+
+  const match = /^(\d{1,2}):(\d{2})$/.exec(String(value).trim());
+  return match ? Number(match[1]) * 60 + Number(match[2]) : undefined;
 }
 
 /**
- * Compare a fact's current value against what a condition asks for.
+ * Compare a fact's current value against what a check asks for.
  *
  * Missing data answers false rather than throwing. A display whose weather
- * provider is down should keep showing the previous screen, not stop.
+ * provider is down should keep showing the previous screen, not go blank.
  */
 export function compare(actual: unknown, operator: string, expected: unknown): boolean {
   switch (operator) {
@@ -87,6 +139,10 @@ export function compare(actual: unknown, operator: string, expected: unknown): b
       return !isBlank(actual);
     case "absent":
       return isBlank(actual);
+    case "is_true":
+      return asBoolean(actual);
+    case "is_false":
+      return !isBlank(actual) && !asBoolean(actual);
     default:
       break;
   }
@@ -106,6 +162,7 @@ export function compare(actual: unknown, operator: string, expected: unknown): b
       if (operator === "gt") return left > right;
       return left >= right;
     }
+
     case "eq":
     case "neq": {
       const left = asNumber(actual);
@@ -113,21 +170,66 @@ export function compare(actual: unknown, operator: string, expected: unknown): b
       const same =
         left !== undefined && right !== undefined
           ? left === right
-          : typeof actual === "boolean" || typeof expected === "boolean"
-            ? asBoolean(actual) === asBoolean(expected)
-            : String(actual).toLowerCase() === String(expected).toLowerCase();
+          : String(actual).toLowerCase() === String(expected).toLowerCase();
       return operator === "eq" ? same : !same;
     }
+
     case "contains":
       return String(actual).toLowerCase().includes(String(expected).toLowerCase());
+
+    case "between": {
+      const now = asMinutes(actual);
+      const range = Array.isArray(expected) ? expected : [];
+      const from = asMinutes(range[0]);
+      const to = asMinutes(range[1]);
+      if (now === undefined || from === undefined || to === undefined) return false;
+
+      // A window that ends before it starts has wrapped past midnight.
+      return from <= to ? now >= from && now < to : now >= from || now < to;
+    }
+
+    case "before": {
+      const now = asMinutes(actual);
+      const mark = asMinutes(expected);
+      return now !== undefined && mark !== undefined && now < mark;
+    }
+
+    case "after": {
+      const now = asMinutes(actual);
+      const mark = asMinutes(expected);
+      return now !== undefined && mark !== undefined && now >= mark;
+    }
+
+    case "is_one_of": {
+      const set = Array.isArray(expected) ? expected.map(String) : [String(expected)];
+      return set.includes(String(actual));
+    }
+
     default:
       return false;
   }
 }
 
-/** How a condition reads back as a sentence, for the flow canvas and the trace. */
-export function describe(factLabel: string, operator: string, expected: unknown): string {
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/** How an operand reads in a sentence. */
+export function describeValue(type: FactType, operator: string, value: unknown): string {
+  if (operator === "between" && Array.isArray(value)) return `${value[0]} and ${value[1]}`;
+
+  if (type === "weekday") {
+    const days = (Array.isArray(value) ? value : [value]).map((day) => DAYS[Number(day)] ?? day);
+    return days.length > 2 ? `${days.slice(0, -1).join(", ")} or ${days.at(-1)}` : days.join(" or ");
+  }
+
+  return String(value);
+}
+
+/** How a whole check reads back, for the canvas and the trace. */
+export function describe(fact: Fact, operator: string, expected: unknown): string {
   const op = OPERATORS[operator];
-  if (!op) return factLabel;
-  return op.needsValue ? `${factLabel} ${op.label} ${expected}` : `${factLabel} ${op.label}`;
+  if (!op) return fact.label;
+
+  return op.arity === "none"
+    ? `${fact.label} ${op.label}`
+    : `${fact.label} ${op.label} ${describeValue(fact.type, operator, expected)}`;
 }

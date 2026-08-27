@@ -3,7 +3,7 @@ import { Liquid } from "liquidjs";
 
 import { provider } from "@/lib/connections";
 import { db } from "@/lib/db";
-import { connections, widgetData, widgets, type Widget } from "@/lib/db/schema";
+import { connections, triggers, widgetData, widgets, type Trigger, type Widget } from "@/lib/db/schema";
 import { find } from "@/lib/extensions/registry";
 
 /**
@@ -88,6 +88,28 @@ async function fromConnection(
   return source.fetch(settings, now);
 }
 
+/** Fetch for any use of an extension - a widget on a screen or a trigger. */
+async function payloadFor(
+  extensionName: string,
+  settings: Record<string, unknown>,
+  now: Date,
+): Promise<Record<string, unknown>> {
+  const extension = await find(extensionName);
+  if (!extension) throw new Error(`${extensionName} is not installed.`);
+
+  switch (extension.manifest.kind) {
+    case "static":
+      return {};
+    case "connection":
+      return fromConnection(extension, settings, now);
+    case "poll":
+      return poll(extension, settings);
+    default:
+      // Transit providers are not ported yet; the sample stands in.
+      return extension.manifest.sample as Record<string, unknown>;
+  }
+}
+
 export interface FetchResult {
   widgetId: number;
   payload?: Record<string, unknown>;
@@ -101,15 +123,7 @@ export async function refresh(widget: Widget, now = new Date()): Promise<FetchRe
   if (extension.manifest.kind === "static") return { widgetId: widget.id };
 
   try {
-    const settings = widget.settings;
-
-    const payload =
-      extension.manifest.kind === "connection"
-        ? await fromConnection(extension, settings, now)
-        : extension.manifest.kind === "poll"
-          ? await poll(extension, settings)
-          : // Transit providers are not ported yet; the sample stands in.
-            (extension.manifest.sample as Record<string, unknown>);
+    const payload = await payloadFor(widget.extension, widget.settings, now);
 
     await db
       .insert(widgetData)
@@ -131,6 +145,48 @@ export async function refresh(widget: Widget, now = new Date()): Promise<FetchRe
 
     return { widgetId: widget.id, error: message };
   }
+}
+
+/**
+ * Refresh a trigger source.
+ *
+ * A failure is written to the row rather than thrown, so the check editor can
+ * say "Milan rain could not be reached" beside the value it is asking about.
+ */
+export async function refreshTrigger(trigger: Trigger, now = new Date()): Promise<FetchResult> {
+  try {
+    const payload = await payloadFor(trigger.extension, trigger.settings, now);
+
+    await db
+      .update(triggers)
+      .set({ payload, fetchedAt: now, error: null })
+      .where(eq(triggers.id, trigger.id));
+
+    return { widgetId: trigger.id, payload };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await db.update(triggers).set({ error: message }).where(eq(triggers.id, trigger.id));
+
+    return { widgetId: trigger.id, error: message };
+  }
+}
+
+/** Refresh every trigger on a device whose data has aged out. */
+export async function refreshTriggers(deviceId: number, now = new Date()): Promise<FetchResult[]> {
+  const rows = await db.select().from(triggers).where(eq(triggers.deviceId, deviceId));
+  const due = [];
+
+  for (const trigger of rows) {
+    const extension = await find(trigger.extension);
+    if (!extension || extension.manifest.kind === "static") continue;
+
+    const window = stalenessMinutes(extension.manifest.interval, extension.manifest.unit);
+    const age = trigger.fetchedAt ? now.getTime() - trigger.fetchedAt.getTime() : Infinity;
+
+    if (window <= 0 ? !trigger.fetchedAt : age >= window * 60_000) due.push(trigger);
+  }
+
+  return Promise.all(due.map((trigger) => refreshTrigger(trigger, now)));
 }
 
 /** Refresh every widget on a screen whose data has aged out. */

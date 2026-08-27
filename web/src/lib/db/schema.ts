@@ -137,6 +137,35 @@ export const devices = pgTable("devices", {
 });
 
 /**
+ * A source of facts a device can decide on.
+ *
+ * A trigger is an extension plus its own settings, owned by the device rather
+ * than by a screen. That separation matters: the first version read facts off
+ * whatever widget happened to be on a screen, so you could only trigger on
+ * what you were already displaying, and "switch screens when the train from a
+ * station I am not showing is late" was not expressible.
+ *
+ * Same shape as a widget - a use of an extension with its own settings and its
+ * own fetched data - but for deciding rather than drawing.
+ */
+export const triggers = pgTable("triggers", {
+  id: serial("id").primaryKey(),
+  deviceId: integer("device_id")
+    .notNull()
+    .references(() => devices.id, { onDelete: "cascade" }),
+  extension: text("extension").notNull(),
+  /** What it is called in the check editor: "Cadorna departures", "Milan rain". */
+  label: text("label").notNull().default(""),
+  settings: jsonb("settings").$type<Record<string, unknown>>().notNull().default({}),
+
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }),
+  error: text("error"),
+
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
  * One node of a device's decision tree.
  *
  * Every wake, the device walks this tree from its root and shows the first
@@ -242,7 +271,12 @@ export const widgetsRelations = relations(widgets, ({ one }) => ({
 export const devicesRelations = relations(devices, ({ one, many }) => ({
   model: one(models, { fields: [devices.modelId], references: [models.id] }),
   nodes: many(decisionNodes),
+  triggers: many(triggers),
   logs: many(deviceLogs),
+}));
+
+export const triggersRelations = relations(triggers, ({ one }) => ({
+  device: one(devices, { fields: [triggers.deviceId], references: [devices.id] }),
 }));
 
 export const decisionNodesRelations = relations(decisionNodes, ({ one }) => ({
@@ -256,4 +290,5 @@ export type Widget = typeof widgets.$inferSelect;
 export type WidgetData = typeof widgetData.$inferSelect;
 export type Device = typeof devices.$inferSelect;
 export type DecisionNode = typeof decisionNodes.$inferSelect;
+export type Trigger = typeof triggers.$inferSelect;
 export type Render = typeof renders.$inferSelect;

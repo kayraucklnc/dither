@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { FACT_TYPES } from "@/lib/facts";
+
 /**
  * What an extension declares about itself.
  *
@@ -50,10 +52,10 @@ export const fieldSchema = z.object({
 
 export type Field = z.infer<typeof fieldSchema>;
 
-/** The value types a fact can hold, and what may be asked about each. */
-export const FACT_TYPES = ["duration", "number", "text", "boolean"] as const;
-export type FactType = (typeof FACT_TYPES)[number];
-
+/**
+ * A value a check can compare. Types and operators live in lib/facts so the
+ * device, the clock and every extension declare facts in one vocabulary.
+ */
 export const factSchema = z.object({
   key: z.string().min(1),
   label: z.string().min(1),
@@ -63,7 +65,7 @@ export const factSchema = z.object({
   unit: z.string().default(""),
 });
 
-export type Fact = z.infer<typeof factSchema>;
+export type { Fact, FactType } from "@/lib/facts";
 
 /**
  * One HTTP call a `poll` extension makes to get its data.

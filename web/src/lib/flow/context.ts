@@ -1,95 +1,33 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { decisionNodes, screens, widgets } from "@/lib/db/schema";
+import { triggers, type Device } from "@/lib/db/schema";
 import { find as findExtension } from "@/lib/extensions/registry";
-import type { Fact } from "@/lib/extensions/manifest";
 import type { Context } from "@/lib/flow/conditions";
-import type { Device } from "@/lib/db/schema";
-import { dataFor } from "@/lib/widget-data";
+import { clockSource, deviceSource, triggerSource, type Source } from "@/lib/flow/sources";
 
 /**
- * Everything a device's flow can ask about, gathered once.
+ * Everything a device's tree can ask about: itself, the clock, and the trigger
+ * sources set up on it.
  *
- * The facts available to a device are the facts of the widgets on the screens
- * its tree can reach - because a fact belongs to a *placement*, not to an
- * extension. "Cadorna to Saronno leaves in under ten minutes" is a different
- * trigger from "Centrale to Bergamo leaves in under ten minutes", and both can
- * exist at once.
+ * Triggers are deliberately not read off the screens a device shows. A trigger
+ * is its own use of an extension with its own settings, so you can branch on a
+ * station you are not displaying.
  */
-export interface WidgetFacts {
-  widgetId: number;
-  label: string;
-  extension: string;
-  screenId: number;
-  screenName: string;
-  facts: Fact[];
-}
+export async function sourcesFor(device: Device, now = new Date()): Promise<Source[]> {
+  const rows = await db.select().from(triggers).where(eq(triggers.deviceId, device.id));
+  const built: Source[] = [deviceSource(device, now), clockSource(now)];
 
-export async function widgetsForDevice(deviceId: number): Promise<WidgetFacts[]> {
-  const nodes = await db.select().from(decisionNodes).where(eq(decisionNodes.deviceId, deviceId));
-  const screenIds = [
-    ...new Set(nodes.map((node) => node.screenId).filter((id): id is number => id !== null)),
-  ];
-
-  if (!screenIds.length) return [];
-
-  const rows = await db
-    .select({
-      id: widgets.id,
-      label: widgets.label,
-      extension: widgets.extension,
-      screenId: widgets.screenId,
-      screenName: screens.name,
-    })
-    .from(widgets)
-    .innerJoin(screens, eq(screens.id, widgets.screenId))
-    .where(inArray(widgets.screenId, screenIds));
-
-  const result: WidgetFacts[] = [];
-
-  for (const row of rows) {
-    const extension = await findExtension(row.extension);
-    if (!extension?.manifest.facts.length) continue;
-
-    result.push({
-      widgetId: row.id,
-      label: row.label || extension.manifest.label,
-      extension: row.extension,
-      screenId: row.screenId,
-      screenName: row.screenName,
-      facts: extension.manifest.facts,
-    });
+  for (const trigger of rows) {
+    const extension = await findExtension(trigger.extension);
+    built.push(triggerSource(trigger, extension?.manifest.facts ?? [], now));
   }
 
-  return result;
+  return built;
 }
 
-/** The live values, for evaluating a flow or showing a trace. */
 export async function contextFor(device: Device, now = new Date()): Promise<Context> {
-  const available = await widgetsForDevice(device.id);
-  const data = await dataFor(
-    available.map((entry) => ({ id: entry.widgetId, extension: entry.extension })),
-  );
+  const sources = await sourcesFor(device, now);
 
-  return {
-    now,
-    device: {
-      percentCharged: device.percentCharged,
-      usbConnected: device.usbConnected,
-      rssi: device.rssi,
-      updateSource: device.updateSource,
-    },
-    widgets: new Map(
-      available.map((entry) => [
-        entry.widgetId,
-        {
-          payload: data.get(entry.widgetId) ?? {},
-          facts: entry.facts,
-          label: entry.label,
-          fetchedAt: now,
-        },
-      ]),
-    ),
-  };
+  return { now, sources: new Map(sources.map((source) => [source.id, source])) };
 }
