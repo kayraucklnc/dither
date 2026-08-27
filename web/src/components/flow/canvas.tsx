@@ -12,14 +12,33 @@ import {
   type Node as RFNode,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Check, GitBranch, Loader2, Trash2, TriangleAlert } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  CornerDownRight,
+  GitBranch,
+  ImagePlus,
+  Loader2,
+  Plus,
+  Trash2,
+  TriangleAlert,
+} from "lucide-react";
 
-import { ConditionEditor, type WidgetFactGroup } from "@/components/flow/condition-editor";
+import {
+  blankCondition,
+  ConditionEditor,
+  type EditorSource,
+  type SourceKind,
+} from "@/components/flow/condition-editor";
+import { ContextMenu, type MenuItem } from "@/components/flow/context-menu";
 import { QuestionNode, ScreenNode, type QuestionData, type ScreenData } from "@/components/flow/nodes";
 import { ScreenPreview } from "@/components/screen-preview";
+import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/cn";
 import { summarise, type Condition } from "@/lib/flow/conditions";
 import { layout } from "@/lib/flow/layout";
+import type { Source } from "@/lib/flow/sources";
 import type { Node } from "@/lib/flow/tree";
 
 export interface ScreenOption {
@@ -31,8 +50,7 @@ interface Trace {
   leafId: number | null;
   reason: string;
   held: boolean;
-  steps: { nodeId: number; question: string; answer: boolean; actual?: string; toNodeId: number | null }[];
-  values: { widgetId: number; widgetLabel: string; key: string; label: string; unit: string; value: string }[];
+  steps: { nodeId: number; question: string; answer: boolean; actual?: string }[];
 }
 
 const control =
@@ -44,8 +62,9 @@ function TreeCanvas({
   deviceRefreshSeconds,
   modelId,
   panel,
-  screens,
-  factGroups,
+  screens: initialScreens,
+  sources: initialSources,
+  sourceKinds,
   initialNodes,
   initialRootId,
 }: {
@@ -54,31 +73,42 @@ function TreeCanvas({
   modelId: number;
   panel: { width: number; height: number };
   screens: ScreenOption[];
-  factGroups: WidgetFactGroup[];
+  sources: EditorSource[];
+  sourceKinds: SourceKind[];
   initialNodes: Node[];
   initialRootId: number | null;
 }) {
   const [nodes, setNodes] = useState(initialNodes);
   const [rootId, setRootId] = useState(initialRootId);
+  const [screens, setScreens] = useState(initialScreens);
+  const [sources, setSources] = useState(initialSources);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [trace, setTrace] = useState<Trace>();
   const [save, setSave] = useState<"idle" | "saving" | "saved" | "failed">("idle");
   const [error, setError] = useState<string>();
   const [nextId, setNextId] = useState(-1);
+  const [menu, setMenu] = useState<{ at: { x: number; y: number }; items: MenuItem[] }>();
 
   const nodeTypes = useMemo(() => ({ question: QuestionNode, screen: ScreenNode }), []);
   const selected = nodes.find((node) => node.id === selectedId);
+  const byId = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
 
   /* ------------------------------------------------------------------ trace */
 
   const refreshTrace = useCallback(async () => {
     const response = await fetch(`/api/devices/${deviceId}/trace`);
-    if (response.ok) setTrace(await response.json());
+    if (!response.ok) return;
+
+    const body = await response.json();
+    setTrace(body);
+    // The trace carries live values, so the check editor can show what each
+    // source currently reads without a second request.
+    if (body.sources) setSources(body.sources);
   }, [deviceId]);
 
   useEffect(() => {
     refreshTrace();
-    const timer = setInterval(refreshTrace, 15_000);
+    const timer = setInterval(refreshTrace, 20_000);
     return () => clearInterval(timer);
   }, [refreshTrace]);
 
@@ -143,122 +173,253 @@ function TreeCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, rootId, deviceId]);
 
-  /* -------------------------------------------------------------- mutations */
+  /* ----------------------------------------------------------------- shapes */
 
   const update = (id: number, patch: Partial<Node>) =>
     setNodes((current) => current.map((node) => (node.id === id ? { ...node, ...patch } : node)));
 
+  const parentOf = useCallback(
+    (id: number) =>
+      nodes.find((node) => node.kind === "question" && (node.yesNodeId === id || node.noNodeId === id)),
+    [nodes],
+  );
+
   /**
-   * Adding a check wraps whatever is currently there.
+   * Insert a check above whatever is at `above`.
    *
-   * "When it rains, show the weather" is one gesture at the top of the tree,
-   * and everything already set up slides into the "no" branch untouched. This
-   * is the move that a state machine needed an edge out of every state for.
+   * Everything already there slides into the "no" branch untouched, which is
+   * how "whatever else is going on, when it rains show the weather" is one
+   * gesture rather than an edge out of every screen.
    */
-  const addCheck = (above: number | null) => {
-    const leafId = nextId;
-    const questionId = nextId - 1;
-    setNextId((value) => value - 2);
+  const addCheck = useCallback(
+    (above: number | null) => {
+      const leafId = nextId;
+      const questionId = nextId - 1;
+      setNextId((value) => value - 2);
 
-    const leaf: Node = {
-      id: leafId,
-      kind: "screen",
-      label: "New screen",
-      condition: null,
-      yesNodeId: null,
-      noNodeId: null,
-      screenId: screens[0]?.id ?? null,
-      refreshSeconds: null,
-      holdSeconds: 0,
-    };
+      const leaf: Node = {
+        id: leafId,
+        kind: "screen",
+        label: "New screen",
+        condition: null,
+        yesNodeId: null,
+        noNodeId: null,
+        screenId: screens[0]?.id ?? null,
+        refreshSeconds: null,
+        holdSeconds: 0,
+      };
 
-    const question: Node = {
-      id: questionId,
-      kind: "question",
-      label: "Check",
-      condition: factGroups.length
-        ? {
-            kind: "fact",
-            widgetId: factGroups[0].widgetId,
-            factKey: factGroups[0].facts[0]?.key ?? "",
-            operator: "present",
-            value: "",
-          }
-        : { kind: "always" },
-      yesNodeId: leafId,
-      noNodeId: above,
-      screenId: null,
-      refreshSeconds: null,
-      holdSeconds: 0,
-    };
+      const question: Node = {
+        id: questionId,
+        kind: "question",
+        label: "Check",
+        condition: blankCondition(sources),
+        yesNodeId: leafId,
+        noNodeId: above,
+        screenId: null,
+        refreshSeconds: null,
+        holdSeconds: 0,
+      };
 
-    setNodes((current) => [...current, leaf, question]);
+      setNodes((current) => {
+        const withNew = [...current, leaf, question];
+        if (above === rootId || above === null) return withNew;
 
-    // Re-point whoever used to lead here, or make it the new root.
-    if (above === rootId) setRootId(questionId);
-    else
+        return withNew.map((node) =>
+          node.id === questionId
+            ? node
+            : node.yesNodeId === above
+              ? { ...node, yesNodeId: questionId }
+              : node.noNodeId === above
+                ? { ...node, noNodeId: questionId }
+                : node,
+        );
+      });
+
+      if (above === rootId || above === null) setRootId(questionId);
+      setSelectedId(questionId);
+    },
+    [nextId, screens, sources, rootId],
+  );
+
+  /** Removing a check splices it out, keeping its "no" branch. */
+  const removeQuestion = useCallback(
+    (id: number) => {
+      const question = byId.get(id);
+      if (!question || question.kind !== "question") return;
+
+      const survivor = question.noNodeId;
+
+      // The "yes" branch goes with it, so collect everything only it reached.
+      const doomed = new Set<number>([id]);
+      const collect = (from: number | null) => {
+        if (from === null || doomed.has(from) || from === survivor) return;
+        doomed.add(from);
+        const node = byId.get(from);
+        collect(node?.yesNodeId ?? null);
+        collect(node?.noNodeId ?? null);
+      };
+      collect(question.yesNodeId);
+
       setNodes((current) =>
-        current.map((node) =>
-          node.yesNodeId === above
-            ? { ...node, yesNodeId: questionId }
-            : node.noNodeId === above
-              ? { ...node, noNodeId: questionId }
-              : node,
-        ),
+        current
+          .filter((node) => !doomed.has(node.id))
+          .map((node) => ({
+            ...node,
+            yesNodeId: node.yesNodeId === id ? survivor : node.yesNodeId,
+            noNodeId: node.noNodeId === id ? survivor : node.noNodeId,
+          })),
       );
 
-    setSelectedId(questionId);
-  };
+      if (rootId === id) setRootId(survivor);
+      setSelectedId(null);
+    },
+    [byId, rootId],
+  );
 
-  /** Removing a question splices it out, keeping its "no" branch. */
-  const removeQuestion = (id: number) => {
-    const question = nodes.find((node) => node.id === id);
-    if (!question || question.kind !== "question") return;
+  /**
+   * Swap a check with the check directly under it on the "no" path.
+   *
+   * Their "yes" branches travel with them, so only the order of the questions
+   * changes. This is what the up and down arrows do, and it is the only way
+   * priority is ever edited: priority *is* depth.
+   */
+  const swapDown = useCallback(
+    (upperId: number) => {
+      const upper = byId.get(upperId);
+      const lowerId = upper?.noNodeId ?? null;
+      const lower = lowerId === null ? undefined : byId.get(lowerId);
 
-    const survivor = question.noNodeId;
+      if (!upper || upper.kind !== "question" || !lower || lower.kind !== "question") return;
 
-    // The "yes" branch goes with it, so collect everything only it reached.
-    const doomed = new Set<number>();
-    const collect = (from: number | null) => {
-      if (from === null || doomed.has(from) || from === survivor) return;
-      doomed.add(from);
-      const node = nodes.find((candidate) => candidate.id === from);
-      collect(node?.yesNodeId ?? null);
-      collect(node?.noNodeId ?? null);
-    };
-    collect(question.yesNodeId);
-    doomed.add(id);
+      const above = parentOf(upperId);
 
-    setNodes((current) =>
-      current
-        .filter((node) => !doomed.has(node.id))
-        .map((node) => ({
-          ...node,
-          yesNodeId: node.yesNodeId === id ? survivor : node.yesNodeId,
-          noNodeId: node.noNodeId === id ? survivor : node.noNodeId,
-        })),
-    );
+      setNodes((current) =>
+        current.map((node) => {
+          if (node.id === upperId) return { ...node, noNodeId: lower.noNodeId };
+          if (node.id === lower.id) return { ...node, noNodeId: upperId };
+          if (above && node.id === above.id) {
+            return above.yesNodeId === upperId
+              ? { ...node, yesNodeId: lower.id }
+              : { ...node, noNodeId: lower.id };
+          }
+          return node;
+        }),
+      );
 
-    if (rootId === id) setRootId(survivor);
-    setSelectedId(null);
-  };
+      if (rootId === upperId) setRootId(lower.id);
+    },
+    [byId, parentOf, rootId],
+  );
+
+  const move = useCallback(
+    (id: number, direction: "up" | "down") => {
+      if (direction === "down") return swapDown(id);
+
+      const above = parentOf(id);
+      if (above?.kind === "question" && above.noNodeId === id) swapDown(above.id);
+    },
+    [parentOf, swapDown],
+  );
+
+  const canMove = useCallback(
+    (id: number) => {
+      const node = byId.get(id);
+      const above = parentOf(id);
+      const below = node?.noNodeId === null || node?.noNodeId === undefined ? undefined : byId.get(node.noNodeId);
+
+      return {
+        up: above?.kind === "question" && above.noNodeId === id,
+        down: below?.kind === "question",
+      };
+    },
+    [byId, parentOf],
+  );
+
+  /* ---------------------------------------------------------------- sources */
+
+  const addSource = useCallback(
+    async (extension: string) => {
+      const response = await fetch(`/api/devices/${deviceId}/triggers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ extension }),
+      });
+
+      if (!response.ok) return setError((await response.json())?.error ?? "Could not add that.");
+
+      await refreshTrace();
+
+      // Point the check being edited at the source that was just created.
+      const { trigger } = await response.json();
+      if (selected?.kind === "question" && trigger) {
+        update(selected.id, {
+          condition: { kind: "fact", sourceId: String(trigger.id), factKey: "", operator: "present" },
+        });
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [deviceId, refreshTrace, selected],
+  );
+
+  const editSource = useCallback(
+    async (id: string, settings: Record<string, unknown>) => {
+      setSources((current) =>
+        current.map((source) => (source.id === id ? { ...source, settings } : source)),
+      );
+
+      await fetch(`/api/devices/${deviceId}/triggers`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: Number(id), settings }),
+      });
+
+      refreshTrace();
+    },
+    [deviceId, refreshTrace],
+  );
+
+  const addScreen = useCallback(
+    async (forNodeId: number) => {
+      const response = await fetch("/api/screens", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "New screen" }),
+      });
+
+      if (!response.ok) return;
+
+      const { screen } = await response.json();
+      setScreens((current) => [...current, screen]);
+      update(forNodeId, { screenId: screen.id });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   /* ------------------------------------------------------------------ graph */
+
+  const sourceMap = useMemo(
+    () =>
+      new Map<string, Source>(
+        sources.map((source) => [
+          source.id,
+          {
+            id: source.id,
+            label: source.label,
+            group: source.group,
+            facts: source.facts,
+            payload: {},
+            fetchedAt: null,
+          },
+        ]),
+      ),
+    [sources],
+  );
 
   const answered = useMemo(
     () => new Map(trace?.steps.map((step) => [step.nodeId, step]) ?? []),
     [trace],
-  );
-
-  const widgetMap = useMemo(
-    () =>
-      new Map(
-        factGroups.map((group) => [
-          group.widgetId,
-          { payload: {}, facts: group.facts, label: group.label, fetchedAt: null },
-        ]),
-      ),
-    [factGroups],
   );
 
   const flowNodes: RFNode[] = useMemo(() => {
@@ -268,40 +429,51 @@ function TreeCanvas({
       const at = positions.get(node.id) ?? { x: 0, y: 0 };
       const step = answered.get(node.id);
 
-      return node.kind === "question"
-        ? {
-            id: String(node.id),
-            type: "question",
-            position: at,
-            selected: selectedId === node.id,
-            data: {
-              question: node.condition ? summarise(node.condition, { widgets: widgetMap }) : "No question set",
-              actual: step?.actual,
-              answer: step?.answer,
-              isRoot: rootId === node.id,
-            } satisfies QuestionData,
-          }
-        : {
-            id: String(node.id),
-            type: "screen",
-            position: at,
-            selected: selectedId === node.id,
-            data: {
-              label: node.label,
-              screenId: node.screenId,
-              screenName: screens.find((screen) => screen.id === node.screenId)?.name ?? null,
-              refreshSeconds: node.refreshSeconds,
-              deviceRefreshSeconds,
-              holdSeconds: node.holdSeconds,
-              isShowing: trace?.leafId === node.id,
-              isRoot: rootId === node.id,
-              panel,
-              modelId,
-            } satisfies ScreenData,
-          };
+      if (node.kind === "question") {
+        const moves = canMove(node.id);
+
+        return {
+          id: String(node.id),
+          type: "question",
+          position: at,
+          selected: selectedId === node.id,
+          data: {
+            question: node.condition
+              ? summarise(node.condition, { sources: sourceMap })
+              : "No check set",
+            actual: step?.actual,
+            answer: step?.answer,
+            isRoot: rootId === node.id,
+            canMoveUp: moves.up,
+            canMoveDown: moves.down,
+            onMove: (direction: "up" | "down") => move(node.id, direction),
+          } satisfies QuestionData,
+        };
+      }
+
+      return {
+        id: String(node.id),
+        type: "screen",
+        position: at,
+        selected: selectedId === node.id,
+        data: {
+          label: node.label,
+          screenId: node.screenId,
+          screenName: screens.find((screen) => screen.id === node.screenId)?.name ?? null,
+          refreshSeconds: node.refreshSeconds,
+          deviceRefreshSeconds,
+          holdSeconds: node.holdSeconds,
+          isShowing: trace?.leafId === node.id,
+          isRoot: rootId === node.id,
+          panel,
+          modelId,
+        } satisfies ScreenData,
+      };
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, rootId, selectedId, answered, trace, screens, panel, modelId, deviceRefreshSeconds, widgetMap]);
+  }, [
+    nodes, rootId, selectedId, answered, trace, screens, panel, modelId,
+    deviceRefreshSeconds, sourceMap, canMove, move,
+  ]);
 
   const flowEdges: Edge[] = useMemo(() => {
     const result: Edge[] = [];
@@ -312,27 +484,18 @@ function TreeCanvas({
 
       const edge = (branch: "yes" | "no", target: number | null) => {
         if (target === null) return;
+
         const taken = step?.answer === (branch === "yes");
+        const colour = branch === "yes" ? "oklch(0.76 0.16 155)" : "oklch(0.74 0.13 20)";
 
         result.push({
           id: `${node.id}-${branch}`,
           source: String(node.id),
           sourceHandle: branch,
           target: String(target),
-          label: branch,
           animated: taken,
-          markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 },
-          style: {
-            stroke: taken ? "oklch(0.76 0.16 155)" : "oklch(0.35 0.011 260)",
-            strokeWidth: taken ? 2.2 : 1.4,
-          },
-          labelStyle: {
-            fill: taken ? "oklch(0.76 0.16 155)" : "oklch(0.56 0.013 260)",
-            fontSize: 10,
-          },
-          labelBgStyle: { fill: "oklch(0.16 0.006 260)" },
-          labelBgPadding: [4, 2] as [number, number],
-          labelBgBorderRadius: 4,
+          markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: colour },
+          style: { stroke: colour, strokeWidth: taken ? 2.4 : 1.4, opacity: taken ? 1 : 0.45 },
         });
       };
 
@@ -342,6 +505,66 @@ function TreeCanvas({
 
     return result;
   }, [nodes, answered]);
+
+  /* ------------------------------------------------------------- right click */
+
+  const menuFor = useCallback(
+    (id: number | null): MenuItem[] => {
+      if (id === null) {
+        return [
+          {
+            id: "top",
+            label: "Add a check at the top",
+            icon: GitBranch,
+            hint: "Asked before everything else",
+            onSelect: () => addCheck(rootId),
+          },
+        ];
+      }
+
+      const node = byId.get(id);
+      if (!node) return [];
+
+      if (node.kind === "screen") {
+        return [
+          {
+            id: "before",
+            label: "Ask something before this",
+            icon: GitBranch,
+            hint: "Shows a different screen when it holds",
+            onSelect: () => addCheck(id),
+          },
+          {
+            id: "screen",
+            label: "Make a new screen for this",
+            icon: ImagePlus,
+            onSelect: () => addScreen(id),
+          },
+        ];
+      }
+
+      const moves = canMove(id);
+
+      return [
+        {
+          id: "yes",
+          label: "Add a check on the yes branch",
+          icon: CornerDownRight,
+          onSelect: () => addCheck(node.yesNodeId),
+        },
+        {
+          id: "no",
+          label: "Add a check on the no branch",
+          icon: CornerDownRight,
+          onSelect: () => addCheck(node.noNodeId),
+        },
+        { id: "up", label: "Ask this earlier", icon: ChevronUp, disabled: !moves.up, onSelect: () => move(id, "up") },
+        { id: "down", label: "Ask this later", icon: ChevronDown, disabled: !moves.down, onSelect: () => move(id, "down") },
+        { id: "delete", label: "Remove this check", icon: Trash2, danger: true, onSelect: () => removeQuestion(id) },
+      ];
+    },
+    [byId, canMove, addCheck, addScreen, move, removeQuestion, rootId],
+  );
 
   /* ------------------------------------------------------------------- view */
 
@@ -357,6 +580,16 @@ function TreeCanvas({
             nodesConnectable={false}
             onNodeClick={(_event, node) => setSelectedId(Number(node.id))}
             onPaneClick={() => setSelectedId(null)}
+            onNodeContextMenu={(event, node) => {
+              event.preventDefault();
+              setSelectedId(Number(node.id));
+              setMenu({ at: { x: event.clientX, y: event.clientY }, items: menuFor(Number(node.id)) });
+            }}
+            onPaneContextMenu={(event) => {
+              event.preventDefault();
+              const pointer = event as unknown as MouseEvent;
+              setMenu({ at: { x: pointer.clientX, y: pointer.clientY }, items: menuFor(null) });
+            }}
             fitView
             fitViewOptions={{ padding: 0.2 }}
             proOptions={{ hideAttribution: true }}
@@ -388,11 +621,10 @@ function TreeCanvas({
                           "rounded-md border px-2 py-0.5 text-[11px]",
                           step.answer
                             ? "border-live/40 bg-live/10 text-live"
-                            : "border-line bg-raised text-faint",
+                            : "border-no/30 bg-no/5 text-no",
                         )}
                       >
                         {step.question}
-                        <span className="opacity-70"> · {step.answer ? "yes" : "no"}</span>
                         {step.actual && <span className="opacity-70"> · {step.actual}</span>}
                       </span>
                     </span>
@@ -413,7 +645,7 @@ function TreeCanvas({
         </div>
       </div>
 
-      <aside className="w-80 shrink-0 overflow-y-auto border-l border-line bg-surface">
+      <aside className="w-84 shrink-0 overflow-y-auto border-l border-line bg-surface">
         <div className="border-b border-line p-4">
           <button
             type="button"
@@ -424,9 +656,8 @@ function TreeCanvas({
             Add a check at the top
           </button>
           <p className="mt-2.5 text-[11px] leading-relaxed text-faint">
-            It gets asked before everything else, so this is how you say &ldquo;whatever else is
-            going on, when it rains show the weather&rdquo;. What is set up now moves into
-            &ldquo;no&rdquo; untouched.
+            Asked before everything else, so this is how you say &ldquo;whatever else is going on,
+            when it rains show the weather&rdquo;. Right-click anything for more.
           </p>
         </div>
 
@@ -445,18 +676,13 @@ function TreeCanvas({
             </div>
 
             <ConditionEditor
-              condition={selected.condition ?? { kind: "always" }}
-              groups={factGroups}
+              condition={selected.condition ?? blankCondition(sources)}
+              sources={sources}
+              kinds={sourceKinds}
               onChange={(condition) => update(selected.id, { condition })}
+              onAddSource={addSource}
+              onEditSource={editSource}
             />
-
-            <button
-              type="button"
-              onClick={() => addCheck(selected.noNodeId)}
-              className="w-full rounded-md border border-line bg-raised px-3 py-1.5 text-[12px] text-muted transition-colors hover:text-ink"
-            >
-              Add another check under &ldquo;no&rdquo;
-            </button>
           </div>
         )}
 
@@ -469,7 +695,18 @@ function TreeCanvas({
             />
 
             <div>
-              <p className="mb-2 text-[12px] font-medium">Shows</p>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-[12px] font-medium">Shows</p>
+                <button
+                  type="button"
+                  onClick={() => addScreen(selected.id)}
+                  className="flex items-center gap-1 text-[11px] text-faint transition-colors hover:text-ink"
+                >
+                  <Plus size={11} />
+                  New screen
+                </button>
+              </div>
+
               <div className="grid grid-cols-2 gap-2">
                 {screens.map((screen) => {
                   const active = screen.id === selected.screenId;
@@ -498,44 +735,48 @@ function TreeCanvas({
             </div>
 
             <div>
-              <label className="mb-1.5 block text-[12px] font-medium">Wake every (seconds)</label>
-              <input
-                type="number"
-                min={30}
-                value={selected.refreshSeconds ?? ""}
-                placeholder={String(deviceRefreshSeconds)}
-                onChange={(event) =>
-                  update(selected.id, {
-                    refreshSeconds: event.target.value ? event.target.valueAsNumber : null,
-                  })
+              <label className="mb-1.5 block text-[12px] font-medium">Wake every</label>
+              <Select
+                value={selected.refreshSeconds ?? 0}
+                ariaLabel="Wake every"
+                options={[
+                  { value: 0, label: `Device default (${deviceRefreshSeconds / 60} min)` },
+                  { value: 60, label: "Every minute" },
+                  { value: 300, label: "Every 5 minutes" },
+                  { value: 600, label: "Every 10 minutes" },
+                  { value: 900, label: "Every 15 minutes" },
+                  { value: 1800, label: "Every 30 minutes" },
+                  { value: 3600, label: "Every hour" },
+                ]}
+                onChange={(seconds) =>
+                  update(selected.id, { refreshSeconds: seconds === 0 ? null : seconds })
                 }
-                className={control}
               />
             </div>
 
             <div>
-              <label className="mb-1.5 block text-[12px] font-medium">
-                Once shown, keep it for (seconds)
-              </label>
-              <input
-                type="number"
-                min={0}
+              <label className="mb-1.5 block text-[12px] font-medium">Once shown, keep it</label>
+              <Select
                 value={selected.holdSeconds}
-                onChange={(event) =>
-                  update(selected.id, { holdSeconds: event.target.valueAsNumber || 0 })
-                }
-                className={control}
+                ariaLabel="Hold"
+                options={[
+                  { value: 0, label: "No minimum", hint: "Switch as soon as something else applies" },
+                  { value: 300, label: "At least 5 minutes" },
+                  { value: 600, label: "At least 10 minutes" },
+                  { value: 1200, label: "At least 20 minutes" },
+                  { value: 3600, label: "At least an hour" },
+                ]}
+                onChange={(holdSeconds) => update(selected.id, { holdSeconds })}
               />
               <p className="mt-1.5 text-[11px] leading-relaxed text-faint">
-                Stops the display flipping back and forth when a value sits on its threshold. Set 1200
-                for &ldquo;stay on the weather for twenty minutes&rdquo;.
+                Stops the display flipping back and forth when a value sits on its threshold.
               </p>
             </div>
 
             <button
               type="button"
               onClick={() => addCheck(selected.id)}
-              className="w-full rounded-md border border-line bg-raised px-3 py-1.5 text-[12px] text-muted transition-colors hover:text-ink"
+              className={cn(control, "text-center text-[12px] text-muted hover:text-ink")}
             >
               Ask something before this screen
             </button>
@@ -547,35 +788,43 @@ function TreeCanvas({
             <p className="text-[13px] leading-relaxed text-faint">
               Pick a check to change what it asks, or a screen to choose what it shows.
             </p>
-            {trace && trace.values.length > 0 && (
+
+            {sources.filter((source) => source.group === "trigger").length > 0 && (
               <>
                 <p className="mt-5 mb-2 text-[11px] font-medium uppercase tracking-wide text-faint">
-                  What this device knows right now
+                  Sources on this device
                 </p>
-                <dl className="space-y-1.5">
-                  {trace.values.map((value) => (
-                    <div
-                      key={`${value.widgetId}-${value.key}`}
-                      className="flex items-baseline justify-between gap-3 rounded-md bg-raised px-2.5 py-1.5"
-                    >
-                      <dt className="min-w-0 truncate text-[11px] text-muted">
-                        {value.label}
-                        <span className="block truncate text-[10px] text-faint">
-                          {value.widgetLabel}
-                        </span>
-                      </dt>
-                      <dd className="shrink-0 font-mono text-[11px] text-ink">
-                        {value.value}
-                        {value.unit && <span className="text-faint"> {value.unit}</span>}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
+                <div className="space-y-2">
+                  {sources
+                    .filter((source) => source.group === "trigger")
+                    .map((source) => (
+                      <div key={source.id} className="rounded-lg border border-line bg-raised p-2.5">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="truncate text-[12px] font-medium">{source.label}</span>
+                          <span className="shrink-0 text-[10px] text-faint">
+                            {source.extensionLabel}
+                          </span>
+                        </div>
+                        <dl className="mt-1.5 space-y-0.5">
+                          {source.facts.slice(0, 4).map((fact) => (
+                            <div key={fact.key} className="flex justify-between gap-2 text-[11px]">
+                              <dt className="truncate text-faint">{fact.label}</dt>
+                              <dd className="shrink-0 font-mono text-muted">
+                                {source.values[fact.key] ?? "—"}
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </div>
+                    ))}
+                </div>
               </>
             )}
           </div>
         )}
       </aside>
+
+      {menu && <ContextMenu at={menu.at} items={menu.items} onClose={() => setMenu(undefined)} />}
     </div>
   );
 }

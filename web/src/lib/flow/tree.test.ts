@@ -16,10 +16,11 @@ const facts = {
 function context(rain: number | undefined, meeting: Record<string, unknown>, now = new Date("2026-08-27T09:00:00Z")): Context {
   return {
     now,
-    device: { percentCharged: 80, usbConnected: false, rssi: -50, updateSource: null },
-    widgets: new Map([
-      [1, { payload: rain === undefined ? {} : { source_1: { rain } }, facts: facts.weather, label: "Weather", fetchedAt: now }],
-      [2, { payload: { next: meeting }, facts: facts.calendar, label: "Calendar", fetchedAt: now }],
+    sources: new Map([
+      ["1", { id: "1", label: "Weather", group: "trigger" as const, facts: facts.weather, fetchedAt: now,
+              payload: rain === undefined ? {} : { source_1: { rain } } }],
+      ["2", { id: "2", label: "Calendar", group: "trigger" as const, facts: facts.calendar, fetchedAt: now,
+              payload: { next: meeting } }],
     ]),
   };
 }
@@ -34,13 +35,13 @@ function context(rain: number | undefined, meeting: Record<string, unknown>, now
 const nodes: Node[] = [
   {
     id: 10, kind: "question", label: "Is it raining?",
-    condition: { kind: "fact", widgetId: 1, factKey: "rain_chance", operator: "gt", value: 60 },
+    condition: { kind: "fact", sourceId: "1", factKey: "rain_chance", operator: "gt", value: 60 },
     yesNodeId: 11, noNodeId: 20, screenId: null, refreshSeconds: null, holdSeconds: 0,
   },
   { id: 11, kind: "screen", label: "Weather", condition: null, yesNodeId: null, noNodeId: null, screenId: 100, refreshSeconds: 600, holdSeconds: 1200 },
   {
     id: 20, kind: "question", label: "Meeting soon?",
-    condition: { kind: "fact", widgetId: 2, factKey: "next_meeting_in", operator: "lt", value: 30 },
+    condition: { kind: "fact", sourceId: "2", factKey: "next_meeting_in", operator: "lt", value: 30 },
     yesNodeId: 21, noNodeId: 30, screenId: null, refreshSeconds: null, holdSeconds: 0,
   },
   { id: 21, kind: "screen", label: "Commute", condition: null, yesNodeId: null, noNodeId: null, screenId: 200, refreshSeconds: 300, holdSeconds: 0 },
@@ -55,7 +56,7 @@ describe("walking the decision tree", () => {
 
     expect(result.leaf?.label).toBe("Weather");
     expect(result.refreshSeconds).toBe(600);
-    expect(result.reason).toContain("Chance of rain is more than 60");
+    expect(result.reason).toContain("Weather: Chance of rain is more than 60");
     expect(result.reason).toContain("80 %");
   });
 
@@ -114,8 +115,8 @@ describe("walking the decision tree", () => {
 
   it("refuses to loop forever on a hand-edited cycle", () => {
     const cyclic: Node[] = [
-      { id: 1, kind: "question", label: "a", condition: { kind: "always" }, yesNodeId: 2, noNodeId: 2, screenId: null, refreshSeconds: null, holdSeconds: 0 },
-      { id: 2, kind: "question", label: "b", condition: { kind: "always" }, yesNodeId: 1, noNodeId: 1, screenId: null, refreshSeconds: null, holdSeconds: 0 },
+      { id: 1, kind: "question", label: "a", condition: { kind: "fact", sourceId: "1", factKey: "rain_chance", operator: "present" }, yesNodeId: 2, noNodeId: 2, screenId: null, refreshSeconds: null, holdSeconds: 0 },
+      { id: 2, kind: "question", label: "b", condition: { kind: "fact", sourceId: "1", factKey: "rain_chance", operator: "present" }, yesNodeId: 1, noNodeId: 1, screenId: null, refreshSeconds: null, holdSeconds: 0 },
     ];
 
     const result = walk(cyclic, 1, nowhere, context(0, {}), 900);

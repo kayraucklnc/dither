@@ -1,199 +1,143 @@
 import { z } from "zod";
 
-import { compare, describe, OPERATORS, valueAt } from "@/lib/facts";
-import type { Fact } from "@/lib/extensions/manifest";
+import { compare, describe, valueAt, type Fact } from "@/lib/facts";
+import type { Source } from "./sources";
 
 /**
- * What makes a transition fire.
+ * What makes a check answer yes.
  *
- * There is no AND, no OR and no nesting. Two ways of reaching a state are two
- * transitions into it, which is both simpler to build in a canvas and simpler
- * to explain when you are asking "why is my display showing this?".
+ * Most checks are one comparison. When one is not enough, `all` and `any`
+ * group several - which is the difference between "add a second check further
+ * down the tree" (a different screen for each combination) and "this one screen
+ * needs two things to be true at once".
+ *
+ * Groups nest, but the editor keeps them shallow on purpose: a rule you cannot
+ * read back as a sentence is a rule you cannot debug at 7am.
  */
 
-export const conditionSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("always") }),
-  z.object({
-    kind: z.literal("time_between"),
-    from: z.string(),
-    to: z.string(),
-  }),
-  z.object({
-    kind: z.literal("weekday"),
-    days: z.array(z.number().min(0).max(6)),
-  }),
-  z.object({
-    kind: z.literal("fact"),
-    widgetId: z.number(),
-    factKey: z.string(),
-    operator: z.string(),
-    value: z.unknown().optional(),
-  }),
-  z.object({ kind: z.literal("battery_below"), percent: z.number() }),
-  z.object({ kind: z.literal("charging") }),
-  z.object({ kind: z.literal("wifi_below"), rssi: z.number() }),
-  z.object({ kind: z.literal("button_pressed") }),
-  z.object({ kind: z.literal("stale"), minutes: z.number() }),
-]);
+export type LeafCondition = {
+  kind: "fact";
+  /** "device", "clock", or a trigger's id as a string. */
+  sourceId: string;
+  factKey: string;
+  operator: string;
+  value?: unknown;
+};
 
-export type Condition = z.infer<typeof conditionSchema>;
+export type Condition =
+  | LeafCondition
+  | { kind: "all"; conditions: Condition[] }
+  | { kind: "any"; conditions: Condition[] };
+
 export type ConditionKind = Condition["kind"];
 
-/** What the editor offers, and how each reads in a sentence. */
-export const CONDITION_KINDS: {
-  id: ConditionKind;
-  label: string;
-  summary: string;
-}[] = [
-  { id: "always", label: "Always", summary: "Fires whenever it is looked at." },
-  { id: "fact", label: "Extension value", summary: "Compares something a widget on this device knows." },
-  { id: "time_between", label: "Between two times", summary: "A window on the clock, which may cross midnight." },
-  { id: "weekday", label: "On certain days", summary: "One or more days of the week." },
-  { id: "button_pressed", label: "Button pressed", summary: "The device woke because someone pressed its button." },
-  { id: "battery_below", label: "Battery below", summary: "Charge has dropped under a percentage." },
-  { id: "charging", label: "On USB power", summary: "The device is plugged in." },
-  { id: "wifi_below", label: "Weak Wi-Fi", summary: "Signal is worse than a threshold." },
-  { id: "stale", label: "Data is stale", summary: "Nothing has been fetched for a while." },
-];
+const leafSchema = z.object({
+  kind: z.literal("fact"),
+  sourceId: z.string(),
+  factKey: z.string(),
+  operator: z.string(),
+  value: z.unknown().optional(),
+});
 
-/** Everything a condition may need to answer, gathered once per evaluation. */
+export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
+  z.union([
+    leafSchema,
+    z.object({ kind: z.literal("all"), conditions: z.array(conditionSchema) }),
+    z.object({ kind: z.literal("any"), conditions: z.array(conditionSchema) }),
+  ]),
+) as z.ZodType<Condition>;
+
+export const isGroup = (
+  condition: Condition,
+): condition is { kind: "all" | "any"; conditions: Condition[] } =>
+  condition.kind === "all" || condition.kind === "any";
+
+/** Everything a check may need to answer, gathered once per evaluation. */
 export interface Context {
   now: Date;
-  device: {
-    percentCharged: number | null;
-    usbConnected: boolean;
-    rssi: number | null;
-    updateSource: string | null;
-  };
-  /** Widget id to its fetched payload and the facts its extension declares. */
-  widgets: Map<number, { payload: unknown; facts: Fact[]; label: string; fetchedAt: Date | null }>;
+  /** Every source this device can ask about, by id. */
+  sources: Map<string, Source>;
 }
 
-const minutesOfDay = (date: Date) => date.getHours() * 60 + date.getMinutes();
-
-function parseClock(value: string): number | undefined {
-  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
-  if (!match) return undefined;
-  return Number(match[1]) * 60 + Number(match[2]);
-}
-
-/** One evaluation, kept so the dashboard can show why a transition did or did not fire. */
+/** One evaluation, kept so the canvas can show why a check did or did not fire. */
 export interface Trace {
   holds: boolean;
   sentence: string;
-  /** The value the condition actually saw, rendered for a human. */
+  /** The value the check actually saw, rendered for a human. */
   actual?: string;
+  /** Present for groups: how each member answered. */
+  children?: Trace[];
 }
 
 export function evaluate(condition: Condition, context: Context): Trace {
-  switch (condition.kind) {
-    case "always":
-      return { holds: true, sentence: "Always" };
+  if (isGroup(condition)) {
+    const children = condition.conditions.map((member) => evaluate(member, context));
 
-    case "time_between": {
-      const from = parseClock(condition.from);
-      const to = parseClock(condition.to);
-      const sentence = `Between ${condition.from} and ${condition.to}`;
-      if (from === undefined || to === undefined) return { holds: false, sentence };
+    // An empty "all" holds and an empty "any" does not, the same way the words
+    // work and the same way an empty AND/OR behaves in code.
+    const holds =
+      condition.kind === "all"
+        ? children.every((child) => child.holds)
+        : children.some((child) => child.holds);
 
-      const now = minutesOfDay(context.now);
-      // A window that ends before it starts has wrapped past midnight.
-      const holds = from <= to ? now >= from && now < to : now >= from || now < to;
-      const clock = `${String(context.now.getHours()).padStart(2, "0")}:${String(context.now.getMinutes()).padStart(2, "0")}`;
-      return { holds, sentence, actual: `now ${clock}` };
-    }
+    const joiner = condition.kind === "all" ? " and " : " or ";
 
-    case "weekday": {
-      const holds = condition.days.includes(context.now.getDay());
-      return { holds, sentence: "On certain days", actual: `today is day ${context.now.getDay()}` };
-    }
-
-    case "fact": {
-      const widget = context.widgets.get(condition.widgetId);
-      if (!widget) return { holds: false, sentence: "A widget that is no longer on this device" };
-
-      const fact = widget.facts.find((candidate) => candidate.key === condition.factKey);
-      if (!fact) {
-        return { holds: false, sentence: `${widget.label}: unknown value "${condition.factKey}"` };
-      }
-
-      const actual = valueAt(widget.payload, fact.path);
-      const holds = compare(actual, condition.operator, condition.value);
-
-      return {
-        holds,
-        sentence: `${widget.label}: ${describe(fact.label, condition.operator, condition.value)}`,
-        actual: actual === undefined ? "no value yet" : `${String(actual)}${fact.unit ? ` ${fact.unit}` : ""}`,
-      };
-    }
-
-    case "battery_below": {
-      const charge = context.device.percentCharged;
-      return {
-        holds: charge !== null && charge < condition.percent,
-        sentence: `Battery below ${condition.percent}%`,
-        actual: charge === null ? "not reported" : `${charge}%`,
-      };
-    }
-
-    case "charging":
-      return {
-        holds: context.device.usbConnected,
-        sentence: "On USB power",
-        actual: context.device.usbConnected ? "plugged in" : "on battery",
-      };
-
-    case "wifi_below": {
-      const rssi = context.device.rssi;
-      return {
-        holds: rssi !== null && rssi < condition.rssi,
-        sentence: `Wi-Fi weaker than ${condition.rssi} dBm`,
-        actual: rssi === null ? "not reported" : `${rssi} dBm`,
-      };
-    }
-
-    case "button_pressed": {
-      const source = context.device.updateSource ?? "";
-      return {
-        holds: /button/i.test(source),
-        sentence: "Button pressed",
-        actual: source || "no reason reported",
-      };
-    }
-
-    case "stale": {
-      const oldest = [...context.widgets.values()]
-        .map((widget) => widget.fetchedAt)
-        .filter((at): at is Date => at !== null)
-        .sort((a, b) => a.getTime() - b.getTime())[0];
-
-      if (!oldest) return { holds: true, sentence: `Nothing fetched for ${condition.minutes} min`, actual: "never fetched" };
-
-      const minutes = Math.floor((context.now.getTime() - oldest.getTime()) / 60_000);
-      return {
-        holds: minutes >= condition.minutes,
-        sentence: `Nothing fetched for ${condition.minutes} min`,
-        actual: `${minutes} min ago`,
-      };
-    }
+    return {
+      holds,
+      sentence: children.length
+        ? children.map((child) => child.sentence).join(joiner)
+        : "nothing to check",
+      children,
+    };
   }
+
+  const source = context.sources.get(condition.sourceId);
+  if (!source) return { holds: false, sentence: "a source that no longer exists" };
+
+  const fact = source.facts.find((candidate) => candidate.key === condition.factKey);
+  if (!fact) {
+    return { holds: false, sentence: `${source.label}: unknown value "${condition.factKey}"` };
+  }
+
+  const actual = valueAt(source.payload, fact.path);
+
+  return {
+    holds: compare(actual, condition.operator, condition.value),
+    sentence: `${source.label}: ${describe(fact, condition.operator, condition.value)}`,
+    actual:
+      actual === null || actual === undefined
+        ? "no value yet"
+        : `${formatFact(fact, actual)}${fact.unit ? ` ${fact.unit}` : ""}`,
+  };
 }
 
-/** The one-line form shown on an edge in the canvas. */
-export function summarise(condition: Condition, context?: Pick<Context, "widgets">): string {
-  if (condition.kind !== "fact") {
-    const kind = CONDITION_KINDS.find((candidate) => candidate.id === condition.kind);
-    if (condition.kind === "time_between") return `${condition.from} - ${condition.to}`;
-    if (condition.kind === "battery_below") return `Battery < ${condition.percent}%`;
-    if (condition.kind === "wifi_below") return `Wi-Fi < ${condition.rssi} dBm`;
-    if (condition.kind === "stale") return `Stale > ${condition.minutes} min`;
-    return kind?.label ?? condition.kind;
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function formatFact(fact: Fact, value: unknown): string {
+  if (fact.type === "boolean") return value ? "yes" : "no";
+  if (fact.type === "weekday") return DAYS[Number(value)] ?? String(value);
+  return String(value);
+}
+
+/** The one-line form shown on a node in the canvas. */
+export function summarise(condition: Condition, context?: Pick<Context, "sources">): string {
+  if (isGroup(condition)) {
+    if (!condition.conditions.length) return "Nothing to check";
+
+    const joiner = condition.kind === "all" ? " and " : " or ";
+
+    return condition.conditions
+      .map((member) => {
+        const text = summarise(member, context);
+        // Parenthesise a nested group so "a and (b or c)" cannot be misread.
+        return isGroup(member) ? `(${text})` : text;
+      })
+      .join(joiner);
   }
 
-  const widget = context?.widgets.get(condition.widgetId);
-  const fact = widget?.facts.find((candidate) => candidate.key === condition.factKey);
-  const operator = OPERATORS[condition.operator];
+  const source = context?.sources.get(condition.sourceId);
+  const fact = source?.facts.find((candidate) => candidate.key === condition.factKey);
 
-  if (!fact || !operator) return "Extension value";
-  return `${fact.label} ${operator.label}${operator.needsValue ? ` ${condition.value}` : ""}`;
+  if (!fact || !source) return "A value that is no longer available";
+  return `${source.label}: ${describe(fact, condition.operator, condition.value)}`;
 }

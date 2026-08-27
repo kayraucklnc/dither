@@ -5,7 +5,7 @@ import { DeviceTree } from "@/components/flow/canvas";
 import { db } from "@/lib/db";
 import { decisionNodes, devices, models, screens } from "@/lib/db/schema";
 import { toNodes } from "@/lib/device-screen";
-import { widgetsForDevice } from "@/lib/flow/context";
+import { editorSources, sourceKinds } from "@/lib/flow/editor-sources";
 
 export const dynamic = "force-dynamic";
 
@@ -29,15 +29,6 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
     .from(screens)
     .orderBy(asc(screens.name));
 
-  // A trigger belongs to a placement, not to an extension, so the choices are
-  // the widgets on the screens this device's tree can actually reach.
-  const factGroups = (await widgetsForDevice(id)).map((entry) => ({
-    widgetId: entry.widgetId,
-    label: entry.label,
-    screenName: entry.screenName,
-    facts: entry.facts,
-  }));
-
   return (
     <DeviceTree
       deviceId={device.id}
@@ -45,7 +36,8 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
       modelId={device.modelId}
       panel={{ width: panel?.width ?? 800, height: panel?.height ?? 480 }}
       screens={screenOptions}
-      factGroups={factGroups}
+      sources={await editorSources(device)}
+      sourceKinds={await sourceKinds()}
       initialNodes={toNodes(rows)}
       initialRootId={device.rootNodeId}
     />
