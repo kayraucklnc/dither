@@ -205,6 +205,33 @@ export function previousMilestone(value: number): number {
   return passed.length ? passed[passed.length - 1] : 0;
 }
 
+/** How many decimal places a number is actually written with. */
+function places(value: number): number {
+  return (String(value).split(".")[1] ?? "").length;
+}
+
+/**
+ * How far there is to go, kept to the precision its two ends are written with.
+ *
+ * A rung is a round number and a figure is an exact count, so the difference
+ * between them is exact to a person - and a fraction out to a double. 750 less
+ * 525.95 is 224.04999999999995, and this number is printed rather than drawn:
+ * it goes on a wall, at the size of a caption, exactly as it arrives.
+ *
+ * The precision is taken from both ends rather than from a constant. From the
+ * figure, because this counts subscribers as readily as it counts money and
+ * money is not always in hundredths - a dinar is in thousandths. And from the
+ * rung, because the bottom of the ladder has halves on it: one customer of a
+ * milestone of one and a half is half a customer away, and rounding that to
+ * the figure's own nought decimal places would say a whole one.
+ */
+function gap(next: number, value: number): number {
+  if (!Number.isFinite(next) || !Number.isFinite(value)) return 0;
+
+  const decimals = Math.min(Math.max(places(next), places(value)), 15);
+  return Math.max(0, Number((next - value).toFixed(decimals)));
+}
+
 export interface Milestone {
   value: number;
   next: number;
@@ -227,7 +254,7 @@ export function milestoneOf(value: number, ratePerDay?: number): Milestone {
   const next = nextMilestone(value);
   const previous = previousMilestone(value);
   const span = Math.max(1, next - previous);
-  const toGo = Math.max(0, next - value);
+  const toGo = gap(next, value);
 
   return {
     value,

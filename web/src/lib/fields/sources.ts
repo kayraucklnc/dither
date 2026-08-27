@@ -1,6 +1,7 @@
 import { calendars } from "@/lib/connections/google/api";
 import { feedValue } from "@/lib/connections/google/feeds";
 import { readyAccounts } from "@/lib/connections/link";
+import { OWN_CURRENCY } from "@/lib/connections/stripe/reading";
 import { provider } from "@/lib/connections";
 import { capabilitiesFor, cities, countries, providers } from "@/lib/transit/catalog";
 import { search as searchStations } from "@/lib/transit/trenord";
@@ -84,6 +85,71 @@ const SOURCES: Source[] = [
             hint: several ? account.account : one.accessRole === "owner" ? "" : "shared",
           })),
       ]);
+    },
+  },
+  {
+    /**
+     * Every Stripe account linked, so a widget can name one - or leave them
+     * all ticked and see the total.
+     *
+     * The value is the account's own id rather than anything this side made
+     * up, because that is what the connection is filed under and what survives
+     * the same key being pasted again.
+     */
+    id: "stripe.accounts",
+    async list() {
+      const accounts = await readyAccounts("stripe");
+
+      if (!accounts.length) {
+        throw new Error("Add a Stripe key under Connections to choose an account.");
+      }
+
+      return accounts.map((account) => ({
+        value: account.account,
+        label: account.label || account.account,
+        hint: account.account,
+      }));
+    },
+  },
+  {
+    /**
+     * What to show the money in.
+     *
+     * The account's own comes first and is the default, because that is the
+     * figure Stripe would show you and the one that needs no rate behind it.
+     * Everything after it is every currency this runtime knows the name of,
+     * which is more than Stripe settles in and costs nothing to offer - a
+     * rate exists or it does not, and the fetch says so either way.
+     */
+    id: "money.currencies",
+    searchable: true,
+    async list(_settings, query) {
+      const names = new Intl.DisplayNames(["en"], { type: "currency" });
+      const wanted = query.trim().toLowerCase();
+
+      const own = { value: OWN_CURRENCY, label: "The account's own", hint: "No conversion" };
+
+      const all = Intl.supportedValuesOf("currency").map((code) => ({
+        value: code.toLowerCase(),
+        label: code,
+        hint: names.of(code) ?? "",
+      }));
+
+      // The handful anybody is likely to want, before three hundred they are
+      // not - a list this long is only usable if the top of it is a shortlist.
+      const common = ["usd", "eur", "gbp", "jpy", "aud", "cad", "chf", "sek", "inr", "try"];
+      const ranked = [
+        ...common.map((code) => all.find((one) => one.value === code)).filter(Boolean),
+        ...all.filter((one) => !common.includes(one.value)),
+      ] as Choice[];
+
+      const matches = (choice: Choice) =>
+        !wanted ||
+        choice.value.includes(wanted) ||
+        choice.label.toLowerCase().includes(wanted) ||
+        (choice.hint ?? "").toLowerCase().includes(wanted);
+
+      return [own, ...ranked].filter(matches);
     },
   },
   {

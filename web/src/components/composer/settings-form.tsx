@@ -70,7 +70,44 @@ function SearchField({
   const [problem, setProblem] = useState<string>();
   const box = useRef<HTMLDivElement>(null);
 
-  useEffect(() => setQuery(value), [value]);
+  /**
+   * What was chosen, as it reads rather than as it is stored.
+   *
+   * A search field keeps an id or a code - `eur`, or the reserved `account`
+   * meaning "whatever the account settles in" - and showing that in the box is
+   * the same invisible state an empty selector is. So the value is looked up
+   * once and the box shows its label, falling back to the raw value when
+   * nothing can be reached: a code somebody can read beats a blank.
+   */
+  useEffect(() => {
+    if (!value) return setQuery("");
+    setQuery(value);
+
+    let cancelled = false;
+
+    fetch("/api/field-options", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sources: [field.options_from], settings, query: value }),
+    })
+      .then((response) => (response.ok ? response.json() : undefined))
+      .then((body) => {
+        if (cancelled) return;
+        const result = body?.options?.[field.options_from!];
+        const match = Array.isArray(result)
+          ? (result as Choice[]).find((choice) => choice.value === value)
+          : undefined;
+        if (match) setQuery(match.label);
+      })
+      .catch(() => {
+        /* leave the raw value showing */
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, field.options_from]);
 
   useEffect(() => {
     if (!open) return;
@@ -156,7 +193,7 @@ function SearchField({
               type="button"
               onClick={() => {
                 onChange(choice.value);
-                setQuery(choice.value);
+                setQuery(choice.label);
                 setOpen(false);
               }}
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-muted transition-colors hover:bg-surface hover:text-ink"
