@@ -29,7 +29,10 @@ static_body: {}
 data: {}
 
 fields:
+  # The three below never appear in the exchange URL - the forecast is fetched
+  # from the coordinates and the unit alone - so they are drawing, not asking.
   - keyname: place
+    presentation: true
     name: Place name
     field_type: string
     default: "Milan"
@@ -62,6 +65,7 @@ fields:
     optional: false
 
   - keyname: style
+    presentation: true
     name: Style
     field_type: select
     default: rich
@@ -74,6 +78,7 @@ fields:
     optional: false
 
   - keyname: show_hours
+    presentation: true
     name: Hours ahead
     field_type: number
     default: 12

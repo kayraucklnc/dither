@@ -112,6 +112,12 @@ export const factSchema = z.object({
   /** Dotted path into the widget's fetched payload. A numeric step indexes an array. */
   path: z.string().min(1),
   unit: z.string().default(""),
+  /**
+   * For a countdown: the path to the instant it counts down to, so a check
+   * asks "how long from now" rather than reading a number that stopped at the
+   * last fetch. See `until` in lib/facts.
+   */
+  until: z.string().min(1).optional(),
 });
 
 export type { Fact, FactType } from "@/lib/facts";

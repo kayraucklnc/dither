@@ -18,6 +18,8 @@ export interface Departure {
   scheduled: string;
   expected: string;
   minutes_until: number;
+  /** The same departure as epoch seconds, which is what a check counts down to. */
+  at_epoch: number;
   delay: number;
   delayed: boolean;
   platform: string;
@@ -116,6 +118,7 @@ export async function board(
       scheduled: clock(now, away - delay),
       expected: clock(now, away),
       minutes_until: away,
+      at_epoch: Math.floor(now.getTime() / 1000) + away * 60,
       delay,
       delayed: delay > 0,
       platform: platforms ? String(1 + ((seed + index) % 8)) : "",
