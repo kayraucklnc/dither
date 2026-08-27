@@ -1,63 +1,75 @@
 {% comment %}
-  Week: a column per day, gaps included.
+  The week - seven days, how full each one is, and what starts it.
 
-  The one design that draws the days with nothing in them, because that is the
-  whole point of looking at a week - you are reading for the shape, and a list
-  that closes up the empty days hides exactly what you were looking for.
+  The only design here that is not about today. It answers the question a wall
+  calendar is for: which day this week is the bad one. Each column is a bar of
+  how much of that day is spoken for, so a glance reads the week's shape rather
+  than its contents.
 
-  Wants a range that leaves today. Given "the rest of today" it has one column
-  to draw and says so rather than pretending to be a week.
+  Scaled against the fullest day rather than against a notional eight-hour one,
+  because a week where nothing exceeds three hours drawn against eight is seven
+  stubs that say nothing. The busiest day's figure is printed, so the scale is
+  never a mystery.
 {% endcomment %}
 
-<div class="screen dense">
-  <div class="title-bar">
-    <div class="title">{{ extension.values.heading | default: calendar.range_label }}</div>
-    <div class="chip">
-      <span class="i i-calendar"></span>
-      {{ calendar.events.size | default: 0 }}
+{%- assign day = calendar -%}
+{%- assign hh = "now" | date: "%H" | times: 60 -%}
+{%- assign now_mins = "now" | date: "%M" | plus: hh -%}
+
+{%- assign box_w = shape.width | at_least: 320 -%}
+{%- assign box_h = shape.height | at_least: 100 -%}
+{%- assign pad = box_w | divided_by: 30 | at_least: 10 | at_most: 20 -%}
+
+{%- comment %} The tallest bar is the busiest day, with a floor so that a quiet
+  week is not drawn as a busy one. {% endcomment -%}
+{%- assign peak = 120 -%}
+{%- for entry in day.days -%}
+  {%- if entry.busy_minutes > peak %}{% assign peak = entry.busy_minutes %}{% endif -%}
+{%- endfor -%}
+
+{%- assign header = 40 -%}
+{%- if notices.size > 0 %}{% assign header = header | plus: 34 %}{% endif -%}
+{%- assign column_w = box_w | minus: pad | minus: pad | divided_by: 7 -%}
+{%- assign named = false -%}
+{%- if column_w > 62 %}{% assign named = true %}{% endif -%}
+
+<div class="screen{% if box_h < 200 %} dense{% endif %}">
+  <div class="title-bar" style="padding: {{ pad }}px {{ pad }}px 8px">
+    <div class="title" style="font-size: {{ box_w | divided_by: 26 | at_least: 15 | at_most: 28 }}px">
+      {{ extension.values.heading | default: "The week" }}
+    </div>
+    <div class="t-xs t-bold">busiest {{ peak | span_in_words }}</div>
+  </div>
+
+  <div class="content" style="padding: {{ pad }}px">
+    <div class="bars" style="gap: {{ column_w | divided_by: 8 | at_least: 3 | at_most: 10 }}px">
+      {% for entry in day.days %}
+        {%- assign height = entry.busy_minutes | times: 100 | divided_by: peak -%}
+        <div class="bar">
+          {% if entry.count > 0 and box_h > 150 %}
+            <span class="tick t-bold">{{ entry.count }}</span>
+          {% endif %}
+
+          {%- comment %} A day with nothing on it is an outlined box rather than
+            no box, or an empty Saturday reads as missing data. {% endcomment -%}
+          <span class="fill{% if entry.busy_minutes == 0 %} fill--empty{% elsif entry.is_weekend %} fill--hatch{% endif %}"
+                style="height: {{ height | at_least: 3 }}%"></span>
+
+          <span class="tick t-bold" style="{% if entry.is_today %}text-decoration: underline{% endif %}">
+            {% if named %}{{ entry.day }}{% else %}{{ entry.day | slice: 0, 1 }}{% endif %}
+          </span>
+          {% if box_h > 190 %}
+            <span class="tick" style="font-size: 10px">
+              {% if entry.first != blank %}{{ entry.first }}{% else %}&mdash;{% endif %}
+            </span>
+          {% endif %}
+        </div>
+      {% endfor %}
     </div>
   </div>
 
-  {% if calendar.spans_days == false or calendar.days.size == 0 %}
-    <div class="content layout layout--col layout--center" style="gap: 8px">
-      <span class="i i-calendar i-lg"></span>
-      <p class="t-md t-bold">{{ calendar.range_label }}</p>
-      <p class="t-xs">Choose a longer range to see the week.</p>
-    </div>
-  {% else %}
-    <div class="content content--tight">
-      <div class="layout layout--row layout--split divide-x" style="align-items: stretch">
-        {% for group in calendar.days limit: 7 %}
-          <div style="min-width: 0; overflow: hidden">
-            <div style="border-bottom: var(--rule) solid var(--ink); padding-bottom: 4px">
-              <p class="t-xs t-upper t-bold">
-                {% if group.today %}Today{% else %}{{ group.day }}{% endif %}
-              </p>
-              <p class="t-xs muted">{{ group.label }}</p>
-            </div>
-
-            {% for entry in group.all_day limit: 1 %}
-              <p class="badge truncate" style="display: block; margin-top: 5px">{{ entry.title }}</p>
-            {% endfor %}
-
-            {% for event in group.events limit: 5 %}
-              <div style="margin-top: 6px">
-                <p class="t-xs t-mono t-bold">{{ event.start }}</p>
-                <p class="t-xs clamp-2">{{ event.title }}</p>
-              </div>
-            {% endfor %}
-
-            {% if group.empty %}
-              <p class="t-xs muted" style="margin-top: 6px">&mdash;</p>
-            {% endif %}
-          </div>
-        {% endfor %}
-      </div>
-    </div>
-  {% endif %}
-
   {% if notices.size > 0 %}
-    <div class="notice-strip">
+    <div class="notice-strip" style="padding: 5px {{ pad }}px">
       {% for notice in notices %}
         {% if notice.overflow %}
           <span class="notice notice--more">+{{ notice.overflow }}</span>
@@ -67,7 +79,6 @@
           </span>
         {% endif %}
       {% endfor %}
-
       {% if shape.wide and notices[0].text != blank %}
         <span class="notice-said">{{ notices[0].text }}</span>
       {% endif %}

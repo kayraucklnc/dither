@@ -131,14 +131,47 @@ export async function serve(device: Device, now = new Date()): Promise<Served> {
     ? `"${result.leaf.label}" has no screen chosen yet. Pick one on this device's page.`
     : "No decision tree yet. Open this device in Dither to set one up.";
 
+  /*
+   * Quiet hours are measured on the displays' clock, not the server's, and
+   * they stop the device *waking* rather than blanking it: an e-ink panel
+   * costs nothing to leave lit and a lot to refresh, so one long sleep beats
+   * forty short ones.
+   *
+   * Worked out before the render rather than after it, because how long the
+   * device is about to sleep for is something the picture needs to know: a
+   * clock face drawn at five to eleven is on the wall until morning, and one
+   * that says "just gone quarter to eleven" all night is a clock that lies for
+   * eight hours. Told the truth about the window, it says "night" instead.
+   */
+  const { timezoneOffset } = await environment();
+  const local = new Date(now.getTime() + timezoneOffset * 60_000);
+  const minutesOfDay = local.getUTCHours() * 60 + local.getUTCMinutes();
+
+  const quiet = { startMinute: device.sleepStartMinute, stopMinute: device.sleepStopMinute };
+  const asleep = inQuietHours(quiet, minutesOfDay);
+  const refreshSeconds = asleep
+    ? secondsUntilAwake(quiet, minutesOfDay)
+    : result.refreshSeconds;
+
+  /**
+   * What the picture is drawn *for*: this instant, and how long it has to last.
+   *
+   * Both go into the key as well as into the render. A design that draws the
+   * clock says how often it would look different, and the key carries the
+   * clock quantised to that - so a face showing the time as a band across a
+   * quarter of an hour is redrawn four times an hour, and a clock is no longer
+   * a picture of whenever the screen was last edited.
+   */
+  const when = { now, refreshSeconds };
+
   // The key doubles as the image's filename, so it stays a plain hash - what
   // makes an empty panel distinct goes into the hash, not into a prefix.
-  const key = `${await fingerprint(placed, spec, said, nothing ? { empty: [heading, detail] } : undefined)}.png`;
+  const key = `${await fingerprint(placed, spec, said, nothing ? { empty: [heading, detail] } : undefined, when)}.png`;
 
   if (!(await store().has(key))) {
     const rendered = nothing
       ? await renderEmpty(spec, heading, detail)
-      : await renderScreen(placed, spec, said);
+      : await renderScreen(placed, spec, said, when);
     await store().put(key, rendered.bytes, "image/png");
 
     await db.insert(renders).values({
@@ -153,25 +186,12 @@ export async function serve(device: Device, now = new Date()): Promise<Served> {
 
   const name = (screen?.name ?? "screen").toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
-  /*
-   * Quiet hours are measured on the displays' clock, not the server's, and
-   * they stop the device *waking* rather than blanking it: an e-ink panel
-   * costs nothing to leave lit and a lot to refresh, so one long sleep beats
-   * forty short ones.
-   */
-  const { timezoneOffset } = await environment();
-  const local = new Date(now.getTime() + timezoneOffset * 60_000);
-  const minutesOfDay = local.getUTCHours() * 60 + local.getUTCMinutes();
-
-  const quiet = { startMinute: device.sleepStartMinute, stopMinute: device.sleepStopMinute };
-  const asleep = inQuietHours(quiet, minutesOfDay);
-
   return {
     storageKey: key,
     // The device caches by filename, so it must change when the picture does
     // and must not change when it does not. The fingerprint gives both.
     filename: `${name}-${key.slice(0, 10)}`,
-    refreshSeconds: asleep ? secondsUntilAwake(quiet, minutesOfDay) : result.refreshSeconds,
+    refreshSeconds,
     asleep,
     walk: result,
     screenName: screen?.name ?? "Nothing set up",

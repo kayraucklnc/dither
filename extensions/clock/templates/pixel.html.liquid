@@ -1,0 +1,155 @@
+{% comment %}
+  Pixel - the time drawn in blocks, the way a display with no greys wants to
+  draw anything.
+
+  Every other face here fights the medium a little: type wants smooth edges, an
+  arc wants anti-aliasing, and the dither gives them a texture they did not
+  ask for. This one is drawn *on* the grid instead of against it. Four digits in
+  a three-by-five block font, at whatever size the box allows, and nothing on
+  screen that is not a full square of ink.
+
+  It is exact to the minute like the readout is, but it hedges the same way the
+  dial does: the time shown is the middle of the window this drawing has to
+  survive, so it is half a window fast when it goes up and half a window slow
+  when it comes down, rather than correct once and then wrong for a quarter of
+  an hour. The row of blocks underneath is the hour, with the covered part
+  filled - the same admission the dial makes with its wedge.
+
+  The font is a string per digit, fifteen characters of ones and noughts read
+  three at a time. A lookup table is not elegant; a hundred lines of case
+  statements drawing rectangles is worse.
+{% endcomment %}
+
+{%- assign shift = 0 -%}
+{%- if extension.values.utc_offset_hours != blank -%}
+  {%- assign shift = extension.values.utc_offset_hours | times: 3600 | minus: dither.offset_seconds -%}
+{%- endif -%}
+{%- assign stamp = "now" | date: "%s" | plus: shift -%}
+
+{%- assign hour24 = stamp | date: "%H" | times: 1 -%}
+{%- assign minute = stamp | date: "%M" | times: 1 -%}
+{%- assign mins = hour24 | times: 60 | plus: minute -%}
+
+{%- assign window_minutes = dither.window_minutes | at_least: 1 -%}
+{%- assign lead = window_minutes | divided_by: 2 -%}
+{%- assign mid = mins | plus: lead -%}
+
+{%- assign shown_h = mid | divided_by: 60 | modulo: 24 -%}
+{%- assign shown_m = mid | modulo: 60 -%}
+{%- if extension.values.twenty_four_hour == false -%}
+  {%- assign shown_h = shown_h | modulo: 12 -%}
+  {%- if shown_h == 0 %}{% assign shown_h = 12 %}{% endif -%}
+{%- endif -%}
+
+{%- capture reading -%}
+{% if shown_h < 10 %}0{% endif %}{{ shown_h }}{% if shown_m < 10 %}0{% endif %}{{ shown_m }}
+{%- endcapture -%}
+
+{%- comment %} Three wide, five tall, top row first. {% endcomment -%}
+{%- assign font = "111101101101111,110010010010111,111001111100111,111001111001111,101101111001001,111100111001111,111100111101111,111001001001001,111101111101111,111101111001111" | split: "," -%}
+
+{%- assign box_w = shape.width | at_least: 110 -%}
+{%- assign box_h = shape.height | at_least: 70 -%}
+{%- comment %} Padding off the shorter side, not off the width. A shallow band
+  is 800 by 80, and a twenty-fourth of the width either side of it is most of
+  the height gone before a single block is drawn. {% endcomment -%}
+{%- assign shorter = box_w | at_most: box_h -%}
+{%- assign pad = shorter | divided_by: 9 | at_least: 6 | at_most: 24 -%}
+
+{%- comment %} The block grid is seventeen units wide and five tall, so the
+  square that fits is decided by whichever of the two runs out first. {% endcomment -%}
+{%- assign strip = 0 -%}
+{%- if extension.values.show_window != false and box_h > 120 %}{% assign strip = 22 %}{% endif -%}
+{%- assign dated = false -%}
+{%- if extension.values.show_date != false and box_h > 190 %}{% assign dated = true %}{% endif -%}
+{%- assign spent = strip -%}
+{%- if dated %}{% assign spent = spent | plus: 30 %}{% endif -%}
+{%- if extension.values.heading != blank and box_h > 150 %}{% assign spent = spent | plus: 26 %}{% endif -%}
+{%- if notices.size > 0 %}{% assign spent = spent | plus: 34 %}{% endif -%}
+
+{%- assign room_w = box_w | minus: pad | minus: pad -%}
+{%- assign room_h = box_h | minus: pad | minus: pad | minus: spent | at_least: 30 -%}
+{%- assign by_width = room_w | divided_by: 17 -%}
+{%- assign by_height = room_h | divided_by: 5 -%}
+{%- assign unit = by_width | at_most: by_height | at_least: 4 -%}
+{%- assign grid_w = unit | times: 17 -%}
+{%- assign grid_h = unit | times: 5 -%}
+
+<div class="screen">
+  <div class="content layout layout--col layout--center" style="gap: {{ pad | divided_by: 2 }}px; padding: {{ pad }}px">
+    {% if extension.values.heading != blank and box_h > 150 %}
+      <p class="t-bold t-upper t-center truncate" style="font-size: {{ unit | at_least: 11 | at_most: 16 }}px; width: 100%">
+        {{ extension.values.heading }}
+      </p>
+    {% endif %}
+
+    <svg viewBox="0 0 17 5" width="{{ grid_w }}" height="{{ grid_h }}"
+         fill="black" stroke="none" style="flex: none; display: block">
+      {% for place in (0..3) %}
+        {%- assign value = reading | slice: place, 1 | times: 1 -%}
+        {%- assign pattern = font[value] -%}
+        {%- assign left = place | times: 4 -%}
+        {%- comment %} The two minute digits are pushed right by the colon. {% endcomment -%}
+        {%- if place > 1 %}{% assign left = left | plus: 2 %}{% endif -%}
+
+        {% for row in (0..4) %}
+          {% for column in (0..2) %}
+            {%- assign at = row | times: 3 | plus: column -%}
+            {%- assign lit = pattern | slice: at, 1 -%}
+            {% if lit == "1" %}
+              {%- assign x = left | plus: column -%}
+              <rect x="{{ x }}.06" y="{{ row }}.06" width="0.88" height="0.88"/>
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+      {% endfor %}
+
+      {%- comment %} The colon, two blocks on the same grid as everything else. {% endcomment -%}
+      <rect x="8.06" y="1.06" width="0.88" height="0.88"/>
+      <rect x="8.06" y="3.06" width="0.88" height="0.88"/>
+    </svg>
+
+    {% if strip > 0 %}
+      {%- comment %} The hour in twelve blocks of five minutes, filled as far
+        as it has gone, with the blocks this drawing is claiming outlined
+        rather than solid - the same admission the dial makes with its wedge,
+        at the resolution this face is drawn in. {% endcomment -%}
+      {%- assign done = minute | divided_by: 5 -%}
+      {%- assign reach = minute | plus: window_minutes | divided_by: 5 | at_most: 12 -%}
+      <div style="display: flex; gap: {{ unit | divided_by: 6 | at_least: 2 | at_most: 5 }}px; width: {{ grid_w }}px">
+        {% for block in (0..11) %}
+          {%- assign state = "empty" -%}
+          {%- if block < done %}{% assign state = "full" %}{% endif -%}
+          {%- if block >= done and block < reach %}{% assign state = "window" %}{% endif -%}
+          <span style="flex: 1 1 0; height: {{ unit | divided_by: 2 | at_least: 6 | at_most: 16 }}px;
+                       {% if state == 'full' %}background: var(--ink)
+                       {% elsif state == 'window' %}background: repeating-linear-gradient(45deg, var(--ink) 0 2px, var(--paper) 2px 4px); box-shadow: inset 0 0 0 2px var(--ink)
+                       {% else %}box-shadow: inset 0 0 0 2px var(--ink){% endif %}"></span>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if dated %}
+      <p class="t-center truncate" style="font-size: {{ unit | times: 3 | divided_by: 2 | at_least: 12 | at_most: 20 }}px; width: 100%">
+        {{ stamp | date: "%a %-d %b" }}
+      </p>
+    {% endif %}
+  </div>
+
+  {% if notices.size > 0 %}
+    <div class="notice-strip" style="padding: 6px {{ pad }}px">
+      {% for notice in notices %}
+        {% if notice.overflow %}
+          <span class="notice notice--more">+{{ notice.overflow }}</span>
+        {% else %}
+          <span class="notice notice--{{ notice.level }}" title="{{ notice.text }}">
+            <span class="i i-{{ notice.icon }}"></span>
+          </span>
+        {% endif %}
+      {% endfor %}
+      {% if shape.wide and notices[0].text != blank %}
+        <span class="notice-said">{{ notices[0].text }}</span>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>

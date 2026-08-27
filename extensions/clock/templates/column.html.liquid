@@ -1,0 +1,65 @@
+{% comment %}
+  Column - hours over minutes, for a narrow strip down the side of a screen.
+
+  Two lines of two figures each, because four figures across a three-column
+  box is 60 pixels of type nobody reads from a chair. Exact, and therefore
+  stale between refreshes, for the same reason the readout is: it says
+  `tick: 60` and is redrawn as often as it changes.
+{% endcomment %}
+
+{%- assign shift = 0 -%}
+{%- if extension.values.utc_offset_hours != blank -%}
+  {%- assign shift = extension.values.utc_offset_hours | times: 3600 | minus: dither.offset_seconds -%}
+{%- endif -%}
+{%- assign stamp = "now" | date: "%s" | plus: shift -%}
+
+{%- if extension.values.twenty_four_hour == false -%}
+  {%- assign hours = stamp | date: "%I" -%}
+  {%- assign suffix = stamp | date: "%p" | downcase -%}
+{%- else -%}
+  {%- assign hours = stamp | date: "%H" -%}
+  {%- assign suffix = "" -%}
+{%- endif -%}
+
+{%- assign box_w = shape.width | at_least: 90 -%}
+{%- assign box_h = shape.height | at_least: 200 -%}
+{%- assign pad = box_w | divided_by: 12 | at_least: 8 | at_most: 18 -%}
+
+{%- comment %} Two figures wide, and two rows of them tall, plus whatever is
+  written underneath. {% endcomment -%}
+{%- assign by_width = box_w | minus: pad | minus: pad | times: 100 | divided_by: 2 | divided_by: 64 -%}
+{%- assign by_height = box_h | times: 30 | divided_by: 100 -%}
+{%- assign figure = by_width | at_most: by_height | at_most: 128 | at_least: 22 -%}
+
+<div class="screen dense">
+  <div class="content layout layout--col layout--center" style="gap: 0; padding: {{ pad }}px">
+    {% if extension.values.heading != blank %}
+      <p class="t-xs t-upper t-center truncate" style="margin-bottom: 10px; width: 100%">{{ extension.values.heading }}</p>
+    {% endif %}
+
+    <p class="t-mono t-bold" style="font-size: {{ figure }}px; line-height: 0.95; letter-spacing: -0.04em">{{ hours }}</p>
+    <p class="t-mono t-bold" style="font-size: {{ figure }}px; line-height: 0.95; letter-spacing: -0.04em">{{ stamp | date: "%M" }}</p>
+    {% if suffix != "" %}<p class="t-xs t-upper" style="margin-top: 4px">{{ suffix }}</p>{% endif %}
+
+    {% if extension.values.show_date != false %}
+      <div class="rule" style="margin: {{ pad }}px 0; width: 62%"></div>
+      <p class="t-center" style="font-size: {{ figure | divided_by: 6 | at_least: 11 | at_most: 18 }}px; line-height: 1.3">
+        {{ stamp | date: "%a" }}<br>{{ stamp | date: "%-d %b" }}
+      </p>
+    {% endif %}
+  </div>
+
+  {% if notices.size > 0 %}
+    <div class="notice-strip">
+      {% for notice in notices %}
+        {% if notice.overflow %}
+          <span class="notice notice--more">+{{ notice.overflow }}</span>
+        {% else %}
+          <span class="notice notice--{{ notice.level }}" title="{{ notice.text }}">
+            <span class="i i-{{ notice.icon }}"></span>
+          </span>
+        {% endif %}
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

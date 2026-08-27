@@ -65,6 +65,67 @@ export function bucketByDay(
   });
 }
 
+export interface HourBucket {
+  /** "09". */
+  hour: string;
+  /** "09:00". */
+  label: string;
+  amount: number;
+  /** True once the hour has not happened yet, so a chart can stop drawing. */
+  ahead: boolean;
+}
+
+/**
+ * Today, hour by hour, in the installation's zone.
+ *
+ * The one series that says something the daily bars cannot: whether a quiet
+ * day is quiet because it is nine in the morning. Hours that have not happened
+ * yet are marked rather than dropped - a chart that ends at the current hour
+ * looks like a chart of a whole day, and reads as a collapse.
+ */
+export function bucketByHour(
+  entries: Entry[],
+  timezone: string,
+  since: Date,
+  now: Date,
+): HourBucket[] {
+  const totals = new Array<number>(24).fill(0);
+  const hourOf = new Intl.DateTimeFormat("en-GB", {
+    timeZone: timezone,
+    hour: "2-digit",
+    hourCycle: "h23",
+  });
+
+  for (const entry of entries) {
+    if (entry.at < since) continue;
+    totals[Number(hourOf.format(entry.at))] += entry.amount;
+  }
+
+  const current = Number(hourOf.format(now));
+
+  return totals.map((amount, hour) => ({
+    hour: String(hour).padStart(2, "0"),
+    label: `${String(hour).padStart(2, "0")}:00`,
+    amount,
+    ahead: hour > current,
+  }));
+}
+
+/**
+ * A running total across a series.
+ *
+ * What makes two periods comparable on one chart: day seven of last week
+ * against day seven of this one is a race, where two jagged daily lines are a
+ * pair of scribbles.
+ */
+export function runningTotal(amounts: number[]): number[] {
+  let carried = 0;
+  return amounts.map((amount) => {
+    carried += amount;
+    return carried;
+  });
+}
+
 /** Everything on or after an instant. The rolling windows - "the last 24 hours". */
 export function sumSince(entries: Entry[], since: Date): number {
   return entries.reduce((total, entry) => (entry.at >= since ? total + entry.amount : total), 0);
@@ -97,6 +158,9 @@ export const WINDOWS = [
   { key: "last_15d", label: "Last 15 days", short: "15d", against: "the 15 days before" },
   { key: "last_30d", label: "Last 30 days", short: "30d", against: "the 30 days before" },
   { key: "month_to_date", label: "Month to date", short: "this month", against: "last month" },
+  /* The one window with nothing to compare against: there is no "the all time
+     before this one". Its detail line says when it starts instead. */
+  { key: "all_time", label: "All time", short: "all time", against: "" },
 ] as const;
 
 export type WindowKey = (typeof WINDOWS)[number]["key"];
@@ -108,6 +172,73 @@ export const ROLLING_DAYS: Partial<Record<WindowKey, number>> = {
   last_15d: 15,
   last_30d: 30,
 };
+
+/**
+ * The rungs a milestone can land on: 1, 1.5, 2, 2.5, 3, 4, 5, 7.5 at every
+ * order of magnitude.
+ *
+ * Powers of ten alone are useless for this - somebody at 1,284 customers is
+ * told to reach 10,000, which is not a target, it is a wall. Every doubling is
+ * too coarse at the bottom and too fine at the top. This ladder puts the next
+ * rung between a tenth and a half again above wherever you are, which is far
+ * enough to be worth reaching and near enough to be worth watching.
+ */
+const LADDER = [1, 1.5, 2, 2.5, 3, 4, 5, 7.5];
+
+function rungs(around: number): number[] {
+  const magnitude = Math.max(0, Math.floor(Math.log10(Math.max(1, around))) - 1);
+  const scales = [magnitude, magnitude + 1, magnitude + 2];
+
+  return scales.flatMap((scale) => LADDER.map((rung) => rung * 10 ** scale));
+}
+
+/** The next rung above a figure. Always strictly above it, so arriving moves it on. */
+export function nextMilestone(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return rungs(value).find((rung) => rung > value) ?? 10 ** (Math.floor(Math.log10(Math.max(1, value))) + 1);
+}
+
+/** The rung last passed, which is where a progress bar starts from. */
+export function previousMilestone(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  const passed = rungs(value).filter((rung) => rung <= value);
+  return passed.length ? passed[passed.length - 1] : 0;
+}
+
+export interface Milestone {
+  value: number;
+  next: number;
+  previous: number;
+  to_go: number;
+  /** How far from the last rung to the next, as a percentage. */
+  percent: number;
+  /** Days at the rate given, when one was. Null when nothing can be said. */
+  in_days: number | null;
+}
+
+/**
+ * Where a figure sits between the rung it has passed and the one ahead.
+ *
+ * The rate is optional and stays optional: "you will pass a million in March"
+ * is a sentence worth printing only when there is something real behind it,
+ * and a made-up date on a wall is worse than no date.
+ */
+export function milestoneOf(value: number, ratePerDay?: number): Milestone {
+  const next = nextMilestone(value);
+  const previous = previousMilestone(value);
+  const span = Math.max(1, next - previous);
+  const toGo = Math.max(0, next - value);
+
+  return {
+    value,
+    next,
+    previous,
+    to_go: toGo,
+    percent: Math.max(0, Math.min(100, Math.round(((value - previous) / span) * 100))),
+    in_days:
+      ratePerDay && ratePerDay > 0 ? Math.max(0, Math.round(toGo / ratePerDay)) : null,
+  };
+}
 
 export interface Recurring {
   /** Minor units charged each period. */

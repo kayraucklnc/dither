@@ -1,94 +1,176 @@
 {% comment %}
-  Full: 800x480. Three styles from one template, because they share their
-  arithmetic and differ only in what they draw.
+  Panel - the dial, the date, and the shape of the day, for most of a screen.
+
+  Everything the other faces do one at a time, laid out so that each answers a
+  different question: the dial for "what time is it", the sentence for "roughly
+  what time is it", the bar for "how much of today is left". None of them
+  claims more than a quarter of an hour, because none of them can.
 {% endcomment %}
 
-{% comment %}
-  Dates already render in the installation time zone, so no offset is needed
-  for the common case. A value here means "this clock is somewhere else", and
-  shifts relative to the installation rather than from UTC.
-{% endcomment %}
-{% assign shift = 0 %}
-{% if extension.values.utc_offset_hours != blank %}
-  {% assign shift = extension.values.utc_offset_hours | times: 3600 | minus: dither.offset_seconds %}
-{% endif %}
-{% assign stamp = "now" | date: "%s" | plus: shift %}
-{% assign style = extension.values.style | default: "digital" %}
-{% if extension.values.twenty_four_hour == false %}
-  {% assign face = stamp | date: "%I:%M" %}
-  {% assign suffix = stamp | date: "%p" %}
-{% else %}
-  {% assign face = stamp | date: "%H:%M" %}
-  {% assign suffix = "" %}
-{% endif %}
+{%- assign shift = 0 -%}
+{%- if extension.values.utc_offset_hours != blank -%}
+  {%- assign shift = extension.values.utc_offset_hours | times: 3600 | minus: dither.offset_seconds -%}
+{%- endif -%}
+{%- assign stamp = "now" | date: "%s" | plus: shift -%}
+
+{%- assign hour24 = stamp | date: "%H" | times: 1 -%}
+{%- assign minute = stamp | date: "%M" | times: 1 -%}
+{%- assign mins = hour24 | times: 60 | plus: minute -%}
+{%- assign hour = hour24 | modulo: 12 -%}
+
+{%- assign window_minutes = dither.window_minutes | at_least: 1 -%}
+{%- assign window = window_minutes | at_most: 60 -%}
+
+{%- comment %} Where the hands are put, and why it is not where the clock
+  says.
+
+  This drawing goes up now and stays up until the device next wakes. A hand at
+  the minute of drawing is right for an instant and then falls behind for the
+  whole window - by the end it is a quarter of an hour slow, every time. Put it
+  at the *middle* of the window instead and it is half a window fast to begin
+  with and half a window slow at the end: the same error, but split either side
+  of the truth, so the average miss is halved and the hand sweeps through the
+  right time rather than trailing it.
+
+  The wedge still starts where the clock actually is, so the pair reads
+  correctly: the span is where the time will be, the hand is the middle of it.
+{% endcomment -%}
+{%- assign lead = window_minutes | divided_by: 2 -%}
+{%- assign mid = minute | plus: lead -%}
+{%- assign half = mid | divided_by: 2 -%}
+{%- assign hour_angle = hour | times: 30 | plus: half -%}
+{%- assign minute_angle = minute | times: 6 -%}
+{%- assign hand_angle = mid | times: 6 -%}
+
+{%- assign sweeping = window -%}
+{%- if extension.values.show_window == false %}{% assign sweeping = 0 %}{% endif -%}
+{%- assign sweep = sweeping | times: 490 | divided_by: 60 -%}
+{%- assign sweep_from = minute_angle | minus: 90 -%}
+
+{%- assign opens = extension.values.day_start | default: "07:00" | minutes_of -%}
+{%- assign closes = extension.values.day_end | default: "23:00" | minutes_of -%}
+{%- assign span = closes | minus: opens -%}
+{%- if span <= 0 %}{% assign span = 1440 | minus: opens | plus: closes %}{% endif -%}
+{%- assign through = mins | through_day: opens, closes -%}
+{%- assign gone = through | times: span | divided_by: 100 -%}
+{%- assign left = span | minus: gone -%}
+{%- assign covers = window | times: 100 | divided_by: span -%}
+{%- assign overrun = through | plus: covers | minus: 100 -%}
+{%- if overrun > 0 %}{% assign covers = covers | minus: overrun %}{% endif -%}
+
+{%- assign box_w = shape.width | at_least: 400 -%}
+{%- assign box_h = shape.height | at_least: 280 -%}
+{%- assign side = box_h | times: 62 | divided_by: 100 | at_most: 300 | at_least: 150 -%}
+
+{%- assign numerals = extension.values.numerals | default: "quarters" -%}
+{%- if side < 200 and numerals == "all" %}{% assign numerals = "quarters" %}{% endif -%}
+
+{%- assign said = mins | time_in_words: window -%}
 
 <div class="screen">
-  {% if style == "analogue" %}
-    {% assign minutes = stamp | date: "%M" | times: 1 %}
-    {% assign hours = stamp | date: "%H" | times: 1 | modulo: 12 %}
-    {% assign minute_angle = minutes | times: 6 %}
-    {% assign hour_angle = hours | times: 30 | plus: minutes | divided_by: 2 %}
+  <div class="title-bar" style="padding: 16px 24px 10px">
+    {%- comment %} Unheaded, it names the place rather than the zone: "Istanbul"
+      is what a person calls it, "Europe/Istanbul" is what a database does. {% endcomment -%}
+    {%- assign here = dither.timezone | split: "/" | last | replace: "_", " " -%}
+    <div class="title">{{ extension.values.heading | default: here }}</div>
+    <div class="chip self-start">
+      <span class="i i-clock"></span>{{ mins | part_of_day }}
+    </div>
+  </div>
 
-    <div class="content layout layout--row layout--center" style="gap: 48px">
-      <svg viewBox="0 0 200 200" width="360" height="360" fill="none" stroke="black">
-        <circle cx="100" cy="100" r="95" stroke-width="5"/>
-        {% for tick in (0..11) %}
-          {% assign angle = tick | times: 30 %}
-          <line x1="100" y1="14" x2="100" y2="{% if tick == 0 or tick == 3 or tick == 6 or tick == 9 %}30{% else %}23{% endif %}"
-                stroke-width="{% if tick == 0 or tick == 3 or tick == 6 or tick == 9 %}7{% else %}3{% endif %}"
-                stroke-linecap="round"
-                transform="rotate({{ angle }} 100 100)"/>
-        {% endfor %}
-        <line x1="100" y1="100" x2="100" y2="48" stroke-width="9" stroke-linecap="round"
-              transform="rotate({{ hour_angle }} 100 100)"/>
-        <line x1="100" y1="100" x2="100" y2="26" stroke-width="5" stroke-linecap="round"
-              transform="rotate({{ minute_angle }} 100 100)"/>
-        <circle cx="100" cy="100" r="8" fill="black" stroke="none"/>
-      </svg>
+  <div class="content" style="padding: 18px 24px">
+    <div class="split-detail">
+      <div class="layout layout--col layout--center fit">
+        <svg viewBox="0 0 200 200" width="{{ side }}" height="{{ side }}" fill="none" stroke="black">
+          <circle cx="100" cy="100" r="95" stroke-width="4"/>
 
-      <div class="stack stack--tight">
-        {% if extension.values.heading != blank %}
-          <p class="t-sm t-upper">{{ extension.values.heading }}</p>
+          {% for tick in (0..59) %}
+            {%- assign fifth = tick | modulo: 5 -%}
+            {%- assign quarter = tick | modulo: 15 -%}
+            <line x1="100" y1="12" x2="100"
+                  y2="{% if quarter == 0 %}30{% elsif fifth == 0 %}25{% else %}18{% endif %}"
+                  stroke-width="{% if quarter == 0 %}6{% elsif fifth == 0 %}3.5{% else %}1.5{% endif %}"
+                  stroke-linecap="round"
+                  transform="rotate({{ tick | times: 6 }} 100 100)"/>
+          {% endfor %}
+
+          {% if numerals != "none" %}
+            {% for mark in (1..12) %}
+              {%- assign angle = mark | times: 30 -%}
+              {%- assign third = mark | modulo: 3 -%}
+              {% if numerals == "all" or third == 0 %}
+                <g transform="rotate({{ angle }} 100 100)">
+                  <g transform="rotate({{ 0 | minus: angle }} 100 46)">
+                    <text x="100" y="46" text-anchor="middle" dominant-baseline="middle"
+                          fill="black" stroke="none"
+                          font-family="Inter, sans-serif" font-weight="700"
+                          font-size="{% if numerals == 'all' %}17{% else %}21{% endif %}">{{ mark }}</text>
+                  </g>
+                </g>
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+
+          {% if sweep > 0 %}
+            <circle cx="100" cy="100" r="78" stroke-width="17" stroke="black"
+                    stroke-dasharray="{{ sweep }} 490"
+                    transform="rotate({{ sweep_from }} 100 100)"/>
+            <circle cx="100" cy="100" r="78" stroke-width="13" stroke="white"
+                    stroke-dasharray="{{ sweep }} 490"
+                    transform="rotate({{ sweep_from }} 100 100)"/>
+          {% endif %}
+
+          <line x1="100" y1="104" x2="100" y2="34" stroke-width="4" stroke-linecap="round"
+                transform="rotate({{ hand_angle }} 100 100)"/>
+          <line x1="100" y1="106" x2="100" y2="56" stroke-width="9" stroke-linecap="round"
+                transform="rotate({{ hour_angle }} 100 100)"/>
+          <circle cx="100" cy="100" r="7" fill="black" stroke="none"/>
+          <circle cx="100" cy="100" r="2.5" fill="white" stroke="none"/>
+        </svg>
+      </div>
+
+      <div class="stack fit" style="justify-content: center; gap: 14px">
+        <p class="t-bold" style="font-size: {{ box_w | divided_by: 18 | at_most: 44 | at_least: 20 }}px; line-height: 1.05; letter-spacing: -0.02em">
+          {{ said }}
+        </p>
+
+        {% if extension.values.show_date != false %}
+          <div class="stack stack--tight" style="gap: 2px">
+            <p class="t-bold" style="font-size: {{ box_h | divided_by: 9 | at_most: 62 | at_least: 24 }}px; line-height: 1">{{ stamp | date: "%-d" }}</p>
+            <p class="t-lg t-bold">{{ stamp | date: "%B" }}</p>
+            <p class="caption t-upper t-bold" style="font-size: 14px">{{ stamp | date: "%A" }}</p>
+          </div>
         {% endif %}
-        <p class="t-bold" style="font-size: 64px; line-height: 1">{{ face }}{{ suffix | downcase }}</p>
-        <p class="t-md">{{ stamp | date: "%A" }}</p>
-        <p class="t-sm">{{ stamp | date: "%-d %B %Y" }}</p>
+
+        {%- comment %} The day so far, and the sliver of it this drawing is
+          guessing at. {% endcomment -%}
+        <div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px">
+            <span class="t-xs t-upper t-bold">The day</span>
+            <span class="t-xs t-bold">
+              {% if through >= 100 %}done{% elsif through <= 0 %}not yet{% else %}{{ left | span_in_words }} left{% endif %}
+            </span>
+          </div>
+          <div style="position: relative; border: 2px solid var(--ink); height: 16px; width: 100%">
+            <span style="display: block; height: 100%; width: {{ through }}%; background: var(--ink)"></span>
+            {% if sweeping > 0 %}
+              <span style="position: absolute; top: 0; bottom: 0; left: {{ through }}%; width: {{ covers | at_least: 1 }}%;
+                           background: repeating-linear-gradient(45deg, var(--ink) 0 2px, var(--paper) 2px 5px)"></span>
+            {% endif %}
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-top: 4px">
+            <span class="t-xs">{{ extension.values.day_start | default: "07:00" }}</span>
+            <span class="t-xs">{{ extension.values.day_end | default: "23:00" }}</span>
+          </div>
+        </div>
       </div>
     </div>
-
-  {% elsif style == "dated" %}
-    <div class="content split-detail">
-      <div class="hero fit">
-        {% if extension.values.heading != blank %}
-          <p class="caption">{{ extension.values.heading }}</p>
-        {% endif %}
-        <p class="t-mono t-bold" style="font-size: 132px; line-height: 1">{{ face }}</p>
-        {% if suffix != "" %}<p class="caption">{{ suffix }}</p>{% endif %}
-      </div>
-
-      <div class="hero fit">
-        <p class="t-bold" style="font-size: 108px; line-height: 1">{{ stamp | date: "%-d" }}</p>
-        <p class="t-lg t-bold">{{ stamp | date: "%B" }}</p>
-        <p class="caption">{{ stamp | date: "%A" }}</p>
-      </div>
-    </div>
-
-  {% else %}
-    <div class="content layout layout--col layout--center" style="gap: 10px">
-      {% if extension.values.heading != blank %}
-        <p class="t-md t-upper">{{ extension.values.heading }}</p>
-      {% endif %}
-      <p class="t-mono t-bold" style="font-size: 190px; line-height: 0.92; letter-spacing: -0.04em">
-        {{ face }}
-      </p>
-      <p class="t-lg">{{ stamp | date: "%A %-d %B" }}{% if suffix != "" %} &middot; {{ suffix }}{% endif %}</p>
-    </div>
-  {% endif %}
+  </div>
 
   {% comment %}
     Where another extension gets to say something on this screen. Glyphs like
     dashboard warning lights, with the loudest one's words beside them when the
-    shape is wide enough to carry them.
+    box is wide enough to carry them.
   {% endcomment %}
   {% if notices.size > 0 %}
     <div class="notice-strip">

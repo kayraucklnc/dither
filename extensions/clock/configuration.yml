@@ -1,19 +1,34 @@
 # Dither bundled extension: Clock.
 #
-# Fetches nothing - it renders the server's clock shifted by an offset. Useful
-# on its own, and the simplest worked example of the format: a manifest, a
-# template per shape, no exchanges, no connection.
+# Fetches nothing - it renders the server's clock, shifted by an offset. That
+# makes it the simplest worked example of the format, and the hardest design
+# problem in the repository.
+#
+# The hard part is that a panel is not a clock. A device wakes, is handed one
+# picture, paints it, and sleeps for a quarter of an hour. A face that draws
+# "10:07" is therefore right for one minute in fifteen and wrong for the other
+# fourteen, and nothing about the drawing admits it. Refreshing faster is not
+# the answer: an e-ink panel redrawn sixty times an hour is a flat battery by
+# Thursday.
+#
+# So the faces here are built the other way round. Each one is told how long
+# its picture has to survive - `dither.window_minutes`, the device's own
+# refresh rate - and draws something that is still true when the device next
+# wakes. A wedge instead of a minute hand. "Just gone half past ten" instead of
+# 10:31. An arc of the day, which moves so slowly that a quarter of an hour is
+# invisible on it. Every design declares a `tick`: how often it would look
+# different, which is how often the server bothers to redraw it.
 #
 # It declares no facts. Anything you would want to branch on about the time is
 # already reported by the built-in Time source, so duplicating it here would
 # give you two answers to the same question.
 
-version: "1.0.0"
+version: "2.0.0"
 name: clock
 label: Clock
 description: >
-  The time, in three styles: a plain readout, a dated panel, or an analogue
-  face. Large enough to read across a room.
+  The time, as a readout, a drawn face, a sentence, or the shape of the day.
+  Built for a panel that is only redrawn every quarter of an hour.
 
 kind: static
 mode: text
@@ -30,19 +45,94 @@ static_body: {}
 data: {}
 sample: {}
 
+# The faces, and the sizes each is willing to be drawn at.
+#
+# `tick` is the honest half of every one of them: how many seconds pass before
+# this face would look different. A readout to the minute says 60 and is
+# redrawn sixty times an hour. A face that draws the time as a band across a
+# quarter of an hour says 900 and is redrawn four times, because that is how
+# often it *changes* - and a picture that has not changed is one the device
+# already holds.
+designs:
+  - template: digital
+    label: Readout
+    hint: The time in figures, as large as the box allows. Exact, and stale between refreshes.
+    columns: [2, 12]
+    rows: [2, 12]
+    nominal: [6, 6]
+    tick: 60
+
+  - template: dial
+    label: Dial
+    hint: A drawn face. The minutes are a swept wedge, not a hand - so it is never wrong, only vague.
+    columns: [3, 12]
+    rows: [4, 12]
+    nominal: [7, 9]
+    tick: 300
+
+  - template: slice
+    label: Slice
+    hint: No hands - a hatched wedge of the minutes this reading covers, over the hour it belongs to.
+    columns: [3, 12]
+    rows: [4, 12]
+    nominal: [6, 8]
+    tick: 300
+
+  - template: arc
+    label: The day
+    hint: How much of the day has gone, drawn as an arc. Barely moves in a quarter of an hour, which is the point.
+    columns: [4, 12]
+    rows: [5, 12]
+    nominal: [7, 7]
+    tick: 300
+
+  - template: pixel
+    label: Pixels
+    hint: The time in block digits, drawn on the panel's own grid. No curves, no anti-aliasing, nothing to dither.
+    columns: [3, 12]
+    rows: [2, 12]
+    nominal: [6, 5]
+    tick: 60
+
+  - template: words
+    label: In words
+    hint: "\"Just gone half past ten\" - hedged by exactly as much as the refresh rate costs."
+    columns: [4, 12]
+    rows: [2, 8]
+    nominal: [9, 4]
+    tick: 300
+
+  - template: column
+    label: Column
+    hint: Hours over minutes, for a narrow strip down the side of a screen.
+    columns: [2, 4]
+    rows: [5, 12]
+    nominal: [3, 10]
+    tick: 60
+
+  - template: band
+    label: Band
+    hint: A shallow full-width strip - the time, the date, and how far through the day.
+    columns: [6, 12]
+    rows: [2, 4]
+    nominal: [12, 3]
+    tick: 60
+
+  - template: full
+    label: Panel
+    hint: The dial, the date, and the shape of the day, for most of a screen.
+    columns: [8, 12]
+    rows: [7, 12]
+    nominal: [12, 12]
+    tick: 300
+
 fields:
-  - keyname: style
-    name: Style
-    field_type: select
-    default: digital
-    options:
-      - value: digital
-        label: Digital — the time, very large
-      - value: dated
-        label: Dated — the time with the day beside it
-      - value: analogue
-        label: Analogue — a drawn face
-    optional: false
+  - keyname: heading
+    name: Heading
+    field_type: string
+    default: ""
+    help_text: A label above the time - a city, usually. Blank hides it.
+    optional: true
 
   - keyname: utc_offset_hours
     name: Hours from UTC
@@ -53,21 +143,73 @@ fields:
       clock showing somewhere else - 2 for Berlin in summer, -4 for New York.
     optional: true
 
-  - keyname: heading
-    name: Heading
-    field_type: string
-    default: ""
-    help_text: A label above the time - a city, usually. Blank hides it.
-    optional: true
-
   - keyname: twenty_four_hour
     name: 24-hour clock
     field_type: boolean
     default: true
     optional: true
 
+  - keyname: show_date
+    name: Show the date
+    field_type: boolean
+    default: true
+    help_text: Turn it off where a neighbouring widget already says what day it is.
+    optional: true
+
+  - keyname: show_window
+    name: Show how long this reading lasts
+    field_type: boolean
+    default: true
+    help_text: >
+      Draws the span the picture is claiming to be right for - the wedge on the
+      dial, the band under the words. It is what makes a vague clock honest
+      rather than just vague. Off, the faces still never overstate the time;
+      they simply stop showing their working.
+    visible_when:
+      field: design
+      any_of: [dial, arc, words, band, full]
+    optional: true
+
+  - keyname: numerals
+    name: Numerals
+    field_type: select
+    default: quarters
+    options:
+      - value: none
+        label: None - ticks only
+      - value: quarters
+        label: 12, 3, 6 and 9
+      - value: all
+        label: All twelve
+    visible_when:
+      field: design
+      any_of: [dial, full]
+    optional: true
+
+  - keyname: day_start
+    name: The day starts
+    field_type: time
+    default: "07:00"
+    help_text: >
+      Your day, not the calendar's. The arc and the day bar measure from here,
+      so "half the day gone" means half of the part you are awake for.
+    visible_when:
+      field: design
+      any_of: [arc, band, words, full]
+    optional: true
+
+  - keyname: day_end
+    name: and ends
+    field_type: time
+    default: "23:00"
+    help_text: A time before the start is read as running past midnight.
+    visible_when:
+      field: design
+      any_of: [arc, band, words, full]
+    optional: true
+
 # Its designs have a strip at the bottom where another extension's notice
-# can appear - a service alert while you are looking at the weather.
+# can appear - a service alert while you are looking at the time.
 accepts_notices: true
 
 facts: []

@@ -79,6 +79,22 @@ export const fieldSchema = z.object({
   visible_when: z
     .object({ field: z.string().min(1), any_of: z.array(z.string()).min(1) })
     .optional(),
+  /**
+   * True when this answer only changes how the widget is *drawn*, never what
+   * is fetched for it.
+   *
+   * An answer is cached by the question that produced it, and the question is
+   * every setting the widget carries - so without this, choosing bars instead
+   * of a line asks Stripe a second time for numbers it has already given us.
+   * Six revenue widgets on one screen must cost one trip, and they only do if
+   * the presentational half of their settings is left out of the question.
+   *
+   * The default is false, meaning "this changes the answer", because that is
+   * the safe way round: a field wrongly marked presentational makes two
+   * widgets share one answer, and two weather widgets showing one city is a
+   * worse failure than one extra fetch.
+   */
+  presentation: z.boolean().default(false),
   min: z.number().optional(),
   max: z.number().optional(),
 });
@@ -166,6 +182,19 @@ export const designSchema = z.object({
   rows: z.tuple([z.number().int().min(1).max(12), z.number().int().min(1).max(12)]),
   /** The size it was really drawn for. Decides which design wins a tie. */
   nominal: z.tuple([z.number().int().min(1).max(12), z.number().int().min(1).max(12)]).optional(),
+  /**
+   * Seconds between one drawing of this design and a different-looking one,
+   * for a design that draws the clock. Zero, the default, means the picture
+   * only changes when the data does.
+   *
+   * This is the honest half of drawing time on a panel that wakes every
+   * quarter of an hour. A design that shows the time to the minute has to say
+   * `tick: 60` or it is served a picture from the last time its data moved -
+   * which, for a clock, is never. A design that shows the time as a band
+   * across a quarter of an hour says `tick: 900` and is redrawn four times an
+   * hour, because that is how often it would look different.
+   */
+  tick: z.number().int().min(0).max(86_400).default(0),
 });
 
 export type DesignDeclaration = z.infer<typeof designSchema>;
