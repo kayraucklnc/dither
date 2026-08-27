@@ -246,6 +246,25 @@ describe("milestones", () => {
     expect(milestone.percent).toBe(50);
   });
 
+  it("counts the gap in the figure's own units, not in floating point", () => {
+    // A real figure has pennies in it, and 750 less 525.95 is
+    // 224.04999999999995 to a double. The template prints this straight, so
+    // that is what went on the wall.
+    expect(milestoneOf(525.95).to_go).toBe(224.05);
+    expect(milestoneOf(18_420.33).to_go).toBe(1579.67);
+
+    // Kept to whatever the two ends carry: a count has no pennies, and a
+    // dinar has three of them.
+    expect(milestoneOf(1250).to_go).toBe(250);
+    expect(milestoneOf(525.955).to_go).toBe(224.045);
+
+    // The bottom of the ladder has halves on it, and half a customer away is
+    // not a whole one - the gap cannot be rounded to the figure's precision
+    // alone.
+    expect(nextMilestone(1)).toBe(1.5);
+    expect(milestoneOf(1).to_go).toBe(0.5);
+  });
+
   it("says when only when there is a rate behind it", () => {
     expect(milestoneOf(1250).in_days).toBe(null);
     expect(milestoneOf(1250, 25).in_days).toBe(10);
