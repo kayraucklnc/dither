@@ -55,7 +55,7 @@ export const COUNTRIES: Country[] = [
             mode: "rail",
             description: "Regional and suburban trains across Lombardy.",
             capabilities: ["journey", "searchable_stations", "platforms", "alerts", "live_delays"],
-            mocked: true,
+            mocked: false,
           },
           {
             code: "atm",
