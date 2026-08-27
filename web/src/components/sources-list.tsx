@@ -213,6 +213,7 @@ export function SourcesList({
                   fields={source.fields}
                   capabilitiesFrom={source.capabilitiesFrom}
                   values={drafts[source.id] ?? source.settings}
+                  purpose="deciding"
                   onChange={(key, value) =>
                     edit(source.id, { ...(drafts[source.id] ?? source.settings), [key]: value })
                   }

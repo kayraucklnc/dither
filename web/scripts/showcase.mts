@@ -568,22 +568,25 @@ const rainCheck = await check(
   eveningCheck.id,
 );
 
-// A nested group: either a meeting you have to physically get to is close, or
-// you are sitting in one now. Both want the same screen; neither is expressible
-// as one comparison.
+/*
+ * A nested group: either you are sitting in a meeting now, or a video call is
+ * close. Both want to be told what is next rather than told to leave, because
+ * neither of them is somewhere you have to travel to. Not expressible as one
+ * comparison, which is what `any` and `all` are for.
+ */
 const meetingCheck = await check(
-  "In a meeting, or about to travel to one?",
+  "In a call, or about to be?",
   {
     kind: "any",
     conditions: [
+      fact(diary.id.toString(), "in_a_meeting", "is_true"),
       {
         kind: "all",
         conditions: [
           fact(diary.id.toString(), "next_meeting_in", "lt", 40),
-          fact(diary.id.toString(), "next_meeting_is_remote", "is_false"),
+          fact(diary.id.toString(), "next_meeting_is_remote", "is_true"),
         ],
       },
-      fact(diary.id.toString(), "in_a_meeting", "is_true"),
     ],
   },
   nextLeaf.id,
@@ -603,12 +606,39 @@ const trainCheck = await check(
   meetingCheck.id,
 );
 
+/*
+ * Somewhere to be, within the hour.
+ *
+ * Three parts, and all three are load-bearing. "Any of my accounts" is not one
+ * of them - the source names both primaries in its Calendars field and the
+ * provider merges them into one list in time order, so `next` is already the
+ * soonest across the two and the check never mentions an account.
+ *
+ * `location` alone would not do it either. A Google Meet reports a location -
+ * the literal string "Meet" - so a video call has one, and a rule that fired on
+ * that would send you to the station for a call you take at your desk. It is
+ * the pair that means "a place": a location, and not a remote one.
+ */
+const somewhereCheck = await check(
+  "Somewhere to be within the hour?",
+  {
+    kind: "all",
+    conditions: [
+      fact(diary.id.toString(), "next_meeting_in", "lt", 60),
+      fact(diary.id.toString(), "next_meeting_is_remote", "is_false"),
+      fact(diary.id.toString(), "next_meeting_location", "present"),
+    ],
+  },
+  leavingLeaf.id,
+  trainCheck.id,
+);
+
 // Asked first, so it wins over everything below it.
 const nightCheck = await check(
   "Overnight?",
   fact(CLOCK_SOURCE, "time_of_day", "between", ["23:00", "06:30"]),
   nightLeaf.id,
-  trainCheck.id,
+  somewhereCheck.id,
 );
 
 await db.update(devices).set({ rootNodeId: nightCheck.id }).where(eq(devices.id, device.id));
