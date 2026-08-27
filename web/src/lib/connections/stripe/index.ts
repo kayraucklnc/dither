@@ -1,285 +1,54 @@
-import Stripe from "stripe";
-
-import { DAY, dateLabel, startOfMonth, whenInWords } from "@/lib/clock";
+import { DAY, dateLabel, dayKey, dayLabel, startOfMonth, wallClock, whenInWords } from "@/lib/clock";
 import { changePercent, formatMoney, symbolFor, toMajorUnits } from "@/lib/money";
+import { rateBetween, rates, type Rates } from "@/lib/exchange";
 import type { FetchContext, Provider, Verification } from "@/lib/connections/provider";
 import {
   ROLLING_DAYS,
   WINDOWS,
-  afterDiscounts,
   milestoneOf,
   bucketByDay,
   bucketByHour,
   runningTotal,
   forecastNext,
-  monthlyValue,
   sumBetween,
   sumSince,
   windowStarts,
-  type Entry,
   type WindowKey,
 } from "./metrics";
+import { FORECAST_DAYS, HISTORY_DAYS, SECRET_KEY, identify, readAccount } from "./read";
+import { chooseCurrency, convertReading, mergeReadings, needsRates, pickAccounts } from "./reading";
 
 /**
  * The real Stripe connection.
  *
- * Everything on a revenue widget comes from here, and every number is answered
- * by one of five questions asked of the API:
+ * One key is one account, and a person can have several - a company and a side
+ * project, a euro business and a dollar one. Each is read on its own by
+ * `read.ts`, carried into one currency and added up by `reading.ts`, and
+ * presented here. What is left in this file is the half a template sees: the
+ * cards, the windows, the charts and the words around them.
  *
- *   balance transactions   what money actually moved, and when
- *   charges today          how many payments, and how many failed
- *   active subscriptions   MRR, how many subscribers, when the next one renews
- *   recent subscriptions   the signup rate, which is what a forecast is
- *   customers              how many there are
- *
- * Balance transactions rather than charges for the money, because they are
- * already in the account's settlement currency: an account taking payments in
- * four currencies has one number for "what we made", and summing charges would
- * add dollars to yen. They also include refunds and disputes as they happen,
- * so the figure is what the account is actually up, not what was billed.
- *
- * Every list is bounded. An unbounded `autoPagingEach` over a busy account is
- * a fetch that takes minutes and a rate limit that takes the panel down, and a
- * screen refreshing every twenty minutes cannot afford either. Where a bound
- * bites, the payload says so rather than quietly reporting a smaller number
- * than the truth.
+ * How many payments a design shows is the design's business, but somebody has
+ * to say how many are carried. A dozen is more than any panel draws at once
+ * and small enough to cost nothing.
  */
+const PURCHASES_CARRIED = 12;
 
-const SECRET_KEY = "secret_key";
-
-/* How far each bounded list is allowed to page. */
-const LIMITS = {
-  /** 30 days of movements. 5000 is a busy shop's month. */
-  balanceTransactions: 5000,
-  /** Today's payments only. */
-  chargesToday: 1000,
-  activeSubscriptions: 2000,
-  /**
-   * Everything the account has ever taken - bounded, because "ever" is not a
-   * quantity anybody can promise to page through on a display's refresh.
-   *
-   * Three thousand movements is thirty requests at worst and one at best, and
-   * covers a self-hosted shop's whole history several times over. Past that the
-   * figure is a floor and says so: the payload carries `all_time_capped`, the
-   * figure carries a "+", and a design that shows it says "at least".
-   *
-   * It overlaps the windows list on purpose. Deriving both from one call would
-   * save a few requests for a small account and quietly truncate the thirty-day
-   * window for a busy one, which is the wrong way round: the windows are what
-   * people run their week on, and the lifetime figure is what they frame.
-   */
-  lifetime: 3000,
-  recentSubscriptions: 1000,
-  customers: 5000,
-  coupons: 500,
-};
-
-/** The window the signup rate is measured over. */
-const FORECAST_DAYS = 30;
-
-/** How much history the day-by-day chart holds. */
-const HISTORY_DAYS = 30;
-
-function client(credentials: Record<string, unknown>): Stripe {
-  const key = String(credentials[SECRET_KEY] ?? "").trim();
-  if (!key) throw new Error("No Stripe secret key is stored for this connection.");
-
-  return new Stripe(key, {
-    // Pinned rather than floating, so an API version rolling forward cannot
-    // silently move a field out from under a template months from now.
-    apiVersion: "2026-08-26.dahlia",
-    maxNetworkRetries: 2,
-    timeout: 20_000,
-    appInfo: { name: "Dither", url: "https://github.com/kayraucklnc/dither" },
-  });
-}
-
-interface Bounded<T> {
-  items: T[];
-  /** True when the bound was reached, so the number below is a floor. */
-  capped: boolean;
-}
-
-async function collect<T>(
-  list: Stripe.ApiListPromise<T>,
-  limit: number,
-): Promise<Bounded<T>> {
-  const items = await list.autoPagingToArray({ limit });
-  return { items, capped: items.length >= limit };
-}
 
 /**
- * Which balance transactions count as money coming in.
+ * Whether a key works, and whose account it is.
  *
- * `charge` and `payment` are income. Refunds, reversals and disputes are
- * already negative amounts, so they simply subtract. Payouts and Stripe's own
- * fees are movements of money we already counted, and adding them would count
- * the same euro twice in opposite directions.
+ * The account's own id comes back too, because with several keys linked it is
+ * what the row is filed under and what a widget's settings name. Checked
+ * before anything is stored: pasting a typo and being told "linked" is how you
+ * end up debugging a blank widget an hour later.
  */
-const INCOME = new Set(["charge", "payment"]);
-const OUTGOING = new Set([
-  "refund",
-  "payment_refund",
-  "payment_failure_refund",
-  "refund_failure",
-  "adjustment",
-  "contribution",
-]);
-
-function entriesFrom(transactions: Stripe.BalanceTransaction[]) {
-  const gross: Entry[] = [];
-  const net: Entry[] = [];
-  let fees = 0;
-
-  for (const transaction of transactions) {
-    const at = new Date(transaction.created * 1000);
-
-    if (INCOME.has(transaction.type)) {
-      gross.push({ at, amount: transaction.amount });
-      net.push({ at, amount: transaction.net });
-      fees += transaction.fee;
-      continue;
-    }
-
-    if (OUTGOING.has(transaction.type)) {
-      net.push({ at, amount: transaction.net });
-      // A refund reduces what we made, so it belongs in gross too - otherwise
-      // "taken today" is a number that only ever goes up.
-      gross.push({ at, amount: transaction.amount });
-    }
-  }
-
-  return { gross, net, fees };
-}
-
-interface SubscriptionSummary {
-  /** Minor units per month, after discounts. */
-  mrr: number;
-  subscribers: number;
-  trialing: number;
-  /** Subscriptions whose price is usage-based, so no MRR can be computed. */
-  unpriced: number;
-  capped: boolean;
-  nextRenewal: { at: Date; amount: number; customer: string } | null;
-}
-
-/**
- * Stripe types `interval` as an open string union, so a value it has never
- * shipped would compile and then normalise to nothing. Anything unrecognised
- * is treated as monthly, which is the only reading that cannot silently make
- * MRR look better than it is.
- */
-function intervalOf(interval: string): "day" | "week" | "month" | "year" {
-  return interval === "day" || interval === "week" || interval === "year" ? interval : "month";
-}
-
-function summariseSubscriptions(
-  subscriptions: Stripe.Subscription[],
-  coupons: Map<string, Stripe.Coupon>,
-  capped: boolean,
-): SubscriptionSummary {
-  let mrr = 0;
-  let unpriced = 0;
-  let trialing = 0;
-  let nextRenewal: SubscriptionSummary["nextRenewal"] = null;
-
-  for (const subscription of subscriptions) {
-    if (subscription.status === "trialing") trialing += 1;
-
-    // A discount arrives as an id, or as an object whose coupon is *also* an
-    // id. Rather than nesting expands four deep - which Stripe caps, and which
-    // would fail the whole fetch if it ever changed - the account's coupons
-    // are listed once and looked up here.
-    const discounts = subscription.discounts
-      .map((discount) =>
-        typeof discount === "string" ? undefined : discount.source?.coupon,
-      )
-      .map((coupon) =>
-        typeof coupon === "string" ? coupons.get(coupon) : (coupon ?? undefined),
-      )
-      .filter((coupon): coupon is Stripe.Coupon => coupon !== undefined)
-      .map((coupon) => ({ percentOff: coupon.percent_off, amountOff: coupon.amount_off }));
-
-    let subscriptionMonthly = 0;
-
-    for (const item of subscription.items.data) {
-      const price = item.price;
-      const recurring = price?.recurring;
-
-      // Tiered and metered prices have no unit amount until an invoice exists,
-      // so they cannot be turned into a monthly figure here. Counted and
-      // reported rather than treated as zero, because a silent zero makes MRR
-      // look like it fell.
-      if (!recurring || price.unit_amount === null || price.billing_scheme !== "per_unit") {
-        unpriced += 1;
-        continue;
-      }
-
-      subscriptionMonthly += monthlyValue({
-        unitAmount: price.unit_amount,
-        quantity: item.quantity ?? 1,
-        interval: intervalOf(recurring.interval),
-        intervalCount: recurring.interval_count,
-      });
-
-      const endsAt = item.current_period_end;
-      if (endsAt && (!nextRenewal || endsAt * 1000 < nextRenewal.at.getTime())) {
-        nextRenewal = {
-          at: new Date(endsAt * 1000),
-          amount: (price.unit_amount ?? 0) * (item.quantity ?? 1),
-          customer:
-            typeof subscription.customer === "string"
-              ? ""
-              : ((subscription.customer as Stripe.Customer)?.name ??
-                (subscription.customer as Stripe.Customer)?.email ??
-                ""),
-        };
-      }
-    }
-
-    // A trial contributes nothing this month, and counting it as MRR is the
-    // single most common way a dashboard flatters itself.
-    if (subscription.status === "active") {
-      mrr += afterDiscounts(subscriptionMonthly, discounts);
-    }
-  }
-
-  return {
-    mrr: Math.round(mrr),
-    subscribers: subscriptions.filter((one) => one.status === "active").length,
-    trialing,
-    unpriced,
-    capped,
-    nextRenewal,
-  };
-}
-
-/* -------------------------------------------------------------------------- */
-
-async function accountCurrency(stripe: Stripe): Promise<{ currency: string; name: string }> {
-  try {
-    // `null` is how stripe-node asks for the account behind the key itself.
-    const account = await stripe.accounts.retrieve(null);
-    return {
-      currency: account.default_currency ?? "usd",
-      name: account.settings?.dashboard?.display_name ?? account.business_profile?.name ?? "",
-    };
-  } catch {
-    // A restricted key may not be allowed to read the account. The balance is
-    // readable by anything that can read charges, and carries the settlement
-    // currency, which is the part that actually matters here.
-    const balance = await stripe.balance.retrieve();
-    return { currency: balance.available[0]?.currency ?? "usd", name: "" };
-  }
-}
-
 async function verify(credentials: Record<string, unknown>): Promise<Verification> {
   try {
-    const stripe = client(credentials);
-    const { currency, name } = await accountCurrency(stripe);
+    const { id, currency, name } = await identify(credentials);
 
     return {
       ok: true,
+      account: id,
       label: name ? `${name} (${currency.toUpperCase()})` : `Stripe (${currency.toUpperCase()})`,
     };
   } catch (error) {
@@ -295,88 +64,53 @@ async function fetchRevenue(
   now: Date,
   context: FetchContext,
 ): Promise<Record<string, unknown>> {
-  const stripe = client(context.credentials);
   const { timezone, locale } = context;
 
+  const chosen = pickAccounts(settings, context.accounts);
+  if (!chosen.length) throw new Error("No Stripe account is linked. Add a key under Connections.");
+
+  /*
+   * Every account at once. They are independent, so the slowest of them is the
+   * whole fetch either way, and reading them one after another would make a
+   * third key three times the wait.
+   */
+  const readings = await Promise.all(
+    chosen.map((account) => readAccount(account, now, timezone)),
+  );
+
+  const currency = chooseCurrency(String(settings.currency ?? ""), readings);
+
+  /*
+   * Rates, but only if a figure has to cross a currency to be shown.
+   *
+   * One account displayed in its own currency is the common case and it costs
+   * nothing extra: nothing is converted, so nothing is fetched. Where a rate
+   * *is* needed and cannot be had, this throws - and the widget draws a fault
+   * rather than a total that added dollars to yen.
+   */
+  let table: Rates | undefined;
+  if (needsRates(readings, currency)) table = await rates(currency, now);
+
+  const rateFor = (code: string) =>
+    code.toLowerCase() === currency ? 1 : table ? rateBetween(table, code, currency) : undefined;
+
+  const merged = mergeReadings(readings.map((one) => convertReading(one, currency, rateFor)));
+
+  const { gross, net, fees } = merged;
+  const allTime = merged.allTime;
+  const since = merged.since ?? now;
+
   const starts = windowStarts(now, timezone);
-  const historyFrom = new Date(now.getTime() - HISTORY_DAYS * DAY);
-  const forecastFrom = new Date(now.getTime() - FORECAST_DAYS * DAY);
   const monthFrom = startOfMonth(now, timezone);
 
-  // The oldest thing any window needs. One list serves every window, which is
-  // the whole reason the windows are cheap to add.
-  const oldest = Math.min(historyFrom.getTime(), monthFrom.getTime());
-
-  const [
-    account,
-    movements,
-    chargesToday,
-    activeSubscriptions,
-    recentSubscriptions,
-    customersToday,
-    customers,
-    coupons,
-    lifetime,
-  ] = await Promise.all([
-    accountCurrency(stripe),
-    collect(
-      stripe.balanceTransactions.list({
-        created: { gte: Math.floor(oldest / 1000) },
-        limit: 100,
-      }),
-      LIMITS.balanceTransactions,
-    ),
-    collect(
-      stripe.charges.list({
-        created: { gte: Math.floor(starts.today.getTime() / 1000) },
-        limit: 100,
-      }),
-      LIMITS.chargesToday,
-    ),
-    collect(
-      stripe.subscriptions.list({
-        status: "all",
-        limit: 100,
-        expand: ["data.discounts", "data.customer"],
-      }),
-      LIMITS.activeSubscriptions,
-    ),
-    collect(
-      stripe.subscriptions.list({
-        status: "all",
-        created: { gte: Math.floor(forecastFrom.getTime() / 1000) },
-        limit: 100,
-      }),
-      LIMITS.recentSubscriptions,
-    ),
-    collect(
-      stripe.customers.list({
-        created: { gte: Math.floor(starts.today.getTime() / 1000) },
-        limit: 100,
-      }),
-      LIMITS.customers,
-    ),
-    collect(stripe.customers.list({ limit: 100 }), LIMITS.customers),
-    collect(stripe.coupons.list({ limit: 100 }), LIMITS.coupons),
-    collect(stripe.balanceTransactions.list({ limit: 100 }), LIMITS.lifetime),
-  ]);
-
-  const currency = account.currency;
-  const { gross, net, fees } = entriesFrom(movements.items);
-
-  /* Everything ever, as far back as the bound reaches. */
-  const ever = entriesFrom(lifetime.items).gross;
-  const allTime = ever.reduce((total, entry) => total + entry.amount, 0);
-  const since = ever.reduce(
-    (earliest, entry) => (entry.at < earliest ? entry.at : earliest),
-    now,
-  );
-
-  const live = activeSubscriptions.items.filter(
-    (one) => one.status === "active" || one.status === "trialing",
-  );
-  const couponsById = new Map(coupons.items.map((coupon) => [coupon.id, coupon]));
-  const subscriptions = summariseSubscriptions(live, couponsById, activeSubscriptions.capped);
+  const subscriptions = {
+    mrr: merged.mrr,
+    subscribers: merged.subscribers,
+    trialing: merged.trialing,
+    unpriced: merged.unpriced,
+    capped: merged.subscriptionsCapped,
+    nextRenewal: merged.nextRenewal,
+  };
 
   const days = bucketByDay(gross, timezone, locale, HISTORY_DAYS, now);
   const week = days.slice(-7);
@@ -394,14 +128,12 @@ async function fetchRevenue(
     all_time: allTime,
   };
 
-  const succeeded = chargesToday.items.filter((charge) => charge.status === "succeeded");
-  const failed = chargesToday.items.filter((charge) => charge.status === "failed");
-  const succeededToday = succeeded.length;
+  const succeededToday = merged.succeededToday;
 
   const sign = (value: number) => `${value >= 0 ? "+" : ""}${value}`;
 
   /**
-   * Every figure in both lengths, because how long a number is drawn is the
+   * A figure in both lengths, because how long a number is drawn is the
    * widget's business and not the account's.
    *
    * This used to read `settings.compact_figures` and format one way, which
@@ -409,14 +141,21 @@ async function fetchRevenue(
    * revenue widgets that disagreed about it asked Stripe twice for the same
    * numbers. Sending both costs a dozen bytes and buys a screenful of widgets
    * one fetch between them.
+   *
+   * `exact` is for a single payment. An aggregate has no pennies worth showing
+   * and rounds, which is why every headline here is whole - but £24.50 is what
+   * somebody paid, and £25 is not, and a tape of individual payments rounded
+   * to the pound is a tape that does not add up to the total above it.
    */
-  const money = (amount: number) => {
-    const major = toMajorUnits(amount, currency);
-    const short = formatMoney(major, currency, locale, { compact: true });
-    const full = formatMoney(major, currency, locale, { compact: false });
+  const moneyIn = (amount: number, code: string, exact = false) => {
+    const major = toMajorUnits(amount, code);
+    const short = formatMoney(major, code, locale, { compact: true });
+    const full = formatMoney(major, code, locale, { compact: false, decimals: exact });
 
     return { ...short, figure_full: full.figure, text_full: full.text };
   };
+
+  const money = (amount: number) => moneyIn(amount, currency);
 
   const windows = Object.fromEntries(
     WINDOWS.map((window) => {
@@ -453,7 +192,7 @@ async function fetchRevenue(
        * dashboard can never be forgiven for.
        */
       const figures = money(amount);
-      const floor = window.key === "all_time" && lifetime.capped;
+      const floor = window.key === "all_time" && merged.lifetimeCapped;
       const atLeast = (value: string) => (floor ? `${value}+` : value);
 
       return [
@@ -477,7 +216,7 @@ async function fetchRevenue(
             window.key === "today"
               ? `${succeededToday} payment${succeededToday === 1 ? "" : "s"}`
               : window.key === "all_time"
-                ? `since ${dateLabel(since, timezone, locale)}${lifetime.capped ? ", and more before that" : ""}`
+                ? `since ${dateLabel(since, timezone, locale)}${merged.lifetimeCapped ? ", and more before that" : ""}`
                 : `against ${money(previous).text_full} ${window.against}`,
           delta: delta === null ? null : `${sign(delta)}% on ${window.against}`,
           // The same figure with nothing after it, for a box too small to hold
@@ -527,11 +266,7 @@ async function fetchRevenue(
 
   /* -- subscribers -------------------------------------------------------- */
 
-  const forecast = forecastNext(
-    recentSubscriptions.items.map((one) => new Date(one.created * 1000)),
-    FORECAST_DAYS,
-    now,
-  );
+  const forecast = forecastNext(merged.signups, FORECAST_DAYS, now);
 
   const renewal = subscriptions.nextRenewal;
 
@@ -561,7 +296,7 @@ async function fetchRevenue(
     last_7d: milestoneOf(whole(minor.last_7d), perDay),
     last_30d: milestoneOf(whole(minor.last_30d), perDay),
     mrr: milestoneOf(Math.round(mrr)),
-    customers: milestoneOf(customers.items.length),
+    customers: milestoneOf(merged.customers),
     subscribers: milestoneOf(subscriptions.subscribers, forecast.perWeek / 7),
   };
 
@@ -611,10 +346,10 @@ async function fetchRevenue(
     customers: {
       key: "customers",
       caption: "Customers",
-      figure: plain(customers.items.length) + (customers.capped ? "+" : ""),
+      figure: plain(merged.customers) + (merged.customersCapped ? "+" : ""),
       symbol: "",
-      detail: customersToday.items.length
-        ? `${plain(customersToday.items.length)} new today`
+      detail: merged.newCustomersToday
+        ? `${plain(merged.newCustomersToday)} new today`
         : "none new today",
       delta: null as string | null,
       delta_short: null as string | null,
@@ -649,12 +384,75 @@ async function fetchRevenue(
     },
   };
 
+  /**
+   * The last few payments, as a person would read them out.
+   *
+   * A name, an amount and a time - which is all "who just paid" is - and a
+   * share of the biggest of them, so a design can give the run of payments a
+   * shape without drawing a chart. The time is a clock time rather than "four
+   * minutes ago": a panel is handed one picture and keeps it for a quarter of
+   * an hour, so a relative phrase is wrong for most of its life, while
+   * "14:32" is still 14:32 tomorrow.
+   */
+  const two = (value: number) => String(value).padStart(2, "0");
+  const todayKey = dayKey(now, timezone);
+  const yesterdayKey = dayKey(new Date(starts.today.getTime() - 1), timezone);
+
+  const shown = merged.purchases.slice(0, PURCHASES_CARRIED);
+  const biggest = shown.reduce((most, one) => Math.max(most, Math.abs(one.minor)), 0);
+  const several = merged.sources.length > 1;
+
+  const purchases = shown.map((purchase) => {
+    const clock = wallClock(purchase.at, timezone);
+    const key = dayKey(purchase.at, timezone);
+    const from = merged.sources.find((one) => one.account === purchase.account);
+
+    return {
+      name: purchase.name,
+      ...moneyIn(purchase.minor, purchase.currency, true),
+      /* Its own currency where no rate could carry it, so a mixed list says so
+         with a symbol rather than by quietly relabelling a figure. */
+      currency: purchase.currency.toUpperCase(),
+      converted: purchase.currency.toLowerCase() === currency,
+      at: purchase.at.toISOString(),
+      at_text: `${two(clock.hour)}:${two(clock.minute)}`,
+      day:
+        key === todayKey
+          ? "Today"
+          : key === yesterdayKey
+            ? "Yesterday"
+            : dayLabel(purchase.at, timezone, locale),
+      today: key === todayKey,
+      /* Nothing when there is only one account: naming it on every line is
+         noise on a panel that has no second account to tell it apart from. */
+      account: several ? (from?.label ?? "") : "",
+      share: biggest ? Math.round((Math.abs(purchase.minor) / biggest) * 100) : 0,
+    };
+  });
+
   return {
     revenue: {
       cards,
       connected: true,
-      account: account.name,
+      purchases,
+      purchase_count: purchases.length,
+      /* Who was added up, and whether that was more than one. */
+      accounts: merged.sources.map((one) => ({
+        account: one.account,
+        label: one.label,
+        currency: one.currency.toUpperCase(),
+      })),
+      account:
+        merged.sources.length === 1
+          ? merged.sources[0].label
+          : `${merged.sources.length} accounts`,
+      account_count: merged.sources.length,
       currency: currency.toUpperCase(),
+      /* Whether these figures were carried across a rate, and how old it is.
+         A converted total is an estimate and a panel showing one should be
+         able to say so. */
+      converted: Boolean(table),
+      rates_at: table ? table.fetchedAt.toISOString() : null,
 
       /* Every window, addressable by name from a template. */
       windows,
@@ -673,15 +471,15 @@ async function fetchRevenue(
       net_30d: toMajorUnits(sumSince(net, new Date(now.getTime() - 30 * DAY)), currency),
       fees_30d: toMajorUnits(fees, currency),
 
-      payments_today: succeeded.length,
-      failed_today: failed.length,
-      new_customers: customersToday.items.length,
+      payments_today: merged.succeededToday,
+      failed_today: merged.failedToday,
+      new_customers: merged.newCustomersToday,
 
-      customers: customers.items.length,
-      customers_capped: customers.capped,
+      customers: merged.customers,
+      customers_capped: merged.customersCapped,
       subscribers: subscriptions.subscribers,
       trialing: subscriptions.trialing,
-      subscribers_capped: subscriptions.capped,
+      subscribers_capped: merged.subscriptionsCapped,
 
       mrr,
       mrr_text: money(subscriptions.mrr).text,
@@ -733,8 +531,8 @@ async function fetchRevenue(
       milestones,
 
       all_time: toMajorUnits(minor.all_time, currency),
-      all_time_capped: lifetime.capped,
-      first_payment_at: ever.length ? since.toISOString() : null,
+      all_time_capped: merged.lifetimeCapped,
+      first_payment_at: merged.since ? merged.since.toISOString() : null,
 
       /* Charts. `week` is the last seven of `days`, so a design can take
          either without a second fetch, and `hours` is today alone - the one
@@ -756,7 +554,7 @@ async function fetchRevenue(
         amount: toMajorUnits(bucket.amount, currency),
       })),
 
-      truncated: movements.capped || activeSubscriptions.capped || customers.capped,
+      truncated: merged.movementsCapped || merged.subscriptionsCapped || merged.customersCapped,
     },
   };
 }
@@ -764,10 +562,17 @@ async function fetchRevenue(
 export const stripe: Provider = {
   id: "stripe",
   label: "Stripe",
-  description: "What you took, what recurs, and who is subscribing.",
+  description: "What you took, what recurs, and who is subscribing. Add a key per account.",
   unlocks: "Revenue",
   icon: "card",
   mocked: false,
+  /*
+   * One key is one account, so holding several is how a person with a company
+   * and a side project sees both - and how a widget adds them up. Each key is
+   * filed under the account it turns out to belong to rather than under this
+   * installation, because that id is what a widget's settings name.
+   */
+  multiple: true,
   help: {
     label: "Stripe API keys",
     url: "https://dashboard.stripe.com/apikeys",
@@ -778,7 +583,8 @@ export const stripe: Provider = {
       label: "Secret key",
       help:
         "A restricted key with read access to Balance, Charges, Customers and Subscriptions " +
-        "is enough, and is what you should use. It is stored on this server and never leaves it.",
+        "is enough, and is what you should use. It is stored on this server and never leaves it. " +
+        "Add one key per Stripe account; a widget can show any of them or the total of all.",
       placeholder: "rk_live_… or sk_live_…",
       secret: true,
     },

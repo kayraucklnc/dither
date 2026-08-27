@@ -113,6 +113,15 @@ export interface Verification {
   ok: boolean;
   /** Whose account it turned out to be, for the connections page. */
   label?: string;
+  /**
+   * The account's own address, when the provider can say what it is.
+   *
+   * What the row is filed under and what a widget's settings name, so it has
+   * to come from the service rather than being made up here. A provider that
+   * holds one account at a time can leave it out and be stored under the
+   * installation's own empty name, as it always was.
+   */
+  account?: string;
   error?: string;
 }
 

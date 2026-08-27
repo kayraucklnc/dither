@@ -56,9 +56,10 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
 - **A connection is an account, linked once, used by every placement.** An
   extension says "I need Google Calendar" and the linked account answers on
   every screen; credentials never live in a widget's settings. Stripe takes a
-  pasted key. Google takes an OAuth client this installation registers itself,
-  then a consent screen - see `docs/google-calendar.md`. Markets and Home are
-  still stand-ins and say so on the card.
+  pasted key, one per account, and a widget shows any of them or the total of
+  all - see `docs/stripe.md`. Google takes an OAuth client this installation
+  registers itself, then a consent screen - see `docs/google-calendar.md`.
+  Markets and Home are still stand-ins and say so on the card.
 - **There is one kind of check: compare a value from a source.** The device is
   a source, the clock is a source, every trigger is a source. A connection
   that reports whether a laptop is awake declares `online: boolean` and the
@@ -138,6 +139,10 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
   question: leave it off one field and a style change is a second fetch. The
   default is off, deliberately - two weather widgets sharing one city is a
   worse failure than one extra fetch.
+- **A list of times a panel keeps for a quarter of an hour shows clock times.**
+  "Four minutes ago" is wrong for most of the life of the picture it is printed
+  on; 14:32 is still 14:32 tomorrow. The recent-payments tape draws the day
+  where it crosses one, or yesterday evening reads as being after this morning.
 - **A clock with no `tick` freezes forever.** The render cache key covers
   everything that can change the picture; a clock fetches nothing, so without a
   declared tick its key never moves and the panel keeps the picture from
@@ -168,6 +173,26 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
 - **Stripe counts in minor units, and a few currencies have none.** Divide a
   yen amount by a hundred and every figure is wrong by two orders of magnitude.
   See `web/src/lib/money.ts`.
+- **Two accounts in two currencies have no total until something says what a
+  euro is worth.** So a figure that has to cross a currency is carried at the
+  day's published rate, and one that cannot be carried is *refused* - adding
+  dollars to yen is the one error a revenue panel must never make quietly.
+  Rates are fetched only when something actually has to cross, so one account
+  shown in its own currency never touches the network for it. See
+  `web/src/lib/exchange.ts`, and `reading.ts` for where several accounts become
+  one.
+- **A key is an account, so it is filed under the account's own id** - not
+  under the installation, the way an OAuth client is. That id is what a
+  widget's settings name and what a second key has to differ from, so it comes
+  from Stripe rather than from us. A key too restricted to read the account
+  gets one derived from the key itself, which is stable for as long as the key
+  is. A row left under the empty name is not an account and nothing lists it,
+  which is what `web/scripts/stripe-accounts.mts` exists to fix.
+- **Which accounts and which currency are questions, not decoration.** Every
+  other revenue setting says `presentation: true` so that six widgets cost one
+  fetch; these two do not, because they change the numbers rather than the
+  drawing of them. A widget showing one account's takings must never be handed
+  the answer that was fetched for all three.
 - **A figure that is drawn can be approximate; one that is printed cannot.** A
   bar an eighth of a pixel out is a bar. A number goes on the wall exactly as
   it arrives, so anything subtracted or divided on the way to a template is a
@@ -272,6 +297,7 @@ npx tsx --env-file=.env.local scripts/sweep.mts   # every design, at the edges o
 npx tsx --env-file=.env.local scripts/qa.mts      # every page, in a browser
 npx tsx --env-file=.env.local scripts/preview-freshness-qa.mts  # a node keeps up with its screen
 npx tsx --env-file=.env.local scripts/watch-this-qa.mts  # "also watch this" says what it did, once
+npx tsx --env-file=.env.local scripts/stripe-accounts.mts  # migrate a key linked before multiple accounts
 npx tsx scripts/shot.mts <url> <out.png> [h]  # screenshot a page, report console errors
 npx tsx scripts/measure.mts                   # element boxes, for layout bugs
 ```
