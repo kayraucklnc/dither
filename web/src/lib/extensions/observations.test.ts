@@ -80,4 +80,41 @@ describe("what a decision is allowed to read", () => {
   it("treats a question nobody has asked the same way", () => {
     expect(reading(undefined)).toEqual({ payload: {}, fetchedAt: null, error: undefined });
   });
+
+  describe("when the source has stopped answering", () => {
+    // `recordFailure` keeps the last payload on purpose: a provider being down
+    // should leave the picture on the panel with a note over it. A decision
+    // has nowhere to put that note, so it has to stop deciding instead - but
+    // not on the first blip, only once the answer is past its own sell-by.
+    const failing = (answeredAt: Date) => ({
+      payload: { calendar: { next: { location: "Sala 4" } } },
+      fetchedAt: answeredAt,
+      attemptedAt: new Date("2026-08-27T09:00:00Z"),
+      error: "Google returned 401 for its calendar list.",
+      standIn: false,
+    });
+
+    /** Ten minutes, which is what the calendar declares. */
+    const staleFrom = new Date("2026-08-27T08:50:00Z");
+
+    it("keeps deciding while the last good answer is still fresh", () => {
+      const answer = failing(new Date("2026-08-27T08:55:00Z"));
+      expect(reading(answer, staleFrom).payload).toEqual(answer.payload);
+    });
+
+    it("stops deciding once that answer is out of date", () => {
+      const answer = failing(new Date("2026-08-27T07:30:00Z"));
+
+      expect(reading(answer, staleFrom)).toEqual({
+        payload: {},
+        fetchedAt: null,
+        error: "Google returned 401 for its calendar list.",
+      });
+    });
+
+    it("leaves a healthy answer alone however old it is", () => {
+      const answer = { ...failing(new Date("2026-08-26T09:00:00Z")), error: undefined };
+      expect(reading(answer, staleFrom).payload).toEqual(answer.payload);
+    });
+  });
 });

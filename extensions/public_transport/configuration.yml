@@ -168,10 +168,16 @@ notices:
       value: 5
 
 facts:
+  # `until`, not just `path`: `minutes_until` is how far off the train was when
+  # the operator was asked, and a board is fetched every five minutes at best.
+  # Read straight, "leaves in 3" survives the train leaving, which is the one
+  # answer a rule about running for it must never give. The instant behind it
+  # is what stays true. See lib/facts.
   - key: next_departure_in
     label: Next departure leaves in
     type: duration
     path: transit.departures.0.minutes_until
+    until: transit.departures.0.at_epoch
     unit: minutes
 
   - key: next_delay

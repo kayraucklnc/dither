@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { compare, describe as sentence, operatorsFor, valueAt } from "./facts";
+import { compare, describe as sentence, operatorsFor, readFact, showFact, valueAt } from "./facts";
 
 describe("reading a fact out of fetched data", () => {
   it("walks a dotted path", () => {
@@ -16,6 +16,77 @@ describe("reading a fact out of fetched data", () => {
   it("answers undefined rather than throwing when the path runs out", () => {
     expect(valueAt({ a: 1 }, "a.b.c")).toBeUndefined();
     expect(valueAt(null, "a")).toBeUndefined();
+  });
+});
+
+describe("a countdown, read at the moment it is asked", () => {
+  const countdown = {
+    key: "next_meeting_in",
+    label: "Next meeting starts in",
+    type: "duration" as const,
+    path: "calendar.next.minutes_until",
+    until: "calendar.next.at_epoch",
+    unit: "minutes",
+  };
+
+  // What one fetch at 09:00 wrote about a meeting at 09:30. The stored
+  // countdown says 30 for as long as the row lives; the instant does not move.
+  const fetched = {
+    calendar: { next: { minutes_until: 30, at_epoch: Date.parse("2026-08-27T09:30:00Z") / 1000 } },
+  };
+
+  it("counts down from the instant rather than reciting the stored number", () => {
+    expect(readFact(countdown, fetched, new Date("2026-08-27T09:00:00Z"))).toBe(30);
+    expect(readFact(countdown, fetched, new Date("2026-08-27T09:20:00Z"))).toBe(10);
+  });
+
+  it("reads as nothing once the moment has gone", () => {
+    // The bug this pins down: a meeting that started an hour ago still read
+    // "in 30 minutes", so "somewhere to be within the hour" stayed true all
+    // day and the panel sat on the leaving-now screen.
+    expect(readFact(countdown, fetched, new Date("2026-08-27T10:30:00Z"))).toBeUndefined();
+    expect(compare(readFact(countdown, fetched, new Date("2026-08-27T10:30:00Z")), "lt", 60)).toBe(
+      false,
+    );
+  });
+
+  it("reads as nothing when there is nothing to count down to", () => {
+    expect(readFact(countdown, { calendar: { next: null } }, new Date())).toBeUndefined();
+    expect(readFact(countdown, {}, new Date())).toBeUndefined();
+  });
+
+  it("takes epoch seconds, epoch milliseconds or anything Date can parse", () => {
+    const at = Date.parse("2026-08-27T09:30:00Z");
+    const now = new Date("2026-08-27T09:00:00Z");
+
+    expect(readFact(countdown, { calendar: { next: { at_epoch: at / 1000 } } }, now)).toBe(30);
+    expect(readFact(countdown, { calendar: { next: { at_epoch: at } } }, now)).toBe(30);
+    expect(
+      readFact(countdown, { calendar: { next: { at_epoch: "2026-08-27T09:30:00Z" } } }, now),
+    ).toBe(30);
+  });
+
+  it("leaves a fact that is not a countdown alone", () => {
+    const plain = { key: "rain", label: "Rain", type: "number" as const, path: "w.rain", unit: "%" };
+    expect(readFact(plain, { w: { rain: 33 } }, new Date())).toBe(33);
+  });
+});
+
+describe("showing a fact", () => {
+  const fact = (type: "boolean" | "weekday" | "number") => ({
+    key: "k",
+    label: "l",
+    type,
+    path: "p",
+    unit: "",
+  });
+
+  it("says what there is, and says so when there is nothing", () => {
+    expect(showFact(fact("boolean"), false)).toBe("no");
+    expect(showFact(fact("boolean"), true)).toBe("yes");
+    expect(showFact(fact("weekday"), 4)).toBe("Thu");
+    expect(showFact(fact("number"), 0)).toBe("0");
+    expect(showFact(fact("number"), undefined)).toBe("—");
   });
 });
 

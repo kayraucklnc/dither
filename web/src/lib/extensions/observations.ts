@@ -131,15 +131,32 @@ export async function answersFor(asked: Question[]): Promise<Map<string, Answer>
  * So a stand-in reads as nothing here. Every operator in `compare` already
  * answers false for missing data, which is exactly the wanted behaviour: a
  * source that has not spoken does not get to decide anything.
+ *
+ * A source that has *stopped* speaking is the same problem arriving later.
+ * `recordFailure` deliberately keeps the last payload, because a provider
+ * being down should leave the picture on the panel with a note over it rather
+ * than blank it - but a decision has nowhere to put that note. It simply shows
+ * the wrong screen, and goes on showing it, because nothing about a stored row
+ * expires on its own. So once a failing answer is older than it was supposed
+ * to be, it stops deciding too: pass `staleFrom`, the instant before which
+ * this extension's answers are out of date.
  */
-export function reading(answer: Answer | undefined): {
+export function reading(
+  answer: Answer | undefined,
+  staleFrom?: Date,
+): {
   payload: Record<string, unknown>;
   fetchedAt: Date | null;
   error?: string;
 } {
-  return answer && !answer.standIn
-    ? { payload: answer.payload, fetchedAt: answer.fetchedAt, error: answer.error }
-    : { payload: {}, fetchedAt: null, error: answer?.error };
+  const nothing = { payload: {}, fetchedAt: null, error: answer?.error };
+
+  if (!answer || answer.standIn) return nothing;
+  if (answer.error && staleFrom && (!answer.fetchedAt || answer.fetchedAt < staleFrom)) {
+    return nothing;
+  }
+
+  return { payload: answer.payload, fetchedAt: answer.fetchedAt, error: answer.error };
 }
 
 export async function record(
