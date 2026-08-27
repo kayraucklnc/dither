@@ -157,6 +157,7 @@ fields:
     optional: true
 
   - keyname: show_window
+    variants: true
     name: Show how long this reading lasts
     field_type: boolean
     default: true
@@ -171,6 +172,7 @@ fields:
     optional: true
 
   - keyname: numerals
+    variants: true
     name: Numerals
     field_type: select
     default: quarters

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/cn";
 
@@ -20,6 +20,7 @@ export function ScreenPreview({
   className,
   fit = "contain",
   crisp = false,
+  defer = false,
 }: {
   src: string;
   width: number;
@@ -34,11 +35,39 @@ export function ScreenPreview({
    * image reads as the greys the panel actually produces.
    */
   crisp?: boolean;
+  /**
+   * Wait until the card is near the viewport before asking for the picture.
+   *
+   * A render is a page in a headless browser, so a catalogue that asks for
+   * twenty at once is twenty pages competing and twenty shimmering cards. The
+   * ones you are looking at should not be behind the ones you are not - and
+   * scrolled to, they are already drawn, because the observer reaches four
+   * hundred pixels past the edge of the screen.
+   *
+   * Off by default: the cost is only worth paying where there are many.
+   */
+  defer?: boolean;
 }) {
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
   const [reason, setReason] = useState<string>();
+  const [wanted, setWanted] = useState(!defer);
+  const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (wanted || !box.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => entries.some((entry) => entry.isIntersecting) && setWanted(true),
+      { rootMargin: "400px" },
+    );
+
+    observer.observe(box.current);
+    return () => observer.disconnect();
+  }, [wanted]);
+
+  useEffect(() => {
+    if (!wanted) return;
+
     setState("loading");
     setReason(undefined);
 
@@ -66,10 +95,11 @@ export function ScreenPreview({
       image.onload = null;
       image.onerror = null;
     };
-  }, [src]);
+  }, [src, wanted]);
 
   return (
     <div
+      ref={box}
       className={cn("relative overflow-hidden rounded-md bg-white", className)}
       style={{ aspectRatio: `${width} / ${height}` }}
     >

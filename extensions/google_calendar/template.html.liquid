@@ -17,6 +17,18 @@
 {%- assign hh = "now" | date: "%H" | times: 60 -%}
 {%- assign now_mins = "now" | date: "%M" | plus: hh -%}
 
+{%- comment %} How many are actually left, counted against the clock at the
+  moment of drawing rather than taken from the payload. `today.remaining` was
+  true when Google was last asked, which is up to ten minutes ago, and this
+  design decides what to *say* from the live clock - so the two disagree for
+  the whole of that window and the panel prints "6 left" beside "Nothing left
+  today". Same reason the countdowns are worked out here. {% endcomment -%}
+{%- assign left = 0 -%}
+{%- for event in day.events -%}
+  {%- if event.end_minutes > now_mins %}{% assign left = left | plus: 1 %}{% endif -%}
+{%- endfor -%}
+{%- assign gone = day.today.total | minus: left | at_least: 0 -%}
+
 {%- assign running = false -%}
 {%- assign coming = false -%}
 {%- for event in day.upcoming -%}
@@ -26,6 +38,29 @@
     {%- assign running = event -%}
   {%- endif -%}
 {%- endfor -%}
+
+{%- comment %} Out of day, but not out of calendar.
+  The board has a whole panel and used to spend the best half of it on the
+  words "Nothing left today" - correct, and the least useful thing on the wall
+  from six o'clock until midnight. `next_any` is the next thing anywhere in the
+  window that was actually fetched, so the headline stays a headline and the
+  fact that today is finished moves into the chip above it. A widget asked only
+  about today has nothing to reach for, and falls through to the empty branch
+  below rather than inventing a tomorrow it never looked at. {% endcomment -%}
+{%- assign later = false -%}
+{%- if running == false and coming == false and day.next_any and day.next_any.start_minutes > now_mins -%}
+  {%- comment %} Only when it is genuinely still ahead. A payload is up to ten
+    minutes old, and `next_any` was the next thing when Google was last asked -
+    so it has to be checked against the clock at the moment of drawing, exactly
+    as the countdown is. Left unchecked, a meeting that started while nobody
+    was looking is drawn as the next one with "now" beside it. {% endcomment -%}
+  {%- assign coming = day.next_any -%}
+  {%- comment %} "Nothing left today" only when it is genuinely not today: a
+    horizon shorter than the day leaves a late meeting out of `upcoming` while
+    it is still ahead of you, and that wants the ordinary countdown rather than
+    an announcement that today is over. {% endcomment -%}
+  {%- if day.next_any_day != "Today" %}{% assign later = true %}{% endif -%}
+{%- endif -%}
 
 {%- assign open = extension.values.day_start | default: "08:00" | minutes_of -%}
 {%- assign close = extension.values.day_end | default: "20:00" | minutes_of -%}
@@ -61,8 +96,12 @@
 <div class="screen">
   <div class="title-bar" style="padding: 16px 24px 10px">
     <div class="title">{{ extension.values.heading | default: day.today.date }}</div>
+    {%- comment %} "0 left" is arithmetic rather than news. {% endcomment -%}
     <div class="chip self-start">
-      <span class="i i-calendar"></span>{{ day.today.remaining }} left
+      <span class="i i-calendar"></span>
+      {% if left > 0 %}{{ left }} left
+      {% elsif day.today.total > 0 %}all done
+      {% else %}clear{% endif %}
     </div>
   </div>
 
@@ -91,13 +130,27 @@
         {% elsif coming %}
           {%- assign until = coming.start_minutes | minus: now_mins -%}
           <div class="stack stack--tight" style="gap: 6px">
-            <span class="chip self-start">
-              <span class="i i-clock"></span>{{ until | in_words }}{% if coming.start_minutes >= 1440 %} &middot; tomorrow{% endif %}
-            </span>
+            {% if later %}
+              <span class="chip self-start">
+                <span class="i i-calendar-check"></span>Nothing left today
+              </span>
+            {% else %}
+              <span class="chip self-start">
+                <span class="i i-clock"></span>{{ until | in_words }}{% if coming.start_minutes >= 1440 %} &middot; tomorrow{% endif %}
+              </span>
+            {% endif %}
             <p class="t-bold clamp-2" style="font-size: {{ box_w | divided_by: 19 | at_most: 40 | at_least: 20 }}px; line-height: 1.05">
               {{ coming.title }}
             </p>
-            <p class="t-md t-mono t-bold">{{ coming.start }} &ndash; {{ coming.end }}</p>
+            {%- comment %} One line, always. "TOMORROW 28 AUG · 08:30 - 09:15"
+              is too long for eight columns, and wrapped it pushed the whole
+              stack down through the figures below it - which reads as a broken
+              screen rather than as a long line. The date is the part worth
+              dropping: the day name carries the meaning and the date only
+              confirms it. {% endcomment -%}
+            <p class="t-md t-mono t-bold truncate">
+              {% if later %}<span class="t-upper">{{ day.next_any_day }}</span> &middot; {% endif %}{{ coming.start }} &ndash; {{ coming.end }}
+            </p>
             {% if extension.values.show_location != false and coming.location != blank %}
               <p class="with-icon t-sm">
                 <span class="i i-{% if coming.remote %}video{% else %}pin{% endif %} i-sm"></span>
@@ -106,16 +159,27 @@
             {% endif %}
           </div>
         {% else %}
+          {%- comment %} Nothing ahead anywhere in what was asked for. The
+            column beside this is already drawing the day that has gone, so
+            what belongs here is the plain news and how the day actually went -
+            never "tomorrow is clear too", which a widget asked about today
+            alone has no way of knowing and said every evening regardless. {% endcomment -%}
           <div class="stack stack--tight" style="gap: 6px">
-            <span class="i i-calendar-check i-lg"></span>
-            <p class="t-xl t-bold">
-              {% if calendar.window_empty %}{{ calendar.empty_label | default: "Nothing left today" }}{% else %}Nothing left today{% endif %}
+            {%- comment %} Sized off the box rather than fixed at t-xl: at eight
+              rows the label wraps to two lines of 36 pixels, and the column is
+              a flex stack - the figures underneath do not move down out of its
+              way, they are simply drawn through. {% endcomment -%}
+            {% if box_h > 340 %}<span class="i i-calendar-check i-lg"></span>{% endif %}
+            <p class="t-bold clamp-2" style="font-size: {{ box_w | divided_by: 22 | at_least: 18 | at_most: 36 }}px; line-height: 1.1">
+              {{ day.empty_label | default: "Nothing left today" }}
             </p>
-            <p class="t-sm">
-              {% if day.tomorrow.count > 0 %}
-                Tomorrow starts at {{ day.tomorrow.first.start }} with {{ day.tomorrow.first.title }}.
+            <p class="t-sm clamp-2">
+              {% if day.today.total > 0 %}
+                {{ day.today.total }} of them, {{ day.today.busy_text }} in all{% if day.today.last_end != blank %}, finished at {{ day.today.last_end }}{% endif %}.
+              {% elsif day.all_day.size > 0 %}
+                Nothing timed. {% for entry in day.all_day %}{{ entry.title }}{% unless forloop.last %}, {% endunless %}{% endfor %}.
               {% else %}
-                Tomorrow is clear too.
+                Nothing on it at all.
               {% endif %}
             </p>
           </div>
@@ -124,26 +188,31 @@
         {%- comment %} The three figures that say how today has actually gone -
           and where the longest hole in what is left of it is, which is the
           thing anybody looking at a calendar is really after. {% endcomment -%}
-        <div class="facts fit" style="align-content: end">
+        <div class="facts fit" style="align-content: end; overflow: hidden">
           <div class="row">
             <span class="name"><span class="i i-hourglass i-xs"></span>Booked today</span>
             <span class="figure">{{ day.today.busy_text }}</span>
           </div>
           <div class="row">
             <span class="name"><span class="i i-calendar i-xs"></span>Meetings</span>
-            <span class="figure">{{ day.today.total }}{% if day.today.done > 0 %}, {{ day.today.done }} done{% endif %}</span>
+            <span class="figure">{{ day.today.total }}{% if gone > 0 %}, {{ gone }} done{% endif %}</span>
           </div>
           <div class="row">
             <span class="name"><span class="i i-check i-xs"></span>Free</span>
             <span class="figure">{{ day.today.free_text }}</span>
           </div>
-          {% if day.longest_gap and extension.values.show_gaps != false %}
+          {%- comment %} The last two rows are the first things to go. At eight
+            rows the column is about ten pixels over its budget, and a grid with
+            `align-content: end` that has been shrunk does not clip - it draws
+            upwards, through the headline above it. {% endcomment -%}
+          {% if box_h > 340 and day.longest_gap and extension.values.show_gaps != false %}
             <div class="row">
               <span class="name"><span class="i i-dot i-xs"></span>Longest gap</span>
               <span class="figure">{{ day.longest_gap.from }}&ndash;{{ day.longest_gap.to }}</span>
             </div>
           {% endif %}
-          {% if day.today.conflicts > 0 %}
+          {% if box_h <= 340 %}
+          {% elsif day.today.conflicts > 0 %}
             <div class="row">
               <span class="name"><span class="i i-alert i-xs"></span>Double booked</span>
               <span class="figure">{{ day.today.conflicts }}</span>

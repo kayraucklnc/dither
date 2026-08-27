@@ -95,6 +95,29 @@ export const fieldSchema = z.object({
    * worse failure than one extra fetch.
    */
   presentation: z.boolean().default(false),
+  /**
+   * True when the *values* of this field are looks in their own right, so the
+   * catalogue draws one preview of every one of them.
+   *
+   * A design is a template, and the extension page has always shown every
+   * design. But a design is not the whole of what a widget looks like: a dial
+   * with roman numerals and a dial with none are the same design and two
+   * completely different pictures, and until now the only way to see the
+   * second was to place a widget and change a setting. Marking the field says
+   * "this is a fork in the drawing, not a preference", and the page shows the
+   * fork.
+   *
+   * It is not the same as `presentation`, and neither implies the other. A
+   * clock fetches nothing, so nothing it takes is presentational in the sense
+   * that matters there - and its numerals are still the most visible choice it
+   * offers. Conversely most presentational fields are a heading or a toggle
+   * that moves one line, and a page of near-identical thumbnails is worse than
+   * none.
+   *
+   * Only `select` and `boolean` can carry it: a field is a fork when its
+   * answers can be listed, and "any string" cannot.
+   */
+  variants: z.boolean().default(false),
   min: z.number().optional(),
   max: z.number().optional(),
 });

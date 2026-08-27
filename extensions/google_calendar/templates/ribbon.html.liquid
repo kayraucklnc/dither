@@ -24,6 +24,18 @@
 {%- assign hh = "now" | date: "%H" | times: 60 -%}
 {%- assign now_mins = "now" | date: "%M" | plus: hh -%}
 
+{%- comment %} How many are actually left, counted against the clock at the
+  moment of drawing rather than taken from the payload. `today.remaining` was
+  true when Google was last asked, which is up to ten minutes ago, and this
+  design decides what to *say* from the live clock - so the two disagree for
+  the whole of that window and the panel prints "6 left" beside "Nothing left
+  today". Same reason the countdowns are worked out here. {% endcomment -%}
+{%- assign left = 0 -%}
+{%- for event in day.events -%}
+  {%- if event.end_minutes > now_mins %}{% assign left = left | plus: 1 %}{% endif -%}
+{%- endfor -%}
+{%- assign gone = day.today.total | minus: left | at_least: 0 -%}
+
 {%- assign box_w = shape.width | at_least: 160 -%}
 {%- assign box_h = shape.height | at_least: 240 -%}
 {%- assign pad = box_w | divided_by: 24 | at_least: 8 | at_most: 18 -%}
@@ -46,9 +58,18 @@
 {%- if now_mins > close %}{% assign close = now_mins | plus: 59 | divided_by: 60 | times: 60 %}{% endif -%}
 {%- assign span = close | minus: open | at_least: 120 -%}
 
+{%- comment %} Whether the day is behind you. The ribbon still draws it - what
+  is over is the point of a day view at six o'clock - but a track with a rule
+  across the bottom of it and nothing else to say is the design at its most
+  useless, so the space under it is spent on the next thing there is. {% endcomment -%}
+{%- assign spent = false -%}
+{%- if left == 0 %}{% assign spent = true %}{% endif -%}
+
 {%- assign header = 44 -%}
 {%- if day.all_day.size > 0 and box_h > 260 %}{% assign header = header | plus: 26 %}{% endif -%}
 {%- if notices.size > 0 %}{% assign header = header | plus: 34 %}{% endif -%}
+{%- assign footer = false -%}
+{%- if spent and box_h > 210 %}{% assign footer = true %}{% assign header = header | plus: 40 %}{% endif -%}
 {%- assign track_h = box_h | minus: header | minus: pad | minus: pad | at_least: 120 -%}
 
 {%- comment %} How often the hours are labelled, so they never collide: a
@@ -179,8 +200,44 @@
                     border-top: 5px solid transparent; border-bottom: 5px solid transparent;
                     border-left: 7px solid var(--ink)"></div>
       {% endif %}
+
+      {%- comment %} Nothing was ever on this day, so the track is an empty
+        grid - which reads as a widget that failed rather than as a free day.
+        Said plainly, over the hours it is talking about. {% endcomment -%}
+      {% if day.today.total == 0 %}
+        <div style="position: absolute; top: 50%; left: {{ gutter | plus: 6 }}px; right: 6px;
+                    transform: translateY(-50%); background: var(--paper);
+                    border: 2px solid var(--ink); padding: 10px 8px; text-align: center">
+          {%- comment %} About this day, not about the window: with Friday in
+            the payload, "Nothing this week" over an empty Thursday is simply
+            untrue. {% endcomment -%}
+          <p class="t-xs t-bold">{% if day.next_any %}Nothing today{% else %}{{ day.empty_label | default: "Nothing today" }}{% endif %}</p>
+          {% if day.all_day.size > 0 %}
+            <p class="t-xs truncate" style="margin-top: 3px">
+              {% for entry in day.all_day %}{{ entry.title }}{% unless forloop.last %} &middot; {% endunless %}{% endfor %}
+            </p>
+          {% endif %}
+        </div>
+      {% endif %}
     </div>
   </div>
+
+  {% if footer %}
+    <div class="footer-bar" style="padding: 7px {{ pad }}px {{ pad }}px; font-size: 13px">
+      {% if day.next_any and day.next_any.start_minutes > now_mins %}
+        <span class="t-bold truncate">
+          {{ day.next_any_day }} {{ day.next_any.start }} &middot; {{ day.next_any.title }}
+        </span>
+        {% if box_w > 260 %}<span class="t-xs" style="flex: none; white-space: nowrap">next</span>{% endif %}
+      {% else %}
+        <span class="t-bold truncate">{{ day.empty_label | default: "Nothing left today" }}</span>
+
+        <span class="t-xs" style="flex: none; white-space: nowrap">
+          {% if gone > 0 %}{{ gone }} done, {{ day.today.busy_text }}{% endif %}
+        </span>
+      {% endif %}
+    </div>
+  {% endif %}
 
   {% if notices.size > 0 %}
     <div class="notice-strip" style="padding: 6px {{ pad }}px">

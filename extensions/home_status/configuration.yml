@@ -52,6 +52,7 @@ fields:
     optional: true
 
   - keyname: style
+    variants: true
     name: Style
     field_type: select
     default: house

@@ -198,6 +198,46 @@ describe("dayShape", () => {
     expect(card.minutes_until).toBe(225);
   });
 
+  it("names the next thing anywhere in the window, and which day it is on", () => {
+    const answer = shape([
+      meeting(on(8), on(8, 30), { title: "Already over" }),
+      meeting(new Date(on(9).getTime() + 2 * 24 * 3600_000), new Date(on(10).getTime() + 2 * 24 * 3600_000), {
+        title: "Saturday",
+      }),
+      meeting(new Date(on(9).getTime() + 24 * 3600_000), new Date(on(10).getTime() + 24 * 3600_000), {
+        title: "Dentist",
+      }),
+    ]) as Record<string, unknown>;
+
+    expect((answer.next_any as { title: string }).title).toBe("Dentist");
+    expect(answer.next_any_day).toBe("Tomorrow");
+    expect(answer.next).toBe(null);
+  });
+
+  it("says there is no next thing rather than reaching past what was fetched", () => {
+    const answer = shape([meeting(on(8), on(8, 30))]) as Record<string, unknown>;
+
+    expect(answer.next_any).toBe(null);
+    expect(answer.next_any_day).toBe("");
+  });
+
+  it("still calls something later today today, so an empty evening is not misdated", () => {
+    const answer = shape([meeting(on(16), on(17), { title: "Late" })]) as Record<string, unknown>;
+
+    expect((answer.next_any as { title: string }).title).toBe("Late");
+    expect(answer.next_any_day).toBe("Today");
+  });
+
+  it("draws only the days it was asked for, so nothing claims a week it never saw", () => {
+    const answer = dayShape([], on(10, 15), {
+      timezone: ZONE,
+      locale: "en-GB",
+      daysAhead: 1,
+    }) as Record<string, unknown>;
+
+    expect((answer.days as unknown[]).length).toBe(1);
+  });
+
   it("keeps tomorrow separate from today", () => {
     const answer = shape([
       meeting(on(14), on(15), { title: "Today" }),
