@@ -25,7 +25,8 @@ cd web && npx tsx scripts/new-extension.mts tide "Tide times"
 
 An extension can be **shown**, **decided on**, or both.
 
-- It is **shown** if it has templates. Each one draws a shape.
+- It is **shown** if it has templates. Each one is a *design*, and covers a
+  range of sizes.
 - It is **decided on** if it declares `facts`. Each fact becomes something a
   device can branch on, and something a notice can fire from.
 
@@ -175,31 +176,87 @@ Plain Liquid. The context is:
 | `extension.values.<field>` | this widget's settings |
 | `source_1`, `source_2`, … | what each exchange answered |
 | `notices` | things another extension wants said here |
-| `shape` | the box you are drawing into: `.id`, `.columns`, `.rows` (out of six) |
+| `shape` | the box you are drawing into — see below |
 | `dither` | `.locale`, `.timezone`, `.offset_hours` from Settings |
 
-### Shapes
+### Sizes and designs
 
-A template is named for the shape it draws. `template.html.liquid` is the
-full screen; everything else lives in `templates/<shape>.html.liquid`:
+A screen is a **12×12 grid**, and a widget can be any rectangle on it. Twelve
+is the smallest number that divides evenly by two, three, four and six, so
+halves, thirds, quarters and sixths all land on whole tracks — and one cell is
+67×40 pixels on an 800×480 panel, fine enough to nudge a widget rather than
+jump it between fixed sizes.
 
-`full` · `half_width` · `half_height` · `quarter` · `third_width` ·
-`two_thirds_width` · `third_height` · `two_thirds_height`
+A **design** is one template plus the range of sizes it is willing to draw. It
+is not a size: several designs can cover the same size, and then the widget
+picks between them — that is what "style" means in the dashboard.
 
-You do not need all eight. A design covers its **family** — wide bands
-(`third_height`, `half_height`, `two_thirds_height`), tall columns
-(`third_width`, `half_width`, `two_thirds_width`), `quarter`, and `full` —
-so four templates usually cover everything. An exact template always wins over
-a family match, and `shape.rows` lets one design fill a taller box:
+Declare them:
 
-```liquid
-{% if shape.rows > 2 %}
-  ...the extra detail that only fits in a taller band...
-{% endif %}
+```yaml
+designs:
+  - template: figure          # templates/figure.html.liquid
+    label: Figure
+    hint: One number, as large as the box allows.
+    columns: [2, 12]          # smallest, largest — out of twelve
+    rows: [2, 12]
+    nominal: [4, 4]           # the size it was really drawn for
 ```
 
-Cross-family is *refused*, not scaled: a full-screen design will never be
-crammed into a corner.
+`nominal` decides which design wins when more than one covers a size: the least
+stretched one, measured as a scale-free distance from its nominal. It is also
+the size the catalogue previews it at.
+
+**You usually do not need to declare anything.** A template named after one of
+the eight original shapes inherits that shape's range:
+
+| template | draws sizes |
+|---|---|
+| `full` (the root `template.html.liquid`) | 9–12 × 9–12 |
+| `two_thirds_height` | 8–12 × 6–10 |
+| `half_height` | 8–12 × 4–8 |
+| `third_height` | 8–12 × 2–5 |
+| `two_thirds_width` | 6–10 × 8–12 |
+| `half_width` | 4–8 × 8–12 |
+| `third_width` | 2–5 × 8–12 |
+| `quarter` | 4–8 × 3–8 |
+
+So four templates — full, a wide band, a tall column and a box — still cover
+most of the grid, and every extension written before designs existed kept
+working unedited.
+
+A size no design covers is **refused**, not scaled. A full-screen design is
+never crammed into a corner, and the editor will not let you draw one there.
+
+### Drawing at more than one size
+
+A design covers a *range*, so it has to cope with every size in it. `shape`
+tells it which one it got:
+
+| | |
+|---|---|
+| `shape.columns`, `shape.rows` | out of twelve |
+| `shape.width`, `shape.height` | the box in real pixels |
+| `shape.wide`, `shape.tall` | at least two thirds of that axis |
+| `shape.band` | wide and shallow |
+| `shape.roomy` | at least 40% of the panel's area |
+| `shape.id`, `shape.label` | which design is drawing |
+
+Use the pixels to size type that has to fit, rather than picking a font size
+and hoping. `at_least` and `at_most` clamp:
+
+```liquid
+{%- assign chars = figure | size | at_least: 3 -%}
+{%- assign by_width = shape.width | minus: 40 | times: 100 | divided_by: chars | divided_by: 56 -%}
+{%- assign by_height = shape.height | times: 40 | divided_by: 100 -%}
+<p style="font-size: {{ by_width | at_most: by_height | at_most: 120 | at_least: 15 }}px">…</p>
+```
+
+Fit to the *shorter* of the two: a wide shallow box runs out of height first
+and a narrow tall one runs out of width, and hard-coding either is how type
+ends up clipped. Anything under a heading should be one line and `.truncate` —
+a caption that wraps pushes the figure out of a box with `overflow: hidden`,
+and it reads as a rendering bug rather than as too many words.
 
 ### Drawing for 1 bit
 
@@ -221,7 +278,7 @@ Classes worth knowing — see `web/src/lib/render/screen-framework.css`:
 Filters that save a hundred lines of `{% case %}`:
 
 `weather_icon` · `weather_label` · `weather_short` · `compass` · `in_words` ·
-`clock_of` · `hour_of` · `as_percent` · `at_least`
+`clock_of` · `hour_of` · `as_percent` · `at_least` · `at_most`
 
 Two traps that have already cost time: a bar's fill must be a **block**
 element for a percentage height to apply, and a chart drawn from zero when
@@ -232,9 +289,31 @@ the low and the high instead.
 
 ```bash
 cd web
-npx tsx --env-file=.env.local scripts/sweep.mts   # renders every extension at every shape
+npx tsx --env-file=.env.local scripts/sweep.mts   # renders every design at the edges of its range
 ```
+
+It renders each design at the smallest size it claims, the largest, both
+lopsided corners of its range and its nominal — the sizes most likely to break
+type that fits itself to its box.
 
 It flags anything that throws or comes back near-blank. Images land in
 `/tmp/dither-sweep` — look at them. Every layout bug in this codebase was
 found by looking.
+
+### Settings that follow the settings above them
+
+A field can hide itself unless another answer has a particular value, so a
+form asks one question at a time rather than all of them at once:
+
+```yaml
+  - keyname: window
+    name: Over what period
+    field_type: select
+    options: [today, last_7d, last_30d]
+    visible_when:
+      field: metric            # another keyname, or `design` for the style
+      any_of: [taken]
+```
+
+`field: design` is how a design brings its own settings — a chart style can ask
+what goes behind the number without every other style asking too.

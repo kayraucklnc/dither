@@ -32,7 +32,7 @@ export const models = pgTable("models", {
 });
 
 /**
- * A screen is a design: a 6x6 grid holding widgets. It is not tied to a
+ * A screen is a design: a 12x12 grid holding widgets. It is not tied to a
  * device, so the same screen can be shown by two panels of the same size.
  */
 export const screens = pgTable("screens", {
@@ -78,11 +78,22 @@ export const widgets = pgTable("widgets", {
    */
   hostsNotices: boolean("hosts_notices").notNull().default(false),
 
-  /** Placement on the 6x6 grid. The shape is derived from the span. */
+  /** Placement on the 12x12 grid. Any span its extension has a design for. */
   column: integer("column").notNull(),
   row: integer("row").notNull(),
   columnSpan: integer("column_span").notNull(),
   rowSpan: integer("row_span").notNull(),
+  /**
+   * Which of the extension's designs draws it - the "style".
+   *
+   * Size no longer picks the design, because several designs can cover one
+   * size: revenue at half width is one enormous figure, or a figure with the
+   * month behind it, or a ledger of every window. Empty means "whichever fits
+   * best", which is what every widget gets until someone chooses. A style that
+   * cannot draw the current size is ignored rather than cleared, so dragging a
+   * widget through a size does not silently forget the choice.
+   */
+  design: text("design").notNull().default(""),
 
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

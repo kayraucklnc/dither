@@ -31,7 +31,7 @@
           <span class="figure">{{ today.precipitation_probability_max[0] }}%</span>
         </div>
         {% comment %} Only room for these in a band taller than two rows. {% endcomment %}
-        {% if shape.rows > 2 %}
+        {% if shape.rows > 4 %}
           <div class="row">
             <span class="name"><span class="i i-wind i-xs"></span>Wind</span>
             <span class="figure">
@@ -48,7 +48,7 @@
       </div>
     </div>
 
-    {% if shape.rows > 3 and source_1.hourly %}
+    {% if shape.rows > 6 and source_1.hourly %}
       <div style="border-top: var(--rule) solid var(--ink); flex: 1; min-height: 0; padding: 10px var(--pad) 8px">
         <div class="bars">
           {% for at in source_1.hourly.time limit: 12 %}
@@ -87,7 +87,7 @@
         {% endif %}
       {% endfor %}
 
-      {% if shape.columns >= 6 and notices[0].text != blank %}
+      {% if shape.wide and notices[0].text != blank %}
         <span class="notice-said">{{ notices[0].text }}</span>
       {% endif %}
     </div>

@@ -1,0 +1,155 @@
+{% comment %}
+  Strip — the headline and three supporting figures, side by side.
+
+  For a shallow full-width band, where stacking anything is impossible and one
+  huge number would waste four fifths of the width. The chosen metric takes the
+  first and largest slot; the other three fill in around it and drop off as the
+  band narrows, rather than shrinking until nothing is readable.
+{% endcomment %}
+
+{%- assign money = revenue -%}
+{%- assign metric = extension.values.metric | default: "taken" -%}
+{%- assign period = extension.values.window | default: "today" -%}
+{%- if metric == "taken" -%}
+  {%- assign card = money.windows[period] -%}
+{%- elsif metric == "next_subscriber" and extension.values.basis == "renewal" -%}
+  {%- assign card = money.cards.next_renewal -%}
+{%- else -%}
+  {%- assign card = money.cards[metric] -%}
+{%- endif -%}
+
+{%- assign box_w = shape.width | at_least: 200 -%}
+{%- assign box_h = shape.height | at_least: 60 -%}
+{%- assign pad = box_h | divided_by: 6 | at_least: 8 | at_most: 18 -%}
+
+{%- comment %} How many figures the width can carry without any of them
+  truncating. Four across 800px is 200px each, which holds "€96.2k" and a
+  caption; below 520px the supporting figures start being dropped. {% endcomment -%}
+{%- assign slots = box_w | divided_by: 190 | at_least: 1 | at_most: 4 -%}
+
+<div class="screen">
+  {%- unless card -%}
+    <div class="content layout layout--row layout--center" style="gap: 10px; padding: {{ pad }}px">
+      <span class="i i-card i-lg"></span>
+      <p class="t-sm t-bold">Not connected — link Stripe under Connections.</p>
+    </div>
+  {%- else -%}
+    {%- assign shown = card.symbol | append: card.figure -%}
+
+    {%- comment %} Every figure here is one line in a slot narrower than the
+      band, so height alone cannot decide the type size: "in 13 hours" is
+      eleven characters where "£452" is four, and sizing both by the band's
+      height wraps the first onto a second line the band does not have.
+
+      A long headline buys itself room by dropping a supporting figure rather
+      than by shrinking to fit beside all of them. Three readable figures beat
+      four where one of them is set in eight-point type.
+      {% endcomment -%}
+    {%- assign chars = shown | size | at_least: 3 -%}
+    {%- if chars > 8 %}{% assign slots = slots | minus: 1 | at_least: 2 %}{% endif -%}
+    {%- assign spare = slots | minus: 1 -%}
+
+    {%- comment %} What the figures actually get: the band, less its own
+      padding, less each divider's gap, rule and indent. Leaving the dividers
+      out of this is what made the headline truncate - the arithmetic said it
+      fit and the layout disagreed by eighty pixels. {% endcomment -%}
+    {%- assign gap = pad | times: 3 | divided_by: 2 -%}
+    {%- assign gaps = spare | times: gap -%}
+    {%- assign rules = spare | times: 20 -%}
+    {%- assign usable_w = box_w | minus: pad | minus: pad | minus: pad | minus: pad
+                                | minus: gaps | minus: rules | at_least: 120 -%}
+
+    {%- comment %} The headline slot is 1.3 of (1.3 + one per supporting figure). {% endcomment -%}
+    {%- assign share = spare | times: 10 | plus: 13 -%}
+    {%- assign head_w = usable_w | times: 13 | divided_by: share -%}
+
+    {%- assign figure_size = box_h | times: 40 | divided_by: 100 | at_most: 56 | at_least: 18 -%}
+    {%- assign by_width = head_w | times: 100 | divided_by: chars | divided_by: 58 -%}
+    {%- assign figure_size = figure_size | at_most: by_width | at_least: 15 -%}
+    {%- assign small_size = figure_size | times: 75 | divided_by: 100 | at_least: 14 -%}
+    {%- assign caption_size = box_h | divided_by: 9 | at_least: 9 | at_most: 13 -%}
+
+    <div class="content layout layout--row divide-x" style="padding: {{ pad }}px {{ pad | times: 2 }}px; gap: {{ pad | times: 1.5 | round }}px; align-items: center">
+      <div class="metric" style="flex: 1.3 1 0">
+        <span class="caption truncate" style="font-size: {{ caption_size }}px">
+          {{ extension.values.heading | default: card.caption }}
+        </span>
+        <span class="value truncate" style="font-size: {{ figure_size }}px">{{ shown }}</span>
+        {%- comment %} A band is one line tall by definition, so the delta is
+          the short form unless the band is unusually deep. {% endcomment -%}
+        {%- assign delta = card.delta_short -%}
+        {%- if box_h > 150 %}{% assign delta = card.delta %}{% endif -%}
+        {% if extension.values.compare != false and delta != blank and box_h > 100 %}
+          <span class="delta truncate" style="font-size: {{ caption_size | plus: 2 }}px">
+            <span class="i i-trending-{% if card.rising %}up{% else %}down{% endif %} i-xs"></span>
+            {{ delta }}
+          </span>
+        {% endif %}
+      </div>
+
+      {%- comment %} The supporting figures, in the order they are worth the
+        room, and never repeating whatever the headline already is. {% endcomment -%}
+      {%- assign drawn = 0 -%}
+
+      {% unless metric == "mrr" %}{% if drawn < spare %}
+        {%- assign drawn = drawn | plus: 1 -%}
+        <div class="metric fit">
+          <span class="caption" style="font-size: {{ caption_size }}px">MRR</span>
+          <span class="value truncate" style="font-size: {{ small_size }}px">{{ money.mrr_text }}</span>
+        </div>
+      {% endif %}{% endunless %}
+
+      {% unless metric == "subscribers" %}{% if drawn < spare %}
+        {%- assign drawn = drawn | plus: 1 -%}
+        <div class="metric fit">
+          <span class="caption" style="font-size: {{ caption_size }}px">Subscribers</span>
+          <span class="value truncate" style="font-size: {{ small_size }}px">{{ money.cards.subscribers.figure }}</span>
+        </div>
+      {% endif %}{% endunless %}
+
+      {% unless metric == "next_subscriber" %}{% if drawn < spare %}
+        {%- assign drawn = drawn | plus: 1 -%}
+        <div class="metric fit">
+          <span class="caption" style="font-size: {{ caption_size }}px">Next subscriber</span>
+          {%- assign words = money.next_subscriber.in_words | size | at_least: 4 -%}
+          <span class="value truncate" style="font-size: {{ head_w | times: 78 | divided_by: 100 | times: 100 | divided_by: words | divided_by: 58 | at_most: small_size | at_least: 13 }}px">
+            {{ money.next_subscriber.in_words }}
+          </span>
+        </div>
+      {% endif %}{% endunless %}
+
+      {% unless metric == "customers" %}{% if drawn < spare %}
+        {%- assign drawn = drawn | plus: 1 -%}
+        <div class="metric fit">
+          <span class="caption" style="font-size: {{ caption_size }}px">Customers</span>
+          <span class="value truncate" style="font-size: {{ small_size }}px">{{ money.cards.customers.figure }}</span>
+        </div>
+      {% endif %}{% endunless %}
+
+      {% unless metric == "taken" %}{% if drawn < spare %}
+        {%- assign drawn = drawn | plus: 1 -%}
+        <div class="metric fit">
+          <span class="caption" style="font-size: {{ caption_size }}px">30 days</span>
+          <span class="value truncate" style="font-size: {{ small_size }}px">{{ money.windows.last_30d.text }}</span>
+        </div>
+      {% endif %}{% endunless %}
+    </div>
+
+    {% if notices.size > 0 and box_h > 130 %}
+      <div class="notice-strip" style="padding: 5px {{ pad | times: 2 }}px">
+        {% for notice in notices %}
+          {% if notice.overflow %}
+            <span class="notice notice--more">+{{ notice.overflow }}</span>
+          {% else %}
+            <span class="notice notice--{{ notice.level }}" title="{{ notice.text }}">
+              <span class="i i-{{ notice.icon }}"></span>
+            </span>
+          {% endif %}
+        {% endfor %}
+        {% if shape.wide and notices[0].text != blank %}
+          <span class="notice-said">{{ notices[0].text }}</span>
+        {% endif %}
+      </div>
+    {% endif %}
+  {%- endunless -%}
+</div>

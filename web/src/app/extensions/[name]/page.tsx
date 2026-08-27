@@ -3,13 +3,13 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Clock, Link2, Radio, Train, Zap } from "lucide-react";
 
 import { ScreenPreview } from "@/components/screen-preview";
-import { ShapeGlyph } from "@/components/shape-badge";
-import { ExtensionShapes, type ShapeFamily } from "@/components/extension-shapes";
+import { ExtensionDesigns, type DesignEntry } from "@/components/extension-designs";
+import { describeRange } from "@/lib/designs";
 import { find, rendersNotices } from "@/lib/extensions/registry";
 import { summarise } from "@/lib/extensions/summary";
 import { operatorsFor } from "@/lib/facts";
 import { DEFAULT_PANEL } from "@/lib/panel";
-import { FAMILIES, pixelsFor, shape as findShape, standIn } from "@/lib/shapes";
+import { pixelsFor } from "@/lib/shapes";
 
 export const dynamic = "force-dynamic";
 
@@ -20,13 +20,6 @@ const KIND = {
   connection: { icon: Link2, label: "Needs an account", hint: "Answered by an account you link once." },
 } as const;
 
-const FAMILY_LABELS: Record<string, { label: string; hint: string }> = {
-  full: { label: "Full screen", hint: "The whole panel" },
-  band: { label: "Wide bands", hint: "Full width, varying height — one design covers all three" },
-  column: { label: "Tall columns", hint: "Full height, varying width — one design covers all three" },
-  block: { label: "Corner", hint: "A quarter of the panel" },
-};
-
 export default async function ExtensionPage({ params }: { params: Promise<{ name: string }> }) {
   const extension = await find((await params).name);
   if (!extension) notFound();
@@ -34,34 +27,25 @@ export default async function ExtensionPage({ params }: { params: Promise<{ name
   const summary = summarise(extension);
   const kind = KIND[summary.kind];
 
-  // Grouped by family, because the family is the thing worth understanding:
-  // it is why four templates cover eight sizes.
-  const families: ShapeFamily[] = Object.entries(FAMILIES)
-    .map(([id, members]) => ({
-      id,
-      label: FAMILY_LABELS[id]?.label ?? id,
-      hint: FAMILY_LABELS[id]?.hint ?? "",
-      shapes: members
-        .filter((member) => summary.shapes.includes(member))
-        .map((member) => {
-          const shape = findShape(member)!;
-          const [width, height] = pixelsFor(shape, DEFAULT_PANEL.width, DEFAULT_PANEL.height);
-          const drawnBy = standIn(member, extension.authored);
+  // Each style previewed at its nominal size - the one it was really drawn for
+  // - rather than at some canonical box, so the previews are at true relative
+  // scale and a band looks like a band.
+  const designs: DesignEntry[] = extension.designs.map((design) => {
+    const [width, height] = pixelsFor(design.nominal, DEFAULT_PANEL.width, DEFAULT_PANEL.height);
 
-          return {
-            id: member,
-            label: shape.label,
-            columns: shape.columns,
-            rows: shape.rows,
-            width,
-            height,
-            authored: extension.authored.includes(member),
-            standInFor: drawnBy ? findShape(drawnBy)?.label.toLowerCase() : undefined,
-            takesNotices: rendersNotices(extension, member),
-          };
-        }),
-    }))
-    .filter((family) => family.shapes.length > 0);
+    return {
+      key: design.key,
+      label: design.label,
+      hint: design.hint,
+      columns: design.nominal.columns,
+      rows: design.nominal.rows,
+      width,
+      height,
+      range: describeRange(design.range),
+      takesNotices: rendersNotices(extension, design.nominal, design.key),
+      declared: design.declared,
+    };
+  });
 
   return (
     <div className="mx-auto max-w-5xl px-8 py-10">
@@ -108,9 +92,9 @@ export default async function ExtensionPage({ params }: { params: Promise<{ name
       )}
 
       <div className="mb-10">
-        <ExtensionShapes
+        <ExtensionDesigns
           name={summary.name}
-          families={families}
+          designs={designs}
           acceptsNotices={extension.manifest.accepts_notices}
         />
       </div>

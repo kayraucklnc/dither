@@ -36,11 +36,11 @@
       </p>
     </div>
 
-    {% if shape.rows > 2 %}
+    {% if shape.rows > 4 %}
       <div style="border-top: var(--rule) solid var(--ink); flex: 1; min-height: 0; padding: 4px var(--pad)">
         <div class="list">
           {% assign behind = 3 %}
-          {% if shape.rows > 3 %}{% assign behind = 5 %}{% endif %}
+          {% if shape.rows > 6 %}{% assign behind = 5 %}{% endif %}
           {% for train in board.departures offset: 1 limit: behind %}
             <div class="list-item">
               <span class="truncate">{{ train.line }} &middot; {{ train.direction }}</span>
@@ -54,7 +54,7 @@
     {% endif %}
   {% endif %}
 
-  {% if board.alert != blank and shape.rows <= 2 %}
+  {% if board.alert != blank and shape.rows <= 4 %}
     <div class="footer-bar" style="padding: 6px var(--pad)">
       <span class="with-icon t-sm"><span class="i i-alert i-xs"></span>{{ board.alert }}</span>
     </div>
@@ -77,7 +77,7 @@
         {% endif %}
       {% endfor %}
 
-      {% if shape.columns >= 6 and notices[0].text != blank %}
+      {% if shape.wide and notices[0].text != blank %}
         <span class="notice-said">{{ notices[0].text }}</span>
       {% endif %}
     </div>

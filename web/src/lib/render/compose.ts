@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { find as findExtension, rendersNotices } from "@/lib/extensions/registry";
-import { COLUMNS, ROWS, shapeForSize } from "@/lib/shapes";
+import { COLUMNS, ROWS, sizeOf, type Size } from "@/lib/shapes";
 import { DEFAULT_ENVIRONMENT, renderWidget, type Environment } from "./liquid";
 
 /**
@@ -34,6 +34,11 @@ export interface PlacedWidget {
   row: number;
   columnSpan: number;
   rowSpan: number;
+  /**
+   * Which of the extension's designs to draw with, when several cover this
+   * size. Empty means "whichever fits best".
+   */
+  design?: string;
   /** Pinned as the screen's alert area. */
   hostsNotices?: boolean;
 }
@@ -122,9 +127,7 @@ const WEIGHT: Record<string, number> = { urgent: 3, warn: 2, info: 1 };
  */
 async function canHost(widget: PlacedWidget): Promise<boolean> {
   const extension = await findExtension(widget.extension);
-  const shape = shapeForSize(widget.columnSpan, widget.rowSpan);
-
-  return Boolean(extension && shape && rendersNotices(extension, shape.id));
+  return Boolean(extension && rendersNotices(extension, sizeOf(widget), widget.design));
 }
 
 export async function routeNotices(
@@ -243,35 +246,29 @@ export async function compose(
       continue;
     }
 
-    const shape = shapeForSize(widget.columnSpan, widget.rowSpan);
-
-    if (!shape) {
-      problems.push(`${name} is ${widget.columnSpan}x${widget.rowSpan}, which is not a shape.`);
-      cells.push(gap(placement, "Not a shape Dither knows"));
-      continue;
-    }
-
-    const rendered = await renderWidget(
-      extension,
-      shape.id,
-      widget.settings,
-      widget.data,
-      routed.get(widget.id) ?? [],
-      environment,
-    );
-
-    if ("problem" in rendered) {
-      problems.push(rendered.problem);
-      cells.push(gap(placement, rendered.problem));
-      continue;
-    }
-
     // The iframe is sized in pixels rather than percentages so the extension's
     // viewport units mean what its author intended.
     const box = {
       width: Math.round(widget.columnSpan * cellWidth),
       height: Math.round(widget.rowSpan * cellHeight),
     };
+
+    const rendered = await renderWidget({
+      extension,
+      size: sizeOf(widget),
+      style: widget.design,
+      settings: widget.settings,
+      data: widget.data,
+      notices: routed.get(widget.id) ?? [],
+      environment,
+      pixels: box,
+    });
+
+    if ("problem" in rendered) {
+      problems.push(rendered.problem);
+      cells.push(gap(placement, rendered.problem));
+      continue;
+    }
 
     const document = `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style>` +
       `<style>html,body{width:${box.width}px;height:${box.height}px;overflow:hidden}` +
@@ -326,7 +323,7 @@ export async function compose(
  */
 export async function composeSolo(
   widget: PlacedWidget,
-  shapeId: string,
+  size: Size,
   width: number,
   height: number,
   environment: Environment = DEFAULT_ENVIRONMENT,
@@ -347,14 +344,16 @@ export async function composeSolo(
     };
   }
 
-  const rendered = await renderWidget(
+  const rendered = await renderWidget({
     extension,
-    shapeId,
-    widget.settings,
-    widget.data,
+    size,
+    style: widget.design,
+    settings: widget.settings,
+    data: widget.data,
     notices,
     environment,
-  );
+    pixels: { width, height },
+  });
 
   if ("problem" in rendered) {
     return {

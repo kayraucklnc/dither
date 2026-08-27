@@ -1,7 +1,8 @@
 import { Liquid } from "liquidjs";
 
+import { refusal } from "@/lib/designs";
 import { templateFor, type Extension } from "@/lib/extensions/registry";
-import { shape } from "@/lib/shapes";
+import { COLUMNS, ROWS, sizeLabel, type Size } from "@/lib/shapes";
 
 /**
  * Extension templates are Liquid, the same dialect TRMNL uses, so designs
@@ -114,7 +115,7 @@ const COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "
 
 /** Clamp a number into a 0-100 percentage, for bars that must not overflow. */
 
-/** The larger of two numbers, so a chart can find its own scale in Liquid. */
+/** The larger, and the smaller, of two numbers - for type that fits its box. */
 
 function register(engine: Liquid): void {
   engine.registerFilter("weather_icon", (code: unknown) => WEATHER[Number(code)]?.icon ?? "cloud");
@@ -153,6 +154,18 @@ function register(engine: Liquid): void {
   engine.registerFilter("at_least", (value: unknown, floor: unknown) =>
     Math.max(Number(value) || 0, Number(floor) || 0),
   );
+  /**
+   * A ceiling, which `at_least` alone cannot express.
+   *
+   * Type that sizes itself to its box needs both ends: the floor stops a
+   * figure vanishing in a small tile, and this stops it running off the edge
+   * of a wide one. Sizes are free now, so every design has to survive a range
+   * rather than one box, and clamping in Liquid is how it does that without a
+   * template per size.
+   */
+  engine.registerFilter("at_most", (value: unknown, ceiling: unknown) =>
+    Math.min(Number(value) || 0, Number(ceiling) || 0),
+  );
 }
 
 const DOCUMENT = /<body[^>]*>([\s\S]*)<\/body>/i;
@@ -169,13 +182,17 @@ export interface RenderContext {
   /** Things another extension wants said here. Empty unless this widget hosts them. */
   notices?: { icon: string; text: string; level: string }[];
   environment?: Environment;
-  /** The shape actually being drawn, which may differ from the one authored. */
-  shape?: string;
+  /** The box being drawn into, in grid cells. */
+  size?: Size;
+  /** Pixel size of that box, when the caller knows the panel. */
+  pixels?: { width: number; height: number };
+  /** The design doing the drawing, which may not be the one authored for this size. */
+  design?: { key: string; label: string };
 }
 
 export async function renderTemplate(template: string, context: RenderContext): Promise<string> {
   const environment = context.environment ?? DEFAULT_ENVIRONMENT;
-  const box = context.shape ? shape(context.shape) : undefined;
+  const box = context.size ?? { columns: COLUMNS, rows: ROWS };
 
   const scope = {
     ...context.data,
@@ -191,13 +208,28 @@ export async function renderTemplate(template: string, context: RenderContext): 
     /**
      * The box this template is actually drawing into.
      *
-     * A design authored for a wide band may be asked to fill a taller one, and
-     * knowing which lets it show a fifth departure or an hourly strip instead
-     * of leaving the extra room empty. Columns and rows are out of six.
+     * Sizes are free now, so a design covers a *range* and has to cope with
+     * every size in it: knowing the box lets a wide band show a fifth
+     * departure when it is tall enough instead of leaving the room empty.
+     *
+     * Columns and rows are out of twelve. `wide`, `tall`, `band` and `roomy`
+     * exist because a template asking "am I full width" should say so rather
+     * than hard-coding a number that changes when the grid does.
      */
-    shape: box
-      ? { id: box.id, label: box.label, columns: box.columns, rows: box.rows }
-      : { id: "full", label: "Full screen", columns: 6, rows: 6 },
+    shape: {
+      id: context.design?.key ?? "full",
+      label: context.design?.label ?? sizeLabel(box),
+      columns: box.columns,
+      rows: box.rows,
+      max_columns: COLUMNS,
+      max_rows: ROWS,
+      width: context.pixels?.width ?? 0,
+      height: context.pixels?.height ?? 0,
+      wide: box.columns >= COLUMNS * 0.66,
+      tall: box.rows >= ROWS * 0.66,
+      band: box.columns >= COLUMNS * 0.66 && box.rows <= ROWS * 0.42,
+      roomy: box.columns * box.rows >= COLUMNS * ROWS * 0.4,
+    },
     extension: {
       name: context.extension.name,
       label: context.extension.manifest.label,
@@ -208,36 +240,43 @@ export async function renderTemplate(template: string, context: RenderContext): 
   return fragment(await engineFor(environment).parseAndRender(template, scope));
 }
 
-/** Render a widget at a shape, or say why it cannot be rendered at that shape. */
-export async function renderWidget(
-  extension: Extension,
-  shape: string,
-  settings: Record<string, unknown>,
-  data: Record<string, unknown>,
-  notices: { icon: string; text: string; level: string }[] = [],
-  environment: Environment = DEFAULT_ENVIRONMENT,
-): Promise<{ html: string } | { problem: string }> {
-  const template = templateFor(extension, shape);
+export interface WidgetRender {
+  extension: Extension;
+  size: Size;
+  settings: Record<string, unknown>;
+  data: Record<string, unknown>;
+  /** The style asked for. Ignored when it cannot draw this size. */
+  style?: string;
+  notices?: { icon: string; text: string; level: string }[];
+  environment?: Environment;
+  pixels?: { width: number; height: number };
+}
 
-  if (!template) {
+/** Render a widget at a size, or say why that size cannot be drawn. */
+export async function renderWidget(
+  request: WidgetRender,
+): Promise<{ html: string; design: string } | { problem: string }> {
+  const { extension, size, settings, data } = request;
+  const chosen = templateFor(extension, size, request.style);
+
+  if (!chosen) {
     // Refusing is the point. Scaling a full-screen design into a corner is
     // how a display ends up with six-point type nobody can read.
-    return {
-      problem:
-        `${extension.manifest.label} has no ${shape.replace(/_/g, " ")} design. ` +
-        `It can be placed as: ${extension.shapes.map((s) => s.replace(/_/g, " ")).join(", ")}.`,
-    };
+    return { problem: refusal(extension.manifest.label, size, extension.designs) };
   }
 
   try {
     return {
-      html: await renderTemplate(template, {
+      design: chosen.design.key,
+      html: await renderTemplate(chosen.source, {
         extension,
         settings,
         data,
-        notices,
-        environment,
-        shape,
+        notices: request.notices ?? [],
+        environment: request.environment ?? DEFAULT_ENVIRONMENT,
+        size,
+        pixels: request.pixels,
+        design: chosen.design,
       }),
     };
   } catch (error) {

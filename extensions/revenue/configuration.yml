@@ -1,18 +1,22 @@
 # Dither bundled extension: Revenue.
 #
-# Backed by the Stripe connection. Link the account once and every revenue
-# widget and trigger uses it; settings here choose the currency and how much
-# detail to show, per placement.
+# Backed by the real Stripe connection. Link the account once under Connections
+# and every revenue widget and trigger uses it; the settings here choose *which
+# number* this placement shows, and the style picks how it is drawn.
 #
-# The Stripe provider is mocked. It answers a day that fills up as it goes so
-# the design can be judged against numbers that move, which a frozen sample
-# never lets you do.
+# The split is deliberate. One trip to Stripe answers every question the
+# account can be asked - what came in over seven windows, what recurs, how many
+# customers, when the next subscriber is due - and it is cached by the account
+# rather than by the widget. So six revenue widgets showing six different
+# numbers on one screen cost one fetch between them, and adding a seventh
+# window costs nothing at all.
 
-version: "1.0.0"
+version: "2.0.0"
 name: revenue
 label: Revenue
 description: >
-  What came in today, how that compares with yesterday, and the week behind it.
+  What came in, what recurs, how many customers, and when the next subscriber
+  is due. One Stripe account, any number of ways to look at it.
 
 kind: connection
 connection: stripe
@@ -21,7 +25,10 @@ tags:
   - money
   - business
 
-interval: 15
+# Stripe is generous but not free: one refresh is a handful of paged list
+# calls. Twenty minutes is often enough for a wall, and gentle enough that a
+# screen with six revenue widgets on it still only asks three times an hour.
+interval: 20
 unit: minute
 days: []
 last_day_of_month: false
@@ -30,42 +37,148 @@ start_at: "2026-01-01T00:00:00Z"
 static_body: {}
 data: {}
 
+# The looks, and the sizes each will be drawn at.
+#
+# `figure` covers almost the whole grid on purpose: a single number is the one
+# thing that reads at any size, so a revenue widget can be dragged to nearly
+# any box and still have something honest to draw. The richer designs refuse
+# the sizes they would be unreadable at, which is the whole point of declaring
+# a range rather than scaling.
+designs:
+  - template: figure
+    label: Figure
+    hint: One number, as large as the box allows, with a line under it.
+    columns: [2, 12]
+    rows: [2, 12]
+    nominal: [4, 4]
+
+  - template: trend
+    label: Figure and trend
+    hint: The number, with the days behind it drawn as bars.
+    columns: [4, 12]
+    rows: [4, 12]
+    nominal: [6, 6]
+
+  - template: ledger
+    label: Ledger
+    hint: A row per window - today, 24 hours, 15 days, 30 days - and the recurring figures.
+    columns: [3, 12]
+    rows: [5, 12]
+    nominal: [4, 12]
+
+  - template: strip
+    label: Strip
+    hint: Four figures side by side in a shallow band.
+    columns: [6, 12]
+    rows: [2, 5]
+    nominal: [12, 3]
+
+  - template: full
+    label: Board
+    hint: The headline, the supporting figures, and a month of bars.
+    columns: [8, 12]
+    rows: [8, 12]
+    nominal: [12, 12]
+
 fields:
+  - keyname: metric
+    name: What to show
+    field_type: select
+    default: taken
+    options:
+      - value: taken
+        label: Money taken
+      - value: mrr
+        label: Monthly recurring revenue
+      - value: subscribers
+        label: How many subscribers
+      - value: customers
+        label: How many customers
+      - value: next_subscriber
+        label: When the next subscriber is due
+    optional: false
+
+  - keyname: window
+    name: Over what period
+    field_type: select
+    default: today
+    options:
+      - value: today
+        label: Today
+      - value: yesterday
+        label: Yesterday
+      - value: last_24h
+        label: The last 24 hours
+      - value: last_7d
+        label: The last 7 days
+      - value: last_15d
+        label: The last 15 days
+      - value: last_30d
+        label: The last 30 days
+      - value: month_to_date
+        label: This month so far
+    help_text: >
+      Today resets at local midnight, so it is small at breakfast. The last 24
+      hours is always a full day's trading whatever time you look.
+    # Only money has a period. There is no such thing as subscribers over the
+    # last seven days, and offering it would be a question with no answer.
+    visible_when:
+      field: metric
+      any_of: [taken]
+    optional: false
+
+  - keyname: basis
+    name: Measured how
+    field_type: select
+    default: forecast
+    options:
+      - value: forecast
+        label: Expected, from the recent signup rate
+      - value: renewal
+        label: The next scheduled renewal
+    help_text: >
+      A forecast is a rate, not a promise, and the design says how much history
+      it is standing on. A renewal is a date Stripe already holds.
+    visible_when:
+      field: metric
+      any_of: [next_subscriber]
+    optional: false
+
   - keyname: heading
     name: Heading
     field_type: string
-    default: "Revenue"
+    default: ""
+    help_text: Left empty, the design names the figure itself.
     optional: true
 
-  - keyname: currency
-    name: Currency
-    field_type: select
-    default: EUR
-    options:
-      - value: EUR
-        label: Euro
-      - value: USD
-        label: US dollar
-      - value: GBP
-        label: Pound sterling
-    optional: false
-
-  - keyname: style
-    name: Style
-    field_type: select
-    default: rich
-    options:
-      - value: rich
-        label: Rich — the week, the breakdown, the lot
-      - value: compact
-        label: Compact — today's number and the change
-    optional: false
-
-  - keyname: show_week
-    name: Show the week
+  - keyname: compare
+    name: Show the change
     field_type: boolean
     default: true
-    help_text: A bar per day behind today. Turned off, the number gets the room.
+    help_text: A figure with no direction is a number nobody can act on.
+    optional: true
+
+  - keyname: compact_figures
+    name: Shorten large numbers
+    field_type: boolean
+    default: true
+    help_text: 74,120 becomes 74.1k. Turn it off where there is room for every digit.
+    optional: true
+
+  - keyname: chart
+    name: What goes behind it
+    field_type: select
+    default: auto
+    options:
+      - value: auto
+        label: Whatever suits the period
+      - value: week
+        label: The last seven days
+      - value: month
+        label: The last thirty days
+    visible_when:
+      field: design
+      any_of: [trend, full]
     optional: true
 
 accepts_notices: true
@@ -91,11 +204,45 @@ notices:
       operator: gte
       value: 25
 
+  - key: quiet_day
+    label: Nothing taken today
+    icon: info
+    level: warn
+    text: "Nothing has come in today"
+    when:
+      fact: today
+      operator: lte
+      value: 0
+
 facts:
   - key: today
     label: Taken today
     type: number
     path: revenue.today
+    unit: ""
+
+  - key: last_24h
+    label: Taken in the last 24 hours
+    type: number
+    path: revenue.last_24h
+    unit: ""
+
+  - key: last_15d
+    label: Taken in the last 15 days
+    type: number
+    path: revenue.last_15d
+    unit: ""
+
+  - key: last_30d
+    label: Taken in the last 30 days
+    type: number
+    path: revenue.last_30d
+    unit: ""
+
+  - key: month_to_date
+    label: Month to date
+    type: number
+    path: revenue.month_to_date
     unit: ""
 
   - key: change_percent
@@ -104,10 +251,22 @@ facts:
     path: revenue.change_percent
     unit: percent
 
-  - key: month_to_date
-    label: Month to date
+  - key: mrr
+    label: Monthly recurring revenue
     type: number
-    path: revenue.month_to_date
+    path: revenue.mrr
+    unit: ""
+
+  - key: subscribers
+    label: Active subscribers
+    type: number
+    path: revenue.subscribers
+    unit: ""
+
+  - key: customers
+    label: Customers
+    type: number
+    path: revenue.customers
     unit: ""
 
   - key: new_customers
@@ -122,24 +281,274 @@ facts:
     path: revenue.failed_today
     unit: ""
 
+  - key: days_to_next_subscriber
+    label: Days until the next subscriber is expected
+    type: number
+    path: revenue.next_subscriber.in_days
+    unit: ""
+
+  - key: days_to_next_renewal
+    label: Days until the next renewal
+    type: number
+    path: revenue.next_renewal.in_days
+    unit: ""
+
+# Stand-in data for previews only, never served to a device. It mirrors the
+# real payload field for field, so a design judged here is a design that works
+# the moment an account is linked.
 sample:
   revenue:
+    connected: true
+    account: Dither
     currency: EUR
     symbol: "€"
+    figure: "3,184"
+    text: "€3,184"
+    amount: 3184
     today: 3184
     yesterday: 2760
-    change_percent: 15
+    last_24h: 4021
+    last_7d: 23604
+    last_15d: 48810
+    last_30d: 96240
     month_to_date: 74120
+    change_percent: 15
+    net_30d: 92870
+    fees_30d: 3370
     payments_today: 41
-    new_customers: 7
     failed_today: 2
+    new_customers: 7
+    customers: 1284
+    customers_capped: false
+    subscribers: 386
+    trialing: 24
+    subscribers_capped: false
+    mrr: 18420
+    mrr_text: "€18.4k"
+    mrr_figure: "18.4k"
+    arr: 221040
+    arr_text: "€221k"
+    mrr_excludes: 0
+    truncated: false
+    next_subscriber:
+      expected_at: "2026-08-28T09:20:00Z"
+      in_words: "in 19 hours"
+      in_days: 0.8
+      per_week: 8.4
+      sample: 36
+      confidence: steady
+      window_days: 30
+    next_renewal:
+      at: "2026-08-28T06:00:00Z"
+      in_words: "in 16 hours"
+      in_days: 0.7
+      customer: Ana Ferrari
+      amount: 49
+      figure: "49"
+      text: "€49"
+      symbol: "€"
+    cards:
+      mrr:
+        key: mrr
+        caption: Monthly recurring
+        figure: "18.4k"
+        symbol: "€"
+        detail: "€221k a year"
+        delta: null
+        delta_short: null
+        rising: true
+        bars: ""
+      subscribers:
+        key: subscribers
+        caption: Subscribers
+        figure: "386"
+        symbol: ""
+        detail: "24 on trial"
+        delta: null
+        delta_short: null
+        rising: true
+        bars: ""
+      customers:
+        key: customers
+        caption: Customers
+        figure: "1,284"
+        symbol: ""
+        detail: "7 new today"
+        delta: null
+        delta_short: null
+        rising: true
+        bars: ""
+      next_subscriber:
+        key: next_subscriber
+        caption: Next subscriber
+        figure: "in 19 hours"
+        symbol: ""
+        detail: "8.4 a week over the last 30 days — steady"
+        delta: null
+        delta_short: null
+        rising: true
+        bars: ""
+      next_renewal:
+        key: next_renewal
+        caption: Next renewal
+        figure: "in 16 hours"
+        symbol: ""
+        detail: "€49 from Ana Ferrari"
+        delta: null
+        delta_short: null
+        rising: true
+        bars: ""
+    windows:
+      today:
+        key: today
+        label: Today
+        short: today
+        amount: 3184
+        figure: "3,184"
+        text: "€3,184"
+        symbol: "€"
+        previous: 2760
+        change_percent: 15
+        rising: true
+        caption: Today
+        detail: 41 payments
+        delta: "+15% on yesterday"
+        delta_short: "+15%"
+        bars: week
+      yesterday:
+        key: yesterday
+        label: Yesterday
+        short: yesterday
+        amount: 2760
+        figure: "2,760"
+        text: "€2,760"
+        symbol: "€"
+        previous: 3110
+        change_percent: -11
+        rising: false
+        caption: Yesterday
+        detail: "against €3,110 the day before"
+        delta: "-11% on the day before"
+        delta_short: "-11%"
+        bars: week
+      last_24h:
+        key: last_24h
+        label: Last 24 hours
+        short: 24h
+        amount: 4021
+        figure: "4,021"
+        text: "€4,021"
+        symbol: "€"
+        previous: 3480
+        change_percent: 16
+        rising: true
+        caption: Last 24 hours
+        detail: "against €3,480 the 24 hours before"
+        delta: "+16% on the 24 hours before"
+        delta_short: "+16%"
+        bars: week
+      last_7d:
+        key: last_7d
+        label: Last 7 days
+        short: 7d
+        amount: 23604
+        figure: "23.6k"
+        text: "€23.6k"
+        symbol: "€"
+        previous: 21180
+        change_percent: 11
+        rising: true
+        caption: Last 7 days
+        detail: "against €21.2k the 7 days before"
+        delta: "+11% on the 7 days before"
+        delta_short: "+11%"
+        bars: week
+      last_15d:
+        key: last_15d
+        label: Last 15 days
+        short: 15d
+        amount: 48810
+        figure: "48.8k"
+        text: "€48.8k"
+        symbol: "€"
+        previous: 45120
+        change_percent: 8
+        rising: true
+        caption: Last 15 days
+        detail: "against €45.1k the 15 days before"
+        delta: "+8% on the 15 days before"
+        delta_short: "+8%"
+        bars: days
+      last_30d:
+        key: last_30d
+        label: Last 30 days
+        short: 30d
+        amount: 96240
+        figure: "96.2k"
+        text: "€96.2k"
+        symbol: "€"
+        previous: 88400
+        change_percent: 9
+        rising: true
+        caption: Last 30 days
+        detail: "against €88.4k the 30 days before"
+        delta: "+9% on the 30 days before"
+        delta_short: "+9%"
+        bars: days
+      month_to_date:
+        key: month_to_date
+        label: Month to date
+        short: this month
+        amount: 74120
+        figure: "74.1k"
+        text: "€74.1k"
+        symbol: "€"
+        previous: 81300
+        change_percent: -9
+        rising: false
+        caption: Month to date
+        detail: "against €81.3k last month"
+        delta: "-9% on last month"
+        delta_short: "-9%"
+        bars: days
     week:
-      - { day: Mon, amount: 2980 }
-      - { day: Tue, amount: 3420 }
-      - { day: Wed, amount: 3110 }
-      - { day: Thu, amount: 3890 }
-      - { day: Fri, amount: 4260 }
-      - { day: Sat, amount: 2760 }
-      - { day: Sun, amount: 3184 }
+      - { day: Mon, date: "17 Aug", amount: 2980 }
+      - { day: Tue, date: "18 Aug", amount: 3420 }
+      - { day: Wed, date: "19 Aug", amount: 3110 }
+      - { day: Thu, date: "20 Aug", amount: 3890 }
+      - { day: Fri, date: "21 Aug", amount: 4260 }
+      - { day: Sat, date: "22 Aug", amount: 2760 }
+      - { day: Sun, date: "23 Aug", amount: 3184 }
+    days:
+      - { day: Mon, date: "29 Jul", amount: 2410 }
+      - { day: Tue, date: "30 Jul", amount: 2880 }
+      - { day: Wed, date: "31 Jul", amount: 3040 }
+      - { day: Thu, date: "1 Aug", amount: 3610 }
+      - { day: Fri, date: "2 Aug", amount: 4120 }
+      - { day: Sat, date: "3 Aug", amount: 2240 }
+      - { day: Sun, date: "4 Aug", amount: 2690 }
+      - { day: Mon, date: "5 Aug", amount: 3180 }
+      - { day: Tue, date: "6 Aug", amount: 3350 }
+      - { day: Wed, date: "7 Aug", amount: 2970 }
+      - { day: Thu, date: "8 Aug", amount: 3720 }
+      - { day: Fri, date: "9 Aug", amount: 4410 }
+      - { day: Sat, date: "10 Aug", amount: 2180 }
+      - { day: Sun, date: "11 Aug", amount: 2540 }
+      - { day: Mon, date: "12 Aug", amount: 3060 }
+      - { day: Tue, date: "13 Aug", amount: 3480 }
+      - { day: Wed, date: "14 Aug", amount: 3290 }
+      - { day: Thu, date: "15 Aug", amount: 3910 }
+      - { day: Fri, date: "16 Aug", amount: 4680 }
+      - { day: Sat, date: "17 Aug", amount: 2980 }
+      - { day: Sun, date: "18 Aug", amount: 3420 }
+      - { day: Mon, date: "19 Aug", amount: 3110 }
+      - { day: Tue, date: "20 Aug", amount: 3890 }
+      - { day: Wed, date: "21 Aug", amount: 4260 }
+      - { day: Thu, date: "22 Aug", amount: 2760 }
+      - { day: Fri, date: "23 Aug", amount: 3184 }
+      - { day: Sat, date: "24 Aug", amount: 2450 }
+      - { day: Sun, date: "25 Aug", amount: 2810 }
+      - { day: Mon, date: "26 Aug", amount: 3340 }
+      - { day: Tue, date: "27 Aug", amount: 3184 }
 
 exchanges: []

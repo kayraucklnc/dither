@@ -1,4 +1,8 @@
 import type { Manifest } from "@/lib/extensions/manifest";
+import type { Provider } from "./provider";
+import { stripe } from "./stripe";
+
+export type { CredentialField, FetchContext, Provider, Verification } from "./provider";
 
 /**
  * Connections are accounts and services you link once, and every widget or
@@ -9,24 +13,12 @@ import type { Manifest } from "@/lib/extensions/manifest";
  * placement of it. That keeps a screen's settings about *what to show* rather
  * than about how to authenticate.
  *
- * Every provider here is mocked. They answer plausible, moving data so screens
- * and rules can be designed and tested before any sign-in flow exists;
- * replacing a mock with a real client changes this file and nothing above it.
- * Each says so, and the dashboard says so too - a stand-in that pretends to be
- * real is worse than no stand-in.
+ * Stripe is real: it takes a key you paste once, checks it before storing it,
+ * and answers with the account's own numbers. The others are still stand-ins,
+ * answering plausible moving data so screens and rules can be designed before
+ * their sign-in flows exist. Each says which it is, and the dashboard says so
+ * too - a stand-in that pretends to be real is worse than no stand-in.
  */
-
-export interface Provider {
-  id: string;
-  label: string;
-  description: string;
-  /** What linking it unlocks, for the connections page. */
-  unlocks: string;
-  icon: string;
-  /** True while the real integration is not written yet. */
-  mocked: boolean;
-  fetch(settings: Record<string, unknown>, now: Date): Promise<Record<string, unknown>>;
-}
 
 const clock = (from: Date, minutes: number) => {
   const at = new Date(from.getTime() + minutes * 60_000);
@@ -82,49 +74,6 @@ const google: Provider = {
         free_minutes: next ? next.minutes_until : 480,
         next: next ?? null,
         events,
-      },
-    };
-  },
-};
-
-/* -------------------------------------------------------------------------- */
-
-const stripe: Provider = {
-  id: "stripe",
-  label: "Stripe",
-  description: "Payments, revenue and new customers.",
-  unlocks: "Revenue",
-  icon: "card",
-  mocked: true,
-
-  async fetch(settings, now) {
-    const currency = String(settings.currency ?? "EUR");
-    const symbol = ({ EUR: "€", USD: "$", GBP: "£" } as Record<string, string>)[currency] ?? "";
-
-    // A day that fills up as it goes, so a morning screenshot differs from an
-    // evening one the way a real dashboard would.
-    const throughDay = (now.getHours() * 60 + now.getMinutes()) / 1440;
-    const today = Math.round(4200 * throughDay + Math.abs(drift(now, 180)));
-
-    const week = Array.from({ length: 7 }, (_, index) => ({
-      day: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][index],
-      amount: Math.round(3200 + drift(now, 900, index) + index * 140),
-    }));
-
-    const yesterday = week[5].amount;
-
-    return {
-      revenue: {
-        currency,
-        symbol,
-        today,
-        yesterday,
-        change_percent: yesterday ? Math.round(((today - yesterday) / yesterday) * 100) : 0,
-        month_to_date: Math.round(week.reduce((total, day) => total + day.amount, 0) * 3.4),
-        payments_today: Math.max(1, Math.round(today / 78)),
-        new_customers: Math.max(0, Math.round(6 + drift(now, 4, 3))),
-        failed_today: Math.max(0, Math.round(1 + drift(now, 2, 5))),
-        week,
       },
     };
   },

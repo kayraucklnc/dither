@@ -110,6 +110,7 @@ export async function serve(device: Device, now = new Date()): Promise<Served> {
     row: row.row,
     columnSpan: row.columnSpan,
     rowSpan: row.rowSpan,
+    design: row.design,
     hostsNotices: row.hostsNotices,
   }));
 
