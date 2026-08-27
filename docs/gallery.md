@@ -70,8 +70,28 @@ A tall picture on a wide panel has two answers before it has a crop.
 
 **Turn it** a quarter, and a 1182×1674 poster becomes 1674×1182 — within a
 whisker of the panel's own shape, so almost nothing is lost. You read it
-sideways, which is a trade only you can make, which is why it is a setting and
-not a rule. It happens before the crop, so everything below still applies.
+sideways, which is why the four fixed turns are still there to overrule with.
+It happens before the crop, so everything below still applies.
+
+**When it fits better** makes that trade for you. It asks the only question a
+server can answer from the pixels — is this picture long the other way from the
+box it is going into? — and turns a quarter clockwise when the answer is yes by
+a clear margin: a fifth or more off square, lying against its box. Anything
+nearer square is left where it is, because spinning a photograph that was
+nearly the right shape anyway buys a few percent and costs you the ability to
+read it. The question is asked against the *widget's* box rather than the
+panel's, so one photograph turns as a 12×2 strip and stays upright as a 12×12
+wallpaper — the same reason the crop happens at render time. Always clockwise:
+which way up the subject is, is not in the file, so the answer is predictably
+one way rather than inconsistently either.
+
+It is **not** the default, and the reason is worth seeing rather than
+believing. A 736×1308 pin of a figure on a rooftop turned sideways on a wide
+panel keeps nearly every pixel and is a picture you have to tilt your head at;
+cropped, it loses two-thirds of its height and *finds the figure*, because
+that is what the attention crop is for. Turning is the right answer for a
+poster, a texture or a diagram — anything without a strong up — and the wrong
+one for a photograph, and only you know which you hung.
 
 **How it fills the box → whole picture** stops cropping altogether and
 letterboxes instead. The bars take their tone from the picture: paper for a

@@ -4,7 +4,7 @@ import path from "node:path";
 import sharp, { type Sharp } from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { DEFAULT_LOOK, prepare, quarterTurn, type Look } from "./prepare";
+import { DEFAULT_LOOK, prepare, quarterTurn, turnFor, type Look } from "./prepare";
 import type { Picture } from "./library";
 
 /**
@@ -81,6 +81,41 @@ describe("quarterTurn", () => {
   });
 });
 
+describe("turnFor", () => {
+  /** A wallpaper and a column: the two boxes worth arguing about. */
+  const wide = { width: 800, height: 480 };
+  const tall = { width: 240, height: 720 };
+
+  it("obeys a number without looking at anything", () => {
+    expect(turnFor(90, { width: 800, height: 480 }, wide)).toBe(90);
+    expect(turnFor("270", { width: 736, height: 1308 }, wide)).toBe(270);
+    expect(turnFor(0, { width: 736, height: 1308 }, wide)).toBe(0);
+  });
+
+  it("turns a picture that is long the other way from its box", () => {
+    expect(turnFor("auto", { width: 736, height: 1308 }, wide)).toBe(90);
+    expect(turnFor("auto", { width: 736, height: 414 }, tall)).toBe(90);
+  });
+
+  it("leaves a picture that already agrees with its box", () => {
+    expect(turnFor("auto", { width: 1200, height: 800 }, wide)).toBe(0);
+    expect(turnFor("auto", { width: 736, height: 1308 }, tall)).toBe(0);
+  });
+
+  it("leaves anything near square alone, whichever way the box lies", () => {
+    // Off square by a tenth is enough to be filed as portrait and nowhere near
+    // enough to be worth reading sideways.
+    expect(turnFor("auto", { width: 900, height: 1000 }, wide)).toBe(0);
+    expect(turnFor("auto", { width: 1080, height: 1080 }, wide)).toBe(0);
+    expect(turnFor("auto", { width: 1000, height: 900 }, tall)).toBe(0);
+  });
+
+  it("leaves a picture nothing could measure alone", () => {
+    expect(turnFor("auto", { width: 0, height: 0 }, wide)).toBe(0);
+    expect(turnFor("auto", { width: 736, height: 1308 }, { width: 0, height: 0 })).toBe(0);
+  });
+});
+
 describe("turning a picture", () => {
   it("moves the top of it to the side", async () => {
     const picture = await put("banded.png", banded());
@@ -104,6 +139,23 @@ describe("turning a picture", () => {
     const round = await prepare(picture, look({ turn: 360 }));
 
     expect(round.source).toBe(none.source);
+  });
+
+  it("draws `auto` as the quarter turn it works out to", async () => {
+    // The measurements are what `resolve` puts on a Picture; the helper above
+    // leaves them at zero because nothing else here reads them.
+    const measured = { ...(await put("auto.png", banded())), width: 200, height: 400 };
+    const box = { width: 160, height: 80 };
+
+    const auto = await prepare(measured, look({ turn: "auto", ...box }));
+    const turned = await prepare(measured, look({ turn: 90, ...box }));
+    expect(auto.source).toBe(turned.source);
+
+    // The same picture in a box that is long the same way it is stays upright.
+    const upright = { width: 80, height: 160 };
+    expect((await prepare(measured, look({ turn: "auto", ...upright }))).source).toBe(
+      (await prepare(measured, look({ turn: 0, ...upright }))).source,
+    );
   });
 
   it("decides an enlargement by the shape it will be drawn at", async () => {
