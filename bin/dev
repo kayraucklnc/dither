@@ -1,0 +1,315 @@
+#! /usr/bin/env bash
+#
+# Development stack wrapper.
+#
+# Prefer the Makefile - `make help` - which wraps the common calls. This script
+# is the implementation, and still takes anything docker compose does.
+#
+#   bin/dev up             this worktree: database, .env.local, dependencies
+#   bin/dev dev            run Next on this worktree's own port
+#   bin/dev port|url|open  where this worktree answers
+#   bin/dev psql [args]    a prompt on the shared database
+#   bin/dev <anything>     passed straight through to docker compose
+#
+# There is one database for every worktree. compose.yml names its project
+# rather than letting Compose take the directory name, so `docker compose up
+# database` from any worktree starts - or simply finds - the same container,
+# holding the same volume. Sharing it is the point: seed once and a branch
+# opened tomorrow already has your screens in it.
+#
+# What is not shared is the port. Each worktree claims the first free one from
+# 3001 up, caches it in .context/dev.env and writes it into web/.env.local, so
+# two branches can be open in two browser tabs at once. Delete that file to
+# have the port recomputed.
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+# Physical, because Conductor points a branch-named symlink at each workspace
+# and git worktree list answers with the real directory. Compared as $PWD, a
+# worktree reached through its symlink does not recognise itself below and
+# claims to be two worktrees fighting over one port.
+ROOT="$(pwd -P)"
+CACHE=".context/dev.env"
+ENV_FILE="web/.env.local"
+
+# 3000 is left alone: it is what compose.yml publishes for the packaged app,
+# and a dev server that took it would collide the next time that comes up.
+FIRST_PORT=3001
+LAST_PORT=3099
+
+if [ ! -f .env ]; then
+  echo "bin/dev: no .env at the repository root - it holds the database password." >&2
+  echo "         Conductor copies it into new workspaces (see .worktreeinclude);" >&2
+  echo "         elsewhere, copy it from a checkout that has one." >&2
+  exit 1
+fi
+
+# Sourced, not exported. A variable this script can read is enough, and an
+# exported one would be inherited by `next dev`, where process.env beats
+# .env.local - so the root .env's API_URI would quietly win over this
+# worktree's port. Compose reads the same file itself, from the project
+# directory, so it needs nothing from here.
+# shellcheck disable=SC1091
+. ./.env
+
+DATABASE_USER="${DATABASE_USER:-}"
+DATABASE_PASSWORD="${DATABASE_PASSWORD:-}"
+DATABASE_NAME="${DATABASE_NAME:-}"
+DATABASE_PORT="${DATABASE_PORT:-5433}"
+
+for required in DATABASE_USER DATABASE_PASSWORD DATABASE_NAME; do
+  if [ -z "${!required}" ]; then
+    echo "bin/dev: .env does not set ${required}." >&2
+    exit 1
+  fi
+done
+
+##
+## This worktree's port
+##
+
+port_free() {
+  ! nc -z 127.0.0.1 "$1" >/dev/null 2>&1
+}
+
+# The first port no other worktree has claimed and nothing on the host answers
+# on. Other worktrees are read from their own caches rather than probed,
+# because a worktree that is not running still owns its port.
+allocate_port() {
+  local claimed=() other port
+
+  while IFS= read -r other; do
+    other="$(cd "$other" 2>/dev/null && pwd -P)" || continue
+    [ "$other" = "$ROOT" ] && continue
+    [ -f "$other/$CACHE" ] || continue
+    claimed+=("$(sed -n 's/^DEV_PORT=//p' "$other/$CACHE")")
+  done < <(git worktree list --porcelain | sed -n 's/^worktree //p')
+
+  for port in $(seq "$FIRST_PORT" "$LAST_PORT"); do
+    case " ${claimed[*]-} " in *" $port "*) continue ;; esac
+    if port_free "$port"; then
+      printf '%s' "$port"
+      return 0
+    fi
+  done
+
+  echo "bin/dev: no free port between ${FIRST_PORT} and ${LAST_PORT}." >&2
+  return 1
+}
+
+if [ -f "$CACHE" ]; then
+  # shellcheck disable=SC1090
+  . "$CACHE"
+else
+  mkdir -p "$(dirname "$CACHE")"
+  DEV_PORT="$(allocate_port)"
+  printf 'DEV_PORT=%s\n' "$DEV_PORT" > "$CACHE"
+fi
+
+URL="http://localhost:${DEV_PORT}"
+
+# Next refuses a second dev server for the same directory whatever port it is
+# offered, and records the first one here. Asked before moving ports, so a
+# second `make dev` says where the first is instead of walking the worktree up
+# to a port nothing will ever answer on.
+running_port() {
+  local lock="web/.next/dev/lock" pid port
+
+  [ -f "$lock" ] || return 1
+  pid="$(sed -n 's/.*"pid":\([0-9]*\).*/\1/p' "$lock")"
+  port="$(sed -n 's/.*"port":\([0-9]*\).*/\1/p' "$lock")"
+  [ -n "$pid" ] && [ -n "$port" ] || return 1
+
+  # Both, because a lock outlives a kill -9 and pids are reused.
+  kill -0 "$pid" 2>/dev/null || return 1
+  port_free "$port" && return 1
+
+  printf '%s' "$port"
+}
+
+# Only when something is about to bind: a port that is busy because this
+# worktree's own server is on it is the normal state, and `bin/dev url` asking
+# about it must not move the worktree somewhere else.
+claim_free_port() {
+  port_free "$DEV_PORT" && return 0
+
+  DEV_PORT="$(allocate_port)"
+  URL="http://localhost:${DEV_PORT}"
+  printf 'DEV_PORT=%s\n' "$DEV_PORT" > "$CACHE"
+  echo "==> Something else has that port. This worktree moves to ${DEV_PORT}."
+}
+
+##
+## web/.env.local
+##
+
+urlencode() {
+  local string="$1" out="" index char
+  for (( index = 0; index < ${#string}; index++ )); do
+    char="${string:index:1}"
+    case "$char" in
+      [a-zA-Z0-9.~_-]) out+="$char" ;;
+      *) out+="$(printf '%%%02X' "'$char")" ;;
+    esac
+  done
+  printf '%s' "$out"
+}
+
+# A device on the wall cannot reach localhost, so whatever host .env names is
+# kept and only the port is this worktree's. Without an API_URI the app falls
+# back to the origin of the request, which is right for a browser.
+api_uri() {
+  if [ -z "${API_URI:-}" ]; then
+    printf '%s' "$URL"
+    return
+  fi
+
+  printf '%s' "$API_URI" | sed -E "s#^([a-z]+://[^/:]+)(:[0-9]+)?#\1:${DEV_PORT}#"
+}
+
+# Rewrites the keys this script owns and leaves every other line alone: an API
+# token somebody pasted in to work on a connection must survive `make up`.
+upsert() {
+  local key="$1" value="$2" scratch
+
+  touch "$ENV_FILE"
+
+  if grep -q "^${key}=" "$ENV_FILE"; then
+    scratch="$(mktemp)"
+    awk -v key="$key" -v value="$value" -F= \
+      '$1 == key && !replaced { print key "=" value; replaced = 1; next } { print }' \
+      "$ENV_FILE" > "$scratch"
+    mv "$scratch" "$ENV_FILE"
+  else
+    printf '%s=%s\n' "$key" "$value" >> "$ENV_FILE"
+  fi
+}
+
+write_env() {
+  local url
+  url="postgres://$(urlencode "$DATABASE_USER"):$(urlencode "$DATABASE_PASSWORD")@localhost:${DATABASE_PORT}/${DATABASE_NAME}"
+
+  upsert DATABASE_URL "$url"
+  # Absolute, so a script run from anywhere reads this worktree's extensions
+  # and writes to this worktree's render cache rather than another branch's.
+  upsert DITHER_EXTENSIONS_DIR "$ROOT/extensions"
+  upsert DITHER_STORAGE_DIR "$ROOT/web/.storage"
+  upsert PORT "$DEV_PORT"
+  upsert DITHER_URL "$URL"
+  upsert API_URI "$(api_uri)"
+
+  if [ -n "${TRENORD_PASSPHRASE:-}" ]; then
+    upsert TRENORD_PASSPHRASE "$TRENORD_PASSPHRASE"
+  fi
+}
+
+##
+## Dependencies
+##
+
+install_dependencies() {
+  if [ -d web/node_modules ] && [ ! web/package-lock.json -nt web/node_modules/.package-lock.json ]; then
+    return 0
+  fi
+
+  echo "==> Installing dependencies."
+  (cd web && npm install --no-audit --no-fund)
+}
+
+# The renderer screenshots a real page, so a browser has to exist. The Docker
+# image inherits one from the Playwright base; a host checkout has to fetch it.
+install_browser() {
+  local executable
+
+  executable="$(cd web && node -e \
+    'process.stdout.write(require("playwright").chromium.executablePath())' 2>/dev/null || true)"
+
+  [ -n "$executable" ] && [ -x "$executable" ] && return 0
+
+  echo "==> Downloading Chromium for the renderer."
+  (cd web && npx --yes playwright install chromium)
+}
+
+##
+## The shared database
+##
+
+psql_() {
+  docker compose exec -T database psql \
+    --username "$DATABASE_USER" --dbname "$DATABASE_NAME" --port "$DATABASE_PORT" "$@"
+}
+
+# Only ever true on a machine whose volume is new: every other worktree is
+# looking at these same tables, and they are already there.
+prepare_database() {
+  local schema rows
+
+  schema="$(psql_ --tuples-only --no-align \
+    --command "select to_regclass('public.models')" 2>/dev/null | tr -d '[:space:]')"
+
+  if [ -z "$schema" ]; then
+    echo "==> Empty database. Creating the schema."
+    (cd web && npx drizzle-kit push --force)
+  fi
+
+  rows="$(psql_ --tuples-only --no-align --command 'select count(*) from models' | tr -d '[:space:]')"
+
+  if [ "$rows" = "0" ]; then
+    echo "==> Loading panel models."
+    psql_ --quiet --set ON_ERROR_STOP=1 < web/scripts/models.sql
+  fi
+}
+
+case "${1:-}" in
+  up)
+    write_env
+    install_dependencies
+    docker compose up --detach --wait database
+    prepare_database
+    install_browser
+    printf '\n  database       localhost:%s  (shared by every worktree)\n' "$DATABASE_PORT"
+    printf '  this worktree  %s  -  make dev\n\n' "$URL"
+    ;;
+  dev)
+    shift
+    running="$(running_port || true)"
+    if [ -n "$running" ]; then
+      printf '\n  already running  http://localhost:%s  -  one dev server per worktree\n\n' "$running"
+      exit 0
+    fi
+    # Next exits on a taken port rather than picking another, so the port is
+    # settled here: another worktree, or anything else on the machine, moves
+    # this one along instead of stopping it.
+    claim_free_port
+    # Rewritten on every start: a branch switch can change what belongs here,
+    # and a stale DATABASE_URL is a confusing way to find that out.
+    write_env
+    cd web
+    exec npm run dev -- --port "$DEV_PORT" "$@"
+    ;;
+  env)
+    write_env
+    echo "$ENV_FILE"
+    ;;
+  port)
+    echo "$DEV_PORT"
+    ;;
+  url)
+    echo "$URL"
+    ;;
+  open)
+    open "$URL"
+    ;;
+  psql)
+    shift
+    docker compose exec database psql \
+      --username "$DATABASE_USER" --dbname "$DATABASE_NAME" --port "$DATABASE_PORT" "$@"
+    ;;
+  *)
+    exec docker compose "$@"
+    ;;
+esac

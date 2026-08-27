@@ -20,11 +20,14 @@ first time it calls `/api/setup`.
 For development:
 
 ```bash
-cd web
-npm install
-npm run dev
-npx tsx --env-file=.env.local scripts/seed.mts   # a device, screens, sources, a tree
+make up     # database, .env.local, dependencies
+make dev    # http://localhost:3001, hot reload
+make seed   # a device, screens, sources, a tree
 ```
+
+`make help` lists the rest and prints this checkout's URL. One database serves
+every git worktree; each worktree gets a port of its own, so two branches can
+run side by side.
 
 ## How it works
 
@@ -74,11 +77,12 @@ rather than an error.
 ## Checking the work
 
 ```bash
+make test                                        # unit
+make verify                                      # the firmware wire contract, live
+
 cd web
-npx vitest run                                   # unit
-npx tsx scripts/verify-device-api.mts            # the firmware wire contract, live
 npx tsx --env-file=.env.local scripts/sweep.mts  # every extension at every shape
-npx tsx scripts/qa.mts                           # every page, in a browser
+npx tsx --env-file=.env.local scripts/qa.mts     # every page, in a browser
 ```
 
 Screenshots find what green tests do not. Every layout bug in this codebase was
