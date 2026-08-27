@@ -78,6 +78,26 @@ API_URI=https://dither.example.com
 Whatever the Connections page displays is what Dither will send, so register
 that.
 
+### In local development
+
+`make up` writes `API_URI` into `web/.env.local`, keeping the host from the
+root `.env` and changing only the port — because a device on the wall cannot
+reach `localhost`. That is right for devices and wrong for this handshake:
+Google accepts a plain-HTTP redirect URI **only** for `http://localhost` and
+`http://127.0.0.1`. A LAN address like `http://192.168.1.27:3005/...` cannot
+be registered at all, so the sign-in fails before it starts.
+
+While you are linking an account on a dev server, point `API_URI` at loopback
+on this worktree's port:
+
+```
+# web/.env.local, after `make up` — `make url` prints the port
+API_URI=http://localhost:3005
+```
+
+`make up` rewrites that key, so set it after running it. Devices will follow
+the same address, which on a dev box is usually what you want anyway.
+
 ## What it reads
 
 One request per refresh, per calendar being shown, at the extension's ten
