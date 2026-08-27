@@ -171,9 +171,9 @@ export async function refreshTrigger(trigger: Trigger, now = new Date()): Promis
   }
 }
 
-/** Refresh every trigger on a device whose data has aged out. */
-export async function refreshTriggers(deviceId: number, now = new Date()): Promise<FetchResult[]> {
-  const rows = await db.select().from(triggers).where(eq(triggers.deviceId, deviceId));
+/** Refresh every source whose data has aged out. Shared, so once for everyone. */
+export async function refreshTriggers(now = new Date()): Promise<FetchResult[]> {
+  const rows = await db.select().from(triggers);
   const due = [];
 
   for (const trigger of rows) {

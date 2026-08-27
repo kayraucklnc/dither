@@ -11,12 +11,13 @@ import { clockSource, deviceSource, triggerSource, type Source } from "@/lib/flo
  * Everything a device's tree can ask about: itself, the clock, and the trigger
  * sources set up on it.
  *
- * Triggers are deliberately not read off the screens a device shows. A trigger
- * is its own use of an extension with its own settings, so you can branch on a
- * station you are not displaying.
+ * Sources are deliberately not read off the screens a device shows, and not
+ * owned by the device either: one is a question asked of the world, so two
+ * panels can watch the same one and it is fetched once for both.
  */
 export async function sourcesFor(device: Device, now = new Date()): Promise<Source[]> {
-  const rows = await db.select().from(triggers).where(eq(triggers.deviceId, device.id));
+  // Sources are shared; the device and the clock are the two that are not.
+  const rows = await db.select().from(triggers);
   const built: Source[] = [deviceSource(device, now), clockSource(now)];
 
   for (const trigger of rows) {
@@ -47,8 +48,8 @@ function pretend(source: Source, values: Record<string, unknown>): Source {
 }
 
 /** Source id to the extension behind it, for notices placed with their source. */
-export async function sourceExtensions(deviceId: number): Promise<Record<string, string>> {
-  const rows = await db.select().from(triggers).where(eq(triggers.deviceId, deviceId));
+export async function sourceExtensions(): Promise<Record<string, string>> {
+  const rows = await db.select().from(triggers);
   return Object.fromEntries(rows.map((row) => [String(row.id), row.extension]));
 }
 

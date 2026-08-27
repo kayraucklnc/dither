@@ -90,7 +90,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     ? await activeNotices(
         await db.select().from(notices).where(eq(notices.deviceId, device.id)),
         await contextFor(device, simulation.at, simulation.overrides),
-        await sourceExtensions(device.id),
+        await sourceExtensions(),
         simulation.notices,
       )
     : [];

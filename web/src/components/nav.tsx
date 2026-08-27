@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Blocks, LayoutTemplate, Link2, MonitorSmartphone, SlidersHorizontal } from "lucide-react";
+import {
+  Blocks,
+  LayoutTemplate,
+  Link2,
+  MonitorSmartphone,
+  Radio,
+  SlidersHorizontal,
+} from "lucide-react";
 
 import { cn } from "@/lib/cn";
 
@@ -17,6 +24,7 @@ const LINKS = [
   { href: "/devices", label: "Devices", icon: MonitorSmartphone, hint: "What each panel is showing" },
   { href: "/screens", label: "Screens", icon: LayoutTemplate, hint: "Designs you can show" },
   { href: "/extensions", label: "Extensions", icon: Blocks, hint: "What screens are built from" },
+  { href: "/sources", label: "Sources", icon: Radio, hint: "What Dither watches, shared by every device" },
   { href: "/connections", label: "Connections", icon: Link2, hint: "Accounts Dither can read from" },
   { href: "/settings", label: "Settings", icon: SlidersHorizontal, hint: "Language and time zone" },
 ];

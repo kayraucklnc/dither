@@ -21,7 +21,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!Number.isInteger(deviceId)) return NextResponse.json({ error: "Bad id." }, { status: 400 });
 
   const rows = await db.select().from(notices).where(eq(notices.deviceId, deviceId));
-  const sources = await db.select().from(triggers).where(eq(triggers.deviceId, deviceId));
+  // Suggestions come from every source, because they are shared now.
+  const sources = await db.select().from(triggers);
 
   const suggestions = [];
 

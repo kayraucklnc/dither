@@ -42,8 +42,10 @@ export interface EditorSource {
   capabilitiesFrom?: string;
   settings?: Record<string, unknown>;
   error?: string;
-  /** How many checks and notices read from it. */
+  /** How many checks and notices read from it, across every device. */
   usedBy?: number;
+  /** Which devices those are, since a source is shared. */
+  usedOn?: string[];
 }
 
 export interface SourceKind {

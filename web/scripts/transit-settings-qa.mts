@@ -20,13 +20,23 @@ await page.locator(".paper-shadow").first().click({ position: { x: 120, y: 200 }
 await page.waitForTimeout(2500);
 await page.screenshot({ path: "/tmp/transit-settings.png" });
 
-// Switching to a metro operator should hide "To" and the platform switch.
+const pickOperator = async (name: RegExp) => {
+  await page.locator("aside").getByLabel("Operator").click();
+  await page.waitForTimeout(400);
+  await page.getByRole("option", { name }).click();
+  await page.waitForTimeout(2000);
+};
+
+// The previous run leaves whatever it chose, so start from a known operator.
+await pickOperator(/Trenord/);
 const beforeTo = await page.getByText("To", { exact: true }).count();
-await page.locator("aside").getByLabel("Operator").click();
-await page.waitForTimeout(400);
-await page.getByRole("option", { name: /ATM/ }).click();
-await page.waitForTimeout(2000);
+
+// A metro board has no destination and no platform, so both should go.
+await pickOperator(/ATM/);
 const afterTo = await page.getByText("To", { exact: true }).count();
+
+// And leave it as it was found, so the next run starts from the same place.
+await pickOperator(/Trenord/);
 
 console.log(`"To" field with Trenord: ${beforeTo}, with ATM: ${afterTo}`);
 await page.screenshot({ path: "/tmp/transit-atm.png" });

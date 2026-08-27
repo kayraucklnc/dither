@@ -15,6 +15,7 @@ const PAGES = [
   ["/screens/12", "The screen editor"],
   ["/extensions", "Extensions"],
   ["/extensions/weather", "An extension"],
+  ["/sources", "Sources"],
   ["/connections", "Connections"],
   ["/settings", "Settings"],
 ];
