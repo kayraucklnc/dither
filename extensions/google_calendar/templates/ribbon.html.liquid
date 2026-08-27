@@ -86,8 +86,9 @@
         that every percentage below is a percentage of the *track* - work them
         out against the whole width instead and a meeting in the second column
         hangs off the right-hand edge by exactly one gutter. {% endcomment -%}
-      {%- assign first_hour = open | divided_by: 60 -%}
-      {%- assign last_hour = close | divided_by: 60 -%}
+      {%- comment -%} Floored: a day that starts at 07:30 is still hour seven. {%- endcomment -%}
+      {%- assign first_hour = open | divided_by: 60 | floor -%}
+      {%- assign last_hour = close | divided_by: 60 | floor -%}
       {% for hour in (first_hour..last_hour) %}
         {%- assign at = hour | times: 60 | minus: open | times: 1000 | divided_by: span -%}
         {%- assign since = hour | minus: first_hour -%}

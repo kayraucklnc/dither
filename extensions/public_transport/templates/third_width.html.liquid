@@ -7,6 +7,26 @@
     <div class="title truncate" style="font-size: 17px">{% if extension.values.heading != blank %}{{ extension.values.heading | truncate: 14 }}{% else %}{{ board.origin | truncate: 14 }}{% endif %}</div>
   </div>
 
+  {% comment %}
+    How many departures the box will actually hold.
+
+    The fetch already trims to the "Departures to show" setting, so this is the
+    other half of the question: whether the room exists to draw them. A board
+    at half width is 480px tall and a board at half width in a nine-row slot is
+    360px, and a fixed count clips the last row halfway through in the second -
+    which reads as a rendering fault rather than as a board that is full.
+
+    Chrome first, because an alert line and a notice strip each take a row's
+    worth away from the list. A filter cannot appear inside an `if`, so every
+    step is assigned.
+  {% endcomment %}
+  {% assign chrome = 44 %}
+  {% if board.alert != blank %}{% assign chrome = chrome | plus: 40 %}{% endif %}
+  {% if notices.size > 0 %}{% assign chrome = chrome | plus: 34 %}{% endif %}
+  {% assign room = shape.height | minus: chrome %}
+  {% assign fits = room | divided_by: 56 %}
+  {% if fits < 1 %}{% assign fits = 1 %}{% endif %}
+
   {% if board.empty %}
     <div class="content layout layout--col layout--center" style="gap: 6px">
       <span class="i i-train i-md"></span>
@@ -15,7 +35,7 @@
   {% else %}
     <div class="content content--tight">
       <div class="list">
-        {% for train in board.departures limit: 6 %}
+        {% for train in board.departures limit: fits %}
           <div class="list-item" style="padding: 8px 0">
             <span style="min-width: 0">
               <span class="t-sm t-bold" style="display: block">{{ train.line }}</span>
