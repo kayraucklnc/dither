@@ -137,11 +137,14 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
   already said yes returns an access token and nothing durable, so the
   connection dies quietly an hour later. Access tokens are never stored - they
   are minted from the refresh token and held in memory.
-- **The redirect URI is the address a browser reaches, not the one the
-  container listens on.** It has to match what is registered character for
-  character, so it is read from `API_URI` or the forwarded headers, and shown
-  on the connections page to be copied. Guessing it is `redirect_uri_mismatch`
-  on Google's error page, not ours.
+- **The redirect URI is the address a *browser* reaches, and `API_URI` is not
+  it.** `API_URI` names the host a panel on the wall can reach - a LAN address
+  on a dev box - and Google refuses a plain-HTTP redirect URI that is not
+  `localhost`, so it cannot even be registered. Devices do not do OAuth. It is
+  read from the forwarded headers, then the host the browser sent, with
+  `DITHER_OAUTH_ORIGIN` for a proxy that reveals neither, and shown on the
+  connections page to be copied. Guessing it is `redirect_uri_mismatch` on
+  Google's error page, not ours.
 - **A row is not a link when the link finishes in the browser.** The client
   credentials are stored the moment they are pasted; only a stored refresh
   token means anyone consented. `isLinked` in `web/src/lib/connections/link.ts`

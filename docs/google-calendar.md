@@ -64,39 +64,44 @@ without touching Dither.
 The card then shows the address of the account it linked. Every calendar
 widget and every calendar trigger on every screen uses it.
 
-## Behind a proxy or a tunnel
+## The address it uses, and why it is not `API_URI`
 
-The redirect URI has to be the address a *browser* reaches Dither at, not the
-address the container listens on. Dither works it out from `X-Forwarded-Proto`
-and `X-Forwarded-Host`, and if your proxy does not set those, set `API_URI` —
-the same variable that fixes up the URLs handed to devices:
+The redirect URI is the address a **browser** reaches Dither at. That is not
+the address a device reaches it at, and only one of them is allowed here:
+Google refuses a plain-HTTP redirect URI unless the host is `localhost` or
+`127.0.0.1`. A LAN address cannot even be registered — the console answers
 
-```
-API_URI=https://dither.example.com
-```
+> Invalid Redirect: must end with a public top-level domain (such as .com or
+> .org).
 
-Whatever the Connections page displays is what Dither will send, so register
-that.
+`API_URI` names the host a panel on the wall can reach, which on a dev box *is*
+a LAN address. Devices do not do OAuth, so it takes no part in this decision.
+Dither reads the browser's own view of the server instead: `X-Forwarded-Proto`
+and `X-Forwarded-Host` first, because behind a reverse proxy the request's own
+host is the proxy's internal one, then the host the browser did send.
 
-### In local development
-
-`make up` writes `API_URI` into `web/.env.local`, keeping the host from the
-root `.env` and changing only the port — because a device on the wall cannot
-reach `localhost`. That is right for devices and wrong for this handshake:
-Google accepts a plain-HTTP redirect URI **only** for `http://localhost` and
-`http://127.0.0.1`. A LAN address like `http://192.168.1.27:3005/...` cannot
-be registered at all, so the sign-in fails before it starts.
-
-While you are linking an account on a dev server, point `API_URI` at loopback
-on this worktree's port:
+So on a dev server, open the dashboard at **`http://localhost:<port>`** — `make
+url` prints the port — and register exactly what the Connections page then
+shows:
 
 ```
-# web/.env.local, after `make up` — `make url` prints the port
-API_URI=http://localhost:3005
+http://localhost:3001/api/connections/google/callback
 ```
 
-`make up` rewrites that key, so set it after running it. Devices will follow
-the same address, which on a dev box is usually what you want anyway.
+Reaching the dashboard at the LAN address instead would advertise the LAN
+address, which is the thing Google will not take.
+
+### When nothing in the request is true
+
+A reverse proxy that rewrites the host and sets no forwarded headers leaves
+Dither nothing to go on. Name the public origin explicitly:
+
+```
+DITHER_OAUTH_ORIGIN=https://dither.example.com
+```
+
+It wins over everything else, and `make up` does not touch it. Whatever the
+Connections page displays is what Dither will send, so register that.
 
 ## What it reads
 

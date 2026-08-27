@@ -103,13 +103,22 @@ export function isHalfway(source: Provider, row: Linked | undefined): boolean {
 /**
  * The origin to build a redirect URI from.
  *
- * It has to match, character for character, what was registered with the
- * provider - so `API_URI` wins when it is set, exactly as it does for the URLs
- * handed to devices. Behind a reverse proxy the request's own origin is the
- * proxy's internal one, which is why the forwarded headers are read before it.
+ * The browser's own view of this server, not the device's. Those are different
+ * addresses and only one of them is allowed here: `API_URI` names the host a
+ * panel on the wall can reach, which on a dev box is a LAN address, and Google
+ * refuses a plain-HTTP redirect URI that is not `localhost` or `127.0.0.1` -
+ * it cannot even be registered. Devices do not do OAuth, so `API_URI` has no
+ * business in this decision.
+ *
+ * What is left is what the browser asked for: the forwarded headers first,
+ * because behind a reverse proxy the request's own host is the proxy's
+ * internal one, then the host it did send. `DITHER_OAUTH_ORIGIN` is for the
+ * proxy that rewrites the host and sets no forwarded headers - the one case
+ * where nothing in the request is true.
  */
 export function originFromHeaders(headers: Headers, fallback = "http://localhost:3000"): string {
-  if (process.env.API_URI) return process.env.API_URI.replace(/\/+$/, "");
+  const declared = process.env.DITHER_OAUTH_ORIGIN;
+  if (declared) return declared.replace(/\/+$/, "");
 
   const host = headers.get("x-forwarded-host") ?? headers.get("host");
   if (!host) return fallback;
