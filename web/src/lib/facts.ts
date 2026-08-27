@@ -26,6 +26,22 @@ export interface Fact {
   /** Dotted path into the source's payload. A numeric step indexes an array. */
   path: string;
   unit: string;
+  /**
+   * For a countdown: the dotted path to the *instant* it counts down to.
+   *
+   * A fetched payload is a photograph. "Next meeting in 30 minutes" was true
+   * when the provider was asked and is a lie a quarter of an hour later, so a
+   * check that compares the stored number is comparing against whenever the
+   * last fetch happened rather than against now - and it never stops being
+   * true, because a number in a row does not tick. Given the instant instead,
+   * the value is worked out at the moment the question is asked, and it reads
+   * as nothing once that instant has gone by: a meeting that has started is
+   * not the next meeting, it is this one.
+   *
+   * The path may hold epoch seconds, epoch milliseconds, or anything `Date`
+   * can parse. `path` stays declared, and is what a design draws.
+   */
+  until?: string;
 }
 
 /** How many operands the editor should ask for. */
@@ -132,6 +148,61 @@ export function setAt(data: unknown, path: string, value: unknown): unknown {
   }
 
   return root;
+}
+
+/**
+ * An instant at a dotted path, in epoch milliseconds.
+ *
+ * Epoch *seconds* is what the payloads carry - `at_epoch` is a Unix timestamp
+ * - so a bare number small enough to be seconds is read as seconds. The cutoff
+ * is 1e11, which as milliseconds is 1973 and as seconds is the year 5138:
+ * nothing a calendar or a timetable can hold falls on the wrong side of it.
+ */
+export function instantAt(data: unknown, path: string): number | undefined {
+  const value = valueAt(data, path);
+
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return undefined;
+    return Math.abs(value) < 1e11 ? value * 1000 : value;
+  }
+
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Date.parse(value.trim());
+    return Number.isNaN(parsed) ? undefined : parsed;
+  }
+
+  return undefined;
+}
+
+/**
+ * What a check actually sees, asked at the moment it is asked.
+ *
+ * Everything except a countdown is read straight out of the payload. A
+ * countdown is recomputed here rather than trusted, because the stored one
+ * stopped at the last fetch - see `until`. The one place both the tree and the
+ * dashboard read a fact, so the number on the canvas is the number the panel
+ * decided on.
+ */
+export function readFact(fact: Fact, payload: unknown, now: Date): unknown {
+  if (!fact.until) return valueAt(payload, fact.path);
+
+  const at = instantAt(payload, fact.until);
+  // Nothing to count down to, or it has already gone by. Either way there is
+  // no answer, and every operator in `compare` reads that as false.
+  if (at === undefined || at <= now.getTime()) return undefined;
+
+  return Math.round((at - now.getTime()) / 60_000);
+}
+
+const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** A fact's current value, for a human. `—` when there is not one. */
+export function showFact(fact: Fact, value: unknown): string {
+  if (value === null || value === undefined) return "—";
+  if (fact.type === "boolean") return value ? "yes" : "no";
+  if (fact.type === "weekday") return DAYS_SHORT[Number(value)] ?? String(value);
+
+  return String(value);
 }
 
 const isBlank = (value: unknown) =>

@@ -174,6 +174,25 @@ introduces itself again afterwards, as a new device with a new key.
   never raw - a key that moved every second would hand a new file to a device
   that cannot use it, and every one of those is a redraw and a slice of
   battery.
+- **A countdown in a fetched payload stopped counting when it was fetched, and
+  a check that reads it decides on a moment that has gone.** "Next meeting in
+  30 minutes" was true when Google was asked; ten minutes later it is a lie,
+  and it is a lie that never expires, because a number in a row does not tick.
+  So `next_meeting_in` and `next_departure_in` declare `until` - the path to
+  the *instant* they count down to - and `readFact` works the minutes out
+  against `context.now`, reading as nothing once that instant has passed: a
+  meeting that has started is not the next meeting. Only `readFact` may read a
+  fact, and the canvas and the sources page go through it too, or the dashboard
+  explains a screen the panel is not showing. It is the clock's `tick` problem
+  wearing the flow layer's clothes.
+- **A source that has stopped answering must stop deciding.** `recordFailure`
+  keeps the last payload on purpose - a dead provider should leave the picture
+  up with a note over it rather than blank the panel - but a decision has
+  nowhere to put that note, so it just shows the wrong screen, for ever.
+  `reading` takes `staleFrom`, the extension's own interval, and a failing
+  answer older than that reads as nothing, the same way a stand-in does.
+  Failing *and still fresh* keeps deciding, so one bad request does not move a
+  panel off the screen it is on.
 - **A flex row that has been shrunk pushes its own contents out.** A column
   whose children total a few pixels more than the box shrinks whichever row it
   likes, and a shrunk row with `align-items: flex-end` sends its contents up
