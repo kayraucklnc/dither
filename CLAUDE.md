@@ -97,6 +97,16 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
 - **Stripe counts in minor units, and a few currencies have none.** Divide a
   yen amount by a hundred and every figure is wrong by two orders of magnitude.
   See `web/src/lib/money.ts`.
+- **The sample is for pictures, never for decisions.** `answersFor` falls back
+  to the extension's sample when a question has no answer, which is what lets a
+  screen be arranged before anyone owns the hardware. Hand that to the tree or
+  to a notice and the device branches on invented data - the transit sample
+  describes a service alert, so every unanswered board shouted one for ever.
+  `reading()` is the gate; the flow layer never sees a stand-in.
+- **Sources refresh when a device wakes, and something has to do it.** `serve`
+  refreshes the stale ones *before* the walk, because the walk is what reads
+  them. Left out, a source answers once at creation and decides with that
+  forever, and a source whose first fetch failed never tries again.
 - **"Today" is a local day, and midnight's offset is not always now's.** On the
   morning the clocks change, the naive answer is an hour into the previous day.
   See `web/src/lib/clock.ts`.
