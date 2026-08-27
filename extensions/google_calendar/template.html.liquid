@@ -32,8 +32,8 @@
         {% endfor %}
         <p class="t-sm">All day. Nothing else scheduled.</p>
       {% else %}
-        <p class="t-xl t-bold">Nothing scheduled</p>
-        <p class="t-sm">The rest of the day is yours.</p>
+        <p class="t-xl t-bold">{{ calendar.empty_label | default: "Nothing scheduled" }}</p>
+        <p class="t-sm">Nothing on the calendars you picked.</p>
       {% endif %}
     </div>
   {% else %}

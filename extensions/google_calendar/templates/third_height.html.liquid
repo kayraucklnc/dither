@@ -6,7 +6,7 @@
   {% if calendar.empty or next == nil %}
     <div class="content layout layout--row layout--center" style="gap: 12px">
       <span class="i i-calendar-check i-md"></span>
-      <p class="t-md t-bold">Nothing scheduled</p>
+      <p class="t-md t-bold">{{ calendar.empty_label | default: "Nothing scheduled" }}</p>
     </div>
   {% else %}
     <div class="content layout layout--row" style="align-items: center; gap: 24px">

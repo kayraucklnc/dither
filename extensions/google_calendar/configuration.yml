@@ -264,6 +264,7 @@ sample:
         day: "Sat"
     range: week
     range_label: "This week"
+    empty_label: "Nothing this week"
     spans_days: true
     many: true
     names:

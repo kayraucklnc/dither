@@ -30,8 +30,8 @@
   {% if calendar.empty and calendar.all_day.size == 0 %}
     <div class="content layout layout--col layout--center" style="gap: 8px">
       <span class="i i-calendar-check i-lg"></span>
-      <p class="t-md t-bold">Nothing scheduled</p>
-      <p class="t-xs">{{ calendar.range_label }} is clear.</p>
+      <p class="t-md t-bold">{{ calendar.empty_label | default: "Nothing scheduled" }}</p>
+      <p class="t-xs">Nothing on the calendars you picked.</p>
     </div>
   {% else %}
     <div class="content content--tight">
