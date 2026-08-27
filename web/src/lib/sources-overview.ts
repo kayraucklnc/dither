@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { decisionNodes, devices, notices, triggers } from "@/lib/db/schema";
-import { answersFor, observationKey } from "@/lib/extensions/observations";
+import { answersFor, observationKey, reading } from "@/lib/extensions/observations";
 import { all, find } from "@/lib/extensions/registry";
 import { valueAt, type Fact } from "@/lib/facts";
 import type { Field } from "@/lib/extensions/manifest";
@@ -68,13 +68,16 @@ export async function sourcesOverview(): Promise<SourceOverview[]> {
 
   for (const row of rows) {
     const extension = await find(row.extension);
-    const answer = answers.get(observationKey(row.extension, row.settings));
-    const age = answer?.fetchedAt
+    // What it *reads*, which is nothing until it has answered for itself. The
+    // page would otherwise recite the extension's sample as this source's
+    // current values, and every rule built on them would look sound.
+    const answer = reading(answers.get(observationKey(row.extension, row.settings)));
+    const age = answer.fetchedAt
       ? Math.floor((now - answer.fetchedAt.getTime()) / 60_000)
       : null;
 
     const facts = [...(extension?.manifest.facts ?? []), FRESHNESS_FACT];
-    const payload = { ...(answer?.payload ?? {}), _dither: { minutes_since_update: age } };
+    const payload = { ...answer.payload, _dither: { minutes_since_update: age } };
     const values: Record<string, string> = {};
 
     for (const fact of facts) {
@@ -102,8 +105,8 @@ export async function sourcesOverview(): Promise<SourceOverview[]> {
       capabilitiesFrom: extension?.manifest.capabilities_from,
       facts,
       values,
-      fetchedAt: answer?.fetchedAt ? answer.fetchedAt.toISOString() : null,
-      error: answer?.error,
+      fetchedAt: answer.fetchedAt ? answer.fetchedAt.toISOString() : null,
+      error: answer.error,
       usedBy: uses.get(String(row.id)) ?? 0,
       usedOn: [...(usedOn.get(String(row.id)) ?? [])],
     });

@@ -88,6 +88,30 @@ export async function answersFor(asked: Question[]): Promise<Map<string, Answer>
   return answers;
 }
 
+/**
+ * The same answer, as a *decision* is allowed to read it.
+ *
+ * `answersFor` falls back to the extension's sample, which is right for a
+ * picture and wrong for a rule. A widget drawing the sample is a screen being
+ * designed before anyone owns the hardware; a check reading it is a device
+ * branching on invented data, and a notice reading it fires on an alert nobody
+ * published - permanently, because a source that has never answered never
+ * stops being a stand-in.
+ *
+ * So a stand-in reads as nothing here. Every operator in `compare` already
+ * answers false for missing data, which is exactly the wanted behaviour: a
+ * source that has not spoken does not get to decide anything.
+ */
+export function reading(answer: Answer | undefined): {
+  payload: Record<string, unknown>;
+  fetchedAt: Date | null;
+  error?: string;
+} {
+  return answer && !answer.standIn
+    ? { payload: answer.payload, fetchedAt: answer.fetchedAt, error: answer.error }
+    : { payload: {}, fetchedAt: null, error: answer?.error };
+}
+
 export async function record(
   extension: string,
   settings: Record<string, unknown>,
