@@ -82,6 +82,48 @@ fields:
 There is no dashboard code to write for a new field. Declare it and the form
 grows a control.
 
+### Settings that follow the settings above them
+
+A field can hide itself unless another answer has a particular value, so a
+form asks one question at a time rather than all of them at once:
+
+```yaml
+  - keyname: window
+    name: Over what period
+    field_type: select
+    options: [today, last_7d, last_30d]
+    visible_when:
+      field: metric            # another keyname, or `design` for the style
+      any_of: [taken]
+```
+
+`field: design` is how a design brings its own settings — a chart style can ask
+what goes behind the number without every other style asking too.
+
+### Settings that must not cost a fetch
+
+An answer is cached by the *question*, and the question is every setting the
+widget carries. So a field that only decides how the data is **drawn** has to
+say so, or two widgets that differ by nothing but a style are two questions and
+two trips to the provider:
+
+```yaml
+  - keyname: line_style
+    name: How the line is drawn
+    field_type: select
+    presentation: true        # changes the picture, never the fetch
+```
+
+The default is `false`, meaning "this changes the answer", because that is the
+safe way round: a field wrongly marked presentational makes two widgets share
+one answer, and two weather widgets showing one city is a worse failure than
+one extra fetch.
+
+The whole of `revenue` is marked this way. One Stripe payload holds every
+window and every metric, so six revenue widgets showing six different numbers
+cost one fetch between them — but only because not one of their settings
+reaches the provider.
+
 ## Fetching
 
 The URL is a Liquid template over *this widget's* settings, which is what lets
@@ -177,7 +219,7 @@ Plain Liquid. The context is:
 | `source_1`, `source_2`, … | what each exchange answered |
 | `notices` | things another extension wants said here |
 | `shape` | the box you are drawing into — see below |
-| `dither` | `.locale`, `.timezone`, `.offset_hours` from Settings |
+| `dither` | `.locale`, `.timezone`, `.offset_hours` from Settings, and `.window_minutes` — see *Drawing the clock* |
 
 ### Sizes and designs
 
@@ -206,6 +248,8 @@ designs:
 `nominal` decides which design wins when more than one covers a size: the least
 stretched one, measured as a scale-free distance from its nominal. It is also
 the size the catalogue previews it at.
+
+A design may also declare `tick: <seconds>` — see *Drawing the clock*.
 
 **You usually do not need to declare anything.** A template named after one of
 the eight original shapes inherits that shape's range:
@@ -280,10 +324,75 @@ Filters that save a hundred lines of `{% case %}`:
 `weather_icon` · `weather_label` · `weather_short` · `compass` · `in_words` ·
 `clock_of` · `hour_of` · `as_percent` · `at_least` · `at_most`
 
+And for anything that draws time or geometry:
+
+`time_in_words` · `part_of_day` · `span_in_words` · `through_day` ·
+`minutes_of` · `sin_of` · `cos_of`
+
+`sin_of` and `cos_of` measure angles the way a clock face does — zero at
+twelve, increasing clockwise — because the thing they exist for is finding the
+two corners of a wedge. Rotating a shape about a point needs none of this;
+`transform="rotate(a 100 100)"` is still the right way to draw a hand.
+
 Two traps that have already cost time: a bar's fill must be a **block**
 element for a percentage height to apply, and a chart drawn from zero when
 every value sits between 2980 and 4260 is seven identical bars — scale between
 the low and the high instead.
+
+## Drawing the clock
+
+A panel is not a clock. A device wakes, is handed one picture, paints it, and
+sleeps — for a quarter of an hour, usually. Two things follow, and an extension
+that draws the time has to deal with both.
+
+**Say how often your picture changes.** A render is cached by everything that
+can change it, and until a design says otherwise the clock is not one of those
+things. A design that draws the time and declares nothing is served the picture
+from whenever its data last moved — which, for an extension that fetches
+nothing, is never.
+
+```yaml
+designs:
+  - template: digital
+    label: Readout
+    tick: 60                  # seconds between one drawing and a different-looking one
+  - template: dial
+    label: Dial
+    tick: 300
+```
+
+The server then redraws it exactly that often and no more often: every changed
+filename costs the device a redraw and a slice of battery.
+
+**Know how long your picture has to last.** `dither.window_minutes` is the
+device's own refresh rate, and it is the difference between a clock that is
+wrong fourteen minutes in fifteen and one that is never wrong at all:
+
+```liquid
+{{ minutes_of_day | time_in_words: dither.window_minutes }}
+```
+
+Three ways to spend it, all of them in `clock`:
+
+- **Hedge the words.** "Just gone half past ten" is true at 10:31 and still
+  true at 10:44. `time_in_words` never names a mark that has not happened and
+  drops "just" once the window outlives it.
+- **Draw the span.** The dial replaces the minute hand with a wedge covering
+  the minutes between this drawing and the next, and the `slice` face is
+  nothing but that wedge. Read as "somewhere in here", it is never wrong.
+- **Put the hand in the middle of it.** A hand at the minute of drawing is
+  right for an instant and then falls behind for the whole window. At the
+  middle it is half a window fast, then half a window slow — the same error,
+  split either side of the truth, so the average miss is halved.
+
+## Drawing for a dithered panel
+
+The panel is 1-bit, but the image is *dithered* on the way out, so a grey ramp
+becomes a stipple. That is the only tint this medium has and the one thing it
+does beautifully: the area under `revenue`'s line is a gradient from ink at the
+line to paper at the axis, and it reads as depth where a solid black fill is a
+blot. Anything you would have used opacity for, use a ramp for instead —
+opacity itself dithers to noise.
 
 ## Checking your work
 
@@ -300,20 +409,3 @@ It flags anything that throws or comes back near-blank. Images land in
 `/tmp/dither-sweep` — look at them. Every layout bug in this codebase was
 found by looking.
 
-### Settings that follow the settings above them
-
-A field can hide itself unless another answer has a particular value, so a
-form asks one question at a time rather than all of them at once:
-
-```yaml
-  - keyname: window
-    name: Over what period
-    field_type: select
-    options: [today, last_7d, last_30d]
-    visible_when:
-      field: metric            # another keyname, or `design` for the style
-      any_of: [taken]
-```
-
-`field: design` is how a design brings its own settings — a chart style can ask
-what goes behind the number without every other style asking too.

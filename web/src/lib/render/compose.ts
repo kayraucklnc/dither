@@ -4,7 +4,12 @@ import path from "node:path";
 
 import { find as findExtension, rendersNotices } from "@/lib/extensions/registry";
 import { COLUMNS, ROWS, sizeOf, type Size } from "@/lib/shapes";
-import { DEFAULT_ENVIRONMENT, renderWidget, type Environment } from "./liquid";
+import {
+  DEFAULT_ENVIRONMENT,
+  DEFAULT_REFRESH_SECONDS,
+  renderWidget,
+  type Environment,
+} from "./liquid";
 
 /**
  * Turn a screen into one HTML document the size of the panel.
@@ -223,6 +228,9 @@ export async function compose(
   height: number,
   notices: Notice[] = [],
   environment: Environment = DEFAULT_ENVIRONMENT,
+  /** The device's refresh rate, so a design that draws the clock knows how
+      long its picture has to stay true. */
+  refreshSeconds: number = DEFAULT_REFRESH_SECONDS,
 ): Promise<Composition> {
   const problems: string[] = [];
   const cells: string[] = [];
@@ -262,6 +270,7 @@ export async function compose(
       notices: routed.get(widget.id) ?? [],
       environment,
       pixels: box,
+      refreshSeconds,
     });
 
     if ("problem" in rendered) {
@@ -328,6 +337,7 @@ export async function composeSolo(
   height: number,
   environment: Environment = DEFAULT_ENVIRONMENT,
   notices: Notice[] = [],
+  refreshSeconds: number = DEFAULT_REFRESH_SECONDS,
 ): Promise<Composition> {
   const extension = await findExtension(widget.extension);
   const css = await framework();
@@ -353,6 +363,7 @@ export async function composeSolo(
     notices,
     environment,
     pixels: { width, height },
+    refreshSeconds,
   });
 
   if ("problem" in rendered) {

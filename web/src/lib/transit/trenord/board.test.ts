@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { departureFrom, type TrenordSettings } from "./board";
+import { departureFrom, headlineOf, type TrenordSettings } from "./board";
 
 /**
  * One solution, shaped the way Trenord's planner shapes them.
@@ -163,5 +163,43 @@ describe("building one departure", () => {
 
     expect(one.day_offset).toBe(1);
     expect(one.minutes_until).toBe(90);
+  });
+});
+
+describe("what an alert is called", () => {
+  it("keeps a title that says something", () => {
+    expect(headlineOf("Reduced service", "Engineering work near Certosa.")).toBe(
+      "Reduced service",
+    );
+  });
+
+  it("looks past the name of the noticeboard to what is actually on it", () => {
+    // Trenord titles every bulletin "Bacheca digitale" whatever it says, so a
+    // board showing the title shows the name of the noticeboard and never the
+    // notice - a permanent warning glyph attached to no information.
+    expect(
+      headlineOf(
+        "Digital notice board",
+        "Rail service is suspended on the Milan bypass. Replacement buses are running.",
+      ),
+    ).toBe("Rail service is suspended on the Milan bypass.");
+  });
+
+  it("does the same in the language the board was asked for", () => {
+    expect(headlineOf("Bacheca digitale", "Servizio sospeso. Bus sostitutivi.")).toBe(
+      "Servizio sospeso.",
+    );
+  });
+
+  it("cuts a sentence nobody can read off a strip", () => {
+    const long = `${"Attention please, ".repeat(20)}.`;
+    const said = headlineOf("Digital notice board", long);
+
+    expect(said.length).toBeLessThanOrEqual(140);
+    expect(said.endsWith("...")).toBe(true);
+  });
+
+  it("falls back to the title when there is no message at all", () => {
+    expect(headlineOf("Digital notice board", "")).toBe("Digital notice board");
   });
 });

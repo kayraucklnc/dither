@@ -71,6 +71,14 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
   covers is refused rather than scaled, so a full-page design is never crammed
   into a corner. Where several designs cover one size, the widget picks: that
   is the "style". See `web/src/lib/designs.ts`.
+- **A panel is not a clock, and a design that draws one has to say so.** The
+  device wakes, is handed one picture, paints it and sleeps for a quarter of an
+  hour. So a design declares `tick`: how many seconds pass before it would look
+  different, which is how often the server bothers to redraw it. And it is told
+  `dither.window_minutes`: how long the picture has to stay true, which is what
+  the wedge on the dial is drawn from and what `time_in_words` hedges by. The
+  hands sit at the *middle* of that window, not at its start - the same error,
+  split either side of the truth, so the average miss is halved.
 
 ## Traps already paid for
 
@@ -108,7 +116,38 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
   window and every metric, because an observation is cached by the question -
   the extension and its settings. Six revenue widgets showing six numbers must
   cost one trip, so the *widget* chooses from a payload that has everything,
-  rather than the provider being told what to fetch.
+  rather than the provider being told what to fetch. That only holds because
+  every presentational field says `presentation: true` and is dropped from the
+  question: leave it off one field and a style change is a second fetch. The
+  default is off, deliberately - two weather widgets sharing one city is a
+  worse failure than one extra fetch.
+- **A clock with no `tick` freezes forever.** The render cache key covers
+  everything that can change the picture; a clock fetches nothing, so without a
+  declared tick its key never moves and the panel keeps the picture from
+  whenever the screen was last edited. The tick goes into the hash quantised,
+  never raw - a key that moved every second would hand a new file to a device
+  that cannot use it, and every one of those is a redraw and a slice of
+  battery.
+- **A flex row that has been shrunk pushes its own contents out.** A column
+  whose children total a few pixels more than the box shrinks whichever row it
+  likes, and a shrunk row with `align-items: flex-end` sends its contents up
+  through the top of the panel - which reads as a missing caption rather than
+  as an overflow. Everything that is not the part meant to absorb the slack
+  wants `flex: none`.
+- **Grey is the only tint this display has, and it is worth having.** The
+  panel is 1-bit but the image is dithered on the way out, so a gradient
+  resolves into a stipple. The area under the revenue line is a ramp from ink
+  to paper and reads as depth; the solid black it replaced was a blot.
+  Opacity, by contrast, dithers to noise - use a ramp, never `opacity`.
+- **"All time" is bounded, so it is a floor and has to say so.** Nobody can
+  promise to page through an account's whole history on a display's refresh, so
+  the lifetime figure walks back three thousand movements and stops. When the
+  bound bites, the figure carries a "+" and the detail line says there is more
+  behind it - the same way the customer count does. A number that quietly means
+  "at least" is the one kind of wrong figure a dashboard is never forgiven for.
+- **Padding a band off its width eats the band.** A full-width strip is 800 by
+  80; a twentieth of the *width* either side is 80 pixels of an 80-pixel box.
+  Anything that draws at a band size takes its padding from the shorter side.
 - **Stripe counts in minor units, and a few currencies have none.** Divide a
   yen amount by a hundred and every figure is wrong by two orders of magnitude.
   See `web/src/lib/money.ts`.

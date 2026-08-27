@@ -1,0 +1,162 @@
+{% comment %}
+  Milestone - how far along you are, and how far there is to go.
+
+  The one design here that is not a measurement. Every other one answers "what
+  happened"; this one answers "how close am I", which is a different job and
+  the reason anybody puts a revenue figure on a wall in the first place.
+
+  It follows whatever the widget was already pointed at - all-time takings,
+  customers, subscribers, MRR - because a milestone is not a separate question,
+  it is the same figure with a target beside it. The rungs are 1, 1.5, 2, 2.5,
+  3, 4, 5 and 7.5 at every order of magnitude, so the next one is always
+  between a tenth and a half again above where you are: far enough to be worth
+  reaching, near enough to be worth watching. Powers of ten alone would tell
+  somebody with 1,284 customers to go and get 10,000.
+
+  The days remaining are printed only where a real rate stands behind them -
+  the last thirty days for money, the signup rate for subscribers. A made-up
+  date on a wall is worse than no date.
+{% endcomment %}
+
+{%- assign money = revenue -%}
+{%- assign metric = extension.values.metric | default: "taken" -%}
+{%- assign period = extension.values.window | default: "today" -%}
+
+{%- comment %} The figure, and the milestone that belongs to it, are looked up
+  by the same key. Anything with no milestone - the next subscriber, which is a
+  date - falls back to saying so rather than inventing one. {% endcomment -%}
+{%- if metric == "taken" -%}
+  {%- assign card = money.windows[period] -%}
+  {%- assign mark = money.milestones[period] -%}
+{%- elsif metric == "next_subscriber" and extension.values.basis == "renewal" -%}
+  {%- assign card = money.cards.next_renewal -%}
+{%- else -%}
+  {%- assign card = money.cards[metric] -%}
+  {%- assign mark = money.milestones[metric] -%}
+{%- endif -%}
+
+{%- assign box_w = shape.width | at_least: 240 -%}
+{%- assign box_h = shape.height | at_least: 110 -%}
+{%- assign pad = box_w | divided_by: 20 | at_least: 12 | at_most: 26 -%}
+
+<div class="screen">
+  {%- unless card -%}
+    <div class="content layout layout--col layout--center" style="gap: 8px; padding: {{ pad }}px">
+      <span class="i i-card i-xl"></span>
+      <p class="t-md t-bold">Not connected</p>
+      <p class="t-sm">Link Stripe under Connections.</p>
+    </div>
+  {%- else -%}
+    {%- assign digits = card.figure -%}
+    {%- if extension.values.compact_figures == false and card.figure_full != blank -%}
+      {%- assign digits = card.figure_full -%}
+    {%- endif -%}
+    {%- assign shown = card.symbol | append: digits -%}
+
+    {%- comment %} The target, in the same shorthand as the figure it sits
+      beside, or the two do not read as a pair. Thousands are shortened from a
+      thousand rather than from ten thousand, because the target is the smaller
+      type of the two and 1,500 at half the size is where the digits start to
+      crowd. {% endcomment -%}
+    {%- comment %} Rounded before it is appended, or a thousandth of 13,680
+      arrives as 13.680000000000001 and goes on the wall like that. {% endcomment -%}
+    {%- assign target = mark.next -%}
+    {%- if target >= 1000 -%}
+      {%- assign target = mark.next | divided_by: 1000.0 | round: 1 -%}
+      {%- assign whole = target | round -%}
+      {%- if target == whole %}{% assign target = whole %}{% endif -%}
+      {%- assign target = target | append: "k" -%}
+    {%- endif -%}
+    {%- assign to_go = mark.to_go -%}
+    {%- if to_go >= 1000 -%}
+      {%- assign to_go = mark.to_go | divided_by: 1000.0 | round: 1 -%}
+      {%- assign whole = to_go | round -%}
+      {%- if to_go == whole %}{% assign to_go = whole %}{% endif -%}
+      {%- assign to_go = to_go | append: "k" -%}
+    {%- endif -%}
+
+    {%- assign spent = 92 -%}
+    {%- if notices.size > 0 %}{% assign spent = spent | plus: 34 %}{% endif -%}
+    {%- assign head_h = box_h | minus: spent | minus: pad | at_least: 30 -%}
+    {%- comment %} The target sits beside the figure and takes about a third of
+      the width, so the figure is fitted to what is left. Fitting it to the
+      whole width is what truncated "3,184" to "3,..." with the target sitting
+      happily beside it. {% endcomment -%}
+    {%- assign chars = shown | size | at_least: 3 -%}
+    {%- assign usable = box_w | minus: pad | minus: pad | times: 64 | divided_by: 100 -%}
+    {%- assign by_width = usable | times: 100 | divided_by: chars | divided_by: 58 -%}
+    {%- assign figure_size = head_h | at_most: by_width | at_most: 96 | at_least: 18 -%}
+
+    <div class="content layout layout--col" style="justify-content: center; gap: {{ pad | divided_by: 2 }}px; padding: {{ pad }}px">
+      <div class="layout layout--row" style="align-items: flex-end; gap: {{ pad }}px; height: auto; flex: none">
+        <div class="stack stack--tight fit" style="gap: 2px; min-width: 0">
+          <p class="t-bold t-upper truncate" style="font-size: {{ figure_size | divided_by: 5 | at_least: 10 | at_most: 15 }}px; letter-spacing: 0.06em">
+            {{ extension.values.heading | default: card.caption }}
+          </p>
+          <p class="t-bold truncate" style="font-size: {{ figure_size }}px; line-height: 1; letter-spacing: -0.03em">
+            {{ shown }}
+          </p>
+        </div>
+
+        {%- unless mark -%}
+        {%- else -%}
+          <div style="flex: none; text-align: right">
+            <p class="t-xs t-upper t-bold">Next</p>
+            <p class="t-bold" style="font-size: {{ figure_size | divided_by: 2 | at_least: 15 | at_most: 40 }}px; line-height: 1.05">
+              {{ card.symbol }}{{ target }}
+            </p>
+          </div>
+        {%- endunless -%}
+      </div>
+
+      {%- if mark -%}
+        {%- comment %} The bar runs from the rung last passed to the one ahead,
+          not from zero: at four hundred and eighty thousand of five hundred, a
+          bar from zero is a full bar and says nothing about the last stretch,
+          which is the only stretch anybody is watching. {% endcomment -%}
+        <div style="flex: none">
+          <div style="position: relative; border: 3px solid var(--ink); height: {{ box_h | divided_by: 8 | at_least: 14 | at_most: 30 }}px; width: 100%">
+            <span style="display: block; height: 100%; width: {{ mark.percent }}%; background: var(--ink)"></span>
+            {%- comment %} A tick every tenth, so the bar can be read as a
+              proportion rather than as a mood. {% endcomment -%}
+            {%- comment %} A filter cannot appear inside an `if`, so the tenth
+              is worked out before it is compared. {% endcomment -%}
+            {% for step in (1..9) %}
+              {%- assign at = step | times: 10 -%}
+              {%- assign ahead = true -%}
+              {%- if at <= mark.percent %}{% assign ahead = false %}{% endif -%}
+              <span style="position: absolute; top: 0; bottom: 0; left: {{ at }}%; width: 1px;
+                           background: {% if ahead %}var(--ink){% else %}var(--paper){% endif %}"></span>
+            {% endfor %}
+          </div>
+
+          <div style="display: flex; justify-content: space-between; margin-top: 5px; gap: 10px">
+            <span class="t-xs t-bold" style="flex: none; white-space: nowrap">{{ mark.percent }}% of the way</span>
+            <span class="t-xs truncate" style="text-align: right">
+              {{ card.symbol }}{{ to_go }} to go{% if mark.in_days %} &middot; about {{ mark.in_days | days_in_words }} at this rate{% endif %}
+            </span>
+          </div>
+        </div>
+      {%- else -%}
+        <p class="t-sm">{{ card.detail }}</p>
+      {%- endif -%}
+    </div>
+  {%- endunless -%}
+
+  {% if notices.size > 0 %}
+    <div class="notice-strip" style="padding: 6px {{ pad }}px">
+      {% for notice in notices %}
+        {% if notice.overflow %}
+          <span class="notice notice--more">+{{ notice.overflow }}</span>
+        {% else %}
+          <span class="notice notice--{{ notice.level }}" title="{{ notice.text }}">
+            <span class="i i-{{ notice.icon }}"></span>
+          </span>
+        {% endif %}
+      {% endfor %}
+      {% if shape.wide and notices[0].text != blank %}
+        <span class="notice-said">{{ notices[0].text }}</span>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>

@@ -1,13 +1,16 @@
 import Stripe from "stripe";
 
-import { DAY, startOfMonth, whenInWords } from "@/lib/clock";
+import { DAY, dateLabel, startOfMonth, whenInWords } from "@/lib/clock";
 import { changePercent, formatMoney, symbolFor, toMajorUnits } from "@/lib/money";
 import type { FetchContext, Provider, Verification } from "@/lib/connections/provider";
 import {
   ROLLING_DAYS,
   WINDOWS,
   afterDiscounts,
+  milestoneOf,
   bucketByDay,
+  bucketByHour,
+  runningTotal,
   forecastNext,
   monthlyValue,
   sumBetween,
@@ -51,6 +54,21 @@ const LIMITS = {
   /** Today's payments only. */
   chargesToday: 1000,
   activeSubscriptions: 2000,
+  /**
+   * Everything the account has ever taken - bounded, because "ever" is not a
+   * quantity anybody can promise to page through on a display's refresh.
+   *
+   * Three thousand movements is thirty requests at worst and one at best, and
+   * covers a self-hosted shop's whole history several times over. Past that the
+   * figure is a floor and says so: the payload carries `all_time_capped`, the
+   * figure carries a "+", and a design that shows it says "at least".
+   *
+   * It overlaps the windows list on purpose. Deriving both from one call would
+   * save a few requests for a small account and quietly truncate the thirty-day
+   * window for a busy one, which is the wrong way round: the windows are what
+   * people run their week on, and the lifetime figure is what they frame.
+   */
+  lifetime: 3000,
   recentSubscriptions: 1000,
   customers: 5000,
   coupons: 500,
@@ -298,6 +316,7 @@ async function fetchRevenue(
     customersToday,
     customers,
     coupons,
+    lifetime,
   ] = await Promise.all([
     accountCurrency(stripe),
     collect(
@@ -339,10 +358,19 @@ async function fetchRevenue(
     ),
     collect(stripe.customers.list({ limit: 100 }), LIMITS.customers),
     collect(stripe.coupons.list({ limit: 100 }), LIMITS.coupons),
+    collect(stripe.balanceTransactions.list({ limit: 100 }), LIMITS.lifetime),
   ]);
 
   const currency = account.currency;
   const { gross, net, fees } = entriesFrom(movements.items);
+
+  /* Everything ever, as far back as the bound reaches. */
+  const ever = entriesFrom(lifetime.items).gross;
+  const allTime = ever.reduce((total, entry) => total + entry.amount, 0);
+  const since = ever.reduce(
+    (earliest, entry) => (entry.at < earliest ? entry.at : earliest),
+    now,
+  );
 
   const live = activeSubscriptions.items.filter(
     (one) => one.status === "active" || one.status === "trialing",
@@ -363,6 +391,7 @@ async function fetchRevenue(
     last_15d: sumSince(gross, new Date(now.getTime() - 15 * DAY)),
     last_30d: sumSince(gross, new Date(now.getTime() - 30 * DAY)),
     month_to_date: sumSince(gross, monthFrom),
+    all_time: allTime,
   };
 
   const succeeded = chargesToday.items.filter((charge) => charge.status === "succeeded");
@@ -371,9 +400,23 @@ async function fetchRevenue(
 
   const sign = (value: number) => `${value >= 0 ? "+" : ""}${value}`;
 
-  const compact = settings.compact_figures !== false;
-  const money = (amount: number) =>
-    formatMoney(toMajorUnits(amount, currency), currency, locale, { compact });
+  /**
+   * Every figure in both lengths, because how long a number is drawn is the
+   * widget's business and not the account's.
+   *
+   * This used to read `settings.compact_figures` and format one way, which
+   * quietly made "shorten large numbers" a *question* rather than a style: two
+   * revenue widgets that disagreed about it asked Stripe twice for the same
+   * numbers. Sending both costs a dozen bytes and buys a screenful of widgets
+   * one fetch between them.
+   */
+  const money = (amount: number) => {
+    const major = toMajorUnits(amount, currency);
+    const short = formatMoney(major, currency, locale, { compact: true });
+    const full = formatMoney(major, currency, locale, { compact: false });
+
+    return { ...short, figure_full: full.figure, text_full: full.text };
+  };
 
   const windows = Object.fromEntries(
     WINDOWS.map((window) => {
@@ -385,7 +428,9 @@ async function fetchRevenue(
       // number with no direction, which is the least useful thing a dashboard
       // can show.
       const previous =
-        window.key === "today"
+        window.key === "all_time"
+          ? 0
+          : window.key === "today"
           ? minor.yesterday
           : before !== undefined
             ? sumBetween(
@@ -401,13 +446,27 @@ async function fetchRevenue(
 
       const delta = changePercent(amount, previous);
 
+      /**
+       * A lifetime figure that hit the page bound is a floor, not a total, and
+       * says so with a "+" - the same way the customer count does. A number
+       * that quietly means "at least" is the one kind of wrong figure a
+       * dashboard can never be forgiven for.
+       */
+      const figures = money(amount);
+      const floor = window.key === "all_time" && lifetime.capped;
+      const atLeast = (value: string) => (floor ? `${value}+` : value);
+
       return [
         window.key,
         {
           key: window.key,
           label: window.label,
           short: window.short,
-          ...money(amount),
+          ...figures,
+          figure: atLeast(figures.figure),
+          text: atLeast(figures.text),
+          figure_full: atLeast(figures.figure_full),
+          text_full: atLeast(figures.text_full),
           amount: toMajorUnits(amount, currency),
           previous: toMajorUnits(previous, currency),
           change_percent: delta,
@@ -417,7 +476,9 @@ async function fetchRevenue(
           detail:
             window.key === "today"
               ? `${succeededToday} payment${succeededToday === 1 ? "" : "s"}`
-              : `against ${money(previous).text} ${window.against}`,
+              : window.key === "all_time"
+                ? `since ${dateLabel(since, timezone, locale)}${lifetime.capped ? ", and more before that" : ""}`
+                : `against ${money(previous).text_full} ${window.against}`,
           delta: delta === null ? null : `${sign(delta)}% on ${window.against}`,
           // The same figure with nothing after it, for a box too small to hold
           // the sentence. A design should be able to drop the words without
@@ -428,6 +489,41 @@ async function fetchRevenue(
       ];
     }),
   );
+
+  /**
+   * The last seven days against the seven before, both as running totals.
+   *
+   * Two jagged daily lines on one chart are a pair of scribbles. Two running
+   * totals are a race, and a race is readable across a room: either this week's
+   * line is above last week's or it is not.
+   *
+   * Seven against seven rather than this month against last, because the fetch
+   * only reaches back thirty days - a month-against-month comparison would be
+   * built on data that is not there for most of the month, and a chart missing
+   * half its history is worse than a chart of a shorter period.
+   */
+  const paceDays = days.slice(-14);
+  const before = runningTotal(paceDays.slice(0, 7).map((bucket) => bucket.amount));
+  const lately = runningTotal(paceDays.slice(7).map((bucket) => bucket.amount));
+
+  const pace = {
+    label: "the last 7 days",
+    against: "the 7 before",
+    ahead: (lately[lately.length - 1] ?? 0) >= (before[before.length - 1] ?? 0),
+    change_percent: changePercent(lately[lately.length - 1] ?? 0, before[before.length - 1] ?? 0),
+    current: paceDays.slice(7).map((bucket, index) => ({
+      day: bucket.day,
+      date: bucket.date,
+      amount: toMajorUnits(bucket.amount, currency),
+      total: toMajorUnits(lately[index], currency),
+    })),
+    previous: paceDays.slice(0, 7).map((bucket, index) => ({
+      day: bucket.day,
+      date: bucket.date,
+      amount: toMajorUnits(bucket.amount, currency),
+      total: toMajorUnits(before[index], currency),
+    })),
+  };
 
   /* -- subscribers -------------------------------------------------------- */
 
@@ -440,6 +536,26 @@ async function fetchRevenue(
   const renewal = subscriptions.nextRenewal;
 
   const mrr = toMajorUnits(subscriptions.mrr, currency);
+
+  /**
+   * The milestones, one per figure that has one.
+   *
+   * Money is measured in major units here rather than in Stripe's minor ones,
+   * because a milestone is a round number to a person and 2,500,000 cents is
+   * not a round number to anybody.
+   */
+  const perDay = toMajorUnits(minor.last_30d, currency) / 30;
+
+  const milestones = {
+    all_time: milestoneOf(toMajorUnits(minor.all_time, currency), perDay),
+    month_to_date: milestoneOf(toMajorUnits(minor.month_to_date, currency), perDay),
+    today: milestoneOf(toMajorUnits(minor.today, currency)),
+    last_7d: milestoneOf(toMajorUnits(minor.last_7d, currency), perDay),
+    last_30d: milestoneOf(toMajorUnits(minor.last_30d, currency), perDay),
+    mrr: milestoneOf(mrr),
+    customers: milestoneOf(customers.items.length),
+    subscribers: milestoneOf(subscriptions.subscribers, forecast.perWeek / 7),
+  };
 
   /**
    * Every metric, in one shape.
@@ -464,7 +580,7 @@ async function fetchRevenue(
       figure: money(subscriptions.mrr).figure,
       symbol: symbolFor(currency),
       detail:
-        `${money(subscriptions.mrr * 12).text} a year` +
+        `${money(subscriptions.mrr * 12).text_full} a year` +
         (subscriptions.unpriced ? `, ${subscriptions.unpriced} usage-priced left out` : ""),
       delta: null as string | null,
       delta_short: null as string | null,
@@ -478,7 +594,7 @@ async function fetchRevenue(
       symbol: "",
       detail: subscriptions.trialing
         ? `${plain(subscriptions.trialing)} on trial`
-        : `${money(subscriptions.mrr).text} a month between them`,
+        : `${money(subscriptions.mrr).text_full} a month between them`,
       delta: null as string | null,
       delta_short: null as string | null,
       rising: true,
@@ -516,7 +632,7 @@ async function fetchRevenue(
       figure: renewal ? whenInWords(renewal.at.getTime() - now.getTime()) : "—",
       symbol: "",
       detail: renewal
-        ? `${money(renewal.amount).text}${renewal.customer ? ` from ${renewal.customer}` : ""}`
+        ? `${money(renewal.amount).text_full}${renewal.customer ? ` from ${renewal.customer}` : ""}`
         : "nothing scheduled",
       delta: null as string | null,
       delta_short: null as string | null,
@@ -594,8 +710,33 @@ async function fetchRevenue(
           }
         : null,
 
+      /**
+       * Where each figure sits on the way to a round number.
+       *
+       * The one thing on a revenue panel that is not a measurement: it is
+       * there to be looked forward to. Keyed the same way the windows and the
+       * cards are, so a design shows the milestone for whatever the widget was
+       * already pointed at rather than asking a second question.
+       *
+       * The days remaining only appear where a real rate stands behind them -
+       * the last thirty days for money, the signup rate for subscribers.
+       * Nothing is invented for a figure that has no rate.
+       */
+      milestones,
+
+      all_time: toMajorUnits(minor.all_time, currency),
+      all_time_capped: lifetime.capped,
+      first_payment_at: ever.length ? since.toISOString() : null,
+
       /* Charts. `week` is the last seven of `days`, so a design can take
-         either without a second fetch. */
+         either without a second fetch, and `hours` is today alone - the one
+         series that can say whether a quiet day is quiet because it is nine in
+         the morning. */
+      hours: bucketByHour(gross, timezone, starts.today, now).map((bucket) => ({
+        ...bucket,
+        amount: toMajorUnits(bucket.amount, currency),
+      })),
+      pace,
       week: week.map((bucket) => ({
         day: bucket.day,
         date: bucket.date,
