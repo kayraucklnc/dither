@@ -58,6 +58,11 @@ export interface MoneyText {
   amount: number;
 }
 
+/** How many decimal places a currency is written with. Two, except when not. */
+export function decimalsOf(currency: string): number {
+  return Math.round(Math.log10(minorUnitsPerMajor(currency)));
+}
+
 export function formatMoney(
   amount: number,
   currency: string,
@@ -67,13 +72,26 @@ export function formatMoney(
   const symbol = symbolFor(currency);
   const rounded = options.decimals ? amount : Math.round(amount);
 
+  /*
+   * Asked for decimals, a figure gets the currency's own - all of them, and
+   * exactly them.
+   *
+   * An aggregate has no pennies worth showing and rounds; a single payment
+   * does, and "24.5" is not a price anybody has ever written. A minimum as
+   * well as a maximum is what puts the trailing zero back, and taking both
+   * from the currency is what keeps a yen figure whole and a dinar's three
+   * places intact.
+   */
+  const places = decimalsOf(currency);
+
   const figure = options.compact
     ? new Intl.NumberFormat(locale, {
         notation: "compact",
         maximumFractionDigits: Math.abs(rounded) >= 10_000 ? 1 : 0,
       }).format(rounded)
     : new Intl.NumberFormat(locale, {
-        maximumFractionDigits: options.decimals ? 2 : 0,
+        minimumFractionDigits: options.decimals ? places : 0,
+        maximumFractionDigits: options.decimals ? places : 0,
       }).format(rounded);
 
   return { figure, text: `${symbol}${figure}`, symbol, amount: rounded };

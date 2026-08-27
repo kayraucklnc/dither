@@ -67,7 +67,27 @@ async function link(formData: FormData) {
       return;
     }
 
-    await save(id, verdict.label ?? source.label, credentials);
+    /*
+     * Filed under the account it turned out to belong to, where the provider
+     * can say. That is what makes a second key a second account rather than a
+     * replacement for the first, and the id has to come from the service:
+     * a widget's settings name it, so anything we invented here would be a
+     * name that changed the next time the same key was pasted.
+     */
+    const under = source.multiple ? verdict.account : undefined;
+    if (source.multiple && !under) {
+      await note(id, "That key works, but the account behind it would not say which it is.");
+      revalidatePath("/connections");
+      return;
+    }
+
+    await save(id, verdict.label ?? source.label, credentials, under);
+
+    // The note from an earlier refusal is on the client row, which nothing
+    // else writes for a key-only provider. Left there it is a red message
+    // under a connection that is working.
+    if (under) await forgetConnection(id, CLIENT);
+
     revalidatePath("/connections");
     return;
   }
@@ -189,17 +209,17 @@ export default async function ConnectionsPage() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="text-[14px] font-medium">{one.label}</h2>
-                      {connected && !one.handshake && (
+                      {connected && !one.handshake && !one.multiple && (
                         <span className="flex items-center gap-1 rounded-full bg-live/10 px-2 py-0.5 text-[11px] text-live">
                           <Check size={10} />
                           {/* Whose account it turned out to be, when the
                               provider was able to say. A provider that just
                               stores its own id says "Linked" instead of
                               repeating its own name back in lower case. */}
-                          {accountName(client!.label, one.id, one.label) ?? "Linked"}
+                          {accountName(client?.label ?? "", one.id, one.label) ?? "Linked"}
                         </span>
                       )}
-                      {connected && one.handshake && (
+                      {connected && (one.handshake || one.multiple) && (
                         <span className="rounded-full bg-live/10 px-2 py-0.5 text-[11px] text-live">
                           {accounts.length} account{accounts.length === 1 ? "" : "s"}
                         </span>
@@ -219,7 +239,7 @@ export default async function ConnectionsPage() {
                     <p className="mt-1 text-[13px] text-muted">{one.description}</p>
                     <p className="mt-0.5 text-[12px] text-faint">Used by {one.unlocks}.</p>
 
-                    {(connected || halfway) && needsCredentials && (
+                    {(connected || halfway) && needsCredentials && !one.multiple && (
                       <p className="mt-1.5 font-mono text-[12px] text-faint">
                         {(one.credentials ?? [])
                           .filter((field) => field.secret)
@@ -233,7 +253,7 @@ export default async function ConnectionsPage() {
                 <div className="flex shrink-0 items-center gap-2">
                   {/* A provider that can hold several offers another sign-in
                       for as long as it is linked, not only while empty. */}
-                  {(halfway || (connected && one.multiple)) && (
+                  {(halfway || (connected && one.multiple && one.handshake)) && (
                     <a
                       href={startUrl(one.id)}
                       className={
@@ -292,7 +312,22 @@ export default async function ConnectionsPage() {
                     >
                       <span className="flex min-w-0 items-center gap-2">
                         <Check size={12} className="shrink-0 text-live" />
-                        <span className="truncate text-[13px] text-ink">{account.account}</span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-[13px] text-ink">
+                            {accountName(account.label, account.account, one.label) ?? account.account}
+                          </span>
+                          {/* The account's own address, and which key answers
+                              for it. With several linked, "which of these is
+                              the live one" is the question this page exists to
+                              answer. */}
+                          <span className="block truncate font-mono text-[11px] text-faint">
+                            {account.account}
+                            {(one.credentials ?? [])
+                              .filter((field) => field.secret)
+                              .map((field) => `  ${secretHint(account.credentials, field.key)}`)
+                              .join("")}
+                          </span>
+                        </span>
                       </span>
 
                       <form action={signOut}>
@@ -325,13 +360,18 @@ export default async function ConnectionsPage() {
                 </p>
               )}
 
-              {!connected && !halfway && needsCredentials && (
+              {/* A provider that can hold several keys keeps its form for as
+                  long as it is linked: another account is another key, and
+                  there is nowhere else to paste one. */}
+              {((!connected && !halfway) || (one.multiple && !one.handshake)) && needsCredentials && (
                 <CredentialForm
                   provider={one.id}
                   fields={one.credentials ?? []}
                   help={one.help}
                   action={link}
-                  submitLabel={one.handshake ? "Save and continue" : "Link"}
+                  submitLabel={
+                    one.handshake ? "Save and continue" : connected ? "Add another account" : "Link"
+                  }
                   above={uri ? <RedirectUri uri={uri} /> : undefined}
                 />
               )}

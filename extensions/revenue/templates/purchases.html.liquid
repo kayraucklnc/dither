@@ -1,0 +1,186 @@
+{% comment %}
+  Recent payments - who paid, how much, and when.
+
+  Every other design here is a measurement: a figure, a trend, a milestone.
+  This one is the ledger tape - the thing a shopkeeper actually looks at, which
+  is not "what did we take today" but "who just paid us".
+
+  So it is not a table. A table gives every row the same weight, and these rows
+  do not have the same weight: the one that just happened is the news, and the
+  ones before it are context. The newest payment is the hero - the amount as
+  large as the box allows, the name under it - and the rest run beneath as a
+  tape, each line led across by dots from the time to the figure the way an
+  index or a menu leads across. Under each figure sits a short rule as wide as
+  that payment is against the biggest on screen, so the run of them has a shape
+  without anybody drawing a chart.
+
+  Times are clock times, never "four minutes ago". The panel is handed one
+  picture and keeps it for a quarter of an hour, so a relative phrase is wrong
+  for most of its life; 14:32 is still 14:32 tomorrow.
+{% endcomment %}
+
+{%- assign money = revenue -%}
+{%- assign paid = money.purchases -%}
+
+{%- assign box_w = shape.width | at_least: 200 -%}
+{%- assign box_h = shape.height | at_least: 90 -%}
+{%- assign pad = box_w | divided_by: 20 | at_least: 10 | at_most: 24 -%}
+
+<div class="screen">
+  {%- unless money.connected -%}
+    <div class="content layout layout--col layout--center" style="gap: 8px; padding: {{ pad }}px">
+      <span class="i i-card i-xl"></span>
+      <p class="t-md t-bold">Not connected</p>
+      <p class="t-sm t-center">Link Stripe under Connections.</p>
+    </div>
+  {%- elsif paid.size == 0 -%}
+    <div class="content layout layout--col layout--center" style="gap: 8px; padding: {{ pad }}px">
+      <span class="i i-card i-xl"></span>
+      <p class="t-md t-bold">No payments yet</p>
+      <p class="t-sm t-center">The first one will appear here.</p>
+    </div>
+  {%- else -%}
+    {%- assign first = paid[0] -%}
+    {%- assign heading = extension.values.heading | default: "Just in" -%}
+
+    {%- comment %} The tape is whatever is left once the hero has had its
+      share, at a row height that stays legible. Worked out in pixels rather
+      than left to flex, because a row that has been squeezed by a row too many
+      is a row with its contents pushed out through the top. {% endcomment -%}
+    {%- assign strip = 0 -%}
+    {%- if notices.size > 0 %}{% assign strip = 34 %}{% endif -%}
+
+    {%- assign inner = box_h | minus: pad | minus: pad | minus: strip -%}
+    {%- assign hero_h = inner | times: 42 | divided_by: 100 | at_least: 54 -%}
+    {%- assign tape_h = inner | minus: hero_h | minus: 10 -%}
+
+    {%- comment %} A day that changes mid-tape needs a line saying so, or
+      yesterday's eight o'clock reads as being after this morning's eleven.
+      Its room is taken out of the tape up front rather than being allowed to
+      push a row off the bottom. {% endcomment -%}
+    {%- assign last_carried = paid[paid.size | minus: 1] -%}
+    {%- assign spans_days = false -%}
+    {%- if last_carried.day != first.day %}{% assign spans_days = true %}{% endif -%}
+
+    {%- assign smallest = box_w | divided_by: 26 | at_least: 22 | at_most: 34 -%}
+    {%- assign fits = tape_h | divided_by: smallest | at_least: 0 | at_most: 9 -%}
+
+    {%- comment %} Never more rows than there are payments to put in them: an
+      empty half of a tall panel is worse than a shorter tape with taller rows,
+      which is what a list of four things on a full page should look like
+      anyway. {% endcomment -%}
+    {%- assign have = paid.size | minus: 1 -%}
+    {%- assign rows = fits | at_most: have -%}
+    {%- assign spare = tape_h -%}
+    {%- if spans_days %}{% assign spare = tape_h | minus: 44 %}{% endif -%}
+    {%- assign row_h = smallest -%}
+    {%- if rows > 0 -%}
+      {%- assign row_h = spare | divided_by: rows | at_least: smallest | at_most: 52 -%}
+    {%- endif -%}
+
+    {%- comment %} The hero figure is fitted to what the name beside it leaves,
+      the same way every other design here fits one. {% endcomment -%}
+    {%- assign shown = first.symbol | append: first.figure_full -%}
+    {%- assign chars = shown | size | at_least: 3 -%}
+    {%- assign usable = box_w | minus: pad | minus: pad | times: 62 | divided_by: 100 -%}
+    {%- assign by_width = usable | times: 100 | divided_by: chars | divided_by: 56 -%}
+    {%- assign hero_size = hero_h | times: 62 | divided_by: 100 | at_most: by_width | at_most: 120 | at_least: 20 -%}
+    {%- assign name_size = hero_size | divided_by: 3 | at_least: 13 | at_most: 22 -%}
+    {%- assign row_size = row_h | times: 52 | divided_by: 100 | at_least: 11 | at_most: 19 -%}
+
+    <div class="content layout layout--col" style="gap: 0; justify-content: center; padding: {{ pad }}px">
+      {%- comment %} The newest payment. Amount first and largest, because
+        across a room that is the only part that reads. {% endcomment -%}
+      <div style="flex: none">
+        <div class="layout layout--row" style="align-items: baseline; gap: 10px; height: auto">
+          <p class="t-bold t-upper truncate fit" style="font-size: {{ row_size }}px; letter-spacing: 0.06em">
+            {{ heading }}
+          </p>
+          <p class="t-bold" style="flex: none; font-size: {{ row_size }}px; font-variant-numeric: tabular-nums">
+            {{ first.at_text }}
+          </p>
+        </div>
+
+        <p class="t-bold truncate" style="font-size: {{ hero_size }}px; line-height: 1.02; letter-spacing: -0.03em; margin-top: 2px">
+          {{ first.symbol }}{{ first.figure_full }}
+        </p>
+
+        <div class="layout layout--row" style="align-items: baseline; gap: 10px; height: auto; margin-top: 2px">
+          <p class="truncate fit" style="font-size: {{ name_size }}px; font-weight: 600">{{ first.name }}</p>
+          {%- if first.account != blank -%}
+            <p class="truncate" style="flex: none; font-size: {{ row_size }}px; max-width: 40%">{{ first.account }}</p>
+          {%- endif -%}
+        </div>
+      </div>
+
+      {%- if rows > 0 and paid.size > 1 -%}
+        <hr class="rule" style="flex: none; margin: 8px 0 0" />
+
+        {%- comment %} The tape. Dots lead the eye from the time across to the
+          figure, which is what makes this a list of entries rather than a grid
+          of cells - and what lets a wide panel stay readable without ruling a
+          line under every row. {% endcomment -%}
+        <div style="flex: none; overflow: hidden">
+          {%- assign running_day = first.day -%}
+          {%- for purchase in paid offset: 1 limit: rows -%}
+            {%- if purchase.day != running_day -%}
+              {%- assign running_day = purchase.day -%}
+              <div class="layout layout--row" style="align-items: center; gap: 8px; height: 22px; flex: none">
+                <span class="t-bold t-upper" style="flex: none; font-size: {{ row_size | minus: 2 }}px; letter-spacing: 0.08em">
+                  {{ purchase.day }}
+                </span>
+                <span style="flex: 1; display: block; border-bottom: 2px solid var(--ink)"></span>
+              </div>
+            {%- endif -%}
+            <div class="layout layout--row"
+                 style="align-items: baseline; gap: 0; height: {{ row_h }}px; flex: none">
+              <span class="t-bold" style="flex: none; font-size: {{ row_size }}px; font-variant-numeric: tabular-nums; width: {{ row_size | times: 3 }}px">
+                {{ purchase.at_text }}
+              </span>
+
+              <span class="truncate" style="flex: none; font-size: {{ row_size }}px; margin-left: 8px; max-width: 46%">
+                {{ purchase.name }}
+              </span>
+
+              {%- comment %} The leader, and the only part that absorbs the
+                slack - everything else is `flex: none`, or a row squeezed by a
+                long name pushes its own figure off the panel.
+
+                It doubles as the weight of the payment: solid for as much of
+                its length as this one is against the biggest on screen, dotted
+                for the rest. So the tape has the shape of the day in it
+                without a column of bars beside it, and no row needs a second
+                line to carry one. {% endcomment -%}
+              <span class="layout layout--row"
+                    style="flex: 1; min-width: 10px; gap: 0; height: auto; align-items: flex-end; margin: 0 7px 5px">
+                <span style="flex: none; display: block; height: 2px; background: var(--ink); width: {{ purchase.share }}%"></span>
+                <span style="flex: 1; display: block; border-bottom: 2px dotted var(--ink)"></span>
+              </span>
+
+              <span class="t-bold" style="flex: none; font-size: {{ row_size | plus: 1 }}px; font-variant-numeric: tabular-nums; white-space: nowrap">
+                {{ purchase.symbol }}{{ purchase.figure_full }}
+              </span>
+            </div>
+          {%- endfor -%}
+        </div>
+      {%- endif -%}
+    </div>
+  {%- endunless -%}
+
+  {% if notices.size > 0 %}
+    <div class="notice-strip" style="padding: 6px {{ pad }}px">
+      {% for notice in notices %}
+        {% if notice.overflow %}
+          <span class="notice notice--more">+{{ notice.overflow }}</span>
+        {% else %}
+          <span class="notice notice--{{ notice.level }}" title="{{ notice.text }}">
+            <span class="i i-{{ notice.icon }}"></span>
+          </span>
+        {% endif %}
+      {% endfor %}
+      {% if shape.wide and notices[0].text != blank %}
+        <span class="notice-said">{{ notices[0].text }}</span>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
