@@ -1,8 +1,15 @@
 import type { Manifest } from "@/lib/extensions/manifest";
+import { google } from "./google";
 import type { Provider } from "./provider";
 import { stripe } from "./stripe";
 
-export type { CredentialField, FetchContext, Provider, Verification } from "./provider";
+export type {
+  CredentialField,
+  FetchContext,
+  Handshake,
+  Provider,
+  Verification,
+} from "./provider";
 
 /**
  * Connections are accounts and services you link once, and every widget or
@@ -13,17 +20,13 @@ export type { CredentialField, FetchContext, Provider, Verification } from "./pr
  * placement of it. That keeps a screen's settings about *what to show* rather
  * than about how to authenticate.
  *
- * Stripe is real: it takes a key you paste once, checks it before storing it,
- * and answers with the account's own numbers. The others are still stand-ins,
+ * Stripe and Google Calendar are real. Stripe takes a key you paste once;
+ * Google needs a consent screen, so it takes the two halves of an OAuth client
+ * and then sends you through Google to say yes. The rest are still stand-ins,
  * answering plausible moving data so screens and rules can be designed before
  * their sign-in flows exist. Each says which it is, and the dashboard says so
  * too - a stand-in that pretends to be real is worse than no stand-in.
  */
-
-const clock = (from: Date, minutes: number) => {
-  const at = new Date(from.getTime() + minutes * 60_000);
-  return `${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`;
-};
 
 /**
  * Mock data has to *move*, or every design gets tuned against one frozen
@@ -33,50 +36,6 @@ const clock = (from: Date, minutes: number) => {
 const drift = (now: Date, spread: number, seed = 0) => {
   const minutes = now.getHours() * 60 + now.getMinutes() + seed * 37;
   return Math.sin(minutes / 90) * spread;
-};
-
-/* -------------------------------------------------------------------------- */
-
-const MEETINGS = [
-  { title: "Design review", location: "Milano Centrale, Sala 4", remote: false, minutes: 24, length: 45 },
-  { title: "Standup", location: "Meet", remote: true, minutes: 84, length: 15 },
-  { title: "1:1 with Ana", location: "Sala 2", remote: false, minutes: 294, length: 30 },
-  { title: "Sprint planning", location: "Zoom", remote: true, minutes: 380, length: 60 },
-];
-
-const google: Provider = {
-  id: "google",
-  label: "Google",
-  description: "Calendar events from a Google account.",
-  unlocks: "Calendar",
-  icon: "calendar",
-  mocked: true,
-
-  async fetch(settings, now) {
-    const horizon = Number(settings.horizon_hours ?? 12) * 60;
-
-    const events = MEETINGS.filter((meeting) => meeting.minutes <= horizon).map((meeting) => ({
-      title: meeting.title,
-      start: clock(now, meeting.minutes),
-      end: clock(now, meeting.minutes + meeting.length),
-      location: meeting.location,
-      remote: meeting.remote,
-      minutes_until: meeting.minutes,
-      accepted: true,
-    }));
-
-    const next = events[0];
-
-    return {
-      calendar: {
-        empty: events.length === 0,
-        remaining_today: events.length,
-        free_minutes: next ? next.minutes_until : 480,
-        next: next ?? null,
-        events,
-      },
-    };
-  },
 };
 
 /* -------------------------------------------------------------------------- */
