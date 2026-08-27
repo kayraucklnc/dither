@@ -233,6 +233,18 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
 - **A multiselect's value is sorted before it is stored.** The settings are
   hashed into the key an answer is cached under, so "work then family" must not
   be a different question from "family then work".
+- **jsonb hands an object's keys back in its own order**, shortest first and
+  then bytewise, so a stored question and the one a browser is holding are
+  hardly ever the same *string* even when they are the same question. Compare
+  them with `sameQuestion` in `web/src/lib/extensions/question.ts`, never by
+  stringifying: "Also watch this" compared them as JSON, so it never saw that
+  it had already been clicked and filed another source every time.
+- **A button that asks the world has to say it is asking.** Creating a source
+  fetches before it answers, which is as long as that takes. Left with no
+  pending state, the click reads as dead, and clicking a dead button again is
+  the whole of how somebody ends up with four identical sources - so it says
+  what it is doing, refuses a second click, and shows the refusal when the
+  server sends one rather than swallowing it.
 - **Migrate stored settings rather than compensating at read time.** Tolerating
   a missing field is not the same as being able to *show* it: a widget with no
   `range` was read correctly and drew an empty selector. One script
@@ -250,6 +262,7 @@ cd web                                        # the rest are still run by hand
 npx tsx --env-file=.env.local scripts/sweep.mts   # every design, at the edges of its range
 npx tsx --env-file=.env.local scripts/qa.mts      # every page, in a browser
 npx tsx --env-file=.env.local scripts/preview-freshness-qa.mts  # a node keeps up with its screen
+npx tsx --env-file=.env.local scripts/watch-this-qa.mts  # "also watch this" says what it did, once
 npx tsx scripts/shot.mts <url> <out.png> [h]  # screenshot a page, report console errors
 npx tsx scripts/measure.mts                   # element boxes, for layout bugs
 ```

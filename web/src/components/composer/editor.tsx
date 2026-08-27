@@ -10,6 +10,7 @@ import { StylePicker } from "@/components/composer/style-picker";
 import { ScreenPreview } from "@/components/screen-preview";
 import { cn } from "@/lib/cn";
 import { chooseDesign, nearestDrawable, supportsSize, type Design } from "@/lib/designs";
+import { sameQuestion } from "@/lib/extensions/question";
 import { layout as findLayout, matching, type Layout } from "@/lib/layouts";
 import type { Field } from "@/lib/extensions/manifest";
 import {
@@ -93,7 +94,10 @@ export function ScreenEditor({
   const [nextId, setNextId] = useState(-1);
   const [dragging, setDragging] = useState(false);
   const [dataVersion, setDataVersion] = useState(0);
-  const [watched, setWatched] = useState<{ extension: string; settings: unknown }[]>([]);
+  const [watched, setWatched] = useState<{ extension: string; settings: Record<string, unknown> }[]>([]);
+  const [watching, setWatching] = useState(false);
+  /** A refusal, and the widget it was about - so picking another clears it. */
+  const [watchProblem, setWatchProblem] = useState<{ widgetId: number; said: string }>();
   const [fetching, setFetching] = useState(false);
   const [armed, setArmed] = useState<Layout | undefined>(() => matching(initialWidgets));
 
@@ -109,31 +113,63 @@ export function ScreenEditor({
    * same thing is the common case, and it should be one click rather than a
    * second trip through a different page to retype the same settings.
    */
+  const readWatched = useCallback(
+    () =>
+      fetch("/api/sources")
+        .then((response) => (response.ok ? response.json() : undefined))
+        .then((body) => body && setWatched(body.sources)),
+    [],
+  );
+
   useEffect(() => {
-    fetch("/api/sources")
-      .then((response) => (response.ok ? response.json() : undefined))
-      .then((body) => body && setWatched(body.sources));
-  }, [dataVersion]);
+    readWatched();
+  }, [readWatched, dataVersion]);
 
-  const isWatched = (widget: EditorWidget) =>
-    watched.some(
-      (source) =>
-        source.extension === widget.extension &&
-        JSON.stringify(source.settings) === JSON.stringify(widget.settings),
-    );
+  const isWatched = (widget: EditorWidget) => watched.some((source) => sameQuestion(source, widget));
 
+  /**
+   * Watch this too, and say so.
+   *
+   * The click is not over when the request is sent: the server asks the world
+   * before it answers, which takes as long as that takes, and the only sign it
+   * worked is this box turning into a sentence - which needs the source list
+   * read again. Until then the button says what it is doing and refuses a
+   * second click, because it used to accept one silently and the second click
+   * is how somebody ends up with four of these.
+   */
   const watch = async (widget: EditorWidget) => {
-    await fetch("/api/sources", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        extension: widget.extension,
-        label: widget.label || undefined,
-        settings: widget.settings,
-      }),
-    });
+    setWatching(true);
+    setWatchProblem(undefined);
 
-    setDataVersion((value) => value + 1);
+    try {
+      const response = await fetch("/api/sources", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          extension: widget.extension,
+          label: widget.label || undefined,
+          settings: widget.settings,
+        }),
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => undefined);
+        setWatchProblem({
+          widgetId: widget.id,
+          said: body?.error ?? "That could not be watched. Try again.",
+        });
+        return;
+      }
+
+      await readWatched();
+      // A source fetches as it is created, so a widget asking the same
+      // question has an answer now where it may have had a stand-in before.
+      setDataVersion((value) => value + 1);
+    } catch {
+      setWatchProblem({ widgetId: widget.id, said: "Dither could not be reached." });
+    } finally {
+      setWatching(false);
+    }
   };
 
   /* ---------------------------------------------------------------- preview */
@@ -846,12 +882,29 @@ export function ScreenEditor({
                   <>
                     <button
                       type="button"
+                      disabled={watching}
                       onClick={() => watch(selected)}
-                      className="flex w-full items-center justify-center gap-2 rounded-md border border-line bg-raised px-3 py-1.5 text-[12px] text-muted transition-colors hover:text-ink"
+                      className={cn(
+                        "flex w-full items-center justify-center gap-2 rounded-md border border-line",
+                        "bg-raised px-3 py-1.5 text-[12px] text-muted transition-colors",
+                        watching ? "opacity-60" : "hover:text-ink",
+                      )}
                     >
-                      <Radio size={12} />
-                      Also watch this
+                      {watching ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        <Radio size={12} />
+                      )}
+                      {watching ? "Asking it now" : "Also watch this"}
                     </button>
+
+                    {watchProblem?.widgetId === selected.id && (
+                      <p className="mt-2 flex gap-2 text-[11px] leading-relaxed text-warn">
+                        <TriangleAlert size={12} className="mt-0.5 shrink-0" />
+                        {watchProblem.said}
+                      </p>
+                    )}
+
                     <p className="mt-2 text-[11px] leading-relaxed text-faint">
                       Drawing it and deciding on it are separate - you can branch on a station you
                       never display. This adds a source with these settings, sharing the same fetch.

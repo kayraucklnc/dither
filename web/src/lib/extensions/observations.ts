@@ -3,6 +3,7 @@ import { inArray } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { observations } from "@/lib/db/schema";
+import { canonicalSettings } from "@/lib/extensions/question";
 import { find, questionSettings } from "@/lib/extensions/registry";
 
 /**
@@ -18,11 +19,10 @@ import { find, questionSettings } from "@/lib/extensions/registry";
  */
 export function observationKey(extension: string, settings: Record<string, unknown>): string {
   // Sorted keys, or the same settings in a different order hash differently.
-  const canonical = JSON.stringify(
-    Object.fromEntries(Object.entries(settings ?? {}).sort(([a], [b]) => a.localeCompare(b))),
-  );
-
-  return createHash("sha256").update(`${extension} ${canonical}`).digest("hex").slice(0, 32);
+  return createHash("sha256")
+    .update(`${extension} ${canonicalSettings(settings)}`)
+    .digest("hex")
+    .slice(0, 32);
 }
 
 /**
