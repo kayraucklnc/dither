@@ -74,7 +74,7 @@ notices:
   - key: failed_payments
     label: Payments failing
     icon: alert
-    loud: true
+    level: urgent
     text: "{{ revenue.failed_today }} payments failed today"
     when:
       fact: failed_today
@@ -84,6 +84,7 @@ notices:
   - key: strong_day
     label: Well ahead of yesterday
     icon: trending-up
+    level: info
     text: "Up {{ revenue.change_percent }}% on yesterday"
     when:
       fact: change_percent

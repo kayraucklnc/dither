@@ -25,9 +25,21 @@ export interface NoticeRow {
   condition: Condition;
   icon: string;
   text: string;
-  loud: boolean;
+  level: "info" | "warn" | "urgent";
+  placement: string;
   enabled: boolean;
 }
+
+/**
+ * Three levels, and they are not only styling: when a design has room for two
+ * and three are active, the quietest is the one summarised away. So a
+ * cancellation is never dropped to make room for "rain likely".
+ */
+const LEVELS = [
+  { id: "info" as const, label: "Info", hint: "Worth knowing. Plain text." },
+  { id: "warn" as const, label: "Warn", hint: "Worth noticing. Outlined." },
+  { id: "urgent" as const, label: "Urgent", hint: "Worth acting on. Inverted, and never summarised away." },
+];
 
 export interface NoticeHost {
   screenId: number;
@@ -44,7 +56,8 @@ export interface Suggestion {
   label: string;
   icon: string;
   text: string;
-  loud: boolean;
+  level: "info" | "warn" | "urgent";
+  placement: string;
   condition: Condition;
 }
 
@@ -241,6 +254,33 @@ export function NoticesPanel({
                       />
                     </div>
 
+                    <div>
+                      <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-faint">
+                        How loud
+                      </label>
+                      <div className="flex rounded-md border border-line bg-ground p-0.5">
+                        {LEVELS.map((level) => (
+                          <button
+                            key={level.id}
+                            type="button"
+                            title={level.hint}
+                            onClick={() => update(row.id, { level: level.id })}
+                            className={cn(
+                              "flex-1 rounded px-2 py-1 text-[11px] transition-colors",
+                              row.level === level.id
+                                ? "bg-accent text-accent-ink"
+                                : "text-faint hover:text-ink",
+                            )}
+                          >
+                            {level.label}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="mt-1.5 text-[11px] leading-relaxed text-faint">
+                        {LEVELS.find((level) => level.id === row.level)?.hint}
+                      </p>
+                    </div>
+
                     <div className="flex gap-2">
                       <div className="flex-1">
                         <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-faint">
@@ -253,22 +293,19 @@ export function NoticesPanel({
                           onChange={(icon) => update(row.id, { icon })}
                         />
                       </div>
-                      <div>
+                      <div className="flex-1">
                         <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-faint">
-                          Emphasis
+                          Where
                         </label>
-                        <button
-                          type="button"
-                          onClick={() => update(row.id, { loud: !row.loud })}
-                          className={cn(
-                            "rounded-md border px-3 py-1.5 text-[12px] transition-colors",
-                            row.loud
-                              ? "border-ink bg-ink text-ground"
-                              : "border-line bg-ground text-muted",
-                          )}
-                        >
-                          {row.loud ? "Inverted" : "Plain"}
-                        </button>
+                        <Select
+                          value={row.placement}
+                          ariaLabel="Where it appears"
+                          options={[
+                            { value: "screen", label: "Alert area", hint: "Wherever the screen keeps them" },
+                            { value: "source", label: "On its own widget", hint: "Beside what it is about, if present" },
+                          ]}
+                          onChange={(placement) => update(row.id, { placement })}
+                        />
                       </div>
                     </div>
 
@@ -278,7 +315,7 @@ export function NoticesPanel({
                         sources={sources}
                         kinds={sourceKinds}
                         onChange={(condition) => update(row.id, { condition })}
-                        onAddSource={() => {}}
+                        onAddSource={async () => undefined}
                         onEditSource={() => {}}
                       />
                     </div>
@@ -307,7 +344,8 @@ export function NoticesPanel({
                     condition: suggestion.condition,
                     icon: suggestion.icon,
                     text: suggestion.text,
-                    loud: suggestion.loud,
+                    level: suggestion.level,
+                    placement: suggestion.placement,
                   })
                 }
                 className="flex w-full items-center gap-2 rounded-lg border border-dashed border-line px-2.5 py-2 text-left transition-colors hover:border-line-strong hover:bg-raised"

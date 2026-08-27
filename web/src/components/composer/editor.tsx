@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Loader2, Plus, Trash2, TriangleAlert } from "lucide-react";
+import { Bell, Check, Loader2, Plus, Trash2, TriangleAlert } from "lucide-react";
 
 import { LayoutPicker } from "@/components/composer/layout-picker";
 import { SettingsForm } from "@/components/composer/settings-form";
@@ -28,6 +28,8 @@ export interface PaletteEntry {
   defaults: Record<string, unknown>;
   /** The biggest shape it draws, so the palette can show what it looks like. */
   headline: ShapeId;
+  /** Sizes whose design has somewhere to show another extension's alert. */
+  noticeShapes: ShapeId[];
 }
 
 export interface EditorWidget {
@@ -39,6 +41,8 @@ export interface EditorWidget {
   row: number;
   columnSpan: number;
   rowSpan: number;
+  /** Pinned as this screen's alert area. */
+  hostsNotices: boolean;
 }
 
 type SaveState = "idle" | "saving" | "saved" | "failed";
@@ -204,6 +208,7 @@ export function ScreenEditor({
       extension: entry.name,
       label: entry.label,
       settings: { ...entry.defaults },
+      hostsNotices: false,
       ...spot,
     };
 
@@ -605,6 +610,88 @@ export function ScreenEditor({
                 );
               })}
             </div>
+
+            {(() => {
+              const shape = shapeForSize(selected.columnSpan, selected.rowSpan);
+              const takesAlerts = shape ? selectedEntry.noticeShapes.includes(shape.id) : false;
+              const pinnedElsewhere = widgets.some(
+                (widget) => widget.hostsNotices && widget.id !== selected.id,
+              );
+
+              // Without a pin the largest design that can take alerts is used,
+              // because room is what an alert needs. Saying so is the point:
+              // where they land should never be a mystery.
+              const auto = [...widgets]
+                .filter((widget) => {
+                  const at = shapeForSize(widget.columnSpan, widget.rowSpan);
+                  const entry = byName.get(widget.extension);
+                  return at && entry?.noticeShapes.includes(at.id);
+                })
+                .sort(
+                  (a, b) =>
+                    b.columnSpan * b.rowSpan - a.columnSpan * a.rowSpan ||
+                    a.row - b.row ||
+                    a.column - b.column,
+                )[0];
+
+              if (!takesAlerts) {
+                return (
+                  <div className="mb-5 rounded-lg border border-line bg-ground/40 p-3">
+                    <p className="text-[12px] text-faint">
+                      This size has no alert strip, so no alert from another extension will appear
+                      on it.
+                    </p>
+                  </div>
+                );
+              }
+
+              const isHost = selected.hostsNotices || (!pinnedElsewhere && auto?.id === selected.id);
+
+              return (
+                <div className="mb-5 rounded-lg border border-line bg-ground/40 p-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setWidgets((current) =>
+                        current.map((widget) =>
+                          widget.id === selected.id
+                            ? { ...widget, hostsNotices: !selected.hostsNotices }
+                            : { ...widget, hostsNotices: false },
+                        ),
+                      )
+                    }
+                    className="flex w-full items-center gap-2 text-left"
+                  >
+                    <Bell
+                      size={13}
+                      className={cn("shrink-0", isHost ? "text-accent-bright" : "text-faint")}
+                    />
+                    <span className="flex-1 text-[12px] font-medium">Alerts appear here</span>
+                    <span
+                      className={cn(
+                        "h-4 w-7 shrink-0 rounded-full border p-0.5 transition-colors",
+                        selected.hostsNotices ? "border-accent/60 bg-accent/30" : "border-line bg-ground",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "block h-2.5 w-2.5 rounded-full transition-transform",
+                          selected.hostsNotices ? "translate-x-3 bg-accent" : "bg-faint",
+                        )}
+                      />
+                    </span>
+                  </button>
+
+                  <p className="mt-2 text-[11px] leading-relaxed text-faint">
+                    {selected.hostsNotices
+                      ? "Pinned. Alerts from any extension land here."
+                      : isHost
+                        ? "Nothing is pinned, so alerts land here — it is the largest design on this screen that takes them."
+                        : `Alerts land on ${auto?.label || auto?.extension || "another widget"} unless you pin them here.`}
+                  </p>
+                </div>
+              );
+            })()}
 
             <div className="border-t border-line pt-5">
               <SettingsForm

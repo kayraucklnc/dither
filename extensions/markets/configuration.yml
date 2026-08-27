@@ -67,7 +67,7 @@ notices:
   - key: big_move
     label: Moved sharply today
     icon: trending-up
-    loud: true
+    level: urgent
     text: "{{ market.symbol }} {{ market.change_percent }}%"
     when:
       fact: change_percent

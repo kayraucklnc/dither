@@ -167,7 +167,7 @@ export interface RenderContext {
   settings: Record<string, unknown>;
   data: Record<string, unknown>;
   /** Things another extension wants said here. Empty unless this widget hosts them. */
-  notices?: { icon: string; text: string; loud: boolean }[];
+  notices?: { icon: string; text: string; level: string }[];
   environment?: Environment;
   /** The shape actually being drawn, which may differ from the one authored. */
   shape?: string;
@@ -214,7 +214,7 @@ export async function renderWidget(
   shape: string,
   settings: Record<string, unknown>,
   data: Record<string, unknown>,
-  notices: { icon: string; text: string; loud: boolean }[] = [],
+  notices: { icon: string; text: string; level: string }[] = [],
   environment: Environment = DEFAULT_ENVIRONMENT,
 ): Promise<{ html: string } | { problem: string }> {
   const template = templateFor(extension, shape);

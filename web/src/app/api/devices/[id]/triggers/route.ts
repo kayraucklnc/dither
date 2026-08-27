@@ -49,13 +49,31 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     );
   }
 
+  const settings = parsed.data.settings ?? defaultSettings(extension);
+
+  /*
+   * Adding the same source twice with the same settings answers with the one
+   * that already exists rather than making another. Two calendars are only
+   * useful when they are *different* calendars, and a silent failure that
+   * invites a second click should not leave four identical rows behind.
+   */
+  const existing = (
+    await db.select().from(triggers).where(eq(triggers.deviceId, deviceId))
+  ).find(
+    (row) =>
+      row.extension === extension.name &&
+      JSON.stringify(row.settings) === JSON.stringify(settings),
+  );
+
+  if (existing) return NextResponse.json({ trigger: existing, reused: true });
+
   const [trigger] = await db
     .insert(triggers)
     .values({
       deviceId,
       extension: extension.name,
       label: parsed.data.label || extension.manifest.label,
-      settings: parsed.data.settings ?? defaultSettings(extension),
+      settings,
     })
     .returning();
 

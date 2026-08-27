@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { find as findExtension } from "@/lib/extensions/registry";
+import { find as findExtension, rendersNotices } from "@/lib/extensions/registry";
 import { COLUMNS, ROWS, shapeForSize } from "@/lib/shapes";
 import { DEFAULT_ENVIRONMENT, renderWidget, type Environment } from "./liquid";
 
@@ -34,6 +34,8 @@ export interface PlacedWidget {
   row: number;
   columnSpan: number;
   rowSpan: number;
+  /** Pinned as the screen's alert area. */
+  hostsNotices?: boolean;
 }
 
 export interface Composition {
@@ -85,27 +87,95 @@ function gap(placement: string, message: string): string {
 export interface Notice {
   icon: string;
   text: string;
-  loud: boolean;
+  level: "info" | "warn" | "urgent";
+  /** "screen" for the alert area, "source" to prefer its own extension's widget. */
+  placement?: string;
+  /** The extension the notice is about, for placement: source. */
+  fromExtension?: string;
 }
 
-/**
- * Which widget hosts the screen's notices.
- *
- * The first one, in reading order, whose extension says its designs have
- * somewhere to put them. One host per screen, so three widgets that all accept
- * notices do not show the same warning three times.
- */
-async function noticeHost(widgets: PlacedWidget[]): Promise<number | undefined> {
-  const ordered = [...widgets].sort(
-    (a, b) => a.row - b.row || a.column - b.column,
-  );
+const WEIGHT: Record<string, number> = { urgent: 3, warn: 2, info: 1 };
 
-  for (const widget of ordered) {
-    const extension = await findExtension(widget.extension);
-    if (extension?.manifest.accepts_notices) return widget.id;
+/**
+ * Deciding where each notice lands.
+ *
+ * A notice never goes to every widget - three designs that take alerts would
+ * show the same warning three times. It goes to one, and *which* one used to
+ * be whichever happened to be first in reading order, which is not a decision
+ * anybody made: moving a widget moved the alerts.
+ *
+ * Now there are two rules, in this order:
+ *
+ *   1. A notice placed "with its source" goes to a widget of the extension it
+ *      is about, if the screen has one. A cancelled train belongs on the
+ *      departure board, not beside the weather.
+ *   2. Everything else goes to the screen's alert area: the widget pinned as
+ *      such, or failing that the *largest* design that can take alerts -
+ *      because room is what an alert needs, and largest is a reason where
+ *      first-in-reading-order was an accident.
+ *
+ * Each design says how many it can hold. Past that the lowest levels are
+ * summarised rather than squeezed, so a cancellation is never dropped to make
+ * room for "rain likely".
+ */
+async function canHost(widget: PlacedWidget): Promise<boolean> {
+  const extension = await findExtension(widget.extension);
+  const shape = shapeForSize(widget.columnSpan, widget.rowSpan);
+
+  return Boolean(extension && shape && rendersNotices(extension, shape.id));
+}
+
+export async function routeNotices(
+  widgets: PlacedWidget[],
+  notices: Notice[],
+): Promise<Map<number, Notice[]>> {
+  const routed = new Map<number, Notice[]>();
+  if (!notices.length) return routed;
+
+  const hosts: PlacedWidget[] = [];
+  for (const widget of widgets) if (await canHost(widget)) hosts.push(widget);
+  if (!hosts.length) return routed;
+
+  const area =
+    hosts.find((widget) => widget.hostsNotices) ??
+    [...hosts].sort(
+      (a, b) =>
+        b.columnSpan * b.rowSpan - a.columnSpan * a.rowSpan ||
+        a.row - b.row ||
+        a.column - b.column,
+    )[0];
+
+  for (const notice of notices) {
+    const target =
+      (notice.placement === "source" &&
+        notice.fromExtension &&
+        hosts.find((widget) => widget.extension === notice.fromExtension)) ||
+      area;
+
+    routed.set(target.id, [...(routed.get(target.id) ?? []), notice]);
   }
 
-  return undefined;
+  // Trim to what each design says it can hold, keeping the loudest.
+  for (const [widgetId, list] of routed) {
+    const widget = widgets.find((candidate) => candidate.id === widgetId)!;
+    const extension = await findExtension(widget.extension);
+    const capacity = extension?.manifest.notice_capacity ?? 2;
+
+    if (list.length <= capacity) continue;
+
+    const ordered = [...list].sort(
+      (a, b) => (WEIGHT[b.level] ?? 0) - (WEIGHT[a.level] ?? 0),
+    );
+    const kept = ordered.slice(0, capacity - 1);
+    const dropped = ordered.length - kept.length;
+
+    routed.set(widgetId, [
+      ...kept,
+      { icon: "info", text: `+${dropped} more`, level: "info" },
+    ]);
+  }
+
+  return routed;
 }
 
 /**
@@ -152,7 +222,7 @@ export async function compose(
   const problems: string[] = [];
   const cells: string[] = [];
   const css = await framework();
-  const host = notices.length ? await noticeHost(widgets) : undefined;
+  const routed = await routeNotices(widgets, notices);
 
   const cellWidth = width / COLUMNS;
   const cellHeight = height / ROWS;
@@ -184,7 +254,7 @@ export async function compose(
       shape.id,
       widget.settings,
       widget.data,
-      widget.id === host ? notices : [],
+      routed.get(widget.id) ?? [],
       environment,
     );
 

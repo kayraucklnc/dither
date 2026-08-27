@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { ScreenEditor, type PaletteEntry } from "@/components/composer/editor";
 import { db } from "@/lib/db";
 import { models, screens, widgets } from "@/lib/db/schema";
-import { all, defaultSettings } from "@/lib/extensions/registry";
+import { all, defaultSettings, rendersNotices } from "@/lib/extensions/registry";
 import { summarise } from "@/lib/extensions/summary";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +36,7 @@ export default async function ScreenPage({ params }: { params: Promise<{ id: str
       fields: extension.manifest.fields,
       defaults: defaultSettings(extension),
       headline: summarise(extension).headline,
+      noticeShapes: extension.shapes.filter((shape) => rendersNotices(extension, shape)),
     }));
 
   return (
@@ -54,6 +55,7 @@ export default async function ScreenPage({ params }: { params: Promise<{ id: str
         row: row.row,
         columnSpan: row.columnSpan,
         rowSpan: row.rowSpan,
+        hostsNotices: row.hostsNotices,
       }))}
     />
   );

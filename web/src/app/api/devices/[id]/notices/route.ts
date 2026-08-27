@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { devices, notices, triggers } from "@/lib/db/schema";
 import { find } from "@/lib/extensions/registry";
+import { NOTICE_LEVELS } from "@/lib/extensions/manifest";
 import { conditionSchema } from "@/lib/flow/conditions";
 
 /**
@@ -42,7 +43,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         label: notice.label,
         icon: notice.icon,
         text: notice.text,
-        loud: notice.loud,
+        level: notice.level,
+        placement: notice.placement,
         condition: {
           kind: "fact" as const,
           sourceId: String(source.id),
@@ -62,7 +64,8 @@ const created = z.object({
   condition: conditionSchema,
   icon: z.string().default("alert"),
   text: z.string().default(""),
-  loud: z.boolean().default(false),
+  level: z.enum(NOTICE_LEVELS).default("warn"),
+  placement: z.enum(["screen", "source"]).default("screen"),
 });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -83,7 +86,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       condition: parsed.data.condition as unknown as Record<string, unknown>,
       icon: parsed.data.icon,
       text: parsed.data.text,
-      loud: parsed.data.loud,
+      level: parsed.data.level,
+      placement: parsed.data.placement,
     })
     .returning();
 
@@ -96,7 +100,8 @@ const updated = z.object({
   condition: conditionSchema.optional(),
   icon: z.string().optional(),
   text: z.string().optional(),
-  loud: z.boolean().optional(),
+  level: z.enum(NOTICE_LEVELS).optional(),
+  placement: z.enum(["screen", "source"]).optional(),
   enabled: z.boolean().optional(),
 });
 

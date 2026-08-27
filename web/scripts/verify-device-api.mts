@@ -37,6 +37,8 @@ const firmwareHeaders = (token: string) => ({
 });
 
 console.log("setup");
+// Marked so the run can clean up after itself. A check that leaves a device
+// behind every time turns the dashboard into a list of its own past runs.
 const mac = `AA:BB:CC:DD:EE:${Math.floor(Math.random() * 90 + 10)}`;
 const setup = await fetch(`${base}/api/setup`, { headers: { id: mac, model: "og", "fw-version": "1.2.3" } });
 const setupBody = await setup.json();
@@ -93,6 +95,17 @@ const noToken = await fetch(`${base}/api/display`);
 check("refuses a request with no token", noToken.status === 401, String(noToken.status));
 const badToken = await fetch(`${base}/api/display`, { headers: firmwareHeaders("not-a-real-key") });
 check("refuses an unknown token", badToken.status === 404, String(badToken.status));
+
+console.log("\ncleanup");
+const listed = await fetch(`${base}/api/devices-by-mac?mac=${encodeURIComponent(mac)}`).catch(() => undefined);
+const id = listed?.ok ? (await listed.json())?.id : undefined;
+
+if (id) {
+  const removed = await fetch(`${base}/api/devices/${id}`, { method: "DELETE" });
+  check("the device it registered is removed again", removed.ok, String(removed.status));
+} else {
+  check("the device it registered is removed again", false, "could not find it to remove");
+}
 
 if (failures.length) {
   console.log(`\n${failures.length} FAILED:`);

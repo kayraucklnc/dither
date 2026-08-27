@@ -52,7 +52,11 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
       screens={screenOptions}
       sources={await editorSources(device)}
       sourceKinds={await sourceKinds()}
-      initialNodes={toNodes(rows)}
+      initialNodes={rows.map((row) => ({
+        ...toNodes([row])[0],
+        x: row.x,
+        y: row.y,
+      }))}
       initialRootId={device.rootNodeId}
     />
   );

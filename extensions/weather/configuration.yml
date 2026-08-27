@@ -90,6 +90,7 @@ notices:
   - key: rain_soon
     label: Rain likely today
     icon: umbrella
+    level: info
     text: "Rain likely - {{ source_1.daily.precipitation_probability_max[0] }}%"
     when:
       fact: rain_chance

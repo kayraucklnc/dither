@@ -69,6 +69,14 @@ export const widgets = pgTable("widgets", {
   settings: jsonb("settings").$type<Record<string, unknown>>().notNull().default({}),
   /** Optional label so two widgets of one extension are tellable apart. */
   label: text("label").notNull().default(""),
+  /**
+   * Pin this widget as the screen's alert area.
+   *
+   * With nothing pinned the largest design that can take alerts is chosen,
+   * because room is what an alert needs. Pinning exists so that is a decision
+   * rather than a consequence of where things happen to sit.
+   */
+  hostsNotices: boolean("hosts_notices").notNull().default(false),
 
   /** Placement on the 6x6 grid. The shape is derived from the span. */
   column: integer("column").notNull(),
@@ -183,7 +191,23 @@ export const notices = pgTable("notices", {
   icon: text("icon").notNull().default("alert"),
   /** Liquid, rendered against the source the condition reads from. */
   text: text("text").notNull().default(""),
-  loud: boolean("loud").notNull().default(false),
+  /**
+   * info | warn | urgent.
+   *
+   * Not only styling: the level decides which notice survives when a design
+   * has room for two and three are active, so "the train is cancelled" is
+   * never dropped to make room for "rain likely".
+   */
+  level: text("level").notNull().default("warn"),
+  /**
+   * screen | source.
+   *
+   * "screen" puts it in the screen's alert area. "source" puts it on a widget
+   * of the same extension when the screen has one - a transit alert on the
+   * departure board rather than beside the weather - and falls back to the
+   * alert area when it does not.
+   */
+  placement: text("placement").notNull().default("screen"),
   enabled: boolean("enabled").notNull().default(true),
   priority: integer("priority").notNull().default(0),
 });

@@ -91,13 +91,19 @@ export type Exchange = z.infer<typeof exchangeSchema>;
  * service alert" is a checkbox rather than a rule you have to compose. The
  * text is Liquid over the source's payload, so it can quote the alert itself.
  */
+export const NOTICE_LEVELS = ["info", "warn", "urgent"] as const;
+export type NoticeLevel = (typeof NOTICE_LEVELS)[number];
+
 export const noticeSchema = z.object({
   key: z.string().min(1),
   label: z.string().min(1),
   icon: z.string().default("alert"),
   /** Liquid, rendered against the source's payload. */
   text: z.string().min(1),
-  loud: z.boolean().default(false),
+  /** info is worth knowing, warn is worth noticing, urgent is worth acting on. */
+  level: z.enum(NOTICE_LEVELS).default("warn"),
+  /** Prefer a widget of this same extension when the screen has one. */
+  placement: z.enum(["screen", "source"]).default("screen"),
   when: z.object({
     fact: z.string().min(1),
     operator: z.string().default("present"),
@@ -141,6 +147,12 @@ export const manifestSchema = z.object({
    * hook is offered, not imposed.
    */
   accepts_notices: z.boolean().default(false),
+  /**
+   * How many notices a design of this extension can show before it is
+   * crowded. Overflow is summarised rather than squeezed, because six alerts
+   * in a band is six unreadable alerts.
+   */
+  notice_capacity: z.number().int().min(1).max(6).default(2),
   exchanges: z.array(exchangeSchema).default([]),
 
   /**
