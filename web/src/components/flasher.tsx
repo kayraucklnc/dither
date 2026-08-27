@@ -162,13 +162,22 @@ export function Flasher({ images }: { images: FirmwareImage[] }) {
   return (
     <div className="rounded-panel border border-line bg-surface p-5">
       {images.length === 0 ? (
-        <p className="text-[13px] leading-relaxed text-muted">
-          No firmware images to write. Drop a <em>merged</em> <code className="font-mono">.bin</code>{" "}
-          — bootloader, partition table and application in one file — into{" "}
-          <code className="font-mono text-ink">web/public/downloads/</code> and reload. A bare{" "}
-          <code className="font-mono">firmware.bin</code> written at offset 0 produces a board that
-          does not boot.
-        </p>
+        <div className="space-y-3 text-[13px] leading-relaxed text-muted">
+          <p>
+            No firmware images to write. Build a board in your{" "}
+            <code className="font-mono text-ink">trmnl-firmware</code> checkout, then bring the
+            result over:
+          </p>
+          <pre className="overflow-auto rounded-lg bg-ground/60 p-3 font-mono text-[12px] text-ink">
+            cd web{"\n"}npx tsx scripts/firmware.mts
+          </pre>
+          <p>
+            That copies only the images that can actually be written at offset zero. A bare{" "}
+            <code className="font-mono">firmware.bin</code> looks just as plausible in a file
+            listing and produces a board that does not boot, so each one is opened and checked
+            rather than trusted for its name.
+          </p>
+        </div>
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-[1fr_auto]">

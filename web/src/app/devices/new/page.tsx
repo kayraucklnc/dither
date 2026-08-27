@@ -109,9 +109,11 @@ export default async function AddDevicePage() {
           <li className="flex gap-2">
             <Cpu size={14} className="mt-0.5 shrink-0 text-faint" />
             <span>
-              A board built from source has the address compiled in instead. Dither serves{" "}
-              <em>stock</em> firmware and never asks a device to run anything of ours, so the only
-              thing that changes between the vendor&apos;s build and yours is where it points.
+              Rebuilding the firmware to change this is not necessary and mostly not the answer. The
+              address is a runtime preference — <code className="font-mono text-ink">api_url</code>{" "}
+              in the board&apos;s own storage — and the{" "}
+              <code className="font-mono text-ink">API_BASE_URL</code> compiled in is only what it
+              falls back to when nothing has been set. One generic image per board is enough.
             </span>
           </li>
         </ul>

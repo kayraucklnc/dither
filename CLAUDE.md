@@ -101,6 +101,26 @@ WebSerial one the Ruby app had; it came back in Next form and reads merged
 images from `web/public/downloads/`. The binaries are gitignored; the directory
 and its README are not.
 
+The images come from a `trmnl-firmware` checkout, and are never copied in by
+hand:
+
+```bash
+cd web && npx tsx scripts/firmware.mts    # or pass the checkout as an argument
+```
+
+**A merged image is not "the file that starts with 0xE9".** A bare
+`firmware.bin` starts with it too, and written at offset zero it produces a
+board that does not boot while looking entirely plausible in a file listing. The
+test is the partition table at `0x8000` - magic `AA 50` - with a bootloader at
+`0x0` (ESP32-S3/C3/C6) or `0x1000` (classic ESP32). `firmware.mts` opens every
+candidate and applies it before copying.
+
+**The server address is not compiled in, and rebuilding to change it is the
+wrong instinct.** `API_BASE_URL` in the firmware's `config.h` is only the
+fallback; the real value is `api_url` in the board's NVS, which its own Wi-Fi
+setup portal writes. One generic image per board is enough for any number of
+installations.
+
 The other direction *is* a dashboard action. Forgetting a device is on its card
 and in its Device tab, and it says what goes with it, because the tree and the
 notices live here rather than on the panel. A panel still on the network simply
