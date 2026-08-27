@@ -4,7 +4,7 @@
 
 <div class="screen dense">
   <div class="title-bar" style="padding: 14px 14px 8px">
-    <div class="title truncate" style="font-size: 17px">{{ board.origin | truncate: 14 }}</div>
+    <div class="title truncate" style="font-size: 17px">{% if extension.values.heading != blank %}{{ extension.values.heading | truncate: 14 }}{% else %}{{ board.origin | truncate: 14 }}{% endif %}</div>
   </div>
 
   {% if board.empty %}

@@ -5,7 +5,14 @@ import { provider } from "@/lib/connections";
 import { db } from "@/lib/db";
 import { connections, observations, triggers, widgets, type Widget } from "@/lib/db/schema";
 import { find, type Extension } from "@/lib/extensions/registry";
-import { observationKey, record, recordFailure } from "@/lib/extensions/observations";
+import {
+  answersFor,
+  observationKey,
+  record,
+  recordFailure,
+  type Answer,
+  type Question,
+} from "@/lib/extensions/observations";
 import { board } from "@/lib/transit/board";
 
 /**
@@ -124,6 +131,43 @@ export async function ask(
 
     return { key, error: message };
   }
+}
+
+/**
+ * Answers, asking first for anything that has never been answered.
+ *
+ * Without this an editor shows the extension's *sample* the moment settings
+ * change - because a new question has no answer yet - so a transit board would
+ * flash "Milano Cadorna to Saronno" whatever you had just typed, then settle
+ * on the real thing. Data about a different question is worse than a spinner.
+ *
+ * Only ever for questions never answered, and never twice in a minute for one
+ * that is failing, so a dead provider does not get hammered by a preview.
+ */
+const RETRY_AFTER = 60_000;
+
+export async function answersEnsuring(asked: Question[], now = new Date()): Promise<Map<string, Answer>> {
+  const answers = await answersFor(asked);
+  const pending = new Map<string, Question>();
+
+  for (const question of asked) {
+    const key = observationKey(question.extension, question.settings);
+    const answer = answers.get(key);
+    if (!answer?.standIn) continue;
+
+    const extension = await find(question.extension);
+    if (!extension || extension.manifest.kind === "static") continue;
+
+    const attempted = answer.attemptedAt?.getTime() ?? 0;
+    if (now.getTime() - attempted < RETRY_AFTER) continue;
+
+    pending.set(key, question);
+  }
+
+  if (!pending.size) return answers;
+
+  await Promise.all([...pending.values()].map((question) => ask(question.extension, question.settings, now)));
+  return answersFor(asked);
 }
 
 /** Whether the answer to this question has aged out. */

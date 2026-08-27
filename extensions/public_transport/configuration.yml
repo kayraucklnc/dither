@@ -111,13 +111,13 @@ fields:
     help_text: Off is usually better - a cancelled train is worth knowing about.
     optional: true
 
-  - keyname: title
+  - keyname: heading
     name: Heading
     field_type: string
     default: ""
     help_text: >
-      The line across the top. Left blank it reads "Milano Cadorna to Saronno",
-      which is usually what you want.
+      The line across the top. Left blank it names the route itself - "Milano
+      Cadorna to Saronno" - which is usually what you want.
     optional: true
 
 # What a rule may ask this extension about.

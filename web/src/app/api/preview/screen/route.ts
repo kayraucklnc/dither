@@ -54,6 +54,7 @@ export async function POST(request: Request) {
       extension: widget.extension,
       settings: widget.settings,
     })),
+    { ensure: true },
   );
 
   const placed: PlacedWidget[] = widgets.map((widget) => ({

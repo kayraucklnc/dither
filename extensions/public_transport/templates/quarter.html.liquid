@@ -12,7 +12,7 @@
   {% else %}
     <div class="content layout layout--col" style="justify-content: space-between">
       <div class="kv">
-        <span class="k t-xs t-upper truncate">{{ board.origin | truncate: 18 }}</span>
+        <span class="k t-xs t-upper truncate">{% if extension.values.heading != blank %}{{ extension.values.heading | truncate: 18 }}{% else %}{{ board.origin | truncate: 18 }}{% endif %}</span>
         <span class="v t-xs">{{ next.minutes_until | in_words }}</span>
       </div>
 
