@@ -110,7 +110,7 @@ export async function noticeHosts(
   const { decisionNodes, screens, widgets } = await import("@/lib/db/schema");
   const { find } = await import("@/lib/extensions/registry");
   const { rendersNotices } = await import("@/lib/extensions/registry");
-  const { shapeForSize } = await import("@/lib/shapes");
+  const { sizeOf } = await import("@/lib/shapes");
   const { eq, inArray } = await import("drizzle-orm");
 
   const nodes = await db.select().from(decisionNodes).where(eq(decisionNodes.deviceId, deviceId));
@@ -132,8 +132,7 @@ export async function noticeHosts(
 
     for (const widget of ordered) {
       const extension = await find(widget.extension);
-      const shape = shapeForSize(widget.columnSpan, widget.rowSpan);
-      if (!extension || !shape || !rendersNotices(extension, shape.id)) continue;
+      if (!extension || !rendersNotices(extension, sizeOf(widget), widget.design)) continue;
 
       host = {
         widgetLabel: widget.label || extension.manifest.label,

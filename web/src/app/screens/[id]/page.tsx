@@ -4,8 +4,7 @@ import { notFound } from "next/navigation";
 import { ScreenEditor, type PaletteEntry } from "@/components/composer/editor";
 import { db } from "@/lib/db";
 import { models, screens, widgets } from "@/lib/db/schema";
-import { all, defaultSettings, rendersNotices } from "@/lib/extensions/registry";
-import { summarise } from "@/lib/extensions/summary";
+import { all, defaultSettings, headlineSize, rendersNotices } from "@/lib/extensions/registry";
 
 export const dynamic = "force-dynamic";
 
@@ -28,15 +27,20 @@ export default async function ScreenPage({ params }: { params: Promise<{ id: str
 
   const extensions = await all();
   const palette: PaletteEntry[] = extensions
-    .filter((extension) => extension.shapes.length > 0)
+    .filter((extension) => extension.designs.length > 0)
     .map((extension) => ({
       name: extension.name,
       label: extension.manifest.label,
-      shapes: extension.shapes,
+      designs: extension.designs,
       fields: extension.manifest.fields,
       defaults: defaultSettings(extension),
-      headline: summarise(extension).headline,
-      noticeShapes: extension.shapes.filter((shape) => rendersNotices(extension, shape)),
+      headline: headlineSize(extension),
+      // Whether a design has an alert strip is a fact about its template, and
+      // templates never reach the browser - so it is settled here and sent as
+      // a list of keys.
+      noticeDesigns: extension.designs
+        .filter((design) => rendersNotices(extension, design.nominal, design.key))
+        .map((design) => design.key),
       capabilitiesFrom: extension.manifest.capabilities_from,
       factCount: extension.manifest.facts.length,
     }));
@@ -57,6 +61,7 @@ export default async function ScreenPage({ params }: { params: Promise<{ id: str
         row: row.row,
         columnSpan: row.columnSpan,
         rowSpan: row.rowSpan,
+        design: row.design,
         hostsNotices: row.hostsNotices,
       }))}
     />

@@ -13,6 +13,7 @@ import {
   type Answer,
   type Question,
 } from "@/lib/extensions/observations";
+import { environment } from "@/lib/settings";
 import { board } from "@/lib/transit/board";
 
 /**
@@ -83,7 +84,15 @@ async function fromConnection(
     throw new Error(`Link your ${source.label} account to use ${extension.manifest.label}.`);
   }
 
-  return source.fetch(settings, now);
+  // The installation's zone, not the server's. "What did we take today" is a
+  // question about a calendar day somewhere, and the somewhere is here.
+  const { locale, timezone } = await environment();
+
+  return source.fetch(settings, now, {
+    credentials: linked?.credentials ?? {},
+    locale,
+    timezone,
+  });
 }
 
 export interface FetchResult {

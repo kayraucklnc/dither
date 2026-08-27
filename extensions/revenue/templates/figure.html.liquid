@@ -1,0 +1,105 @@
+{% comment %}
+  Figure — one number, as large as the box allows.
+
+  The design that covers almost the whole grid, from a 2x2 tile to the full
+  panel, which is why it sizes its own type rather than picking a font size.
+  `shape.width` and `shape.height` are the real pixels of the box, so the
+  figure is fitted to the *shorter* of what the width allows and what the
+  height allows: a wide shallow band runs out of height first, a narrow tall
+  one runs out of width, and hard-coding either is how type ends up clipped.
+
+  Everything under the figure is one line and truncates. A caption that wraps
+  is a caption that pushes the figure out of a box with `overflow: hidden`,
+  and the failure looks like a rendering bug rather than like too many words.
+{% endcomment %}
+
+{%- assign money = revenue -%}
+{%- assign metric = extension.values.metric | default: "taken" -%}
+{%- assign period = extension.values.window | default: "today" -%}
+{%- if metric == "taken" -%}
+  {%- assign card = money.windows[period] -%}
+{%- elsif metric == "next_subscriber" and extension.values.basis == "renewal" -%}
+  {%- assign card = money.cards.next_renewal -%}
+{%- else -%}
+  {%- assign card = money.cards[metric] -%}
+{%- endif -%}
+
+{%- assign box_w = shape.width | at_least: 120 -%}
+{%- assign box_h = shape.height | at_least: 60 -%}
+{%- assign pad = box_w | divided_by: 16 | at_least: 8 | at_most: 24 -%}
+
+<div class="screen">
+  {%- unless card -%}
+    <div class="content layout layout--col layout--center" style="gap: 6px; padding: {{ pad }}px">
+      <span class="i i-card i-lg"></span>
+      <p class="t-sm t-center t-bold">Not connected</p>
+      {% if shape.rows > 4 %}<p class="t-xs t-center">Link Stripe under Connections.</p>{% endif %}
+    </div>
+  {%- else -%}
+    {%- assign shown = card.symbol | append: card.figure -%}
+    {%- assign chars = shown | size | at_least: 3 -%}
+
+    {%- comment %} How much of the height the figure may take.
+      It depends on how many lines end up under it, which depends on the box:
+      a shallow band draws the figure alone and can give it nearly everything,
+      while a tall box draws a caption and two lines of detail and must not.
+      A fixed share is what left a 12x2 band with a 33px figure in 800px of
+      white, and what clipped the caption off a 4x4 tile. {% endcomment -%}
+    {%- assign inner_h = box_h | minus: pad | minus: pad -%}
+    {%- assign share = 84 -%}
+    {%- if shape.rows > 2 %}{% assign share = 62 %}{% endif -%}
+    {%- if shape.rows > 3 %}{% assign share = 48 %}{% endif -%}
+    {%- if shape.rows > 6 %}{% assign share = 42 %}{% endif -%}
+    {%- assign by_height = inner_h | times: share | divided_by: 100 -%}
+    {%- comment %} 56 is roughly the width of a bold digit as a share of its size. {% endcomment -%}
+    {%- assign by_width = box_w | minus: pad | minus: pad | times: 100 | divided_by: chars | divided_by: 56 -%}
+    {%- assign figure_size = by_width | at_most: by_height | at_most: 120 | at_least: 15 -%}
+
+    {%- assign caption = extension.values.heading | default: card.caption -%}
+    {%- assign caption_size = figure_size | divided_by: 4 | at_least: 9 | at_most: 16 -%}
+    {%- assign detail_size = figure_size | divided_by: 3 | at_least: 10 | at_most: 18 -%}
+
+    {%- comment %} The words come off the delta before the delta itself does.
+      "+15%" in a tile still says which way it is going. {% endcomment -%}
+    {%- assign delta = card.delta -%}
+    {%- if box_w < 300 %}{% assign delta = card.delta_short %}{% endif -%}
+
+    <div class="content layout layout--col layout--center"
+         style="gap: {{ figure_size | divided_by: 10 | at_least: 2 }}px; padding: {{ pad }}px">
+      {%- comment %} Under three rows there is no room for a caption without
+        squeezing the figure, and the figure is the point. {% endcomment -%}
+      {% if shape.rows > 2 and caption != blank %}
+        <p class="t-bold t-upper t-center truncate"
+           style="font-size: {{ caption_size }}px; line-height: 1.2; letter-spacing: 0.06em; width: 100%">
+          {{ caption }}
+        </p>
+      {% endif %}
+
+      <p class="t-bold t-center truncate"
+         style="font-size: {{ figure_size }}px; line-height: 1; letter-spacing: -0.03em; width: 100%">
+        {{ shown }}
+      </p>
+
+      {% if shape.rows > 3 %}
+        {% if extension.values.compare != false and delta != blank %}
+          <p class="with-icon t-bold t-center truncate"
+             style="font-size: {{ detail_size }}px; line-height: 1.2; width: 100%; justify-content: center">
+            <span class="i i-trending-{% if card.rising %}up{% else %}down{% endif %} i-sm"></span>
+            {{ delta }}
+          </p>
+        {% elsif card.detail != blank %}
+          <p class="t-center truncate" style="font-size: {{ detail_size }}px; line-height: 1.2; width: 100%">
+            {{ card.detail }}
+          </p>
+        {% endif %}
+      {% endif %}
+
+      {%- comment %} Both lines only where there is genuinely room for both. {% endcomment -%}
+      {% if shape.rows > 6 and card.detail != blank and extension.values.compare != false and delta != blank %}
+        <p class="t-center truncate" style="font-size: {{ detail_size }}px; line-height: 1.2; width: 100%">
+          {{ card.detail }}
+        </p>
+      {% endif %}
+    </div>
+  {%- endunless -%}
+</div>

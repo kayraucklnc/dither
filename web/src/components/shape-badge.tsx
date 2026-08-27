@@ -1,11 +1,12 @@
 import { cn } from "@/lib/cn";
-import { COLUMNS, ROWS, type Shape } from "@/lib/shapes";
+import { COLUMNS, ROWS, type Size } from "@/lib/shapes";
 
 /**
- * A shape drawn as the fraction of the panel it takes up. A six-by-six
- * thumbnail says "half width" faster than the words do.
+ * A size drawn as the fraction of the panel it takes up. A twelve-by-twelve
+ * thumbnail says "half width" faster than the words do - and says "7×5", which
+ * has no words at all, just as fast.
  */
-export function ShapeGlyph({ shape, className }: { shape: Shape; className?: string }) {
+export function ShapeGlyph({ size, className }: { size: Size; className?: string }) {
   return (
     <span
       aria-hidden
@@ -17,7 +18,7 @@ export function ShapeGlyph({ shape, className }: { shape: Shape; className?: str
     >
       <span
         className="rounded-[1px] bg-current"
-        style={{ gridColumn: `1 / span ${shape.columns}`, gridRow: `1 / span ${shape.rows}` }}
+        style={{ gridColumn: `1 / span ${size.columns}`, gridRow: `1 / span ${size.rows}` }}
       />
     </span>
   );

@@ -20,6 +20,7 @@ cd web
 npm run dev            # http://localhost:3000, hot reload
 npx tsx --env-file=.env.local scripts/seed.mts    # a device, screens, sources, a tree
 npx drizzle-kit push --force                     # apply schema changes
+npx tsx --env-file=.env.local scripts/regrid.mts # 6x6 widgets -> the 12x12 grid, once
 ```
 
 Postgres comes from `compose.yml` at the repository root. The volume is still
@@ -49,10 +50,12 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
 - **Notices are the additive half.** The tree is exclusive; a notice appears on
   whatever screen is showing, in the first widget whose extension declares
   `accepts_notices`. Extensions suggest their own.
-- **Shapes are declared, and refused when they are not.** A widget takes the
-  size it is drawn at on a 6x6 grid. An extension covers its *family* - a wide
-  band design serves any wide band - but a full-page design is never crammed
-  into a corner. See `standIn` in `web/src/lib/shapes.ts`.
+- **Size is free; the look is a choice; both are refused when undeclared.** A
+  widget takes any rectangle on a 12x12 grid. An extension declares *designs* -
+  a template plus the range of sizes it will be drawn at - and a size no design
+  covers is refused rather than scaled, so a full-page design is never crammed
+  into a corner. Where several designs cover one size, the widget picks: that
+  is the "style". See `web/src/lib/designs.ts`.
 
 ## Traps already paid for
 
@@ -79,13 +82,31 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
   this scrambled widget ids by index and corrupted a screen.
 - **Extension templates use `{{ extension.values.x }}`**, and exchange
   responses arrive as `source_1`, `source_2`, never in `extension.data`.
+- **A widget's chosen style has to be carried by every render path.** It lives
+  on the widget, so the editor preview, the saved-screen preview and the device
+  each have to pass it through - and the zod schema on the editor's preview
+  route strips it unless it is declared. Miss one and picking a style changes
+  the thumbnail beside the picker and nothing on the panel.
+- **A filter cannot appear inside a Liquid `if`.** `{% if a | modulo: 5 == 0 %}`
+  is a tokenizer error, not a false. Assign first.
+- **One answer per account, not per widget.** The Stripe payload carries every
+  window and every metric, because an observation is cached by the question -
+  the extension and its settings. Six revenue widgets showing six numbers must
+  cost one trip, so the *widget* chooses from a payload that has everything,
+  rather than the provider being told what to fetch.
+- **Stripe counts in minor units, and a few currencies have none.** Divide a
+  yen amount by a hundred and every figure is wrong by two orders of magnitude.
+  See `web/src/lib/money.ts`.
+- **"Today" is a local day, and midnight's offset is not always now's.** On the
+  morning the clocks change, the naive answer is an hour into the previous day.
+  See `web/src/lib/clock.ts`.
 
 ## Checking the work
 
 ```bash
 npx vitest run                                # unit
 npx tsx scripts/verify-device-api.mts         # the firmware wire contract, live
-npx tsx --env-file=.env.local scripts/sweep.mts   # every extension x every shape
+npx tsx --env-file=.env.local scripts/sweep.mts   # every design, at the edges of its range
 npx tsx scripts/shot.mts <url> <out.png> [h]  # screenshot a page, report console errors
 npx tsx scripts/measure.mts                   # element boxes, for layout bugs
 ```

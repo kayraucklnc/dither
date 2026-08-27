@@ -4,7 +4,7 @@ import { Bell, Clock, Link2, Radio, Train, Zap } from "lucide-react";
 import { ScreenPreview } from "@/components/screen-preview";
 import type { ExtensionSummary } from "@/lib/extensions/summary";
 import { DEFAULT_PANEL } from "@/lib/panel";
-import { pixelsFor, shape as findShape } from "@/lib/shapes";
+import { pixelsFor, sizeToken } from "@/lib/shapes";
 
 const KIND = {
   static: { icon: Clock, label: "Local" },
@@ -19,10 +19,7 @@ const KIND = {
  * choosing, not for reading.
  */
 export function ExtensionTile({ extension }: { extension: ExtensionSummary }) {
-  const shape = findShape(extension.headline);
-  const [width, height] = shape
-    ? pixelsFor(shape, DEFAULT_PANEL.width, DEFAULT_PANEL.height)
-    : [800, 480];
+  const [width, height] = pixelsFor(extension.headline, DEFAULT_PANEL.width, DEFAULT_PANEL.height);
   const kind = KIND[extension.kind];
 
   return (
@@ -31,7 +28,7 @@ export function ExtensionTile({ extension }: { extension: ExtensionSummary }) {
       className="group flex flex-col rounded-panel border border-line bg-surface p-3 transition-colors hover:border-line-strong"
     >
       <ScreenPreview
-        src={`/api/preview/extension/${extension.name}?shape=${extension.headline}`}
+        src={`/api/preview/extension/${extension.name}?size=${sizeToken(extension.headline)}`}
         width={width}
         height={height}
         alt={extension.label}
@@ -53,7 +50,7 @@ export function ExtensionTile({ extension }: { extension: ExtensionSummary }) {
 
         <div className="mt-2.5 flex items-center gap-3 text-[11px] text-faint">
           <span>
-            {extension.shapes.length} size{extension.shapes.length === 1 ? "" : "s"}
+            {extension.designCount} style{extension.designCount === 1 ? "" : "s"}
           </span>
           {extension.factCount > 0 && (
             <span className="flex items-center gap-1 text-accent-bright">
@@ -63,7 +60,7 @@ export function ExtensionTile({ extension }: { extension: ExtensionSummary }) {
           )}
           {extension.noticeShapes > 0 && (
             <span
-              title={`${extension.noticeShapes} of its sizes have somewhere to show another extension's alert`}
+              title={`${extension.noticeShapes} of its named sizes have somewhere to show another extension's alert`}
               className="flex items-center gap-1"
             >
               <Bell size={10} />
