@@ -87,6 +87,13 @@ designs:
     rows: [4, 12]
     nominal: [8, 6]
 
+  - template: milestone
+    label: Milestone
+    hint: How far along you are to the next round number, and how long it will take at the current rate.
+    columns: [4, 12]
+    rows: [3, 12]
+    nominal: [6, 5]
+
   - template: spark
     label: Figure and spark
     hint: One number with a hairline of history beside it, for a box too small for a chart.
@@ -140,9 +147,13 @@ fields:
         label: The last 30 days
       - value: month_to_date
         label: This month so far
+      - value: all_time
+        label: All time
     help_text: >
       Today resets at local midnight, so it is small at breakfast. The last 24
-      hours is always a full day's trading whatever time you look.
+      hours is always a full day's trading whatever time you look. All time
+      reaches as far back as one bounded trip to Stripe can see, and says so
+      with a "+" when there is more behind it.
     # Only money has a period. There is no such thing as subscribers over the
     # last seven days, and offering it would be a question with no answer.
     visible_when:
@@ -229,11 +240,17 @@ fields:
         label: Filled under
       - value: steps
         label: Stepped
+      - value: smooth
+        label: Curved
+      - value: smooth_area
+        label: Curved and filled
     help_text: >
       Filled reads from furthest away and is the right answer on a wall.
       A plain line is better where two periods are drawn on top of each other,
       and stepped is the honest one for daily totals - a day is a block of
-      trading, not a point that the days either side slope towards.
+      trading, not a point that the days either side slope towards. Curved
+      still passes through every figure exactly; only the shape between two of
+      them is invented, which is a decoration rather than a claim.
     visible_when:
       field: design
       any_of: [graph, full]
@@ -591,6 +608,24 @@ sample:
         delta: "-9% on last month"
         delta_short: "-9%"
         bars: days
+      all_time:
+        key: all_time
+        label: All time
+        short: all time
+        amount: 486320
+        figure: "486.3k"
+        figure_full: "486,320"
+        text: "€486.3k"
+        text_full: "€486,320"
+        symbol: "€"
+        previous: 0
+        change_percent: null
+        rising: true
+        caption: All time
+        detail: "since 11 Mar 2024"
+        delta: null
+        delta_short: null
+        bars: days
     week:
       - { day: Mon, date: "17 Aug", amount: 2980 }
       - { day: Tue, date: "18 Aug", amount: 3420 }
@@ -599,6 +634,18 @@ sample:
       - { day: Fri, date: "21 Aug", amount: 4260 }
       - { day: Sat, date: "22 Aug", amount: 2760 }
       - { day: Sun, date: "23 Aug", amount: 3184 }
+    milestones:
+      all_time: { value: 486320, next: 500000, previous: 400000, to_go: 13680, percent: 86, in_days: 4 }
+      month_to_date: { value: 74120, next: 75000, previous: 50000, to_go: 880, percent: 96, in_days: 0 }
+      today: { value: 3184, next: 4000, previous: 3000, to_go: 816, percent: 18, in_days: null }
+      last_7d: { value: 23604, next: 25000, previous: 20000, to_go: 1396, percent: 72, in_days: 0 }
+      last_30d: { value: 96240, next: 100000, previous: 75000, to_go: 3760, percent: 85, in_days: 1 }
+      mrr: { value: 18420, next: 20000, previous: 15000, to_go: 1580, percent: 68, in_days: null }
+      customers: { value: 1284, next: 1500, previous: 1000, to_go: 216, percent: 57, in_days: null }
+      subscribers: { value: 386, next: 400, previous: 300, to_go: 14, percent: 86, in_days: 12 }
+    all_time: 486320
+    all_time_capped: false
+    first_payment_at: "2024-03-11T09:12:00Z"
     hours:
       - { hour: "00", label: "00:00", amount: 0, ahead: false }
       - { hour: "01", label: "01:00", amount: 0, ahead: false }

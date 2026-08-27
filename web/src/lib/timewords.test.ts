@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   clockWords,
+  daysInWords,
   partOfDay,
   spanInWords,
   throughDay,
@@ -85,6 +86,21 @@ describe("throughDay", () => {
 
   it("reads as not started rather than as over, before the day opens", () => {
     expect(throughDay(at(5), at(7), at(23))).toBe(0);
+  });
+});
+
+describe("daysInWords", () => {
+  it("says what somebody waiting for it would say", () => {
+    expect(daysInWords(0)).toBe("any day now");
+    expect(daysInWords(1)).toBe("a day");
+    expect(daysInWords(4)).toBe("4 days");
+    expect(daysInWords(21)).toBe("3 weeks");
+    expect(daysInWords(120)).toBe("4 months");
+  });
+
+  it("loses precision as it goes further out, rather than pretending to keep it", () => {
+    // "in 34 days" is a promise nobody can make about a milestone.
+    expect(daysInWords(34)).toBe("5 weeks");
   });
 });
 

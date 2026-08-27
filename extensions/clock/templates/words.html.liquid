@@ -29,7 +29,11 @@
 
 {%- assign box_w = shape.width | at_least: 160 -%}
 {%- assign box_h = shape.height | at_least: 60 -%}
-{%- assign pad = box_w | divided_by: 22 | at_least: 10 | at_most: 26 -%}
+{%- comment %} Padding off the shorter side rather than off the width: a
+  full-width band is 800 by 80, and a twenty-second of the width either side is
+  most of the height gone before a word is set. {% endcomment -%}
+{%- assign shorter = box_w | at_most: box_h -%}
+{%- assign pad = shorter | divided_by: 8 | at_least: 9 | at_most: 26 -%}
 
 {%- comment %} The sentence is long and wraps, so it is fitted by area rather
   than by character count: roughly, how many characters fit on a line at a
