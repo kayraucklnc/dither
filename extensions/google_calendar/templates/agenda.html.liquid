@@ -65,7 +65,9 @@
   {%- if shown.size == 0 -%}
     <div class="content layout layout--col layout--center" style="gap: 8px">
       <span class="i i-calendar-check i-lg"></span>
-      <p class="t-md t-bold t-center">Nothing left today</p>
+      <p class="t-md t-bold t-center">
+        {% if calendar.window_empty %}{{ calendar.empty_label | default: "Nothing left today" }}{% else %}Nothing left today{% endif %}
+      </p>
       {% if day.tomorrow.count > 0 and box_h > 200 %}
         <p class="t-sm t-center truncate" style="width: 100%">
           Tomorrow: {{ day.tomorrow.first.start }} {{ day.tomorrow.first.title }}

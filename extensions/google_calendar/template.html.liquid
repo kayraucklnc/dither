@@ -108,7 +108,9 @@
         {% else %}
           <div class="stack stack--tight" style="gap: 6px">
             <span class="i i-calendar-check i-lg"></span>
-            <p class="t-xl t-bold">Nothing left today</p>
+            <p class="t-xl t-bold">
+              {% if calendar.window_empty %}{{ calendar.empty_label | default: "Nothing left today" }}{% else %}Nothing left today{% endif %}
+            </p>
             <p class="t-sm">
               {% if day.tomorrow.count > 0 %}
                 Tomorrow starts at {{ day.tomorrow.first.start }} with {{ day.tomorrow.first.title }}.

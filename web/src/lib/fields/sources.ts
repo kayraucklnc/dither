@@ -1,3 +1,7 @@
+import { calendars } from "@/lib/connections/google/api";
+import { feedValue } from "@/lib/connections/google/feeds";
+import { readyAccounts } from "@/lib/connections/link";
+import { provider } from "@/lib/connections";
 import { capabilitiesFor, cities, countries, providers } from "@/lib/transit/catalog";
 import { search as searchStations } from "@/lib/transit/trenord";
 
@@ -29,6 +33,59 @@ export interface Source {
 }
 
 const SOURCES: Source[] = [
+  {
+    /**
+     * Every calendar on every linked Google account.
+     *
+     * A calendar's id is an address - `en.uk#holiday@group.v.calendar.google.com`
+     * or the address of whoever shared it with you - so listing them is the
+     * difference between picking "Work" and remembering that. With two
+     * accounts linked the value carries the account too, because "primary" is
+     * a calendar on both of them; the account shows as the hint, so two
+     * calendars both called "Family" can be told apart.
+     */
+    id: "google.calendars",
+    async list() {
+      const google = provider("google");
+      if (!google) return [];
+
+      const accounts = await readyAccounts("google");
+      const linked = accounts.filter((one) => google.handshake!.complete(one.credentials));
+
+      if (!linked.length) {
+        throw new Error("Link a Google account under Connections to choose a calendar.");
+      }
+
+      const perAccount = await Promise.all(
+        linked.map(async (account) => {
+          try {
+            return { account, found: await calendars(account.credentials) };
+          } catch {
+            // One account being unreachable should leave the others pickable.
+            // The calendars already chosen on it still work.
+            return { account, found: [] };
+          }
+        }),
+      );
+
+      const several = linked.length > 1;
+
+      return perAccount.flatMap(({ account, found }) => [
+        {
+          value: feedValue(account.account, "primary"),
+          label: several ? `Primary — ${account.account}` : "Primary",
+          hint: several ? "" : account.account,
+        },
+        ...found
+          .filter((one) => !one.primary)
+          .map((one) => ({
+            value: feedValue(account.account, one.id),
+            label: one.summaryOverride?.trim() || one.summary?.trim() || one.id,
+            hint: several ? account.account : one.accessRole === "owner" ? "" : "shared",
+          })),
+      ]);
+    },
+  },
   {
     id: "transit.countries",
     async list() {

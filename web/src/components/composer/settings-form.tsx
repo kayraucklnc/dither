@@ -5,6 +5,7 @@ import { Check, Loader2, Search, TriangleAlert } from "lucide-react";
 
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/cn";
+import { MultiSelect } from "./multi-select";
 import type { Field } from "@/lib/extensions/manifest";
 
 /**
@@ -200,6 +201,13 @@ export function SettingsForm({
   onChange: (key: string, value: unknown) => void;
 }) {
   const [remote, setRemote] = useState<Record<string, Choice[]>>({});
+  /**
+   * Why a list is empty, when the source said. An unreachable source and a
+   * genuinely empty one look identical otherwise, and "Link a Google account
+   * under Connections" is the difference between a dead form and an
+   * instruction.
+   */
+  const [refusals, setRefusals] = useState<Record<string, string>>({});
   const [can, setCan] = useState<string[]>([]);
 
   const listed = fields.filter(
@@ -226,12 +234,17 @@ export function SettingsForm({
 
     const body = await response.json();
     const options: Record<string, Choice[]> = {};
+    const said: Record<string, string> = {};
 
     for (const [id, value] of Object.entries(body.options ?? {})) {
       if (Array.isArray(value)) options[id] = value as Choice[];
+      else if (value && typeof value === "object" && "error" in value) {
+        said[id] = String((value as { error: unknown }).error);
+      }
     }
 
     setRemote(options);
+    setRefusals(said);
     setCan(body.can ?? []);
   }, [wanted, capabilitiesFrom, signature]);
 
@@ -254,7 +267,11 @@ export function SettingsForm({
         if (field.needs_capability && !can.includes(field.needs_capability)) return null;
         if (!visible(field, values, design)) return null;
 
-        const value = values[field.keyname] ?? "";
+        // Falling back to the manifest's default, not to blank. A widget saved
+        // before a field existed has no value for it, and an empty selector
+        // reads as "nothing chosen" when what is actually true is "the
+        // default". `??` rather than `||`, so a boolean turned off stays off.
+        const value = values[field.keyname] ?? field.default ?? "";
         const id = `field-${field.keyname}`;
         const choices = field.options_from ? (remote[field.options_from] ?? []) : optionsOf(field);
 
@@ -289,6 +306,14 @@ export function SettingsForm({
                     ? choices
                     : [{ value: String(value), label: String(value) || "Nothing to choose" }]
                 }
+                onChange={(next) => onChange(field.keyname, next)}
+              />
+            ) : field.field_type === "multiselect" ? (
+              <MultiSelect
+                value={Array.isArray(value) ? value.map(String) : value ? [String(value)] : []}
+                options={choices}
+                ariaLabel={field.name}
+                emptyLabel={refusals[field.options_from ?? ""] ?? "Nothing to choose yet."}
                 onChange={(next) => onChange(field.keyname, next)}
               />
             ) : field.field_type === "boolean" ? (

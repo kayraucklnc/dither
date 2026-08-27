@@ -23,11 +23,17 @@ export function CredentialForm({
   fields,
   help,
   action,
+  submitLabel = "Link",
+  above,
 }: {
   provider: string;
   fields: CredentialField[];
   help?: { label: string; url: string };
   action: (formData: FormData) => Promise<void>;
+  /** "Link" for a key that is the whole story, "Save and continue" for half of one. */
+  submitLabel?: string;
+  /** Anything that has to be read before the fields are filled in. */
+  above?: React.ReactNode;
 }) {
   const [shown, setShown] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
@@ -45,6 +51,8 @@ export function CredentialForm({
       className="mt-3 space-y-3 border-t border-line pt-3"
     >
       <input type="hidden" name="provider" value={provider} />
+
+      {above}
 
       {fields.map((field) => (
         <div key={field.key}>
@@ -95,7 +103,7 @@ export function CredentialForm({
           className="flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-[13px] font-medium text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-60"
         >
           {busy && <Loader2 size={13} className="animate-spin" />}
-          {busy ? "Checking" : "Link"}
+          {busy ? "Checking" : submitLabel}
         </button>
 
         {help && (
