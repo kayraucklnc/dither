@@ -1,9 +1,0 @@
-<%#
-  Inlines the Dither screen framework.
-
-  Inlined rather than linked because Shoter assigns page.content directly, so
-  the page has no origin and relative URLs cannot resolve. The CSS lives in
-  lib/dither/screen_framework.css so the Ruby fragment wrapper
-  (Aspects::Screens::Documenter) can share the exact same source.
-%>
-<style><%= Dither::ScreenFramework.css %></style>

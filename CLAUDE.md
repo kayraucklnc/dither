@@ -1,16 +1,17 @@
 # Dither
 
 Self-hosted e-ink display server. Started as a fork of `usetrmnl/terminus`;
-the dashboard has since been rewritten in Next.js and lives in `web/`.
-Repo: github.com/kayraucklnc/dither.
+rewritten in Next.js, which is now the whole thing. Repo:
+github.com/kayraucklnc/dither.
 
 **Server only.** Devices run *stock* trmnl-firmware, unmodified. Nothing a
 device sees may change: `/api/setup`, `/api/display`, `/api/log` and their
 headers are a fixed contract, written down in `docs/device-api-contract.md`
 and checked end to end by `web/scripts/verify-device-api.mts`.
 
-The Ruby app at the repository root is the previous version. It is kept for
-reference while the port finishes; nothing new should be written there.
+There is no Ruby left. The last thing it uniquely had - the Trenord client -
+is ported to `web/src/lib/transit/trenord/`, and the rest went with it. If you
+need the old implementation, it is in the history before the deletion commit.
 
 ## Running it
 
@@ -21,8 +22,9 @@ npx tsx --env-file=.env.local scripts/seed.mts    # a device, screens, sources, 
 npx drizzle-kit push --force                     # apply schema changes
 ```
 
-Postgres comes from the old stack's compose file (`terminus-database-1`,
-port 5433, database `dither`).
+Postgres comes from `compose.yml` at the repository root. The volume is still
+named `terminus_database-data`, kept through the rename so nobody's screens
+went with the old name.
 
 ## The model, and why
 
