@@ -73,7 +73,7 @@ export async function serve(device: Device, now = new Date()): Promise<Served> {
   const said = await activeNotices(
     await db.select().from(notices).where(eq(notices.deviceId, device.id)),
     context,
-    await sourceExtensions(device.id),
+    await sourceExtensions(),
   );
 
   if (result.leaf && result.leaf.id !== device.currentNodeId) {

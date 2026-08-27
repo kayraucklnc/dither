@@ -548,7 +548,7 @@ function TreeCanvas({
    */
   const addSource = useCallback(
     async (extension: string): Promise<Condition | undefined> => {
-      const response = await fetch(`/api/devices/${deviceId}/triggers`, {
+      const response = await fetch("/api/sources", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ extension }),
@@ -559,20 +559,20 @@ function TreeCanvas({
         return undefined;
       }
 
-      const { trigger } = await response.json();
-      if (!trigger) return undefined;
+      const { source } = await response.json();
+      if (!source) return undefined;
 
       // Read the facts off the refreshed list rather than state, which this
       // closure captured before the source existed.
       const fresh = await refreshTrace();
-      const created = fresh?.sources?.find((source) => source.id === String(trigger.id));
+      const created = fresh?.sources?.find((candidate) => candidate.id === String(source.id));
       const first = created?.facts[0];
 
       setError(undefined);
 
       return {
         kind: "fact",
-        sourceId: String(trigger.id),
+        sourceId: String(source.id),
         factKey: first?.key ?? "",
         operator: first ? defaultOperator(first.type) : "present",
         value: first ? defaultValue(first.type) : "",
@@ -587,7 +587,7 @@ function TreeCanvas({
         current.map((source) => (source.id === id ? { ...source, settings } : source)),
       );
 
-      await fetch(`/api/devices/${deviceId}/triggers`, {
+      await fetch("/api/sources", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: Number(id), settings }),
@@ -600,10 +600,10 @@ function TreeCanvas({
 
   const removeSource = useCallback(
     async (id: string) => {
-      await fetch(`/api/devices/${deviceId}/triggers?id=${id}`, { method: "DELETE" });
+      await fetch(`/api/sources?id=${id}`, { method: "DELETE" });
       refreshTrace();
     },
-    [deviceId, refreshTrace],
+    [refreshTrace],
   );
 
   const addScreen = useCallback(
@@ -1179,17 +1179,22 @@ function TreeCanvas({
               Pick a check to change what it asks, or a screen to choose what it shows.
             </p>
 
+            <p className="mt-5 text-[11px] leading-relaxed text-faint">
+              Sources are shared across every panel. One can be watched here and alerted on
+              somewhere else, and it is fetched once for both.
+            </p>
+
             {sources.filter((source) => source.group === "trigger").length > 0 && (
               <>
                 <div className="mt-5 mb-2 flex items-center justify-between">
                   <p className="text-[11px] font-medium uppercase tracking-wide text-faint">
-                    Sources on this device
+                    Sources
                   </p>
                   <button
                     type="button"
                     onClick={async () => {
                       setRefreshing(true);
-                      await fetch(`/api/devices/${deviceId}/triggers/refresh`, { method: "POST" });
+                      await fetch("/api/sources/refresh", { method: "POST" });
                       await refreshTrace();
                       setRefreshing(false);
                     }}
@@ -1233,6 +1238,8 @@ function TreeCanvas({
                         {source.usedBy ? (
                           <p className="mt-0.5 text-[10px] text-faint">
                             {source.usedBy} check{source.usedBy === 1 ? "" : "s"} read from it
+                            {source.usedOn && source.usedOn.length > 0 &&
+                              ` · ${source.usedOn.join(", ")}`}
                           </p>
                         ) : (
                           <p className="mt-0.5 text-[10px] text-faint">Nothing reads from it yet</p>

@@ -65,15 +65,15 @@ const [device] = await db
   .returning();
 
 /*
- * Sources belong to the device, not to a screen, so a check can ask about a
- * station or a city that is not displayed anywhere.
+ * Sources belong to nothing in particular: not to a screen, so a check can ask
+ * about a station that is not displayed, and not to a device, so two panels can
+ * watch the same one.
  */
 const source = async (extension: string, label: string, settings: Record<string, unknown> = {}) => {
   const loaded = await find(extension);
   const [row] = await db
     .insert(triggers)
     .values({
-      deviceId: device.id,
       extension,
       label,
       settings: { ...(loaded ? defaultSettings(loaded) : {}), ...settings },

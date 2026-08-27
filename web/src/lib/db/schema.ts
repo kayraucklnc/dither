@@ -145,22 +145,23 @@ export const devices = pgTable("devices", {
 });
 
 /**
- * A source of facts a device can decide on.
+ * A source of facts anything can decide on.
  *
- * A trigger is an extension plus its own settings, owned by the device rather
- * than by a screen. That separation matters: the first version read facts off
- * whatever widget happened to be on a screen, so you could only trigger on
- * what you were already displaying, and "switch screens when the train from a
+ * A source is an extension plus its own settings - the same shape as a widget,
+ * but for deciding rather than drawing. Two separations got it here.
+ *
+ * First, it is not read off a screen: the original version took facts from
+ * whatever widget happened to be displayed, so "switch when the train from a
  * station I am not showing is late" was not expressible.
  *
- * Same shape as a widget - a use of an extension with its own settings and its
- * own fetched data - but for deciding rather than drawing.
+ * Second, it does not belong to a device. "Milan transit" is a question asked
+ * of the world, not a property of a panel - so one source can be watched by
+ * the panel in the hall and alerted on by the one on the desk, and it is
+ * fetched once for both. What is per device is the *subscription*: the checks
+ * and the notices each one builds on top.
  */
 export const triggers = pgTable("triggers", {
   id: serial("id").primaryKey(),
-  deviceId: integer("device_id")
-    .notNull()
-    .references(() => devices.id, { onDelete: "cascade" }),
   extension: text("extension").notNull(),
   /** What it is called in the check editor: "Cadorna departures", "Milan rain". */
   label: text("label").notNull().default(""),
@@ -334,13 +335,8 @@ export const widgetsRelations = relations(widgets, ({ one }) => ({
 export const devicesRelations = relations(devices, ({ one, many }) => ({
   model: one(models, { fields: [devices.modelId], references: [models.id] }),
   nodes: many(decisionNodes),
-  triggers: many(triggers),
   notices: many(notices),
   logs: many(deviceLogs),
-}));
-
-export const triggersRelations = relations(triggers, ({ one }) => ({
-  device: one(devices, { fields: [triggers.deviceId], references: [devices.id] }),
 }));
 
 export const decisionNodesRelations = relations(decisionNodes, ({ one }) => ({

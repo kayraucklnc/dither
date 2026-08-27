@@ -54,7 +54,7 @@ async function answer(
   const said = await activeNotices(
     rules,
     context,
-    await sourceExtensions(id),
+    await sourceExtensions(),
     Object.fromEntries(Object.entries(forced).map(([id, state]) => [Number(id), state])),
   );
 
