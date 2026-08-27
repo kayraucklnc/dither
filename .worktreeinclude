@@ -1,11 +1,10 @@
 # Gitignored files copied from the repository root into every new Conductor
 # workspace. See https://conductor.build/docs/reference/worktreeinclude
 #
-# Committed on purpose. `.env` is not in git and must not be — it holds
-# APP_SECRET and the database password. What is committed is the instruction to
-# copy it, never the values.
+# Committed on purpose. `.env` is not in git and must not be - it holds the
+# database password. What is committed is the instruction to copy it, never the
+# values.
 #
-# Without this, a fresh workspace has no `.env`, and `make up` fails on
-# Hanami::Settings before it reaches the browser: api_uri and app_secret are
-# required and have no usable defaults.
+# Without this a fresh workspace has no `.env`, so compose has no credentials
+# and the database comes up empty.
 .env

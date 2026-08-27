@@ -1,106 +1,51 @@
-# syntax = docker/dockerfile:1.4
-
-ARG RUBY_VERSION=4.0.6
-
-FROM docker.io/library/ruby:$RUBY_VERSION-slim AS base
-
-ARG NODE_VERSION=24
-
-LABEL org.opencontainers.image.base.name=dither
-LABEL org.opencontainers.image.title=Dither
-LABEL org.opencontainers.image.description="Dither - a self-hosted e-ink display server."
-LABEL org.opencontainers.image.authors="Dither"
-LABEL org.opencontainers.image.vendor=Dither
-
-ENV LANG=C.UTF-8
-ENV RACK_ENV=production
-ENV HANAMI_ENV=production
-ENV HANAMI_SERVE_ASSETS=true
-ENV BUNDLE_DEPLOYMENT=1
-ENV BUNDLE_PATH=/usr/local/bundle
-ENV BUNDLE_WITHOUT="development:quality:test:tools"
-
+# Dither.
+#
+# Chromium is the awkward part: the render pipeline screenshots a real page, so
+# the image needs a browser and the fonts a panel is designed against. Playwright
+# publishes an image with both already installed and matched to its own version,
+# which beats assembling one and discovering the mismatch at render time.
+# Tag must match the playwright version in web/package.json: the image ships
+# browsers under a version-stamped path, and a mismatch fails at render time
+# with "Executable doesn't exist" rather than at build.
+FROM mcr.microsoft.com/playwright:v1.62.1-noble AS base
 WORKDIR /app
 
-SHELL ["/bin/bash", "-o", "errexit", "-o", "nounset", "-o", "pipefail", "-c"]
+# The image ships npm 10, which cannot read the optional platform entries npm 11
+# writes into a lockfile - it reports them as missing and refuses to `ci`.
+# Matching the version that wrote the lockfile is cheaper than loosening the
+# install into something unreproducible.
+RUN npm install -g npm@11
 
-RUN <<STEPS
-  apt-get update -qq
-  apt-get install --no-install-recommends -y \
-  chromium \
-  curl \
-  fonts-noto-cjk \
-  git \
-  gnupg2 \
-  imagemagick \
-  libjemalloc2 \
-  locales \
-  lsb-release \
-  npm \
-  tmux
-  curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/postgresql-keyring.gpg
-  echo "deb [signed-by=/usr/share/keyrings/postgresql-keyring.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
-  curl -fsSL https://deb.nodesource.com/setup_$NODE_VERSION.x | bash -
-  apt-get update -qq
-  apt-get install --no-install-recommends -y postgresql-client-18 nodejs
-  rm -rf /var/lib/apt/lists /var/cache/apt/archives
-STEPS
+FROM base AS deps
+COPY web/package.json web/package-lock.json ./
+# `npm install` rather than `npm ci`: a lockfile written on macOS omits the
+# linux-only optional binaries sharp and esbuild need, and one written on linux
+# omits the macOS ones, so `ci` fails on whichever platform did not write it.
+# Versions still come from the lockfile; only the platform binaries resolve here.
+RUN npm install --no-audit --no-fund
 
 FROM base AS build
+ENV NEXT_TELEMETRY_DISABLED=1
+COPY --from=deps /app/node_modules ./node_modules
+COPY web/ ./
+# Extensions are read at request time rather than bundled, but the build wants
+# the directory to exist.
+COPY extensions/ ../extensions/
+RUN npm run build
 
-RUN <<STEPS
-  apt-get update -qq \
-  && apt-get install --no-install-recommends -y build-essential \
-  libpq-dev \
-  libyaml-dev \
-  pkg-config
-  rm -rf /var/lib/apt/lists /var/cache/apt/archives
-STEPS
+FROM base AS run
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
 
-COPY .ruby-version Gemfile Gemfile.lock .node-version package.json package-lock.json ./
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=build /app/.next ./.next
+COPY --from=build /app/public ./public
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/next.config.ts ./next.config.ts
+COPY --from=build /app/src/lib/render ./src/lib/render
 
-RUN <<STEPS
-  git clone --bare --depth 1 --single-branch https://github.com/usetrmnl/terminus .git
-  git -C .git fetch --tags
-  bundle install
-  npm ci
-  rm -rf "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git
-STEPS
+# The renderer reads its stylesheet and the mark off disk relative to the
+# working directory, so both have to be here rather than only in the bundle.
+RUN mkdir -p /data/renders
 
-COPY . .
-
-FROM build AS development
-
-ENV RACK_ENV=development
-ENV HANAMI_ENV=development
-ENV BUNDLE_DEPLOYMENT=0
-ENV BUNDLE_WITHOUT=""
-
-RUN <<STEPS
-  bundle install
-STEPS
-
-FROM base
-COPY --from=build "${BUNDLE_PATH}" "${BUNDLE_PATH}"
-COPY --from=build /app /app
-
-RUN <<STEPS
-  mkdir -p /app/log
-  mkdir -p /app/public/assets
-  mkdir -p /app/public/fonts
-  mkdir -p /app/public/uploads
-  mkdir -p /app/public/uploads/cache
-  mkdir -p /app/tmp
-STEPS
-
-RUN groupadd --system --gid 1000 app && \
-    useradd app --uid 1000 --gid 1000 --create-home --shell /bin/bash && \
-    chown -R app:app . log public tmp
-
-USER 1000:1000
-
-ENTRYPOINT ["scripts/docker/entrypoint"]
-
-EXPOSE 2300
-
-CMD ["bundle", "exec", "puma", "--config", "./config/puma.rb"]
+EXPOSE 3000
+CMD ["npm", "run", "start"]
