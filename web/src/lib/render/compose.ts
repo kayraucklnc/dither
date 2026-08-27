@@ -92,6 +92,8 @@ export interface Notice {
   placement?: string;
   /** The extension the notice is about, for placement: source. */
   fromExtension?: string;
+  /** Set on the summary entry: how many did not fit. */
+  overflow?: number;
 }
 
 const WEIGHT: Record<string, number> = { urgent: 3, warn: 2, info: 1 };
@@ -171,7 +173,7 @@ export async function routeNotices(
 
     routed.set(widgetId, [
       ...kept,
-      { icon: "info", text: `+${dropped} more`, level: "info" },
+      { icon: "info", text: `${dropped} more`, level: "info", overflow: dropped },
     ]);
   }
 

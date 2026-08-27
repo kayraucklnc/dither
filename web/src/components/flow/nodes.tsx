@@ -143,6 +143,8 @@ export interface ScreenData extends Record<string, unknown> {
   modelId: number;
   /** So the thumbnail includes this device's notices, as the panel would. */
   deviceId: number;
+  /** Whatever the Test tab is pretending, so the picture agrees with the trace. */
+  previewSuffix: string;
 }
 
 export function ScreenNode({ data, selected }: NodeProps & { data: ScreenData }) {
@@ -180,7 +182,7 @@ export function ScreenNode({ data, selected }: NodeProps & { data: ScreenData })
       <div className="px-2">
         {data.screenId ? (
           <ScreenPreview
-            src={`/api/preview/screen/${data.screenId}?modelId=${data.modelId}&deviceId=${data.deviceId}`}
+            src={`/api/preview/screen/${data.screenId}?modelId=${data.modelId}&deviceId=${data.deviceId}${data.previewSuffix}`}
             width={data.panel.width}
             height={data.panel.height}
             alt={data.screenName ?? data.label}

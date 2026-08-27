@@ -133,6 +133,24 @@ function TreeCanvas({
   }, [deviceId, tab]);
 
   const nodeTypes = useMemo(() => ({ question: QuestionNode, screen: ScreenNode }), []);
+
+  /**
+   * The simulation, folded into every preview URL.
+   *
+   * A thumbnail that ignores the pretence disagrees with the trace beside it,
+   * which is worse than not simulating at all.
+   */
+  const previewSuffix = useMemo(() => {
+    if (!simulation.active) return "";
+
+    const payload = {
+      at: simulation.at ? new Date(simulation.at).toISOString() : undefined,
+      overrides: simulation.overrides,
+      notices: simulation.notices,
+    };
+
+    return `&sim=${btoa(JSON.stringify(payload)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}`;
+  }, [simulation]);
   const { screenToFlowPosition } = useReactFlow();
 
   /**
@@ -678,12 +696,13 @@ function TreeCanvas({
           panel,
           modelId,
           deviceId,
+          previewSuffix,
         } satisfies ScreenData,
       };
     }),
   [
     nodes, rootId, selectedId, answered, trace, screens, panel, modelId,
-    deviceRefreshSeconds, sourceMap, canMove, move, reachable,
+    deviceRefreshSeconds, sourceMap, canMove, move, reachable, previewSuffix,
   ]);
 
   const [flowNodes, setFlowNodes, onNodesChange] = useNodesState<RFNode>([]);
@@ -1092,7 +1111,7 @@ function TreeCanvas({
                       )}
                     >
                       <ScreenPreview
-                        src={`/api/preview/screen/${screen.id}?modelId=${modelId}&deviceId=${deviceId}`}
+                        src={`/api/preview/screen/${screen.id}?modelId=${modelId}&deviceId=${deviceId}${previewSuffix}`}
                         width={panel.width}
                         height={panel.height}
                         alt={screen.name}
