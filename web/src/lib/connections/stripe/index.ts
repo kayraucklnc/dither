@@ -543,16 +543,24 @@ async function fetchRevenue(
    * Money is measured in major units here rather than in Stripe's minor ones,
    * because a milestone is a round number to a person and 2,500,000 cents is
    * not a round number to anybody.
+   *
+   * Climbed in whole units, because a milestone belongs to the figure printed
+   * beside it and every figure here is whole - `formatMoney` rounds unless it
+   * is asked for decimals, and nothing asks. Handed the pennies instead, the
+   * ladder measured a gap the panel never showed: a card reading GBP 526 sat
+   * beside "GBP 224.04999999999995 to go", which is 750 less 525.95 as a
+   * double and what a person actually found on their wall.
    */
   const perDay = toMajorUnits(minor.last_30d, currency) / 30;
+  const whole = (amount: number) => Math.round(toMajorUnits(amount, currency));
 
   const milestones = {
-    all_time: milestoneOf(toMajorUnits(minor.all_time, currency), perDay),
-    month_to_date: milestoneOf(toMajorUnits(minor.month_to_date, currency), perDay),
-    today: milestoneOf(toMajorUnits(minor.today, currency)),
-    last_7d: milestoneOf(toMajorUnits(minor.last_7d, currency), perDay),
-    last_30d: milestoneOf(toMajorUnits(minor.last_30d, currency), perDay),
-    mrr: milestoneOf(mrr),
+    all_time: milestoneOf(whole(minor.all_time), perDay),
+    month_to_date: milestoneOf(whole(minor.month_to_date), perDay),
+    today: milestoneOf(whole(minor.today)),
+    last_7d: milestoneOf(whole(minor.last_7d), perDay),
+    last_30d: milestoneOf(whole(minor.last_30d), perDay),
+    mrr: milestoneOf(Math.round(mrr)),
     customers: milestoneOf(customers.items.length),
     subscribers: milestoneOf(subscriptions.subscribers, forecast.perWeek / 7),
   };

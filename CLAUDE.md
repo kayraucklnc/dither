@@ -168,6 +168,15 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
 - **Stripe counts in minor units, and a few currencies have none.** Divide a
   yen amount by a hundred and every figure is wrong by two orders of magnitude.
   See `web/src/lib/money.ts`.
+- **A figure that is drawn can be approximate; one that is printed cannot.** A
+  bar an eighth of a pixel out is a bar. A number goes on the wall exactly as
+  it arrives, so anything subtracted or divided on the way to a template is a
+  place a double shows its working: a milestone of 750 less takings of 525.95
+  read "224.04999999999995 to go" at the size of a caption. Milestones are
+  climbed in whole major units now, because every money figure beside them is
+  whole - `formatMoney` rounds unless asked for decimals, and nothing asks -
+  and the gap is taken at the precision of *both* its ends, since the bottom of
+  the ladder has halves on it and half a customer is not a whole one.
 - **The sample is for pictures, never for decisions.** `answersFor` falls back
   to the extension's sample when a question has no answer, which is what lets a
   screen be arranged before anyone owns the hardware. Hand that to the tree or
