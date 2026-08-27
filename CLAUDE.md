@@ -80,7 +80,13 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
   a template plus the range of sizes it will be drawn at - and a size no design
   covers is refused rather than scaled, so a full-page design is never crammed
   into a corner. Where several designs cover one size, the widget picks: that
-  is the "style". See `web/src/lib/designs.ts`.
+  is the "style". See `web/src/lib/designs.ts`. A design is not the whole of a
+  look, though: a dial with roman numerals and a dial with none are one design
+  and two pictures, so a field whose *values* fork the drawing says
+  `variants: true` and the catalogue draws one preview of each. It is not the
+  same flag as `presentation` and neither implies the other - a clock fetches
+  nothing, so nothing it takes is presentational, and its numerals are still
+  the most visible choice it offers.
 - **A panel is not a clock, and a design that draws one has to say so.** The
   device wakes, is handed one picture, paints it and sleeps for a quarter of an
   hour. So a design declares `tick`: how many seconds pass before it would look
@@ -379,6 +385,27 @@ introduces itself again afterwards, as a new device with a new key.
   (`web/scripts/calendar-settings.mts`) beat teaching one more component about
   the invisible state - and it had to cover *triggers* as well as widgets, or a
   widget and the source beside it stop sharing one answer.
+- **A count from the payload beside a decision from the clock is two answers to
+  one question.** Every calendar design works its countdowns out at the moment
+  of drawing, because the payload is up to ten minutes old - and then printed
+  `today.remaining` straight from that payload, so for the whole of that window
+  the band said "6 left" beside "Nothing left today". Anything a live decision
+  is drawn next to has to be counted the same way, off `day.events` and
+  `now_mins`.
+- **`empty_label` is about the window, not about today.** It says "Nothing this
+  week", which is the wrong sentence to print above a list of what is on this
+  week. It is only true when nothing is ahead anywhere; when today has merely
+  run out, the sentence is "Nothing left today". `next_any` is the difference,
+  and it has to be checked against the drawing clock like everything else, or a
+  stale payload draws a meeting that started ten minutes ago as the next one.
+- **Nothing left today is a screen too, and it is on for six hours.** Every
+  design has a branch that runs from the last meeting until midnight, and the
+  sample is a busy Thursday, so it is the branch nobody looks at. What is worth
+  drawing there is what the payload already knows: the next thing whenever it
+  is, the days ahead as bars, the day that has just gone hatched behind you.
+  Only what was *fetched*, though - "the rest of today" is one day, and seven
+  empty bars under it is an invented week. `web/scripts/calendar-quiet-qa.mts`
+  draws all three of those days at every size.
 
 ## Checking the work
 
@@ -388,6 +415,7 @@ make verify                                   # the firmware wire contract, live
 
 cd web                                        # the rest are still run by hand
 npx tsx --env-file=.env.local scripts/sweep.mts   # every design, at the edges of its range
+npx tsx --env-file=.env.local scripts/calendar-quiet-qa.mts  # every calendar design, on a day that is over
 npx tsx --env-file=.env.local scripts/qa.mts      # every page, in a browser
 npx tsx scripts/shot.mts <url> <out.png> [h]  # screenshot a page, report console errors
 npx tsx scripts/measure.mts                   # element boxes, for layout bugs

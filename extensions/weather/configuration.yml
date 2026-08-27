@@ -66,6 +66,7 @@ fields:
 
   - keyname: style
     presentation: true
+    variants: true
     name: Style
     field_type: select
     default: rich

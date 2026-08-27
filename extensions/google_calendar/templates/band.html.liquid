@@ -22,6 +22,18 @@
   {%- endif -%}
 {%- endfor -%}
 
+{%- comment %} How many are actually left, counted against the clock at the
+  moment of drawing rather than taken from the payload. `today.remaining` was
+  true when Google was last asked, which is up to ten minutes ago, and this
+  design decides what to *say* from the live clock - so the two disagree for
+  the whole of that window and the panel prints "6 left" beside "Nothing left
+  today". Same reason the countdowns are worked out here. {% endcomment -%}
+{%- assign left = 0 -%}
+{%- for event in day.events -%}
+  {%- if event.end_minutes > now_mins %}{% assign left = left | plus: 1 %}{% endif -%}
+{%- endfor -%}
+{%- assign gone = day.today.total | minus: left | at_least: 0 -%}
+
 {%- assign open = extension.values.day_start | default: "08:00" | minutes_of -%}
 {%- assign close = extension.values.day_end | default: "20:00" | minutes_of -%}
 {%- for event in day.events -%}
@@ -60,10 +72,39 @@
         <p class="t-bold truncate" style="font-size: {{ title_size }}px; line-height: 1.15">
           <span class="t-mono">{{ coming.start }}</span> {{ coming.title }}
         </p>
+      {% elsif day.next_any and day.next_any_day != "Today" and day.next_any.start_minutes > now_mins %}
+        {%- comment %} Out of day, not out of calendar. The strip beside this
+          still shows today, hatched and behind you; the words are better spent
+          on the next thing there actually is than on repeating what the strip
+          already says.
+
+          "Nothing left today" and not `empty_label`: there is something in the
+          window - it is being named on the line below - so "nothing this week"
+          would be flatly untrue. And something still ahead *today* but past a
+          short horizon is not this case at all. {% endcomment -%}
+        {%- comment %} The day goes on the small line and only the time stays
+          beside the title: a band's left third is 320 pixels, and "Tomorrow
+          08:30" in the same size as the title spent two thirds of them before
+          the title had a word. {% endcomment -%}
+        {%- comment %} The day is the part that cannot be dropped. A narrow band
+          gives this line about 160 pixels, and "NOTHING LEFT TODAY · TOMORROW"
+          truncates to "NOTHING LEFT T…" - which loses the one word that stops
+          "08:30 Dentist" underneath reading as this morning. {% endcomment -%}
+        <p class="with-icon t-xs t-upper t-bold truncate" style="gap: 5px">
+          <span class="i i-calendar-check i-xs"></span>{% if box_w > 640 %}Nothing left today &middot; {% endif %}{{ day.next_any_day }}
+        </p>
+        <p class="t-bold truncate" style="font-size: {{ title_size }}px; line-height: 1.15">
+          <span class="t-mono">{{ day.next_any.start }}</span> {{ day.next_any.title }}
+        </p>
       {% else %}
         <p class="with-icon t-bold" style="font-size: {{ title_size }}px; gap: 8px">
-          <span class="i i-calendar-check i-sm"></span>Nothing left today
+          <span class="i i-calendar-check i-sm"></span>{{ day.empty_label | default: "Nothing left today" }}
         </p>
+        {% if shape.rows > 3 and day.today.total > 0 %}
+          <p class="t-xs truncate" style="margin-top: 2px">
+            {{ day.today.total }} today, {{ day.today.busy_text }} of it, all done
+          </p>
+        {% endif %}
       {% endif %}
       {% if shape.rows > 3 and extension.values.show_location != false and running == false and coming.location != blank %}
         <p class="with-icon t-xs truncate" style="margin-top: 2px">
@@ -78,7 +119,7 @@
     <div class="fit" style="min-width: 120px">
       <div style="display: flex; justify-content: space-between; margin-bottom: 4px">
         <span class="t-xs t-bold">{{ day.today.busy_text }} booked</span>
-        <span class="t-xs">{{ day.today.remaining }} left &middot; {{ day.today.free_text }} free</span>
+        <span class="t-xs">{{ left }} left &middot; {{ day.today.free_text }} free</span>
       </div>
 
       <div style="position: relative; border: 2px solid var(--ink); width: 100%;

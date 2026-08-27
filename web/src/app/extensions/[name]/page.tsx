@@ -2,10 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Clock, Image, Link2, Radio, Train, Zap } from "lucide-react";
 
-import { ScreenPreview } from "@/components/screen-preview";
 import { ExtensionDesigns, type DesignEntry } from "@/components/extension-designs";
 import { describeRange } from "@/lib/designs";
-import { find, rendersNotices } from "@/lib/extensions/registry";
+import { looksFor } from "@/lib/extensions/looks";
+import { defaultSettings, find, rendersNotices } from "@/lib/extensions/registry";
 import { summarise } from "@/lib/extensions/summary";
 import { operatorsFor } from "@/lib/facts";
 import { DEFAULT_PANEL } from "@/lib/panel";
@@ -31,6 +31,14 @@ export default async function ExtensionPage({ params }: { params: Promise<{ name
   // Each style previewed at its nominal size - the one it was really drawn for
   // - rather than at some canonical box, so the previews are at true relative
   // scale and a band looks like a band.
+  //
+  // A design is not the whole of a look, though. A dial with roman numerals
+  // and a dial with none are one design and two pictures, so any field the
+  // manifest marks `variants` is drawn out at every one of its values beside
+  // the design it belongs to - the settings that fork the drawing, shown as
+  // the forks they are rather than as a line of help text.
+  const defaults = defaultSettings(extension);
+
   const designs: DesignEntry[] = extension.designs.map((design) => {
     const [width, height] = pixelsFor(design.nominal, DEFAULT_PANEL.width, DEFAULT_PANEL.height);
 
@@ -45,6 +53,12 @@ export default async function ExtensionPage({ params }: { params: Promise<{ name
       range: describeRange(design.range),
       takesNotices: rendersNotices(extension, design.nominal, design.key),
       declared: design.declared,
+      looks: looksFor(extension.manifest.fields, design.key, defaults).map((look) => ({
+        key: look.key,
+        field: look.field,
+        value: look.value,
+        settings: JSON.stringify(look.settings),
+      })),
     };
   });
 
