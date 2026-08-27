@@ -137,6 +137,7 @@ function assemble(manifest: Manifest, templates: Record<string, string>) {
         },
         nominal: { columns: nominal[0], rows: nominal[1] },
         declared: true,
+        tick: declaration.tick,
       });
       continue;
     }
@@ -239,6 +240,38 @@ export async function loadProblems(): Promise<ExtensionProblem[]> {
 export function defaultSettings(extension: Extension): Record<string, unknown> {
   return Object.fromEntries(
     extension.manifest.fields.map((field) => [field.keyname, field.default ?? ""]),
+  );
+}
+
+/**
+ * The half of a widget's settings that decides what is *fetched* for it.
+ *
+ * Two widgets asking the same question share one answer and one trip to the
+ * provider, and the question is these settings - not the ones that only choose
+ * how the answer is drawn. Which station is a question; whether the chart
+ * behind the number covers a week or a month is not, and a manifest says so by
+ * marking the field `presentation: true`.
+ *
+ * An unknown extension is answered with the settings untouched, because
+ * pretending two questions are one is the failure that puts the wrong city on
+ * a screen; asking twice is only slow.
+ */
+export function questionSettings(
+  extension: Extension | undefined,
+  settings: Record<string, unknown>,
+): Record<string, unknown> {
+  if (!extension) return settings;
+
+  const drawing = new Set(
+    extension.manifest.fields
+      .filter((field) => field.presentation)
+      .map((field) => field.keyname),
+  );
+
+  if (!drawing.size) return settings;
+
+  return Object.fromEntries(
+    Object.entries(settings ?? {}).filter(([keyname]) => !drawing.has(keyname)),
   );
 }
 

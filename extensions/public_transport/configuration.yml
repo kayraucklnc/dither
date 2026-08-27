@@ -182,7 +182,15 @@ facts:
   - key: alert
     label: Service alert
     type: text
-    path: transit.alerts.0.title
+    # The headline rather than the title: an operator's bulletin is titled
+    # after the noticeboard it came from, so the title is the same generic
+    # phrase whatever it happens to say. See lib/transit/trenord/board.ts.
+    path: transit.alerts.0.headline
+
+  - key: alert_severity
+    label: Service alert severity
+    type: text
+    path: transit.alerts.0.severity
 
 # Shaped exactly like a real board, so a design that reads well here reads well
 # in the field.
@@ -245,6 +253,9 @@ sample:
         status: "SCHEDULED"
     alerts:
       - title: "Reduced service"
+        headline: "Reduced service"
+        severity: "WARNING"
         description: "Engineering work between Cadorna and Bovisa until 10:00."
+        message: "Engineering work between Cadorna and Bovisa until 10:00."
 
 exchanges: []

@@ -174,14 +174,57 @@ function stationName(solutions: unknown[], key: string, fallback: string): strin
   return fallback;
 }
 
+/**
+ * Headings Trenord uses for the *container* rather than for the alert.
+ *
+ * Their bulletin arrives titled "Bacheca digitale" - the digital notice board
+ * - whatever it happens to say, so a board that shows the title shows the name
+ * of the noticeboard and never the notice. A month of engineering work on the
+ * Milan bypass reads as "Digital notice board", which is worse than showing
+ * nothing: it is a permanent warning glyph attached to a sentence that carries
+ * no information at all.
+ */
+const CONTAINER_TITLES = new Set([
+  "bacheca digitale",
+  "digital notice board",
+  "informazioni",
+  "information",
+  "avvisi",
+  "notices",
+]);
+
+/**
+ * What an alert is *called* on a panel: its title, unless the title is the
+ * name of the noticeboard, in which case the first sentence of what it
+ * actually says.
+ *
+ * Kept to one sentence because the destination is a strip a few centimetres
+ * wide - the whole message stays in `message` for a design with room for it.
+ */
+export function headlineOf(title: string, message: string): string {
+  if (title && !CONTAINER_TITLES.has(title.trim().toLowerCase())) return title;
+  if (!message) return title;
+
+  // Split on the end of a sentence rather than on every full stop, so "no.  9"
+  // and an abbreviation do not cut it short.
+  const [first] = message.split(/(?<=[.!?])\s+/);
+  const sentence = (first ?? message).trim();
+
+  return sentence.length > 140 ? `${sentence.slice(0, 137).trimEnd()}...` : sentence;
+}
+
 function alerts(payload: JourneyPayload, language: string) {
   return list(payload.hafas_alerts).map((raw) => {
     const alert = bag(raw);
+    const title = text(alert[`title_${language}`] ?? alert.title_en);
+    const message = text(alert[`message_${language}`] ?? alert.message_en);
 
     return {
       severity: String(alert.severity ?? "INFO"),
-      title: text(alert[`title_${language}`] ?? alert.title_en),
-      message: text(alert[`message_${language}`] ?? alert.message_en),
+      title,
+      message,
+      /** What a board or a notice should say. See headlineOf. */
+      headline: headlineOf(title, message),
     };
   });
 }
@@ -294,7 +337,7 @@ export async function trenordBoard(
       queried_at: `${String(local.getHours()).padStart(2, "0")}:${String(local.getMinutes()).padStart(2, "0")}`,
       departures,
       alerts: said,
-      alert: said[0]?.title ?? "",
+      alert: said[0]?.headline ?? "",
     },
   };
 }

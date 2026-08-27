@@ -4,11 +4,12 @@ import { Liquid } from "liquidjs";
 import { provider } from "@/lib/connections";
 import { db } from "@/lib/db";
 import { connections, observations, triggers, widgets, type Widget } from "@/lib/db/schema";
-import { find, type Extension } from "@/lib/extensions/registry";
+import { find, questionSettings, type Extension } from "@/lib/extensions/registry";
 import {
   answersFor,
   observationKey,
   record,
+  storedKey,
   recordFailure,
   type Answer,
   type Question,
@@ -114,8 +115,12 @@ export async function ask(
   settings: Record<string, unknown>,
   now = new Date(),
 ): Promise<FetchResult> {
-  const key = observationKey(extensionName, settings);
   const extension = await find(extensionName);
+  // The provider is told the question, not the widget: settings that only
+  // choose how the answer is drawn are no part of what gets fetched, and
+  // including them would ask the same question once per style on the screen.
+  const asked = questionSettings(extension, settings);
+  const key = observationKey(extensionName, asked);
 
   if (!extension) {
     await recordFailure(extensionName, settings, `${extensionName} is not installed.`);
@@ -127,12 +132,12 @@ export async function ask(
   try {
     const payload =
       extension.manifest.kind === "connection"
-        ? await fromConnection(extension, settings, now)
+        ? await fromConnection(extension, asked, now)
         : extension.manifest.kind === "poll"
-          ? await poll(extension, settings)
-          : await board(settings, now);
+          ? await poll(extension, asked)
+          : await board(asked, now);
 
-    await record(extensionName, settings, payload, now);
+    await record(extensionName, asked, payload, now);
     return { key, payload };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -160,8 +165,7 @@ export async function answersEnsuring(asked: Question[], now = new Date()): Prom
   const pending = new Map<string, Question>();
 
   for (const question of asked) {
-    const key = observationKey(question.extension, question.settings);
-    const answer = answers.get(key);
+    const answer = answers.get(observationKey(question.extension, question.settings));
     if (!answer?.standIn) continue;
 
     const extension = await find(question.extension);
@@ -170,7 +174,9 @@ export async function answersEnsuring(asked: Question[], now = new Date()): Prom
     const attempted = answer.attemptedAt?.getTime() ?? 0;
     if (now.getTime() - attempted < RETRY_AFTER) continue;
 
-    pending.set(key, question);
+    // Keyed by the question rather than by the asker, so two widgets that
+    // differ only in how they draw one answer fetch it once between them.
+    pending.set(await storedKey(question.extension, question.settings), question);
   }
 
   if (!pending.size) return answers;
@@ -194,7 +200,7 @@ export async function isStale(
   const [row] = await db
     .select()
     .from(observations)
-    .where(eq(observations.key, observationKey(extensionName, settings)));
+    .where(eq(observations.key, await storedKey(extensionName, settings)));
 
   if (!row?.fetchedAt) return true;
   return now.getTime() - row.fetchedAt.getTime() >= window * 60_000;
@@ -211,25 +217,30 @@ export const refreshTrigger = (source: { extension: string; settings: Record<str
 /** Refresh whatever a screen needs and has let go stale. */
 export async function refreshScreen(screenId: number, now = new Date()): Promise<FetchResult[]> {
   const rows = await db.select().from(widgets).where(eq(widgets.screenId, screenId));
-  const due: Widget[] = [];
+  // One entry per question. A screen showing today's takings four ways is one
+  // stale answer, not four, and asking Stripe four times for it would be both
+  // slow and rude.
+  const due = new Map<string, Widget>();
 
   for (const widget of rows) {
-    if (await isStale(widget.extension, widget.settings, now)) due.push(widget);
+    if (!(await isStale(widget.extension, widget.settings, now))) continue;
+    due.set(await storedKey(widget.extension, widget.settings), widget);
   }
 
-  return Promise.all(due.map((widget) => refresh(widget, now)));
+  return Promise.all([...due.values()].map((widget) => refresh(widget, now)));
 }
 
 /** Refresh every watched source that has aged out. Shared, so once for all. */
 export async function refreshTriggers(now = new Date()): Promise<FetchResult[]> {
   const rows = await db.select().from(triggers);
-  const due = [];
+  const due = new Map<string, (typeof rows)[number]>();
 
   for (const source of rows) {
-    if (await isStale(source.extension, source.settings, now)) due.push(source);
+    if (!(await isStale(source.extension, source.settings, now))) continue;
+    due.set(await storedKey(source.extension, source.settings), source);
   }
 
-  return Promise.all(due.map((source) => refreshTrigger(source, now)));
+  return Promise.all([...due.values()].map((source) => refreshTrigger(source, now)));
 }
 
 /** Everything a set of widget ids needs, asked now regardless of age. */

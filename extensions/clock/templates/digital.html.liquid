@@ -1,0 +1,102 @@
+{% comment %}
+  Readout - the time in figures, as large as the box allows.
+
+  The face for people who want the figures, and the only one here that goes
+  stale: it is exact when it is drawn and wrong by up to a refresh afterwards.
+  It says `tick: 60` in the manifest, so the server redraws it every minute it
+  would look different, and a device that only wakes every quarter of an hour
+  simply misses fourteen of those. If that bothers you, the other six faces
+  exist precisely because it bothered us.
+
+  Sized from the box rather than from a font-size table, because this design
+  covers everything from a 2x2 tile to the whole panel. Fitted to the shorter
+  of what the width allows and what the height allows: a shallow band runs out
+  of height first, a narrow tall box runs out of width, and hard-coding either
+  is how type ends up clipped.
+{% endcomment %}
+
+{%- assign shift = 0 -%}
+{%- if extension.values.utc_offset_hours != blank -%}
+  {%- assign shift = extension.values.utc_offset_hours | times: 3600 | minus: dither.offset_seconds -%}
+{%- endif -%}
+{%- assign stamp = "now" | date: "%s" | plus: shift -%}
+
+{%- if extension.values.twenty_four_hour == false -%}
+  {%- assign face = stamp | date: "%I:%M" -%}
+  {%- assign suffix = stamp | date: "%p" | downcase -%}
+{%- else -%}
+  {%- assign face = stamp | date: "%H:%M" -%}
+  {%- assign suffix = "" -%}
+{%- endif -%}
+
+{%- assign box_w = shape.width | at_least: 100 -%}
+{%- assign box_h = shape.height | at_least: 50 -%}
+{%- comment %} Padding off the shorter side rather than off the width: a
+  full-width band is 800 by 80, and a twentieth of the width either side of it
+  is more than half the height gone before anything is drawn. {% endcomment -%}
+{%- assign shorter = box_w | at_most: box_h -%}
+{%- assign pad = shorter | divided_by: 7 | at_least: 6 | at_most: 24 -%}
+
+{%- comment %} How much of the height the figures may take, which depends on
+  how many lines end up under them. A tile with nothing else in it can give
+  them nearly everything; a panel with a heading and a date cannot. {% endcomment -%}
+{%- assign lines = 0 -%}
+{%- if extension.values.heading != blank and shape.rows > 3 %}{% assign lines = lines | plus: 1 %}{% endif -%}
+{%- if extension.values.show_date != false and shape.rows > 3 %}{% assign lines = lines | plus: 1 %}{% endif -%}
+{%- assign share = 88 -%}
+{%- if lines == 1 %}{% assign share = 66 %}{% endif -%}
+{%- if lines >= 2 %}{% assign share = 54 %}{% endif -%}
+
+{%- assign by_height = box_h | minus: pad | minus: pad | times: share | divided_by: 100 -%}
+{%- comment %} A monospaced digit is about 0.6 of its size wide, and "10:45"
+  is five of them. {% endcomment -%}
+{%- assign chars = face | size | at_least: 4 -%}
+{%- assign by_width = box_w | minus: pad | minus: pad | times: 100 | divided_by: chars | divided_by: 62 -%}
+{%- assign figure = by_width | at_most: by_height | at_most: 210 | at_least: 14 -%}
+{%- assign small = figure | divided_by: 6 | at_least: 11 | at_most: 26 -%}
+
+<div class="screen">
+  <div class="content layout layout--col layout--center"
+       style="gap: {{ figure | divided_by: 12 | at_least: 2 | at_most: 14 }}px; padding: {{ pad }}px">
+    {% if extension.values.heading != blank and shape.rows > 3 %}
+      <p class="t-bold t-upper t-center truncate"
+         style="font-size: {{ small | at_most: 20 }}px; line-height: 1.2; width: 100%">
+        {{ extension.values.heading }}
+      </p>
+    {% endif %}
+
+    <p class="t-mono t-bold t-center"
+       style="font-size: {{ figure }}px; line-height: 0.94; letter-spacing: -0.04em">
+      {{ face }}{% if suffix != "" and shape.columns > 3 %}<span style="font-size: {{ figure | divided_by: 3 }}px">{{ suffix }}</span>{% endif %}
+    </p>
+
+    {% if extension.values.show_date != false and shape.rows > 3 %}
+      <p class="t-center truncate" style="font-size: {{ small }}px; line-height: 1.2; width: 100%">
+        {% if shape.columns > 5 %}{{ stamp | date: "%A %-d %B" }}{% else %}{{ stamp | date: "%a %-d %b" }}{% endif %}
+      </p>
+    {% endif %}
+  </div>
+
+  {% comment %}
+    Where another extension gets to say something on this screen. Glyphs like
+    dashboard warning lights, with the loudest one's words beside them when the
+    box is wide enough to carry them.
+  {% endcomment %}
+  {% if notices.size > 0 and shape.rows > 3 %}
+    <div class="notice-strip" style="padding: 6px {{ pad }}px">
+      {% for notice in notices %}
+        {% if notice.overflow %}
+          <span class="notice notice--more">+{{ notice.overflow }}</span>
+        {% else %}
+          <span class="notice notice--{{ notice.level }}" title="{{ notice.text }}">
+            <span class="i i-{{ notice.icon }}"></span>
+          </span>
+        {% endif %}
+      {% endfor %}
+
+      {% if shape.wide and notices[0].text != blank %}
+        <span class="notice-said">{{ notices[0].text }}</span>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>

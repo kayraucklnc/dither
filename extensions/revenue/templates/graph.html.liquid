@@ -1,0 +1,371 @@
+{% comment %}
+  Line - the figure, with the period drawn under it.
+
+  Bars answer "which day was busiest". A line answers "what is happening",
+  which is a different question and the one a wall panel is usually asked. It
+  is also the only shape that can carry two periods at once without becoming
+  unreadable, which is what the running-total option is for: this week's line
+  against last week's is a race, and either it is above or it is not.
+
+  Three things this has to get right on a 1-bit panel:
+
+    - Scale between the low and the high, never from zero. A week that runs
+      2980 to 4260 drawn from zero is a flat line that says nothing. The two
+      figures are printed above the plot so the scale is never a mystery -
+      a chart without them is a shape rather than a number.
+    - No type inside the plot. The viewBox is stretched to the box, so anything
+      drawn in it is stretched too; text goes in the rows above and below,
+      where it is drawn by the browser at the size it was asked for.
+    - Hours that have not happened yet are not zeroes. Today's line stops at
+      the current hour rather than diving to the floor, which is what a chart
+      of a partly-finished day looks like when nobody thought about it.
+{% endcomment %}
+
+{%- assign money = revenue -%}
+{%- assign metric = extension.values.metric | default: "taken" -%}
+{%- assign period = extension.values.window | default: "today" -%}
+{%- if metric == "taken" -%}
+  {%- assign card = money.windows[period] -%}
+{%- elsif metric == "next_subscriber" and extension.values.basis == "renewal" -%}
+  {%- assign card = money.cards.next_renewal -%}
+{%- else -%}
+  {%- assign card = money.cards[metric] -%}
+{%- endif -%}
+
+{%- comment %} Which series goes under the figure. `auto` follows the window
+  the widget is pointed at, which is what makes the default sensible without
+  anybody choosing. {% endcomment -%}
+{%- assign chart = extension.values.chart | default: "auto" -%}
+{%- if chart == "auto" -%}
+  {%- if period == "today" or period == "yesterday" %}{% assign chart = "week" %}{% endif -%}
+  {%- if chart == "auto" and card.bars == "week" %}{% assign chart = "week" %}{% endif -%}
+  {%- if chart == "auto" %}{% assign chart = "month" %}{% endif -%}
+{%- endif -%}
+
+{%- assign racing = false -%}
+{%- if chart == "pace" -%}
+  {%- assign series = money.pace.current -%}
+  {%- assign shadow = money.pace.previous -%}
+  {%- assign racing = true -%}
+  {%- assign from_label = money.pace.label -%}
+  {%- assign to_label = money.pace.against -%}
+{%- elsif chart == "today" -%}
+  {%- assign series = "" | split: "" -%}
+  {%- for hour in money.hours -%}
+    {%- unless hour.ahead %}{% assign series = series | concat: hour %}{% endunless -%}
+  {%- endfor -%}
+  {%- assign from_label = "00:00" -%}
+  {%- assign to_label = money.hours[23].label -%}
+{%- elsif chart == "week" -%}
+  {%- assign series = money.week -%}
+  {%- assign from_label = money.week[0].date -%}
+  {%- assign to_label = "today" -%}
+{%- else -%}
+  {%- assign series = money.days -%}
+  {%- assign from_label = money.days[0].date -%}
+  {%- assign to_label = "today" -%}
+{%- endif -%}
+
+{%- assign box_w = shape.width | at_least: 260 -%}
+{%- assign box_h = shape.height | at_least: 150 -%}
+{%- assign pad = box_w | divided_by: 22 | at_least: 10 | at_most: 24 -%}
+{%- assign axis = true -%}
+{%- if extension.values.axis == false or box_h < 190 %}{% assign axis = false %}{% endif -%}
+
+<div class="screen">
+  {%- unless card -%}
+    <div class="content layout layout--col layout--center" style="gap: 8px; padding: {{ pad }}px">
+      <span class="i i-card i-xl"></span>
+      <p class="t-md t-bold">Not connected</p>
+      <p class="t-sm">Link Stripe under Connections.</p>
+    </div>
+  {%- else -%}
+    {%- comment %} The figure, in whichever length the widget asked for. Both
+      are in the payload, so the choice costs no second trip to Stripe. {% endcomment -%}
+    {%- assign digits = card.figure -%}
+    {%- if extension.values.compact_figures == false and card.figure_full != blank -%}
+      {%- assign digits = card.figure_full -%}
+    {%- endif -%}
+    {%- assign shown = card.symbol | append: digits -%}
+    {%- assign chars = shown | size | at_least: 3 -%}
+
+    {%- comment %} The plot takes the height the words leave, and the figure is
+      sized to what is left over. {% endcomment -%}
+    {%- comment %} The plot is what is left once the words have been paid for,
+      so the words are budgeted first: the padding, the gaps between rows, and
+      the two axis rows if they are on. The figure then takes a little under
+      half of what remains, which leaves the plot the larger share - it is the
+      reason this design exists. {% endcomment -%}
+    {%- assign spent = pad | times: 2 | plus: 34 -%}
+    {%- if axis %}{% assign spent = spent | plus: 40 %}{% endif -%}
+    {%- assign head_h = box_h | minus: spent | times: 44 | divided_by: 100 | at_least: 34 -%}
+    {%- assign by_height = head_h | times: 74 | divided_by: 100 -%}
+    {%- assign by_width = box_w | minus: pad | minus: pad | times: 100 | divided_by: chars | divided_by: 56 -%}
+    {%- assign figure_size = by_width | at_most: by_height | at_most: 92 | at_least: 16 -%}
+
+    {%- comment %} The low and the high of whatever is being drawn. A running
+      total starts at zero because it is a total; everything else is scaled
+      between its own ends, or a week of ordinary trading is a flat line. {% endcomment -%}
+    {%- assign peak = 0 -%}
+    {%- assign trough = 999999999 -%}
+    {%- for point in series -%}
+      {%- assign value = point.amount -%}
+      {%- if racing %}{% assign value = point.total %}{% endif -%}
+      {%- if value > peak %}{% assign peak = value %}{% endif -%}
+      {%- if value < trough %}{% assign trough = value %}{% endif -%}
+    {%- endfor -%}
+    {%- if racing -%}
+      {%- assign trough = 0 -%}
+      {%- for point in shadow -%}
+        {%- if point.total > peak %}{% assign peak = point.total %}{% endif -%}
+      {%- endfor -%}
+    {%- endif -%}
+    {%- assign spread = peak | minus: trough -%}
+    {%- if spread <= 0 %}{% assign spread = 1 %}{% endif -%}
+
+    {%- assign count = series | size | at_least: 2 -%}
+    {%- assign last = count | minus: 1 -%}
+    {%- assign stepped = false -%}
+    {%- if extension.values.line_style == "steps" %}{% assign stepped = true %}{% endif -%}
+    {%- assign curved = false -%}
+    {%- if extension.values.line_style == "smooth" %}{% assign curved = true %}{% endif -%}
+    {%- if extension.values.line_style == "smooth_area" %}{% assign curved = true %}{% endif -%}
+
+    {%- comment %} The line itself, as a list of points in a thousand-unit
+      viewBox. Built with append rather than with anything cleverer, because
+      Liquid has nothing cleverer. {% endcomment -%}
+    {%- assign points = "" -%}
+    {%- for point in series -%}
+      {%- assign value = point.amount -%}
+      {%- if racing %}{% assign value = point.total %}{% endif -%}
+      {%- assign height = value | minus: trough | times: 250 | divided_by: spread -%}
+      {%- assign y = 275 | minus: height -%}
+      {%- if stepped -%}
+        {%- assign x0 = forloop.index0 | times: 1000 | divided_by: count -%}
+        {%- assign x1 = forloop.index | times: 1000 | divided_by: count -%}
+        {%- assign points = points | append: x0 | append: "," | append: y | append: " "
+                                   | append: x1 | append: "," | append: y | append: " " -%}
+      {%- else -%}
+        {%- assign x = forloop.index0 | times: 1000 | divided_by: last -%}
+        {%- assign points = points | append: x | append: "," | append: y | append: " " -%}
+      {%- endif -%}
+    {%- endfor -%}
+
+    {%- comment %} The curve, when one was asked for.
+
+      A Catmull-Rom spline written out as cubic Béziers: each segment gets two
+      control points a third of a step either side, aimed along the line
+      through its neighbours. It passes through every point exactly - the
+      figures are not moved, only the shape between two of them is invented,
+      which is a decoration rather than a claim.
+
+      The control points are clamped to the plot. A run of quiet days either
+      side of a spike sends a control point below the axis, and a curve that
+      dips under its own baseline reads as a loss that never happened. {% endcomment -%}
+    {%- assign curve = "" -%}
+    {%- if curved -%}
+      {%- assign step = 1000 | divided_by: last -%}
+      {%- assign reach = step | divided_by: 3 -%}
+      {%- for point in series -%}
+        {%- unless forloop.last -%}
+          {%- assign here = forloop.index0 -%}
+          {%- assign before = here | minus: 1 | at_least: 0 -%}
+          {%- assign after = here | plus: 1 -%}
+          {%- assign beyond = here | plus: 2 | at_most: last -%}
+
+          {%- assign v0 = series[before].amount -%}
+          {%- assign v1 = series[here].amount -%}
+          {%- assign v2 = series[after].amount -%}
+          {%- assign v3 = series[beyond].amount -%}
+          {%- if racing -%}
+            {%- assign v0 = series[before].total -%}
+            {%- assign v1 = series[here].total -%}
+            {%- assign v2 = series[after].total -%}
+            {%- assign v3 = series[beyond].total -%}
+          {%- endif -%}
+
+          {%- assign y0 = v0 | minus: trough | times: 250 | divided_by: spread -%}
+          {%- assign y0 = 275 | minus: y0 -%}
+          {%- assign y1 = v1 | minus: trough | times: 250 | divided_by: spread -%}
+          {%- assign y1 = 275 | minus: y1 -%}
+          {%- assign y2 = v2 | minus: trough | times: 250 | divided_by: spread -%}
+          {%- assign y2 = 275 | minus: y2 -%}
+          {%- assign y3 = v3 | minus: trough | times: 250 | divided_by: spread -%}
+          {%- assign y3 = 275 | minus: y3 -%}
+
+          {%- assign c1y = y2 | minus: y0 | divided_by: 6.0 | plus: y1 | at_least: 12 | at_most: 275 -%}
+          {%- assign c2y = y3 | minus: y1 | divided_by: 6.0 -%}
+          {%- assign c2y = y2 | minus: c2y | at_least: 12 | at_most: 275 -%}
+
+          {%- assign x1 = here | times: 1000 | divided_by: last -%}
+          {%- assign x2 = after | times: 1000 | divided_by: last -%}
+          {%- assign c1x = x1 | plus: reach -%}
+          {%- assign c2x = x2 | minus: reach -%}
+
+          {%- if forloop.first -%}
+            {%- assign curve = curve | append: "M " | append: x1 | append: "," | append: y1 -%}
+          {%- endif -%}
+          {%- assign curve = curve | append: " C " | append: c1x | append: "," | append: c1y
+                                   | append: " " | append: c2x | append: "," | append: c2y
+                                   | append: " " | append: x2 | append: "," | append: y2 -%}
+        {%- endunless -%}
+      {%- endfor -%}
+    {%- endif -%}
+
+    {%- assign trail = "" -%}
+    {%- if racing -%}
+      {%- for point in shadow -%}
+        {%- assign height = point.total | minus: trough | times: 250 | divided_by: spread -%}
+        {%- assign y = 275 | minus: height -%}
+        {%- assign x = forloop.index0 | times: 1000 | divided_by: last -%}
+        {%- assign trail = trail | append: x | append: "," | append: y | append: " " -%}
+      {%- endfor -%}
+    {%- endif -%}
+
+    {%- comment %} Filled by default, and never when two periods are drawn on
+      top of each other - a solid mass under one of them hides the other. {% endcomment -%}
+    {%- assign filled = false -%}
+    {%- if extension.values.line_style == blank
+        or extension.values.line_style == "area"
+        or extension.values.line_style == "smooth_area" -%}
+      {%- if racing == false %}{% assign filled = true %}{% endif -%}
+    {%- endif -%}
+
+    <div class="content layout layout--col" style="gap: {{ pad | divided_by: 2 }}px; padding: {{ pad }}px">
+      {%- comment %} Every row but the plot is `flex: none`. Without it the
+        column shrinks whichever row it likes when the content is a few pixels
+        taller than the box, and a row with `align-items: flex-end` that has
+        been shrunk pushes its own contents out through the top of the panel -
+        which looks like a missing caption rather than like an overflow. {% endcomment -%}
+      <div class="layout layout--row" style="align-items: flex-end; gap: {{ pad }}px; height: auto; flex: none">
+        <div class="stack stack--tight fit" style="gap: 2px; min-width: 0">
+          <p class="t-bold t-upper truncate" style="font-size: {{ figure_size | divided_by: 4 | at_least: 10 | at_most: 15 }}px; letter-spacing: 0.06em">
+            {{ extension.values.heading | default: card.caption }}
+          </p>
+          <p class="t-bold truncate" style="font-size: {{ figure_size }}px; line-height: 1; letter-spacing: -0.03em">
+            {{ shown }}
+          </p>
+        </div>
+
+        {% if extension.values.compare != false and card.delta_short != blank %}
+          <div style="flex: none; text-align: right">
+            <p class="with-icon t-bold" style="font-size: {{ figure_size | divided_by: 3 | at_least: 13 | at_most: 22 }}px; justify-content: flex-end">
+              <span class="i i-trending-{% if card.rising %}up{% else %}down{% endif %} i-sm"></span>
+              {% if box_w > 380 %}{{ card.delta }}{% else %}{{ card.delta_short }}{% endif %}
+            </p>
+          </div>
+        {% endif %}
+      </div>
+
+      {% if axis %}
+        {%- comment %} The scale, said out loud. The plot is drawn between
+          these two numbers and not from zero, and printing them is the
+          difference between a chart and a doodle. {% endcomment -%}
+        <div style="display: flex; justify-content: space-between; align-items: baseline; flex: none">
+          <span class="t-xs t-bold t-upper">
+            {% if racing %}
+              {{ money.pace.label }} vs {{ money.pace.against }}
+            {% else %}
+              high {{ card.symbol }}{{ peak }}
+            {% endif %}
+          </span>
+          <span class="t-xs">
+            {% if racing %}
+              {{ money.symbol }}{{ money.pace.current[6].total }} against {{ money.symbol }}{{ money.pace.previous[6].total }}
+            {% else %}
+              low {{ card.symbol }}{{ trough }}
+            {% endif %}
+          </span>
+        </div>
+      {% endif %}
+
+      <div class="fit" style="min-height: 40px; position: relative">
+        {%- comment %} preserveAspectRatio none stretches the viewBox to the
+          box, which is what makes one drawing work at every size in the range.
+          Every stroke says non-scaling-stroke or it is stretched with it. {% endcomment -%}
+        <svg viewBox="0 0 1000 300" preserveAspectRatio="none" width="100%" height="100%"
+             fill="none" stroke="black" style="display: block">
+          {%- comment %} The fill is a ramp from ink at the line to paper at the
+            baseline, not a solid mass. The panel is dithered on the way out, so
+            the ramp is resolved into a stipple that thins as it falls - which is
+            the only kind of tint a 1-bit display has, and the one thing it does
+            beautifully. A solid black area is a heavy blot at this size; a
+            stipple reads as depth and leaves the gridline under it visible.
+
+            The gradient is in objectBoundingBox units, so it spans the filled
+            shape itself - darkest along the highest peak, gone by the axis -
+            and the non-uniform stretch of the viewBox does not distort it. {% endcomment -%}
+          <defs>
+            <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#000"/>
+              <stop offset="0.55" stop-color="#8a8a8a"/>
+              <stop offset="1" stop-color="#ffffff"/>
+            </linearGradient>
+          </defs>
+          {%- comment %} A rule top and bottom, so the plot has edges to be
+            read against. {% endcomment -%}
+          <line x1="0" y1="25" x2="1000" y2="25" stroke-width="1" stroke-dasharray="4 6" vector-effect="non-scaling-stroke"/>
+          <line x1="0" y1="275" x2="1000" y2="275" stroke-width="2" vector-effect="non-scaling-stroke"/>
+
+          {% if filled %}
+            {% if curved %}
+              <path d="M 0,275 L {{ curve | remove_first: 'M ' | prepend: '' }} L 1000,275 Z"
+                    fill="url(#fade)" stroke="none"/>
+            {% else %}
+              <polygon points="0,275 {{ points }}1000,275" fill="url(#fade)" stroke="none"/>
+            {% endif %}
+          {% endif %}
+
+          {% if racing %}
+            {%- comment %} Last week, dashed and behind. {% endcomment -%}
+            <polyline points="{{ trail }}" stroke-width="2" stroke-dasharray="7 6"
+                      stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+          {% endif %}
+
+          {% if curved %}
+            <path d="{{ curve }}" stroke-width="{% if filled %}2{% else %}4{% endif %}"
+                  stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+          {% else %}
+            <polyline points="{{ points }}" stroke-width="{% if filled %}2{% else %}4{% endif %}"
+                      stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+          {% endif %}
+        </svg>
+
+        {%- comment %} The last point, marked in the paper margin rather than
+          in the stretched viewBox - a circle in there would be an ellipse. {% endcomment -%}
+        {%- assign final = series[last] -%}
+        {%- assign value = final.amount -%}
+        {%- if racing %}{% assign value = final.total %}{% endif -%}
+        {%- assign height = value | minus: trough | times: 250 | divided_by: spread -%}
+        {%- assign top = 275 | minus: height | times: 100 | divided_by: 300 -%}
+        <span style="position: absolute; right: -4px; top: {{ top }}%; width: 11px; height: 11px;
+                     transform: translateY(-50%); border-radius: 50%;
+                     background: var(--paper); box-shadow: inset 0 0 0 3px var(--ink)"></span>
+      </div>
+
+      {% if axis %}
+        <div style="display: flex; justify-content: space-between; flex: none">
+          <span class="t-xs">{{ from_label }}</span>
+          <span class="t-xs t-bold">{{ to_label }}</span>
+        </div>
+      {% endif %}
+    </div>
+  {%- endunless -%}
+
+  {% if notices.size > 0 %}
+    <div class="notice-strip" style="padding: 6px {{ pad }}px">
+      {% for notice in notices %}
+        {% if notice.overflow %}
+          <span class="notice notice--more">+{{ notice.overflow }}</span>
+        {% else %}
+          <span class="notice notice--{{ notice.level }}" title="{{ notice.text }}">
+            <span class="i i-{{ notice.icon }}"></span>
+          </span>
+        {% endif %}
+      {% endfor %}
+      {% if shape.wide and notices[0].text != blank %}
+        <span class="notice-said">{{ notices[0].text }}</span>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>

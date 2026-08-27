@@ -4,8 +4,13 @@ import { DAY } from "@/lib/clock";
 import {
   afterDiscounts,
   bucketByDay,
+  bucketByHour,
   forecastNext,
+  milestoneOf,
   monthlyValue,
+  nextMilestone,
+  previousMilestone,
+  runningTotal,
   sumBetween,
   sumSince,
   windowStarts,
@@ -162,5 +167,93 @@ describe("forecasting the next subscriber", () => {
     // elapsed, and "expected two weeks ago" is not a forecast.
     const forecast = forecastNext([daysAgo(29), daysAgo(28)], 30, now);
     expect(forecast.expectedAt!.getTime()).toBe(now.getTime());
+  });
+});
+
+describe("bucketByHour", () => {
+  const zone = "Europe/Rome";
+  const at = (hour: number, minute = 0) => new Date(Date.UTC(2026, 7, 27, hour - 2, minute));
+
+  it("buckets today's takings by local hour", () => {
+    const hours = bucketByHour(
+      [
+        { at: at(9, 10), amount: 1000 },
+        { at: at(9, 50), amount: 500 },
+        { at: at(14), amount: 2000 },
+      ],
+      zone,
+      at(0),
+      at(15),
+    );
+
+    expect(hours).toHaveLength(24);
+    expect(hours[9].amount).toBe(1500);
+    expect(hours[14].amount).toBe(2000);
+    expect(hours[10].amount).toBe(0);
+  });
+
+  it("marks the hours that have not happened yet", () => {
+    const hours = bucketByHour([], zone, at(0), at(15, 30));
+
+    expect(hours[15].ahead).toBe(false);
+    expect(hours[16].ahead).toBe(true);
+  });
+
+  it("ignores anything before today", () => {
+    const hours = bucketByHour([{ at: at(-6), amount: 900 }], zone, at(0), at(12));
+
+    expect(hours.reduce((total, hour) => total + hour.amount, 0)).toBe(0);
+  });
+});
+
+describe("runningTotal", () => {
+  it("carries each day into the next", () => {
+    expect(runningTotal([10, 20, 5])).toEqual([10, 30, 35]);
+  });
+
+  it("answers an empty series with an empty one", () => {
+    expect(runningTotal([])).toEqual([]);
+  });
+});
+
+describe("milestones", () => {
+  it("puts the next rung within reach rather than at the next power of ten", () => {
+    // 1,284 customers is told to reach 1,500, not 10,000. One is a target and
+    // the other is a wall.
+    expect(nextMilestone(1284)).toBe(1500);
+    expect(nextMilestone(18_420)).toBe(20_000);
+    expect(nextMilestone(386)).toBe(400);
+    expect(nextMilestone(3184)).toBe(4000);
+  });
+
+  it("always moves on when you arrive, so a milestone is never already met", () => {
+    expect(nextMilestone(1000)).toBe(1500);
+    expect(nextMilestone(1_000_000)).toBe(1_500_000);
+  });
+
+  it("knows where the last one was, which is where the bar starts", () => {
+    expect(previousMilestone(1284)).toBe(1000);
+    expect(previousMilestone(400)).toBe(400);
+    expect(previousMilestone(0)).toBe(0);
+  });
+
+  it("measures the way from one rung to the next", () => {
+    const milestone = milestoneOf(1250);
+
+    expect(milestone.previous).toBe(1000);
+    expect(milestone.next).toBe(1500);
+    expect(milestone.to_go).toBe(250);
+    expect(milestone.percent).toBe(50);
+  });
+
+  it("says when only when there is a rate behind it", () => {
+    expect(milestoneOf(1250).in_days).toBe(null);
+    expect(milestoneOf(1250, 25).in_days).toBe(10);
+  });
+
+  it("survives the figures nobody plans for", () => {
+    expect(milestoneOf(0).next).toBeGreaterThan(0);
+    expect(milestoneOf(0).percent).toBe(0);
+    expect(nextMilestone(Number.NaN)).toBe(0);
   });
 });

@@ -135,7 +135,15 @@ export async function board(
   // alert strip nobody ever sees.
   const alerts =
     chosen.capabilities.includes("alerts") && (seed + Math.floor(minutes / 37)) % 4 === 0
-      ? [{ title: "Reduced service", detail: `Engineering work near ${origin}.` }]
+      ? [
+          {
+            title: "Reduced service",
+            headline: "Reduced service",
+            message: `Engineering work near ${origin}.`,
+            detail: `Engineering work near ${origin}.`,
+            severity: "WARNING",
+          },
+        ]
       : [];
 
   return {
@@ -150,7 +158,7 @@ export async function board(
       empty: departures.length === 0,
       departures,
       alerts,
-      alert: alerts[0]?.title ?? "",
+      alert: alerts[0]?.headline ?? "",
     },
   };
 }

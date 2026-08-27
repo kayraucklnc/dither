@@ -1,0 +1,101 @@
+{% comment %}
+  Band - a shallow full-width strip: the time, the date, and the day so far.
+
+  A band is one line tall by definition, so it holds the figures and hangs the
+  honesty off the side: a bar of the whole day with the part already spent
+  filled in, and the span this drawing covers marked on it. At twelve columns
+  that bar is 300 pixels for sixteen hours, so a quarter of an hour is five
+  pixels - visible, and correctly tiny.
+{% endcomment %}
+
+{%- assign shift = 0 -%}
+{%- if extension.values.utc_offset_hours != blank -%}
+  {%- assign shift = extension.values.utc_offset_hours | times: 3600 | minus: dither.offset_seconds -%}
+{%- endif -%}
+{%- assign stamp = "now" | date: "%s" | plus: shift -%}
+
+{%- assign hour24 = stamp | date: "%H" | times: 1 -%}
+{%- assign minute = stamp | date: "%M" | times: 1 -%}
+{%- assign mins = hour24 | times: 60 | plus: minute -%}
+{%- assign window = dither.window_minutes | at_least: 1 -%}
+
+{%- if extension.values.twenty_four_hour == false -%}
+  {%- assign face = stamp | date: "%I:%M" -%}
+  {%- assign suffix = stamp | date: "%p" | downcase -%}
+{%- else -%}
+  {%- assign face = stamp | date: "%H:%M" -%}
+  {%- assign suffix = "" -%}
+{%- endif -%}
+
+{%- assign opens = extension.values.day_start | default: "07:00" | minutes_of -%}
+{%- assign closes = extension.values.day_end | default: "23:00" | minutes_of -%}
+{%- assign span = closes | minus: opens -%}
+{%- if span <= 0 %}{% assign span = 1440 | minus: opens | plus: closes %}{% endif -%}
+{%- assign through = mins | through_day: opens, closes -%}
+{%- assign covers = window | times: 100 | divided_by: span -%}
+{%- assign overrun = through | plus: covers | minus: 100 -%}
+{%- if overrun > 0 %}{% assign covers = covers | minus: overrun %}{% endif -%}
+
+{%- assign box_w = shape.width | at_least: 300 -%}
+{%- assign box_h = shape.height | at_least: 60 -%}
+{%- assign pad = box_h | divided_by: 5 | at_least: 8 | at_most: 20 -%}
+{%- assign figure = box_h | times: 52 | divided_by: 100 | at_most: 76 | at_least: 20 -%}
+
+<div class="screen">
+  <div class="content layout layout--row" style="align-items: center; gap: {{ pad | times: 1.4 | round }}px; padding: {{ pad }}px {{ pad | times: 1.6 | round }}px">
+    <p class="t-mono t-bold" style="font-size: {{ figure }}px; line-height: 1; letter-spacing: -0.03em; flex: none">
+      {{ face }}{% if suffix != "" %}<span style="font-size: 0.4em"> {{ suffix }}</span>{% endif %}
+    </p>
+
+    {% if extension.values.show_date != false and shape.columns > 7 %}
+      <div style="flex: none; border-left: var(--rule) solid var(--ink); padding-left: {{ pad | times: 1.4 | round }}px">
+        <p class="t-bold truncate" style="font-size: {{ figure | divided_by: 2.6 | round | at_least: 13 | at_most: 26 }}px">{{ stamp | date: "%A" }}</p>
+        <p class="truncate" style="font-size: {{ figure | divided_by: 3.6 | round | at_least: 11 | at_most: 19 }}px">{{ stamp | date: "%-d %B" }}</p>
+      </div>
+    {% endif %}
+
+    {%- comment %} The day as a bar, filled as far as it has gone. The hollow
+      block on the end is the quarter of an hour this picture is claiming -
+      the only part of it that is a guess. {% endcomment -%}
+    <div class="fit" style="min-width: 90px">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 5px">
+        <span class="t-xs t-upper">{{ mins | part_of_day }}</span>
+        <span class="t-xs t-bold">{{ through | round }}%</span>
+      </div>
+      <div style="position: relative; border: 2px solid var(--ink); height: {{ box_h | divided_by: 7 | at_least: 10 | at_most: 18 }}px; width: 100%">
+        <span style="display: block; height: 100%; width: {{ through }}%; background: var(--ink)"></span>
+        {% if extension.values.show_window != false %}
+          <span style="position: absolute; top: 0; bottom: 0; left: {{ through }}%; width: {{ covers | at_least: 1 }}%;
+                       background: repeating-linear-gradient(45deg, var(--ink) 0 2px, var(--paper) 2px 5px)"></span>
+        {% endif %}
+      </div>
+      {% if shape.rows > 2 %}
+        <div style="display: flex; justify-content: space-between; margin-top: 4px">
+          <span class="t-xs">{{ extension.values.day_start | default: "07:00" }}</span>
+          <span class="t-xs">{{ extension.values.day_end | default: "23:00" }}</span>
+        </div>
+      {% endif %}
+    </div>
+
+    {% if extension.values.heading != blank %}
+      <span class="chip" style="flex: none">{{ extension.values.heading }}</span>
+    {% endif %}
+  </div>
+
+  {% if notices.size > 0 and shape.rows > 2 %}
+    <div class="notice-strip" style="padding: 5px {{ pad | times: 1.6 | round }}px">
+      {% for notice in notices %}
+        {% if notice.overflow %}
+          <span class="notice notice--more">+{{ notice.overflow }}</span>
+        {% else %}
+          <span class="notice notice--{{ notice.level }}" title="{{ notice.text }}">
+            <span class="i i-{{ notice.icon }}"></span>
+          </span>
+        {% endif %}
+      {% endfor %}
+      {% if shape.wide and notices[0].text != blank %}
+        <span class="notice-said">{{ notices[0].text }}</span>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
