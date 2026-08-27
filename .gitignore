@@ -23,3 +23,6 @@ next-env.d.ts
 /log/
 /public/
 /tmp/
+
+# Firmware images offered by the flasher on /devices/new. Binaries, not source.
+web/public/downloads/*.bin
