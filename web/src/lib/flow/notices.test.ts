@@ -60,9 +60,12 @@ describe("notices and the extension's sample", () => {
   });
 
   it("still says it when a real board reports one", async () => {
+    // `headline` rather than `title`: an operator's bulletin is titled after
+    // the noticeboard it came from, so the fact reads the headline instead.
+    // See lib/transit/trenord/board.ts.
     const payload = {
       transit: {
-        alerts: [{ title: "Reduced service" }],
+        alerts: [{ title: "Digital notice board", headline: "Reduced service", severity: "WARNING" }],
         alert: "Reduced service",
         departures: [{ line: "S3", delay: 0, cancelled: false }],
       },

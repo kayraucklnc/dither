@@ -38,6 +38,22 @@ export interface Design {
   nominal: Size;
   /** True when the manifest declared it, false when it fell back to a preset. */
   declared: boolean;
+  /**
+   * How often this design's picture changes with the clock, in seconds. Zero
+   * means it does not - the picture only moves when the data does.
+   *
+   * A render is cached by everything that can change it, and until this existed
+   * the clock was not one of those things: a clock fetches nothing, so its
+   * fingerprint never moved and the panel kept the first time it was ever
+   * handed, forever. Declaring a tick puts the clock in the key, quantised, so
+   * the picture is redrawn exactly as often as it would look different and
+   * never more often than that.
+   *
+   * It is per design rather than per extension because it is a property of the
+   * drawing: an exact readout looks different every minute, a face that shows
+   * the time as a band across a quarter of an hour does not.
+   */
+  tick: number;
 }
 
 /**
@@ -119,6 +135,9 @@ export function presetDesign(key: string): Design | undefined {
     range: found.range,
     nominal: found.nominal,
     declared: false,
+    // A template that inherited its range never asked for a tick. Nothing
+    // written before designs existed drew a clock this way.
+    tick: 0,
   };
 }
 

@@ -1,0 +1,238 @@
+{% comment %}
+  Dial - a drawn face, where the minutes are a swept wedge rather than a hand.
+
+  This is the design the whole extension is arranged around. A minute hand
+  points at one minute; the picture it is drawn in will hang on the wall for
+  fifteen. So there is no minute hand. There is a wedge that starts at the
+  minute this was drawn and sweeps as far as the clock will have moved by the
+  time the device next asks - `dither.window_minutes`, which is the device's
+  own refresh rate rather than a number guessed here.
+
+  Read it as "somewhere in there", and it is never wrong. Read a minute hand
+  the same way and it is wrong fourteen minutes in fifteen, while looking
+  precise about it, which is worse.
+
+  The hour hand is drawn exactly, because it moves seven and a half degrees in
+  a quarter of an hour and nobody can see that.
+
+  Everything is a rotation about the centre, so there is no trigonometry in a
+  templating language that has none: the arc is a dashed circle turned to
+  start where it should, which is the same trick a donut chart uses.
+{% endcomment %}
+
+{%- assign shift = 0 -%}
+{%- if extension.values.utc_offset_hours != blank -%}
+  {%- assign shift = extension.values.utc_offset_hours | times: 3600 | minus: dither.offset_seconds -%}
+{%- endif -%}
+{%- assign stamp = "now" | date: "%s" | plus: shift -%}
+
+{%- assign hour24 = stamp | date: "%H" | times: 1 -%}
+{%- assign minute = stamp | date: "%M" | times: 1 -%}
+{%- assign hour = hour24 | modulo: 12 -%}
+
+{%- assign mins = hour24 | times: 60 | plus: minute -%}
+
+{%- assign window_minutes = dither.window_minutes | at_least: 1 -%}
+{%- assign window = window_minutes | at_most: 60 -%}
+{%- if extension.values.show_window == false %}{% assign window = 0 %}{% endif -%}
+
+{%- comment %} Where the hands are put, and why it is not where the clock
+  says.
+
+  This drawing goes up now and stays up until the device next wakes. A hand at
+  the minute of drawing is right for an instant and then falls behind for the
+  whole window - by the end it is a quarter of an hour slow, every time. Put it
+  at the *middle* of the window instead and it is half a window fast to begin
+  with and half a window slow at the end: the same error, but split either side
+  of the truth, so the average miss is halved and the hand sweeps through the
+  right time rather than trailing it.
+
+  The wedge still starts where the clock actually is, so the pair reads
+  correctly: the span is where the time will be, the hand is the middle of it.
+
+  A filter cannot appear inside an `if`, so every step is assigned first.
+{% endcomment -%}
+{%- assign lead = window_minutes | divided_by: 2 -%}
+{%- assign mid = minute | plus: lead -%}
+{%- assign half = mid | divided_by: 2 -%}
+{%- assign hour_angle = hour | times: 30 | plus: half -%}
+{%- assign minute_angle = minute | times: 6 -%}
+{%- assign hand_angle = mid | times: 6 -%}
+
+
+{%- comment %} The dial is square, so it is fitted to the shorter side, and
+  the room left over decides whether anything is written under it. {% endcomment -%}
+{%- assign box_w = shape.width | at_least: 120 -%}
+{%- assign box_h = shape.height | at_least: 120 -%}
+{%- assign pad = box_w | divided_by: 22 | at_least: 8 | at_most: 20 -%}
+
+{%- assign caption = "" -%}
+{%- if extension.values.heading != blank %}{% assign caption = extension.values.heading %}{% endif -%}
+
+{%- comment %} A face is square and a band is not, so in a wide box the dial
+  stands beside what it would otherwise have written underneath. Centred alone
+  in a twelve-by-four band it is a small clock in a lot of paper; beside the
+  date and the sentence it is a band that reads. {% endcomment -%}
+{%- assign wide_at = box_h | times: 16 | divided_by: 10 -%}
+{%- assign beside = false -%}
+{%- if box_w > wide_at and box_w > 380 %}{% assign beside = true %}{% endif -%}
+
+{%- assign said_text = mins | time_in_words: window_minutes -%}
+
+{%- assign under = 0 -%}
+{%- if notices.size > 0 %}{% assign under = 34 %}{% endif -%}
+{%- assign dated = false -%}
+
+{%- if beside -%}
+  {%- assign room_h = box_h | minus: under | minus: pad | minus: pad -%}
+  {%- comment %} Never more than half the width, or the words beside it have
+    nowhere to go. {% endcomment -%}
+  {%- assign by_width = box_w | times: 46 | divided_by: 100 -%}
+  {%- assign side = room_h | at_most: by_width | at_least: 90 -%}
+  {%- if extension.values.show_date != false %}{% assign dated = true %}{% endif -%}
+  {%- comment %} The sentence takes the width the face left over, up to the
+    point where it would start competing with the face for attention. {% endcomment -%}
+  {%- assign said_chars = said_text | size | at_least: 10 -%}
+  {%- assign spare_w = box_w | minus: side | minus: pad | minus: pad | minus: pad -%}
+  {%- assign by_chars = spare_w | times: 100 | divided_by: said_chars | divided_by: 50 -%}
+  {%- assign said_size = side | divided_by: 3 | at_most: by_chars | at_most: 54 | at_least: 15 -%}
+{%- else -%}
+  {%- if caption != "" %}{% assign under = under | plus: 30 %}{% endif -%}
+  {%- if extension.values.show_date != false and box_h > 260 %}{% assign dated = true %}{% endif -%}
+  {%- comment %} The line plus its gap plus the descenders of "Thursday",
+    which is what the first attempt forgot. {% endcomment -%}
+  {%- if dated %}{% assign under = under | plus: 46 %}{% endif -%}
+  {%- assign room_h = box_h | minus: under | minus: pad | minus: pad -%}
+  {%- assign room_w = box_w | minus: pad | minus: pad -%}
+  {%- assign side = room_w | at_most: room_h | at_least: 90 -%}
+{%- endif -%}
+
+{%- assign said = said_text -%}
+
+{%- comment %} Numerals need pixels to be legible. At the small end of this
+  design's range the face is 150 pixels across, where a numeral is six points
+  and a smudge, so it is drawn as ticks alone whatever the setting says. {% endcomment -%}
+{%- assign numerals = extension.values.numerals | default: "quarters" -%}
+{%- if side < 170 %}{% assign numerals = "none" %}{% endif -%}
+{%- if side < 260 and numerals == "all" %}{% assign numerals = "quarters" %}{% endif -%}
+
+{%- comment %} The wedge is a dashed circle: as much of its circumference as
+  the window is of an hour, turned to begin at the minute hand. The radius is
+  78, so the circumference is 490. {% endcomment -%}
+{%- assign sweep = window | times: 490 | divided_by: 60 -%}
+{%- assign sweep_from = minute_angle | minus: 90 -%}
+
+<div class="screen">
+  <div class="content layout layout--{% if beside %}row{% else %}col{% endif %} layout--center"
+       style="gap: {{ pad }}px; padding: {{ pad }}px">
+    {% if caption != "" and beside == false %}
+      <p class="t-bold t-upper t-center truncate" style="font-size: {{ side | divided_by: 18 | at_least: 11 | at_most: 18 }}px; width: 100%">
+        {{ caption }}
+      </p>
+    {% endif %}
+
+    <svg viewBox="0 0 200 200" width="{{ side }}" height="{{ side }}"
+         fill="none" stroke="black" style="flex: none">
+      <circle cx="100" cy="100" r="95" stroke-width="4"/>
+
+      {%- comment %} Every fifth mark is heavier: a face is read by the hour
+        first and the rest is texture. {% endcomment -%}
+      {% for tick in (0..59) %}
+        {%- assign fifth = tick | modulo: 5 -%}
+        {%- assign quarter = tick | modulo: 15 -%}
+        {% if fifth == 0 or side > 220 %}
+          <line x1="100" y1="12" x2="100"
+                y2="{% if quarter == 0 %}30{% elsif fifth == 0 %}25{% else %}18{% endif %}"
+                stroke-width="{% if quarter == 0 %}6{% elsif fifth == 0 %}3.5{% else %}1.5{% endif %}"
+                stroke-linecap="round"
+                transform="rotate({{ tick | times: 6 }} 100 100)"/>
+        {% endif %}
+      {% endfor %}
+
+      {% if numerals != "none" %}
+        {% for mark in (1..12) %}
+          {%- assign angle = mark | times: 30 -%}
+          {%- assign quarter = mark | modulo: 3 -%}
+          {% if numerals == "all" or quarter == 0 %}
+            {%- comment %} Turned into place, then turned back, so the numeral
+              stands upright wherever it lands. {% endcomment -%}
+            <g transform="rotate({{ angle }} 100 100)">
+              <g transform="rotate({{ 0 | minus: angle }} 100 46)">
+                <text x="100" y="46" text-anchor="middle" dominant-baseline="middle"
+                      fill="black" stroke="none"
+                      font-family="Inter, sans-serif" font-weight="700"
+                      font-size="{% if numerals == 'all' %}17{% else %}21{% endif %}">{{ mark }}</text>
+              </g>
+            </g>
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+
+      {% if window > 0 %}
+        {%- comment %} The span this drawing is claiming. Hatching would
+          disappear at this width on a 1-bit panel, so it is an outlined band:
+          two thin arcs and the fill between them left as paper. {% endcomment -%}
+        <circle cx="100" cy="100" r="78" stroke-width="17" stroke="black"
+                stroke-dasharray="{{ sweep }} 490" opacity="1"
+                transform="rotate({{ sweep_from }} 100 100)"/>
+        <circle cx="100" cy="100" r="78" stroke-width="13" stroke="white"
+                stroke-dasharray="{{ sweep }} 490"
+                transform="rotate({{ sweep_from }} 100 100)"/>
+      {% endif %}
+
+      {%- comment %} The minute hand marks where the window *starts*. It is the
+        one thing here that is exactly true at the moment of drawing. {% endcomment -%}
+      {%- comment %} The minute hand, in the middle of the span rather than at
+        the start of it. {% endcomment -%}
+      <line x1="100" y1="104" x2="100" y2="34" stroke-width="4" stroke-linecap="round"
+            transform="rotate({{ hand_angle }} 100 100)"/>
+      <line x1="100" y1="106" x2="100" y2="56" stroke-width="9" stroke-linecap="round"
+            transform="rotate({{ hour_angle }} 100 100)"/>
+      <circle cx="100" cy="100" r="7" fill="black" stroke="none"/>
+      <circle cx="100" cy="100" r="2.5" fill="white" stroke="none"/>
+    </svg>
+
+    {% if beside %}
+      {%- comment %} What the face cannot say precisely, said in words - and
+        the date, which is the other question a clock on a wall gets asked. {% endcomment -%}
+      <div class="stack fit" style="justify-content: center; gap: 6px; min-width: 0">
+        {% if caption != "" %}
+          <p class="t-bold t-upper truncate" style="font-size: {{ side | divided_by: 14 | at_least: 11 | at_most: 16 }}px">{{ caption }}</p>
+        {% endif %}
+        <p class="t-bold clamp-2" style="font-size: {{ said_size }}px; line-height: 1.08; letter-spacing: -0.02em">
+          {{ said }}
+        </p>
+        {% if dated %}
+          <p class="truncate" style="font-size: {{ said_size | divided_by: 2 | at_least: 12 | at_most: 22 }}px">
+            {{ stamp | date: "%A %-d %B" }}
+          </p>
+        {% endif %}
+      </div>
+    {% elsif dated %}
+      <p class="t-center truncate" style="font-size: {{ side | divided_by: 16 | at_least: 12 | at_most: 20 }}px; width: 100%">
+        {{ stamp | date: "%A %-d %B" }}
+      </p>
+    {% endif %}
+  </div>
+
+  {% comment %}
+    Where another extension gets to say something on this screen.
+  {% endcomment %}
+  {% if notices.size > 0 %}
+    <div class="notice-strip" style="padding: 6px {{ pad }}px">
+      {% for notice in notices %}
+        {% if notice.overflow %}
+          <span class="notice notice--more">+{{ notice.overflow }}</span>
+        {% else %}
+          <span class="notice notice--{{ notice.level }}" title="{{ notice.text }}">
+            <span class="i i-{{ notice.icon }}"></span>
+          </span>
+        {% endif %}
+      {% endfor %}
+
+      {% if shape.wide and notices[0].text != blank %}
+        <span class="notice-said">{{ notices[0].text }}</span>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>

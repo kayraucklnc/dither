@@ -1,4 +1,4 @@
-import { HOUR, endOfDay, endOfMonth, endOfWeek } from "@/lib/clock";
+import { DAY, HOUR, endOfDay, endOfMonth, endOfWeek, startOfDay } from "@/lib/clock";
 
 /**
  * How far ahead a calendar widget looks, in the words people use.
@@ -56,6 +56,15 @@ export interface Window {
   emptyLabel: string;
   /** True when the window can hold more than one day, so days want labelling. */
   spansDays: boolean;
+  /**
+   * How many local days the window covers, including today.
+   *
+   * What the week and agenda designs draw. A month is capped at a fortnight
+   * because past that a column per day is unreadable and a list is scrolling
+   * off the panel - the *fetch* still covers the month, so the counts and the
+   * facts are right; only the drawing is bounded.
+   */
+  daysAhead: number;
 }
 
 /**
@@ -91,6 +100,7 @@ export function windowFor(
       label: `Next ${hours} hours`,
       emptyLabel: `Nothing in the next ${hours} hour${hours === 1 ? "" : "s"}`,
       spansDays: hours > 12,
+      daysAhead: hours > 12 ? 2 : 1,
     };
   }
 
@@ -115,5 +125,16 @@ export function windowFor(
           ? "Nothing this week"
           : "Nothing this month";
 
-  return { from: now, to, key, label, emptyLabel, spansDays: key !== "today" };
+  // Whole local days between now and the boundary, counting the one we are in.
+  const days = Math.max(1, Math.ceil((to.getTime() - startOfDay(now, timezone).getTime()) / DAY));
+
+  return {
+    from: now,
+    to,
+    key,
+    label,
+    emptyLabel,
+    spansDays: key !== "today",
+    daysAhead: Math.min(14, days),
+  };
 }

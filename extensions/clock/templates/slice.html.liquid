@@ -1,0 +1,166 @@
+{% comment %}
+  Slice - no hands at all, just the span the reading is good for.
+
+  The dial's wedge, taken to its conclusion. If the only honest thing a clock
+  on this panel can say is "somewhere in here", then say that and nothing else:
+  a slice cut from the centre, covering the minutes between this drawing and
+  the next one. Where it points is where you are in the hour. How wide it is is
+  how much the panel does not know.
+
+  It is hatched rather than solid so that what is behind it stays readable -
+  which on a display with no tints is what "semi-transparent" has to mean. The
+  hour sits behind it in the middle of the face, so the whole reading is: this
+  hour, this far round.
+
+  A quarter of an hour is ninety degrees of a minute dial, so the slice is a
+  real quarter of the face rather than a token. That is the point: it is not a
+  decoration of the uncertainty, it is drawn to scale.
+{% endcomment %}
+
+{%- assign shift = 0 -%}
+{%- if extension.values.utc_offset_hours != blank -%}
+  {%- assign shift = extension.values.utc_offset_hours | times: 3600 | minus: dither.offset_seconds -%}
+{%- endif -%}
+{%- assign stamp = "now" | date: "%s" | plus: shift -%}
+
+{%- assign hour24 = stamp | date: "%H" | times: 1 -%}
+{%- assign minute = stamp | date: "%M" | times: 1 -%}
+{%- assign mins = hour24 | times: 60 | plus: minute -%}
+{%- assign hour = hour24 | modulo: 12 -%}
+
+{%- assign window_minutes = dither.window_minutes | at_least: 1 -%}
+{%- assign window = window_minutes | at_most: 55 | at_least: 4 -%}
+
+{%- comment %} The slice runs from the minute this was drawn to the minute the
+  device is expected to ask again. Both ends are points on a circle, which is
+  why the geometry filters exist - a wedge is a path with two corners and an
+  arc, and there is no rotating a fixed shape into one. {% endcomment -%}
+{%- assign from_angle = minute | times: 6 -%}
+{%- assign to_angle = minute | plus: window | times: 6 -%}
+{%- assign radius = 78 -%}
+
+{%- assign x1 = from_angle | cos_of | times: radius | plus: 100 -%}
+{%- assign y1 = from_angle | sin_of | times: radius | plus: 100 -%}
+{%- assign x2 = to_angle | cos_of | times: radius | plus: 100 -%}
+{%- assign y2 = to_angle | sin_of | times: radius | plus: 100 -%}
+{%- assign sweep = to_angle | minus: from_angle -%}
+{%- assign long = 0 -%}
+{%- if sweep > 180 %}{% assign long = 1 %}{% endif -%}
+
+{%- if extension.values.twenty_four_hour == false -%}
+  {%- assign face = hour -%}
+  {%- if face == 0 %}{% assign face = 12 %}{% endif -%}
+{%- else -%}
+  {%- assign face = stamp | date: "%H" -%}
+{%- endif -%}
+
+{%- assign box_w = shape.width | at_least: 120 -%}
+{%- assign box_h = shape.height | at_least: 120 -%}
+{%- assign pad = box_w | divided_by: 22 | at_least: 8 | at_most: 20 -%}
+
+{%- assign under = 0 -%}
+{%- if notices.size > 0 %}{% assign under = 34 %}{% endif -%}
+{%- assign dated = false -%}
+{%- if extension.values.show_date != false and box_h > 250 -%}
+  {%- assign dated = true -%}
+  {%- assign under = under | plus: 32 -%}
+{%- endif -%}
+{%- if extension.values.heading != blank %}{% assign under = under | plus: 26 %}{% endif -%}
+
+{%- assign room_h = box_h | minus: under | minus: pad | minus: pad -%}
+{%- assign room_w = box_w | minus: pad | minus: pad -%}
+{%- assign side = room_w | at_most: room_h | at_least: 96 -%}
+
+{%- assign numerals = extension.values.numerals | default: "quarters" -%}
+{%- if side < 170 %}{% assign numerals = "none" %}{% endif -%}
+
+<div class="screen">
+  <div class="content layout layout--col layout--center" style="gap: {{ pad | divided_by: 2 }}px; padding: {{ pad }}px">
+    {% if extension.values.heading != blank %}
+      <p class="t-bold t-upper t-center truncate" style="font-size: {{ side | divided_by: 18 | at_least: 11 | at_most: 17 }}px; width: 100%">
+        {{ extension.values.heading }}
+      </p>
+    {% endif %}
+
+    <svg viewBox="0 0 200 200" width="{{ side }}" height="{{ side }}"
+         fill="none" stroke="black" style="flex: none">
+      <defs>
+        {%- comment %} Forty-five degree rule, spaced so that it survives the
+          dither at any size the face is drawn: closer than four units and it
+          fills in to solid, wider and it stops reading as one shape. {% endcomment -%}
+        <pattern id="slice-hatch" width="8" height="8" patternUnits="userSpaceOnUse"
+                 patternTransform="rotate(45)">
+          <line x1="0" y1="0" x2="0" y2="8" stroke="black" stroke-width="2.2"/>
+        </pattern>
+      </defs>
+
+      <circle cx="100" cy="100" r="95" stroke-width="4"/>
+
+      {%- comment %} Sixty marks, the quarters heavier. The slice is read
+        against these, so they carry more of the reading here than they do on a
+        face that has hands. {% endcomment -%}
+      {% for tick in (0..59) %}
+        {%- assign fifth = tick | modulo: 5 -%}
+        {%- assign quarter = tick | modulo: 15 -%}
+        {% if fifth == 0 or side > 200 %}
+          <line x1="100" y1="12" x2="100"
+                y2="{% if quarter == 0 %}32{% elsif fifth == 0 %}26{% else %}18{% endif %}"
+                stroke-width="{% if quarter == 0 %}7{% elsif fifth == 0 %}3.5{% else %}1.5{% endif %}"
+                stroke-linecap="round"
+                transform="rotate({{ tick | times: 6 }} 100 100)"/>
+        {% endif %}
+      {% endfor %}
+
+      {% if numerals != "none" %}
+        {% for mark in (1..12) %}
+          {%- assign angle = mark | times: 30 -%}
+          {%- assign third = mark | modulo: 3 -%}
+          {% if numerals == "all" or third == 0 %}
+            <g transform="rotate({{ angle }} 100 100)">
+              <g transform="rotate({{ 0 | minus: angle }} 100 48)">
+                <text x="100" y="48" text-anchor="middle" dominant-baseline="middle"
+                      fill="black" stroke="none"
+                      font-family="Inter, sans-serif" font-weight="700"
+                      font-size="{% if numerals == 'all' %}15{% else %}18{% endif %}">{{ mark }}</text>
+              </g>
+            </g>
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+
+      {%- comment %} The hour, behind the slice and large enough to be read
+        through it. This is the half of the reading the slice cannot carry. {% endcomment -%}
+      <text x="100" y="104" text-anchor="middle" dominant-baseline="middle"
+            fill="black" stroke="none" font-family="Inter, sans-serif"
+            font-weight="700" font-size="58" letter-spacing="-2">{{ face }}</text>
+
+      {%- comment %} And the span itself. Drawn last so it is over the hour,
+        hatched so the hour survives it. {% endcomment -%}
+      <path d="M 100 100 L {{ x1 }} {{ y1 }} A {{ radius }} {{ radius }} 0 {{ long }} 1 {{ x2 }} {{ y2 }} Z"
+            fill="url(#slice-hatch)" stroke="black" stroke-width="3" stroke-linejoin="round"/>
+    </svg>
+
+    {% if dated %}
+      <p class="t-center truncate" style="font-size: {{ side | divided_by: 16 | at_least: 12 | at_most: 20 }}px; width: 100%">
+        {{ mins | time_in_words: window_minutes }}
+      </p>
+    {% endif %}
+  </div>
+
+  {% if notices.size > 0 %}
+    <div class="notice-strip" style="padding: 6px {{ pad }}px">
+      {% for notice in notices %}
+        {% if notice.overflow %}
+          <span class="notice notice--more">+{{ notice.overflow }}</span>
+        {% else %}
+          <span class="notice notice--{{ notice.level }}" title="{{ notice.text }}">
+            <span class="i i-{{ notice.icon }}"></span>
+          </span>
+        {% endif %}
+      {% endfor %}
+      {% if shape.wide and notices[0].text != blank %}
+        <span class="notice-said">{{ notices[0].text }}</span>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>

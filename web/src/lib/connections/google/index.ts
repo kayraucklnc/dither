@@ -1,9 +1,11 @@
 import type { FetchContext, Provider, Verification } from "@/lib/connections/provider";
 
-import { agenda } from "./agenda";
+import { dayShape } from "@/lib/calendar/day";
+
+import { toMeetings } from "./agenda";
 import { calendars, events, type EventsResult } from "./api";
 import { resolveFeeds, selectedFeeds } from "./feeds";
-import { windowFor } from "./range";
+import { horizonHours, windowFor } from "./range";
 import {
   CLIENT_ID,
   CLIENT_SECRET,
@@ -117,7 +119,8 @@ async function fetchCalendar(
 
   // "The rest of today" is a boundary in a place, not a duration - so the
   // window is resolved against the installation's zone before anything is
-  // asked of Google.
+  // asked of Google. It decides what is *fetched*; how much of it a given
+  // design draws is the design's business.
   const window = windowFor(settings, now, timezone, locale);
   const byAccount = new Map(accounts.map((one) => [one.account, one]));
 
@@ -148,27 +151,32 @@ async function fetchCalendar(
   /** Whether the label has to name the account as well as the calendar. */
   const acrossAccounts = new Set(read.map((one) => one.account)).size > 1;
 
-  const day = agenda(
-    read.flatMap((feed) =>
+  const meetings = read.flatMap((feed) =>
+    toMeetings(
       feed.events.map((event) => ({
         ...event,
         calendarName: many ? feedLabel(feed, acrossAccounts) : undefined,
       })),
-    ),
-    {
-      now,
       timezone,
-      locale,
-      window,
-      hideDeclined: settings.hide_declined !== false,
-      truncated: read.some((feed) => feed.truncated),
-    },
+      `${feed.account}-${feed.calendar}`,
+    ),
   );
+
+  // Everything a design can ask, from one list. The payload carries every
+  // answer and the design chooses among them, so six calendar widgets on one
+  // screen cost one trip to Google between them.
+  const shape = dayShape(meetings, now, {
+    timezone,
+    locale,
+    horizonHours: horizonHours(settings),
+    hideDeclined: settings.hide_declined !== false,
+    daysAhead: window.daysAhead,
+    ...minutesFromSettings(settings),
+  });
 
   return {
     calendar: {
-      ...day,
-      connected: true,
+      ...shape,
       name: read.map((feed) => feedLabel(feed, acrossAccounts)).join(", "),
       names: read.map((feed) => feedLabel(feed, acrossAccounts)),
       accounts: [...new Set(read.map((one) => one.account))],
@@ -177,8 +185,44 @@ async function fetchCalendar(
       unread: missing.length,
       many,
       across_accounts: acrossAccounts,
+      /* What was asked for, so an empty panel can say which question it
+         answered - "Nothing this week" rather than "Nothing scheduled".
+         `empty` on its own is about *today*, which is the right thing for a
+         design drawing today and the wrong thing to hang this label on: a week
+         with nothing until Friday is not "nothing this week". */
+      range: window.key,
+      range_label: window.label,
+      empty_label: window.emptyLabel,
+      spans_days: window.spansDays,
+      /** Nothing anywhere in the window that was fetched. */
+      window_empty: meetings.every(
+        (meeting) => settings.hide_declined !== false && meeting.response === "declined",
+      ),
     },
   };
+}
+
+/**
+ * The day view's own start and end, which are wall-clock times in settings.
+ *
+ * Left out entirely when unset, so `dayShape` keeps its own defaults rather
+ * than being handed a NaN.
+ */
+function minutesFromSettings(settings: Record<string, unknown>): {
+  openMinute?: number;
+  closeMinute?: number;
+} {
+  const read = (value: unknown): number | undefined => {
+    const match = /^(\d{1,2}):(\d{2})$/.exec(String(value ?? "").trim());
+    if (!match) return undefined;
+
+    return Number(match[1]) * 60 + Number(match[2]);
+  };
+
+  const open = read(settings.day_start);
+  const close = read(settings.day_end);
+
+  return { ...(open === undefined ? {} : { openMinute: open }), ...(close === undefined ? {} : { closeMinute: close }) };
 }
 
 export const google: Provider = {

@@ -31,6 +31,7 @@ const design = (
   },
   nominal: { columns: nominal[0], rows: nominal[1] },
   declared: true,
+  tick: 0,
 });
 
 const FIGURE = design("figure", [2, 12], [2, 12], [4, 4]);

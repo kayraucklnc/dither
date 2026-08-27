@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { agenda } from "./agenda";
-import type { GoogleEvent } from "./api";
 import { windowFor } from "./range";
 
 /**
@@ -122,167 +120,28 @@ describe("where a window ends", () => {
 
 /* -------------------------------------------------------------------------- */
 
-const timed = (from: string, to: string, summary: string): GoogleEvent => ({
-  summary,
-  start: { dateTime: from },
-  end: { dateTime: to },
-});
-
-describe("a window that covers more than one day", () => {
+describe("how many days a window asks a design to draw", () => {
   const now = new Date("2026-08-27T09:00:00Z");
+  const days = (settings: Record<string, unknown>) =>
+    windowFor(settings, now, "UTC", "en-GB").daysAhead;
 
-  const week = (events: GoogleEvent[]) =>
-    agenda(events, {
-      now,
-      timezone: "UTC",
-      locale: "en-GB",
-      window: windowFor({ range: "week" }, now, "UTC", "en-GB"),
-      hideDeclined: true,
-    });
-
-  it("groups by local day, keeping the quiet ones", () => {
-    // A week with a hole in it is a week you can see the hole in. Dropping the
-    // empty days would make Friday look like it follows Thursday's meeting.
-    const day = week([
-      timed("2026-08-27T10:00:00Z", "2026-08-27T11:00:00Z", "Design review"),
-      timed("2026-08-29T14:00:00Z", "2026-08-29T15:00:00Z", "Sprint planning"),
-    ]);
-
-    expect(day.days.map((one) => one.date)).toEqual([
-      "2026-08-27",
-      "2026-08-28",
-      "2026-08-29",
-      "2026-08-30",
-    ]);
-    expect(day.days[0].events.map((one) => one.title)).toEqual(["Design review"]);
-    expect(day.days[1].empty).toBe(true);
-    expect(day.days[2].events.map((one) => one.title)).toEqual(["Sprint planning"]);
+  it("is one for the rest of today", () => {
+    expect(days({ range: "today" })).toBe(1);
   });
 
-  it("marks today and tomorrow, so a design can name them rather than date them", () => {
-    const day = week([]);
-
-    expect(day.days[0]).toMatchObject({ today: true, tomorrow: false, day: "Thu" });
-    expect(day.days[1]).toMatchObject({ today: false, tomorrow: true, day: "Fri" });
+  it("is two for today and tomorrow", () => {
+    expect(days({ range: "tomorrow" })).toBe(2);
   });
 
-  it("puts a multi-day all-day entry on every day it covers", () => {
-    const day = week([
-      { summary: "Annual leave", start: { date: "2026-08-28" }, end: { date: "2026-08-30" } },
-    ]);
-
-    expect(day.days.map((one) => one.all_day.map((entry) => entry.title))).toEqual([
-      [],
-      ["Annual leave"],
-      ["Annual leave"],
-      [],
-    ]);
+  it("reaches the end of the week", () => {
+    // Thursday to Sunday inclusive.
+    expect(days({ range: "week" })).toBe(4);
   });
 
-  it("keeps remaining_today about today even when the window is a month", () => {
-    const day = agenda(
-      [
-        timed("2026-08-27T10:00:00Z", "2026-08-27T11:00:00Z", "Today"),
-        timed("2026-08-30T10:00:00Z", "2026-08-30T11:00:00Z", "Later"),
-      ],
-      {
-        now,
-        timezone: "UTC",
-        locale: "en-GB",
-        window: windowFor({ range: "month" }, now, "UTC", "en-GB"),
-        hideDeclined: true,
-      },
-    );
-
-    expect(day.events).toHaveLength(2);
-    expect(day.remaining_today).toBe(1);
-    expect(day.range).toBe("month");
-    expect(day.range_label).toBe("This month");
-  });
-
-  it("keeps a one-day all-day entry on one day, east of Greenwich", () => {
-    // The bug this pins down, found against a real account in Istanbul: an
-    // all-day date floats - "2026-08-28" is the 28th wherever you are, with no
-    // instant behind it. Read as midnight UTC and compared against local
-    // midnights, a one-day birthday appeared on both the 28th and the 29th
-    // everywhere east of UTC. It has to be compared as a calendar date.
-    const at = new Date("2026-08-27T09:00:00Z");
-    const birthday: GoogleEvent = {
-      summary: "Lesya BD 02",
-      start: { date: "2026-08-28" },
-      end: { date: "2026-08-29" },
-    };
-
-    for (const timezone of ["Europe/Istanbul", "Asia/Tokyo", "UTC", "America/Los_Angeles"]) {
-      const day = agenda([birthday], {
-        now: at,
-        timezone,
-        locale: "en-GB",
-        window: windowFor({ range: "week" }, at, timezone, "en-GB"),
-        hideDeclined: true,
-      });
-
-      const drawnOn = day.days.filter((one) => one.all_day.length).map((one) => one.date);
-      expect(drawnOn, timezone).toEqual(["2026-08-28"]);
-    }
-  });
-
-  it("still spreads a genuinely multi-day entry across its days", () => {
-    const at = new Date("2026-08-27T09:00:00Z");
-    const leave: GoogleEvent = {
-      summary: "Annual leave",
-      start: { date: "2026-08-28" },
-      end: { date: "2026-08-31" },
-    };
-
-    const day = agenda([leave], {
-      now: at,
-      timezone: "Europe/Istanbul",
-      locale: "en-GB",
-      window: windowFor({ range: "week" }, at, "Europe/Istanbul", "en-GB"),
-      hideDeclined: true,
-    });
-
-    expect(day.days.filter((one) => one.all_day.length).map((one) => one.date)).toEqual([
-      "2026-08-28",
-      "2026-08-29",
-      "2026-08-30",
-    ]);
-  });
-
-  it("knows whether an all-day entry is today by the local date", () => {
-    // 22:00 UTC on the 27th is already the 28th in Istanbul, so the birthday
-    // on the 28th is today there and tomorrow in London.
-    const at = new Date("2026-08-27T22:00:00Z");
-    const birthday: GoogleEvent = {
-      summary: "Lesya BD 02",
-      start: { date: "2026-08-28" },
-      end: { date: "2026-08-29" },
-    };
-
-    const build = (timezone: string) =>
-      agenda([birthday], {
-        now: at,
-        timezone,
-        locale: "en-GB",
-        window: windowFor({ range: "week" }, at, timezone, "en-GB"),
-        hideDeclined: true,
-      });
-
-    expect(build("Europe/Istanbul").all_day_today).toBe(1);
-    expect(build("Europe/London").all_day_today).toBe(0);
-  });
-
-  it("builds no groups for a window that cannot leave today", () => {
-    const day = agenda([], {
-      now,
-      timezone: "UTC",
-      locale: "en-GB",
-      window: windowFor({ range: "today" }, now, "UTC", "en-GB"),
-      hideDeclined: true,
-    });
-
-    expect(day.spans_days).toBe(false);
-    expect(day.days).toEqual([]);
+  it("is bounded for a month, because a column per day stops being readable", () => {
+    // The fetch still covers the month - the counts and the facts are right.
+    // Only what a design is asked to draw is capped.
+    expect(days({ range: "month" })).toBe(5);
+    expect(days({ range: "month" })).toBeLessThanOrEqual(14);
   });
 });

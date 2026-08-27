@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { agenda } from "./agenda";
+import { toMeetings } from "./agenda";
 import type { GoogleEvent } from "./api";
 import { feedValue, parseFeed, resolveFeeds, selectedFeeds } from "./feeds";
-import { windowFor } from "./range";
 
 /**
  * Several calendars, one widget.
@@ -114,49 +113,38 @@ describe("which feeds a widget was pointed at", () => {
 /* -------------------------------------------------------------------------- */
 
 const from = (calendarName: string | undefined, at: string, summary: string): GoogleEvent => ({
+  id: summary,
   summary,
   calendarName,
   start: { dateTime: at },
   end: { dateTime: at },
 });
 
-describe("merging what several feeds answered", () => {
-  const now = new Date("2026-08-27T09:00:00Z");
-
-  const merged = (events: GoogleEvent[]) =>
-    agenda(events, {
-      now,
-      timezone: "UTC",
-      locale: "en-GB",
-      window: windowFor({ range: "today" }, now, "UTC", "en-GB"),
-      hideDeclined: true,
-    });
-
-  it("interleaves them by time rather than by feed", () => {
-    // Two lists arriving one after the other must not draw as two lists. The
-    // whole point of merging is one timeline.
-    const day = merged([
-      from("Work", "2026-08-27T10:00:00Z", "Design review"),
-      from("Work", "2026-08-27T15:00:00Z", "Retro"),
-      from("Family", "2026-08-27T12:00:00Z", "School pickup"),
-    ]);
-
-    expect(day.events.map((event) => event.title)).toEqual([
-      "Design review",
-      "School pickup",
-      "Retro",
-    ]);
-  });
-
+describe("what several feeds contribute to one list", () => {
   it("marks each entry with the feed it came from", () => {
-    const day = merged([from("Family", "2026-08-27T12:00:00Z", "School pickup")]);
+    const meetings = toMeetings(
+      [
+        from("Work", "2026-08-27T10:00:00Z", "Design review"),
+        from("Family", "2026-08-27T12:00:00Z", "School pickup"),
+      ],
+      "UTC",
+    );
 
-    expect(day.next?.calendar).toBe("Family");
+    expect(meetings.map((one) => one.calendar)).toEqual(["Work", "Family"]);
   });
 
-  it("leaves the mark empty for a single feed, where it would be noise", () => {
-    const day = merged([from(undefined, "2026-08-27T12:00:00Z", "School pickup")]);
+  it("leaves the mark unset for a single feed, where it would be noise", () => {
+    const [meeting] = toMeetings([from(undefined, "2026-08-27T12:00:00Z", "School pickup")], "UTC");
 
-    expect(day.next?.calendar).toBe("");
+    expect(meeting.calendar).toBeUndefined();
+  });
+
+  it("keeps ids apart when two feeds both number their events from one", () => {
+    // Without the per-feed prefix, two events called `event-0` collide and the
+    // conflict and lane arithmetic quietly pairs the wrong ones.
+    const work = toMeetings([{ summary: "A", start: { dateTime: "2026-08-27T10:00:00Z" } }], "UTC", "work");
+    const home = toMeetings([{ summary: "B", start: { dateTime: "2026-08-27T10:00:00Z" } }], "UTC", "home");
+
+    expect(work[0].id).not.toBe(home[0].id);
   });
 });
