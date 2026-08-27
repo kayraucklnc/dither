@@ -36,6 +36,17 @@ export async function GET(
     );
   }
 
+  /**
+   * A stand-in notice, so the catalogue can show a design with and without one.
+   * Whether the strip appears at all is the template's decision - a design that
+   * ignores `notices` renders identically either way, which is itself the
+   * answer to "does this size take alerts?".
+   */
+  const withNotice = url.searchParams.get("notice") === "1";
+  const notices = withNotice
+    ? [{ icon: "alert", text: "Service alert on the S3", loud: true }]
+    : [];
+
   const settings = defaultSettings(extension);
   const data = extension.manifest.sample as Record<string, unknown>;
   const [width, height] = pixelsFor(shape, DEFAULT_PANEL.width, DEFAULT_PANEL.height);
@@ -47,6 +58,7 @@ export async function GET(
       column: 1, row: 1, columnSpan: COLUMNS, rowSpan: ROWS,
     }],
     { ...DEFAULT_PANEL, width, height },
+    notices,
   );
 
   if (request.headers.get("if-none-match") === `"${key}"`) {
@@ -54,7 +66,8 @@ export async function GET(
   }
 
   const cached = await store().get(`${key}.png`);
-  const bytes = cached ?? (await renderSolo(name, shape.id, settings, data, DEFAULT_PANEL)).bytes;
+  const bytes =
+    cached ?? (await renderSolo(name, shape.id, settings, data, DEFAULT_PANEL, notices)).bytes;
 
   if (!cached) await store().put(`${key}.png`, bytes, "image/png");
 

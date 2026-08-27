@@ -35,8 +35,8 @@ import {
 } from "@/components/flow/condition-editor";
 import { ContextMenu, type MenuItem } from "@/components/flow/context-menu";
 import { DevicePanel, type DeviceDetails } from "@/components/flow/device-panel";
-import { NoticesPanel } from "@/components/flow/notices-panel";
-import { NO_SIMULATION, TestPanel, type Simulation } from "@/components/flow/test-panel";
+import { NoticesPanel, type NoticeHost } from "@/components/flow/notices-panel";
+import { NO_SIMULATION, TestPanel, type Simulation, type TestNotice } from "@/components/flow/test-panel";
 import { QuestionNode, ScreenNode, type QuestionData, type ScreenData } from "@/components/flow/nodes";
 import { ScreenPreview } from "@/components/screen-preview";
 import { Select } from "@/components/ui/select";
@@ -58,7 +58,9 @@ interface Trace {
   reason: string;
   held: boolean;
   steps: { nodeId: number; question: string; answer: boolean; actual?: string }[];
-  notices: { icon: string; text: string; loud: boolean }[];
+  notices: { id: number; icon: string; text: string; loud: boolean }[];
+  firing: number[];
+  hosts: NoticeHost[];
 }
 
 const control =
@@ -101,6 +103,15 @@ function TreeCanvas({
   const [tab, setTab] = useState<"decide" | "notices" | "device" | "test">("decide");
   const [simulation, setSimulation] = useState<Simulation>(NO_SIMULATION);
   const [refreshing, setRefreshing] = useState(false);
+  const [testNotices, setTestNotices] = useState<TestNotice[]>([]);
+
+  // The notice list is small and rarely changes, so it is fetched once rather
+  // than riding along on every trace.
+  useEffect(() => {
+    fetch(`/api/devices/${deviceId}/notices`)
+      .then((response) => (response.ok ? response.json() : undefined))
+      .then((body) => body && setTestNotices(body.notices));
+  }, [deviceId, tab]);
 
   const nodeTypes = useMemo(() => ({ question: QuestionNode, screen: ScreenNode }), []);
   const selected = nodes.find((node) => node.id === selectedId);
@@ -118,6 +129,7 @@ function TreeCanvas({
           body: JSON.stringify({
             at: simulation.at ? new Date(simulation.at).toISOString() : undefined,
             overrides: simulation.overrides,
+            notices: simulation.notices,
           }),
         })
       : await fetch(`/api/devices/${deviceId}/trace`);
@@ -718,7 +730,13 @@ function TreeCanvas({
 
         <div className="min-h-0 flex-1 overflow-y-auto">
         {tab === "test" ? (
-          <TestPanel sources={sources} simulation={simulation} onChange={setSimulation} />
+          <TestPanel
+            sources={sources}
+            notices={testNotices}
+            firing={trace?.firing ?? []}
+            simulation={simulation}
+            onChange={setSimulation}
+          />
         ) : tab === "device" ? (
           <DevicePanel device={device} />
         ) : tab === "notices" ? (
@@ -727,6 +745,8 @@ function TreeCanvas({
             sources={sources}
             sourceKinds={sourceKinds}
             sourceMap={sourceMap}
+            hosts={trace?.hosts ?? []}
+            firing={trace?.firing ?? []}
             onChanged={refreshTrace}
           />
         ) : (

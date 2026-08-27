@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Megaphone, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Megaphone, Plus, Trash2 } from "lucide-react";
 
 import { ConditionEditor, type EditorSource, type SourceKind } from "@/components/flow/condition-editor";
 import { Select } from "@/components/ui/select";
@@ -27,6 +27,14 @@ export interface NoticeRow {
   text: string;
   loud: boolean;
   enabled: boolean;
+}
+
+export interface NoticeHost {
+  screenId: number;
+  screenName: string;
+  widgetLabel: string | null;
+  extensionLabel: string | null;
+  showing: boolean;
 }
 
 export interface Suggestion {
@@ -55,12 +63,16 @@ export function NoticesPanel({
   sources,
   sourceKinds,
   sourceMap,
+  hosts,
+  firing,
   onChanged,
 }: {
   deviceId: number;
   sources: EditorSource[];
   sourceKinds: SourceKind[];
   sourceMap: Map<string, Source>;
+  hosts: NoticeHost[];
+  firing: number[];
   onChanged: () => void;
 }) {
   const [rows, setRows] = useState<NoticeRow[]>([]);
@@ -111,9 +123,49 @@ export function NoticesPanel({
   return (
     <div className="space-y-4 p-4">
       <p className="text-[12px] leading-relaxed text-faint">
-        Additive, unlike the tree. A notice appears on whichever screen is showing, as long as that
-        screen has somewhere to put it.
+        Additive, unlike the tree. A notice appears on whichever screen is showing, in the first
+        widget whose design has somewhere to put one.
       </p>
+
+      {hosts.length > 0 && (
+        <div className="rounded-lg border border-line bg-ground/40 p-3">
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-faint">
+            Where they would appear
+          </p>
+
+          <ul className="space-y-1.5">
+            {hosts.map((host) => (
+              <li key={host.screenId} className="flex items-start gap-2 text-[11px]">
+                <span
+                  className={cn(
+                    "mt-1 h-1.5 w-1.5 shrink-0 rounded-full",
+                    host.showing ? "bg-live" : host.widgetLabel ? "bg-faint" : "bg-warn",
+                  )}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-muted">
+                    {host.screenName}
+                    {host.showing && <span className="text-live"> · showing now</span>}
+                  </span>
+                  <span className="block truncate text-faint">
+                    {host.widgetLabel
+                      ? `in ${host.widgetLabel}`
+                      : "nothing on this screen takes alerts"}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          {hosts.some((host) => !host.widgetLabel) && (
+            <p className="mt-2.5 flex items-start gap-1.5 text-[11px] leading-relaxed text-warn">
+              <AlertTriangle size={11} className="mt-0.5 shrink-0" />
+              A screen with no widget that takes alerts shows none. The extensions page marks which
+              sizes do.
+            </p>
+          )}
+        </div>
+      )}
 
       {rows.length > 0 && (
         <div className="space-y-2">
@@ -151,8 +203,15 @@ export function NoticesPanel({
                     onClick={() => setOpenId(open ? null : row.id)}
                     className="min-w-0 flex-1 text-left"
                   >
-                    <span className="block truncate text-[12px] font-medium">
-                      {row.label || row.text || "Notice"}
+                    <span className="flex items-center gap-1.5">
+                      <span className="min-w-0 truncate text-[12px] font-medium">
+                        {row.label || row.text || "Notice"}
+                      </span>
+                      {firing.includes(row.id) && (
+                        <span className="shrink-0 rounded bg-live/15 px-1.5 py-0.5 text-[10px] font-medium text-live">
+                          showing
+                        </span>
+                      )}
                     </span>
                     <span className="block truncate text-[11px] text-faint">
                       when {summarise(row.condition, { sources: sourceMap })}

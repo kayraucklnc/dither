@@ -258,6 +258,7 @@ export async function composeSolo(
   width: number,
   height: number,
   environment: Environment = DEFAULT_ENVIRONMENT,
+  notices: Notice[] = [],
 ): Promise<Composition> {
   const extension = await findExtension(widget.extension);
   const css = await framework();
@@ -279,7 +280,7 @@ export async function composeSolo(
     shapeId,
     widget.settings,
     widget.data,
-    [],
+    notices,
     environment,
   );
 

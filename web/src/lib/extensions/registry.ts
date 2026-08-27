@@ -193,3 +193,18 @@ export function templateFor(extension: Extension, shape: string): string | undef
   const chosen = standIn(shape as ShapeId, extension.authored);
   return chosen ? extension.templates[chosen] : undefined;
 }
+
+/**
+ * Whether the design that draws this shape has somewhere to put a notice.
+ *
+ * `accepts_notices` on the manifest is the author's intent; this is whether
+ * the template that will actually run renders them. The two can differ,
+ * because a shape may be drawn by a stand-in from its family, and because an
+ * author can forget the block. What matters to a screen is the second one.
+ */
+export function rendersNotices(extension: Extension, shape: string): boolean {
+  if (!extension.manifest.accepts_notices) return false;
+
+  const template = templateFor(extension, shape);
+  return template !== undefined && /\bnotices\b/.test(template);
+}

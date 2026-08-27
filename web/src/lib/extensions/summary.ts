@@ -1,5 +1,5 @@
 import { requiredBy } from "@/lib/connections";
-import { all, type Extension } from "@/lib/extensions/registry";
+import { all, rendersNotices, type Extension } from "@/lib/extensions/registry";
 import type { ShapeId } from "@/lib/shapes";
 
 /** What a page needs to know about an extension, without its templates. */
@@ -15,6 +15,8 @@ export interface ExtensionSummary {
   headline: ShapeId;
   settingCount: number;
   factCount: number;
+  /** How many of its sizes have somewhere to show another extension's alert. */
+  noticeShapes: number;
   connection?: { id: string; label: string; mocked: boolean };
   problems: string[];
 }
@@ -40,6 +42,7 @@ export function summarise(extension: Extension): ExtensionSummary {
     headline: [...extension.shapes].sort((a, b) => (AREA[b] ?? 0) - (AREA[a] ?? 0))[0],
     settingCount: extension.manifest.fields.length,
     factCount: extension.manifest.facts.length,
+    noticeShapes: extension.shapes.filter((shape) => rendersNotices(extension, shape)).length,
     connection: connection
       ? { id: connection.id, label: connection.label, mocked: connection.mocked }
       : undefined,

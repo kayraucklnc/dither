@@ -28,14 +28,25 @@ export interface ActiveNotice {
 export async function activeNotices(
   rules: Notice[],
   context: Context,
+  /**
+   * Ids to show regardless of their condition, and ids to suppress.
+   *
+   * Judging the wording of an alert that fires twice a year should not require
+   * engineering the weather. Kept as an explicit argument rather than a
+   * condition that always holds, because "always" is not actually expressible
+   * in a vocabulary where every check compares a real value.
+   */
+  forced: Record<number, "on" | "off"> = {},
 ): Promise<ActiveNotice[]> {
   const active: ActiveNotice[] = [];
 
   for (const rule of [...rules].sort((a, b) => a.priority - b.priority)) {
-    if (!rule.enabled) continue;
+    if (forced[rule.id] === "off") continue;
 
     const condition = rule.condition as unknown as Condition;
-    if (!evaluate(condition, context).holds) continue;
+    const on = forced[rule.id] === "on" || (rule.enabled && evaluate(condition, context).holds);
+
+    if (!on) continue;
 
     // The text may quote the value that triggered it, so it renders against
     // the payload of whatever source the condition reads from.
@@ -56,4 +67,76 @@ export async function activeNotices(
   }
 
   return active;
+}
+
+
+/**
+ * Where a notice would land, screen by screen.
+ *
+ * "Enable this and something appears" is not an answer to "appears where?".
+ * A notice renders into the first widget, in reading order, whose design has
+ * somewhere to put one - so a screen made entirely of designs that ignore
+ * notices shows nothing, and that is worth saying out loud rather than leaving
+ * to be discovered on a wall.
+ */
+export interface NoticeHost {
+  screenId: number;
+  screenName: string;
+  /** The widget that would show it, or null when nothing on this screen can. */
+  widgetLabel: string | null;
+  extensionLabel: string | null;
+  /** True when this is the screen the device is showing right now. */
+  showing: boolean;
+}
+
+export async function noticeHosts(
+  deviceId: number,
+  showingScreenId: number | null,
+): Promise<NoticeHost[]> {
+  const { db } = await import("@/lib/db");
+  const { decisionNodes, screens, widgets } = await import("@/lib/db/schema");
+  const { find } = await import("@/lib/extensions/registry");
+  const { rendersNotices } = await import("@/lib/extensions/registry");
+  const { shapeForSize } = await import("@/lib/shapes");
+  const { eq, inArray } = await import("drizzle-orm");
+
+  const nodes = await db.select().from(decisionNodes).where(eq(decisionNodes.deviceId, deviceId));
+  const screenIds = [...new Set(nodes.map((node) => node.screenId).filter((id): id is number => id !== null))];
+
+  if (!screenIds.length) return [];
+
+  const rows = await db.select().from(screens).where(inArray(screens.id, screenIds));
+  const placed = await db.select().from(widgets).where(inArray(widgets.screenId, screenIds));
+
+  const hosts: NoticeHost[] = [];
+
+  for (const screen of rows) {
+    const ordered = placed
+      .filter((widget) => widget.screenId === screen.id)
+      .sort((a, b) => a.row - b.row || a.column - b.column);
+
+    let host: { widgetLabel: string; extensionLabel: string } | undefined;
+
+    for (const widget of ordered) {
+      const extension = await find(widget.extension);
+      const shape = shapeForSize(widget.columnSpan, widget.rowSpan);
+      if (!extension || !shape || !rendersNotices(extension, shape.id)) continue;
+
+      host = {
+        widgetLabel: widget.label || extension.manifest.label,
+        extensionLabel: extension.manifest.label,
+      };
+      break;
+    }
+
+    hosts.push({
+      screenId: screen.id,
+      screenName: screen.name,
+      widgetLabel: host?.widgetLabel ?? null,
+      extensionLabel: host?.extensionLabel ?? null,
+      showing: screen.id === showingScreenId,
+    });
+  }
+
+  return hosts.sort((a, b) => Number(b.showing) - Number(a.showing) || a.screenName.localeCompare(b.screenName));
 }
