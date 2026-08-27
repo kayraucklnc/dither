@@ -1,48 +1,82 @@
 import sharp from "sharp";
 
 import { resolve, type Picture } from "./library";
+import { DEFAULT_MARKS, isScreen, screened, type Screen } from "./screen";
 
 /**
  * A photograph, turned into something a one-bit panel can carry.
  *
- * Two decisions live here, and both are the opposite of what you would do for
+ * Three decisions live here, and each is the opposite of what you would do for
  * a screen with pixels to spare.
- *
- * **It is not dithered.** The render pipeline already ends in Floyd-Steinberg
- * over the whole panel, and an image dithered here would be dithered twice:
- * once into a stipple, then again after the browser has resampled that stipple
- * to fit a box, which is how you get moire. So what comes out of here is
- * *grey* - as many levels as the source has - and the panel's own dither is
- * left to be the only one. It is the same rule the rest of this codebase
- * follows for gradients, applied to a photograph.
  *
  * **It is cropped to the widget, not to the panel.** Sizes are free: the same
  * picture might be a full-bleed wallpaper at 12x12 and a 2x12 strip down the
  * side of a screen, and those want different rectangles out of the original,
  * not the same rectangle squashed. Cropping is done here, at render time,
  * because this is the first point at which anything knows how big the box is.
+ *
+ * **The tones are moved before anything else happens.** A one-bit display has
+ * no tint, so contrast is not a finishing touch - it is the only control over
+ * how much of the picture survives at all. The panel's paper is brighter and
+ * its ink weaker than any screen's, so a photograph that looked right on a
+ * phone is usually too dark and too flat for it.
+ *
+ * **It may or may not be reduced to one bit here.** By default it is not: the
+ * render pipeline ends in Floyd-Steinberg over the whole page and doing it
+ * twice, either side of a resample, is moire. But a *chosen* screen - a dot
+ * screen, an ordered threshold - has to be applied to the picture's own pixels
+ * or it is not that screen any more, so when one is asked for the result comes
+ * back already at the panel's two values. That is safe precisely because the
+ * crop is the exact size of the box: every pixel lands on a palette entry, the
+ * page dither has no error to diffuse, and the marks arrive intact.
  */
 
 export type Fit = "fill" | "whole";
 
-/** What to do to the tones on the way. Contrast is the only lever 1 bit has. */
-export const TONES: Record<string, { gamma: number; contrast: number }> = {
-  as_is: { gamma: 1, contrast: 1 },
-  // A photograph that dithers to mud is nearly always too dark for the medium:
-  // the panel's paper is brighter than any screen's white and its ink is not
-  // as black as any screen's black, so the mid tones need lifting into it.
-  lift: { gamma: 1.35, contrast: 1.05 },
-  deepen: { gamma: 0.85, contrast: 1.45 },
-  flatten: { gamma: 1, contrast: 0.7 },
+/**
+ * Where to keep, when a rectangle has to be thrown away.
+ *
+ * `auto` finds the busiest region, which is right far more often than not - it
+ * is what turns a portrait photograph into a widescreen portrait rather than a
+ * widescreen waistcoat. It is also the one that can be surprising, because
+ * "busiest" is not "the subject": on a poster it will find the type. So the
+ * plain compass points are here to be overruled with.
+ */
+export const FOCUS: Record<string, string | number> = {
+  auto: sharp.strategy.attention,
+  centre: "centre",
+  top: "north",
+  bottom: "south",
+  left: "west",
+  right: "east",
 };
 
 export interface Look {
   width: number;
   height: number;
   fit: Fit;
-  tone: string;
+  /** A key of FOCUS. */
+  focus: string;
+  /** -100 to 100, zero being the picture as it is. */
+  brightness: number;
+  contrast: number;
+  screen: Screen;
+  /** How many panel pixels one mark of the screen covers. */
+  marks: number;
   invert: boolean;
 }
+
+export const DEFAULT_LOOK: Look = {
+  width: 0,
+  height: 0,
+  fit: "fill",
+  focus: "auto",
+  brightness: 0,
+  contrast: 0,
+  screen: "panel",
+  marks: DEFAULT_MARKS,
+  invert: false,
+};
 
 export interface Prepared {
   /** A data URI. Inlined because a screenshotted page has no origin to resolve against. */
@@ -50,6 +84,8 @@ export interface Prepared {
   width: number;
   height: number;
   bytes: number;
+  /** True when this is already black and white, and the page dither is a no-op over it. */
+  reduced: boolean;
 }
 
 /**
@@ -86,22 +122,46 @@ function boxOf(look: Look): { width: number; height: number } {
   };
 }
 
+const clamp = (value: number, low: number, high: number) =>
+  Math.max(low, Math.min(high, Number.isFinite(value) ? value : 0));
+
+/**
+ * Brightness and contrast as one straight line through the tones.
+ *
+ * Contrast pivots on mid grey rather than on black, or every increase in
+ * contrast is also a darkening and the picture closes up. The curve is the
+ * usual photographic one, which is steep near the ends of the range - the
+ * difference between 90 and 100 is far more than between 0 and 10, and it
+ * should be, because that end is where a photograph becomes a graphic.
+ */
+function levels(brightness: number, contrast: number): { slope: number; offset: number } {
+  const c = clamp(contrast, -100, 100) * 1.28;
+  const slope = (259 * (c + 255)) / (255 * (259 - c));
+  const lift = clamp(brightness, -100, 100) * 1.28;
+
+  return { slope, offset: 128 - 128 * slope + lift };
+}
+
 export async function prepare(picture: Picture, look: Look): Promise<Prepared> {
   const box = boxOf(look);
+  const screen: Screen = isScreen(look.screen) ? look.screen : "panel";
+
   const key = [
     picture.file,
     picture.modifiedAt,
     box.width,
     box.height,
     look.fit,
-    look.tone,
+    look.focus,
+    look.brightness,
+    look.contrast,
+    screen,
+    look.marks,
     look.invert,
   ].join("|");
 
   const held = cache.get(key);
   if (held) return held;
-
-  const tone = TONES[look.tone] ?? TONES.as_is;
 
   /**
    * Pixel art is enlarged by repeating pixels, never by interpolating them.
@@ -117,6 +177,8 @@ export async function prepare(picture: Picture, look: Look): Promise<Prepared> {
   const enlarging =
     (source.width ?? 0) * 1.4 < box.width && (source.height ?? 0) * 1.4 < box.height;
 
+  const { slope, offset } = levels(look.brightness, look.contrast);
+
   let pipeline = sharp(picture.file, { animated: false })
     // Phones write the orientation in EXIF rather than in the pixels, so a
     // holiday photograph arrives on its side unless this is asked for.
@@ -125,45 +187,66 @@ export async function prepare(picture: Picture, look: Look): Promise<Prepared> {
       width: box.width,
       height: box.height,
       fit: look.fit === "whole" ? "contain" : "cover",
-      // Where a rectangle has to be thrown away, throw away the boring part.
-      // A widescreen crop of a portrait photograph taken through the middle
-      // is a waistcoat; taken through where the detail is, it is a portrait.
-      position: look.fit === "whole" ? "centre" : sharp.strategy.attention,
+      position: look.fit === "whole" ? "centre" : (FOCUS[look.focus] ?? FOCUS.auto),
       background: { r: 255, g: 255, b: 255 },
       kernel: enlarging ? "nearest" : "lanczos3",
     })
     .greyscale();
 
-  // Contrast about the mid point, not about zero: `linear(m, c)` with c chosen
-  // so 128 maps to itself, or every increase in contrast is also a darkening
-  // and the picture closes up.
-  if (tone.contrast !== 1) {
-    pipeline = pipeline.linear(tone.contrast, 128 * (1 - tone.contrast));
-  }
-
-  // sharp's gamma brightens and will not take a value below one, so darkening
-  // is the same curve applied to the negative and turned back over.
-  if (tone.gamma > 1) pipeline = pipeline.gamma(tone.gamma);
-  if (tone.gamma < 1) pipeline = pipeline.negate().gamma(1 / tone.gamma).negate();
-
+  if (slope !== 1 || offset !== 0) pipeline = pipeline.linear(slope, offset);
   if (look.invert) pipeline = pipeline.negate();
 
-  // PNG for anything that arrived as PNG, JPEG for everything else. The
-  // bundled art is line work and block tone, and a JPEG of it is a picture of
-  // ringing artefacts the dither then makes a feature of; a photograph as a
-  // palette PNG is four times the bytes for a difference nothing downstream
-  // can represent.
-  const asPng = /\.png$/i.test(picture.file);
+  if (screen === "panel") {
+    /**
+     * PNG for anything that arrived as PNG, JPEG for everything else.
+     *
+     * Line work and block tone as a JPEG is a picture of ringing artefacts
+     * that the page dither then makes a feature of; a photograph as a palette
+     * PNG is four times the bytes for a difference nothing downstream can
+     * represent.
+     */
+    const asPng = /\.png$/i.test(picture.file);
 
-  const encoded = asPng
-    ? await pipeline.png({ palette: true, colors: 64, compressionLevel: 9 }).toBuffer({ resolveWithObject: true })
-    : await pipeline.jpeg({ quality: 88, chromaSubsampling: "4:4:4" }).toBuffer({ resolveWithObject: true });
+    const encoded = asPng
+      ? await pipeline
+          .png({ palette: true, colors: 64, compressionLevel: 9 })
+          .toBuffer({ resolveWithObject: true })
+      : await pipeline
+          .jpeg({ quality: 88, chromaSubsampling: "4:4:4" })
+          .toBuffer({ resolveWithObject: true });
+
+    return remember(key, {
+      source: `data:image/${asPng ? "png" : "jpeg"};base64,${encoded.data.toString("base64")}`,
+      width: encoded.info.width,
+      height: encoded.info.height,
+      bytes: encoded.data.length,
+      reduced: false,
+    });
+  }
+
+  const { data, info } = await pipeline.raw().toBuffer({ resolveWithObject: true });
+  const reduced = screened(
+    new Uint8Array(data.buffer, data.byteOffset, data.length),
+    info.width,
+    info.height,
+    screen,
+    look.marks,
+  );
+
+  const encoded = await sharp(Buffer.from(reduced), {
+    raw: { width: info.width, height: info.height, channels: 1 },
+  })
+    // Two colours in, two colours out: a bilevel PNG of a whole panel is a few
+    // kilobytes, where the same marks as greyscale would be a hundred.
+    .png({ palette: true, colors: 2, compressionLevel: 9 })
+    .toBuffer({ resolveWithObject: true });
 
   return remember(key, {
-    source: `data:image/${asPng ? "png" : "jpeg"};base64,${encoded.data.toString("base64")}`,
+    source: `data:image/png;base64,${encoded.data.toString("base64")}`,
     width: encoded.info.width,
     height: encoded.info.height,
     bytes: encoded.data.length,
+    reduced: true,
   });
 }
 

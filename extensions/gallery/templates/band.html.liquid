@@ -13,7 +13,12 @@
 
 {%- assign shot = source_1.picture -%}
 {%- assign fit = extension.values.fit | default: "fill" -%}
-{%- assign tone = extension.values.tone | default: "as_is" -%}
+{%- assign focus = extension.values.focus | default: "auto" -%}
+{%- assign contrast = extension.values.contrast | default: 0 -%}
+{%- assign brightness = extension.values.brightness | default: 0 -%}
+{%- assign screen = extension.values.screen | default: "panel" -%}
+{%- assign marks = extension.values.marks | default: 4 -%}
+{%- assign invert = extension.values.invert -%}
 
 {%- assign captioned = false -%}
 {%- assign label_w = 0 -%}
@@ -25,7 +30,8 @@
 {%- assign plate_w = shape.width | minus: label_w | at_least: 40 -%}
 {%- assign plate = shot.id
       | as_image: width: plate_w, height: shape.height,
-                  fit: fit, tone: tone, invert: extension.values.invert -%}
+                  fit: fit, focus: focus, contrast: contrast,
+                  brightness: brightness, screen: screen, marks: marks, invert: invert -%}
 
 {% if plate == "" %}
 {%- comment %} Nothing to hang.

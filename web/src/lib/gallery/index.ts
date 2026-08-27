@@ -1,6 +1,6 @@
 import { environment } from "@/lib/settings";
 
-import { collections, pictures, resolve, root, type Picture } from "./library";
+import { collections, pictures, resolve, root, type Orientation, type Picture } from "./library";
 import { holdSeconds, turnOf } from "./pick";
 
 /**
@@ -60,37 +60,72 @@ export async function shelf(
     throw new Error(`There is no collection called "${wanted}" any more.`);
   }
 
-  const held = await pictures(collection?.id);
-  if (!held.length) {
+  const inside = await pictures(collection?.id);
+  if (!inside.length) {
     throw new Error(`${collection?.label ?? "The gallery"} has no pictures in it.`);
   }
 
-  const hold = holdSeconds(String(settings.hold ?? "hour"));
+  /**
+   * One picture, chosen once and left alone, or a rotation.
+   *
+   * Its own question rather than a "never" hidden at the top of the rotation
+   * menu, which is where it used to live and where nobody found it.
+   */
+  const one = String(settings.pick ?? "rotate") === "one";
+
+  /**
+   * Only the pictures that are the right shape for this panel.
+   *
+   * The single most useful filter there is, because almost everything in this
+   * visual idiom was made portrait for a phone and a panel is widescreen. A
+   * rotation of portrait pins on a landscape wallpaper is a rotation of crops,
+   * and the honest answer is not a cleverer crop - it is not showing them.
+   *
+   * It only applies to a rotation. Naming one picture is a stronger statement
+   * than naming a shape, so a pinned portrait is shown; the alternative was a
+   * widget that reported one eligible picture and drew a different one.
+   *
+   * A filter that leaves nothing says so rather than quietly falling back to
+   * the whole collection - a wallpaper showing the pictures you excluded is
+   * worse than one that has stopped and told you why.
+   */
+  const wantedShape = String(settings.orientation ?? "any") as Orientation;
+  const held =
+    one || wantedShape === "any"
+      ? inside
+      : inside.filter((candidate) => candidate.orientation === wantedShape);
+
+  if (!held.length) {
+    const shapes = [...new Set(inside.map((candidate) => candidate.orientation))];
+
+    throw new Error(
+      `Nothing in ${collection?.label ?? "the gallery"} is ${wantedShape}. ` +
+        `It holds ${inside.length} picture${inside.length === 1 ? "" : "s"}, ` +
+        `${inside.length === 1 ? "and it is" : "all of them"} ${shapes.join(" or ")}.`,
+    );
+  }
+
   const { timezone } = await environment();
 
   /**
-   * One picture, chosen once and left alone.
-   *
-   * Pinning is not a degenerate rotation - it is the other thing people want
-   * a gallery for, which is one print on one wall. So it names a picture, and
-   * a name that no longer resolves is refused rather than falling through to
-   * the rotation: silently showing something else is how you find out months
+   * A name that no longer resolves is refused rather than falling through to
+   * the rotation. Silently showing something else is how you find out months
    * later that the picture you chose has not been up since June.
    */
-  const pinned = hold === 0 ? String(settings.pinned ?? "").trim() : "";
+  if (one) {
+    const wanted = String(settings.pinned ?? "").trim();
+    const chosen = wanted ? await resolve(wanted) : held[0];
 
-  if (pinned) {
-    const one = await resolve(pinned);
-    if (!one) throw new Error(`The picture chosen for this widget is no longer there.`);
+    if (!chosen) throw new Error("The picture chosen for this widget is no longer there.");
 
     return {
       source_1: {
         collection: collection?.id ?? "",
         collection_label: collection?.label ?? "Everything",
         count: held.length,
-        picture: brief(one),
-        next: brief(one),
-        position: held.findIndex((candidate) => candidate.id === one.id) + 1,
+        picture: brief(chosen),
+        next: brief(chosen),
+        position: held.findIndex((candidate) => candidate.id === chosen.id) + 1,
         sheet: held.slice(0, SHEET_LIMIT).map(brief),
       } satisfies Shelf,
     };
@@ -101,7 +136,7 @@ export async function shelf(
     now,
     {
       order: String(settings.order ?? "shuffle"),
-      hold,
+      hold: holdSeconds(String(settings.hold ?? "hour")),
       // Two collections of the same size would otherwise shuffle into step
       // with each other, and two gallery widgets on one screen would turn
       // over together like a departure board.

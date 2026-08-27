@@ -1,5 +1,6 @@
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
+import sharp from "sharp";
 
 /**
  * The pictures this installation can put on a wall.
@@ -24,6 +25,9 @@ export interface Collection {
   count: number;
 }
 
+export const ORIENTATIONS = ["any", "landscape", "portrait", "square"] as const;
+export type Orientation = (typeof ORIENTATIONS)[number];
+
 export interface Picture {
   /** `<collection>/<file>`. Never a path; see `resolve`. */
   id: string;
@@ -32,6 +36,10 @@ export interface Picture {
   /** What a caption would say. Empty when the filename says nothing. */
   title: string;
   modifiedAt: number;
+  width: number;
+  height: number;
+  /** Never `any`; that is only ever a question, not an answer. */
+  orientation: Exclude<Orientation, "any">;
 }
 
 const READABLE = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif", ".avif", ".tif", ".tiff"]);
@@ -86,6 +94,53 @@ function label(directory: string): string {
 
 const isPicture = (name: string) =>
   !IGNORED.test(name) && READABLE.has(path.extname(name).toLowerCase());
+
+/**
+ * How big a picture is, remembered for as long as the file has not moved.
+ *
+ * Shape is worth knowing about every picture in the folder, because a
+ * widescreen panel showing a rotation of phone wallpapers is a widescreen panel
+ * showing crops - and the fix is to be able to say "only the landscape ones",
+ * which means every listing has to know. Reading it is a header read rather
+ * than a decode, and the answer cannot change without the file changing, so it
+ * is kept against the modification time and never asked twice.
+ */
+const measured = new Map<string, { width: number; height: number }>();
+
+async function measure(file: string, modifiedAt: number) {
+  const key = `${file}|${modifiedAt}`;
+  const held = measured.get(key);
+  if (held) return held;
+
+  let size = { width: 0, height: 0 };
+  try {
+    const meta = await sharp(file).metadata();
+    // EXIF orientations 5 to 8 are quarter turns, and sharp reports the stored
+    // pixels rather than the upright ones - so a phone photograph taken
+    // sideways would be filed as landscape and cropped as one.
+    const turned = (meta.orientation ?? 1) >= 5;
+    size = {
+      width: turned ? (meta.height ?? 0) : (meta.width ?? 0),
+      height: turned ? (meta.width ?? 0) : (meta.height ?? 0),
+    };
+  } catch {
+    // Something unreadable is still listed - the renderer says so far better
+    // than a listing that silently drops it.
+  }
+
+  measured.set(key, size);
+  return size;
+}
+
+/** Within a twentieth either way of square counts as square. */
+function orientationOf(width: number, height: number): Exclude<Orientation, "any"> {
+  if (!width || !height) return "landscape";
+
+  const ratio = width / height;
+  if (ratio > 1.05) return "landscape";
+  if (ratio < 0.95) return "portrait";
+  return "square";
+}
 
 async function listDirectory(directory: string): Promise<string[]> {
   try {
@@ -178,12 +233,17 @@ export async function pictures(collectionId?: string): Promise<Picture[]> {
         continue;
       }
 
+      const { width, height } = await measure(file, modifiedAt);
+
       found.push({
         id: `${collection.id}/${name}`,
         file,
         collection: collection.id,
         title: titleOf(name),
         modifiedAt,
+        width,
+        height,
+        orientation: orientationOf(width, height),
       });
     }
   }
@@ -216,7 +276,18 @@ export async function resolve(id: string): Promise<Picture | undefined> {
     const info = await stat(file);
     if (!info.isFile()) return undefined;
 
-    return { id, file, collection: collectionId, title: titleOf(name), modifiedAt: info.mtimeMs };
+    const { width, height } = await measure(file, info.mtimeMs);
+
+    return {
+      id,
+      file,
+      collection: collectionId,
+      title: titleOf(name),
+      modifiedAt: info.mtimeMs,
+      width,
+      height,
+      orientation: orientationOf(width, height),
+    };
   } catch {
     return undefined;
   }

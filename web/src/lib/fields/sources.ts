@@ -118,14 +118,20 @@ const SOURCES: Source[] = [
   {
     /** The pictures in the chosen collection, for pinning one of them. */
     id: "gallery.pictures",
-    dependsOn: ["collection"],
+    dependsOn: ["collection", "orientation"],
     async list(settings) {
       const held = await pictures(String(settings.collection ?? "") || undefined);
+      const shape = String(settings.orientation ?? "any");
 
-      return held.map((one, index) => ({
+      // Narrowed the same way the widget will narrow it. Offering a portrait
+      // to a widget set to landscape-only is offering a choice that silently
+      // does nothing.
+      const usable = shape === "any" ? held : held.filter((one) => one.orientation === shape);
+
+      return usable.map((one, index) => ({
         value: one.id,
         label: one.title || `Untitled ${index + 1}`,
-        hint: one.collection,
+        hint: one.width ? `${one.width}×${one.height} ${one.orientation}` : one.collection,
       }));
     },
   },

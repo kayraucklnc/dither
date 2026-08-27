@@ -55,24 +55,69 @@ thing to keep.
 ## What it does to a picture
 
 Every design asks for its crop at the exact pixel size of the box it is drawing
-into, and gets back grey - never black and white.
+into. Two things always happen to it, and everything after that is a choice.
 
 - **Cropped to the widget, not to the panel.** Sizes are free, so the same
   photograph is a different rectangle as a 12×12 wallpaper and as a 3×12 strip
-  down the side of a screen. The crop is chosen around whatever is most
-  detailed in the picture rather than through the middle, which is what makes a
-  portrait pin work on a widescreen panel at all.
-- **Never dithered here.** The render pipeline already ends in Floyd-Steinberg
-  over the whole panel. An image dithered twice - once into a stipple, then
-  again after the browser resampled that stipple - is moire. So this hands over
-  continuous tone and lets the panel's own dither be the only one.
+  down the side of a screen.
 - **Enlarged by repeating pixels, never by interpolating them.** A 524-pixel
   pixel drawing on an 800-pixel panel grows with `nearest`, because Lanczos
   grows it into a blur and a blur dithers into mush.
 
-Four tones are offered, and *Lift* is the one to reach for first: the panel's
-paper is brighter and its ink weaker than any screen's, so a photograph that
-looked right on a phone often comes out muddy.
+### What to keep
+
+A portrait picture on a landscape panel has to lose something. *Whatever is
+busiest* finds the most detailed region, which is right most of the time —
+it is what turns a portrait photograph into a widescreen portrait rather than a
+widescreen waistcoat. It is also the setting that surprises people, because
+"busiest" is not "the subject": on a poster it finds the lettering, so a comic
+cover crops to its own title. The compass points are there to overrule it with,
+and on a poster *the middle* is usually what you wanted.
+
+### Contrast and brightness
+
+The most useful controls here, by a distance. A one-bit panel has no tints, so
+contrast is not a finishing touch — it decides how much of the picture survives
+at all, and the top of the range is where a photograph stops being a photograph
+and becomes a graphic. Both run −100 to 100 and both pivot on mid grey, so
+raising contrast does not also darken the picture.
+
+Reach for brightness when something comes out muddy: the panel's paper is
+brighter and its ink weaker than any screen's, so a photograph that looked
+right on a phone is usually sitting too low for it.
+
+### How it is reduced to ink
+
+The panel turns grey into black and white on its own. This decides whether it
+gets to — and since there is no colour and no motion here, *how* a picture is
+reduced is very nearly the whole of how it feels.
+
+| | |
+|---|---|
+| **Leave it to the panel** | Floyd-Steinberg over the finished page. The default |
+| **Diffusion** | The same kernel, but on the picture's own pixels. Fine, even, photographic |
+| **Atkinson** | Throws away a quarter of the error. Crisp, contrasty, blown highlights — everything scanned on a Mac in 1987 |
+| **Ordered** | An 8×8 Bayer threshold. A crosshatch laid *over* the picture rather than following it |
+| **Halftone** | A dot screen turned to 45°, the way ink on paper works |
+| **Noise** | A random threshold. Grainy, like a photocopy of a photocopy |
+
+The last three have a **mark size** in panel pixels: small enough and the screen
+is a texture you have to look for, large enough and it is the first thing you
+see, which on a picture hung on a wall is usually the point.
+
+Choosing anything but *Leave it to the panel* means the picture comes back
+already black and white, which is only safe because every design asks for its
+crop at the exact pixel size of the box and places it one for one. Ask for any
+other size and the browser resamples the marks back into greys for the page
+dither to find — which is the moiré this otherwise avoids.
+
+Two details worth knowing, because both were bugs first. The halftone reads the
+*average* of a cell rather than the pixel in the middle of it: a poster that is
+already a printed halftone has a middle pixel that is black or white more or
+less at random, and sampling it turns the picture to confetti. And the
+relationship between tone and dot size is counted rather than derived — area of
+a circle is wrong at both ends, so a solid black band printed 92% black with a
+sparkle of paper in the corners.
 
 ## The designs
 
@@ -87,11 +132,36 @@ looked right on a phone often comes out muddy.
 All five take notices, drawn on paper along the foot rather than over the
 picture, because type on a photograph at one bit is either backed or gone.
 
+## Which picture
+
+**Show** is the first thing to answer, and there are only two answers: a
+rotation through the collection, or *just one picture, that I choose*. The
+second is half of what a gallery is for — one print on one wall — and it names
+the picture, so a picture that has been deleted is refused rather than quietly
+replaced by whatever sorts first.
+
+**Only pictures that are** narrows a rotation by shape: landscape, portrait or
+square. It is the most useful filter here, because nearly everything in this
+idiom was made portrait for a phone and a panel is widescreen — a rotation of
+portrait pictures on a landscape wallpaper is a rotation of crops, and the
+honest fix is not a cleverer crop. A filter that leaves nothing eligible says
+so; it does not fall back to the whole collection.
+
+Shape is read from the file rather than guessed from the name, and a phone
+photograph taken sideways is measured the way it will be *shown* — EXIF quarter
+turns are undone first, or a portrait would be filed as a landscape and cropped
+as one. The picture picker shows the pixels and the shape beside each name, and
+narrows itself the same way the widget will.
+
+Naming one picture beats naming a shape, so the shape filter only applies to a
+rotation. A pinned portrait is shown; the alternative was a widget reporting one
+eligible picture and drawing a different one.
+
 ## When it changes
 
-Hourly by default; *Never* pins one picture and leaves it. Nothing faster than
-a quarter of an hour is worth asking for - the panel is only redrawn that often,
-and every change costs the device a redraw and a slice of battery.
+Hourly by default. Nothing faster than a quarter of an hour is worth asking for
+- the panel is only redrawn that often, and every change costs the device a
+redraw and a slice of battery.
 
 Which picture is up is a **pure function of the clock**, and that is load-
 bearing rather than tidy. A widget's data is refetched whenever it has aged out,

@@ -13,7 +13,12 @@
 
 {%- assign shot = source_1.picture -%}
 {%- assign fit = extension.values.fit | default: "fill" -%}
-{%- assign tone = extension.values.tone | default: "as_is" -%}
+{%- assign focus = extension.values.focus | default: "auto" -%}
+{%- assign contrast = extension.values.contrast | default: 0 -%}
+{%- assign brightness = extension.values.brightness | default: 0 -%}
+{%- assign screen = extension.values.screen | default: "panel" -%}
+{%- assign marks = extension.values.marks | default: 4 -%}
+{%- assign invert = extension.values.invert -%}
 
 {%- assign short = shape.width | at_most: shape.height | at_least: 80 -%}
 {%- assign mat = short | divided_by: 11 | at_least: 9 | at_most: 30 -%}
@@ -30,13 +35,22 @@
 {%- assign notice_h = 0 -%}
 {%- if notices.size > 0 %}{% assign notice_h = 30 %}{% endif -%}
 
+{%- comment %} The plate is asked for at the exact pixels it will occupy, and
+  the arithmetic has to include the gap under it - a chosen screen comes back
+  already black and white, and a black-and-white image placed at 99% of its own
+  size is resampled back into greys for the page dither to find. {% endcomment -%}
+{%- assign gap = mat | divided_by: 2 | at_least: 5 -%}
+{%- assign under = notice_h -%}
+{%- if captioned %}{% assign under = under | plus: caption_h | plus: gap %}{% endif -%}
+
 {%- assign plate_w = shape.width | minus: mat | minus: mat | minus: rule | minus: rule | at_least: 24 -%}
 {%- assign plate_h = shape.height | minus: mat | minus: mat | minus: rule | minus: rule
-      | minus: caption_h | minus: notice_h | at_least: 24 -%}
+      | minus: under | at_least: 24 -%}
 
 {%- assign plate = shot.id
       | as_image: width: plate_w, height: plate_h,
-                  fit: fit, tone: tone, invert: extension.values.invert -%}
+                  fit: fit, focus: focus, contrast: contrast,
+                  brightness: brightness, screen: screen, marks: marks, invert: invert -%}
 
 {%- assign title_size = caption_h | times: 45 | divided_by: 100 | at_least: 11 | at_most: 20 -%}
 
@@ -73,7 +87,7 @@
 </div>
 {% else %}
 <div class="screen">
-  <div class="content layout layout--col" style="padding: {{ mat }}px; gap: {{ mat | divided_by: 2 | at_least: 5 }}px">
+  <div class="content layout layout--col" style="padding: {{ mat }}px; gap: {{ gap }}px">
     <div style="flex: 1 1 auto; min-height: 0; border: {{ rule }}px solid var(--ink); background: var(--paper)">
       <img src="{{ plate }}" alt="" width="{{ plate_w }}" height="{{ plate_h }}"
            style="display: block; width: 100%; height: 100%; object-fit: cover">
