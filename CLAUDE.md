@@ -1,88 +1,93 @@
 # Dither
 
-Self-hosted e-ink display server. Fork of usetrmnl/terminus, rebranded and
-being reshaped. Repo: github.com/kayraucklnc/dither (`upstream` remote still
-points at usetrmnl/terminus).
+Self-hosted e-ink display server. Started as a fork of `usetrmnl/terminus`;
+the dashboard has since been rewritten in Next.js and lives in `web/`.
+Repo: github.com/kayraucklnc/dither.
 
-**Server only.** Devices run *stock* trmnl-firmware, unmodified. Nothing that a
+**Server only.** Devices run *stock* trmnl-firmware, unmodified. Nothing a
 device sees may change: `/api/setup`, `/api/display`, `/api/log` and their
-headers are a fixed contract. The dashboard above them is ours to reshape.
+headers are a fixed contract, written down in `docs/device-api-contract.md`
+and checked end to end by `web/scripts/verify-device-api.mts`.
 
-The Ruby namespace is `Dither`, not `Terminus`. The database is still named
-`terminus` and the compose project is still `terminus-*` — renaming either
-means moving data, so it is deliberate leftover, not an oversight.
-
-## Read this before design or architecture work
-
-**`docs/product-brief.md` is the source of truth for where this product is
-going.** Read it at the start of any session that touches the domain model,
-naming, or UI. It outranks anything inherited from upstream Dither.
-
-The essentials, inline, so they survive even without opening it:
-
-- **Extensions declare their own layout variants** (full page, half, third).
-  Supporting a shape is optional; full page is the floor. The composer must
-  **refuse** to place an extension in a shape it has not declared — never fake
-  it by scaling.
-- **Scenes are composed by dragging extensions into slots**, not authored as
-  raw HTML. Illegal arrangements are impossible, not merely discouraged.
-- **Nothing is authored as a combination.** A scene is resolved from rules, not
-  hand-built per situation, or you get 2^N screens for N extensions.
-- **Rules decide what shows.** A device has an ordered list of rules; the first
-  whose condition holds wins. Several matching at once is normal — priority
-  decides, never insertion order. A rule may override the refresh cadence.
-  `lib/dither/conditions.rb` is the condition vocabulary; adding a kind is an
-  entry there plus a form field, never a migration.
-- **The layout is derived, not chosen** — the resolver picks the smallest layout
-  that seats every active rule, which only works because extensions declare
-  shapes.
-- **Naming settled**: Shape / Layout / Scene / Mode + Rules. "View" was rejected
-  because `Dither::Views` is Hanami's own namespace.
-- **A preview showing what the device sees right now** is core, not a
-  nice-to-have. The product must be evaluable before owning hardware.
-- The user has authorised **scrapping inherited code and naming freely**.
+The Ruby app at the repository root is the previous version. It is kept for
+reference while the port finishes; nothing new should be written there.
 
 ## Running it
 
 ```bash
-bin/dev up        # dev stack, source-mounted, everything hot reloads
-bin/dev down
-bin/dev logs reloader   # what the Ruby watcher is restarting on
+cd web
+npm run dev            # http://localhost:3000, hot reload
+npx tsx --env-file=.env.local scripts/seed.mts    # a device, screens, sources, a tree
+npx drizzle-kit push --force                     # apply schema changes
 ```
 
-http://localhost:2300. Production build: `docker compose up -d`.
+Postgres comes from the old stack's compose file (`terminus-database-1`,
+port 5433, database `dither`).
 
-Everything hot reloads. CSS and JS via the `assets` service, ERB per render,
-and Ruby via `bin/dev_reloader`, which polls for changes and touches
-`tmp/restart.txt` for Puma's `tmp_restart` plugin. Polling rather than inotify
-because filesystem events do not cross the macOS/container boundary reliably.
+## The model, and why
 
-## Seeding
+Six ideas. Getting any of them wrong is what the first version got wrong.
+
+- **An extension is code; a widget is a use of it.** Extensions ship in
+  `extensions/<name>/` and are never edited from the dashboard - there is no
+  "new extension" button. A widget is one placement of one extension on one
+  screen, with *its own* settings and *its own* fetched data. Two train routes
+  on one screen is the whole point of the distinction.
+- **A trigger is a source, not a borrowed widget.** Sources belong to a device,
+  so you can decide on a station you are not displaying.
+- **There is one kind of check: compare a value from a source.** The device is
+  a source, the clock is a source, every trigger is a source. A connection
+  that reports whether a laptop is awake declares `online: boolean` and the
+  branch is buildable with no new check kind. `all` / `any` group several.
+- **A device decides with a tree, not a state machine.** Walk from the root,
+  answer questions, show the leaf you land on. "When it rains show the weather
+  wherever you were" is one node near the top; when the rain stops the tree
+  re-answers and lands wherever it should be now, so there is no return stack.
+  Priority is depth. The only memory is `holdSeconds` on a leaf.
+- **Notices are the additive half.** The tree is exclusive; a notice appears on
+  whatever screen is showing, in the first widget whose extension declares
+  `accepts_notices`. Extensions suggest their own.
+- **Shapes are declared, and refused when they are not.** A widget takes the
+  size it is drawn at on a 6x6 grid. An extension covers its *family* - a wide
+  band design serves any wide band - but a full-page design is never crammed
+  into a corner. See `standIn` in `web/src/lib/shapes.ts`.
+
+## Traps already paid for
+
+- **A render is cached by its design as well as its data.** The fingerprint
+  includes each extension's template digest and the stylesheet's. Leave those
+  out and editing a template changes nothing until the data moves.
+- **The cache key is also the image filename**, and `/api/image/[key]` only
+  accepts a plain hash. Anything distinguishing a render belongs *inside* the
+  hash, never as a key prefix.
+- **The framework must reset `<p>` margins.** At 76px that is 152px of phantom
+  space, enough to push a hero clean off the panel.
+- **`.bars` must `align-items: stretch`.** With `flex-end` every bar sizes to
+  its content and a percentage height resolves against nothing.
+- **A `<span>` with a percentage height does nothing** unless it is `display:
+  block`. Templates write fills as spans.
+- **Liquid counts timezone offset minutes *west*** of UTC, like
+  `Date.getTimezoneOffset`. `Environment.timezoneOffset` counts east; it is
+  negated once, at the engine.
+- **A partial unique index, not a plain one**, for "one initial per device" -
+  a plain unique on `(device, flag)` also forbids two rows where the flag is
+  false.
+- **Adopt server ids exactly once.** An autosave effect that writes state
+  unconditionally retriggers itself and saves forever; the first version of
+  this scrambled widget ids by index and corrupted a screen.
+- **Extension templates use `{{ extension.values.x }}`**, and exchange
+  responses arrive as `source_1`, `source_2`, never in `extension.data`.
+
+## Checking the work
 
 ```bash
-bin/dev exec web bundle exec bin/seed_designs      # example designs
-bin/dev exec web bundle exec bin/seed_extensions   # bundled extensions
+npx vitest run                                # unit
+npx tsx scripts/verify-device-api.mts         # the firmware wire contract, live
+npx tsx --env-file=.env.local scripts/sweep.mts   # every extension x every shape
+npx tsx scripts/shot.mts <url> <out.png> [h]  # screenshot a page, report console errors
+npx tsx scripts/measure.mts                   # element boxes, for layout bugs
 ```
 
-## Gotchas that have already bitten
-
-- **Sanitize strips CSS custom properties** not listed in `config/sanitize.yml`.
-  A new framework token must be added there or `:root` silently comes back
-  empty while `var()` references survive and resolve to nothing.
-- **Screens render with no origin.** `Shoter` assigns `page.content` directly,
-  so relative URLs cannot resolve. Stylesheets must be inlined; fonts are
-  referenced by installed family name (Inter, DejaVu, Noto CJK).
-- **Views must inherit `Dither::View`**, not `Hanami::View`, or they render
-  without the app layout and the navigation silently differs on that page.
-- **`relations.*` returns Hashes**; use `repositories.*` for structs with
-  associations.
-- Host `node_modules` holds a darwin-arm64 esbuild binary — the dev compose
-  masks it with a named volume so the linux one wins.
-- **`liquid.sanitize` returns a whole document**, not a fragment. Anything
-  embedding a rendered extension must unwrap `<body>` first, or the nested
-  `<html>` makes `TempPather` skip inlining the stylesheet.
-- **Exchange responses arrive as `source_1`, `source_2`…**, never in
-  `extension.data`. Settings are `{{ extension.values.x }}`, not
-  `{{ values.x }}`.
-- **`expose :layout` in a view never reaches the template** — Hanami views own
-  that name. Same trap as `Dither::Views`.
+Screenshots find what green tests do not. Every layout bug in this codebase
+was found by looking, and several by `measure.mts` after looking was not
+enough.

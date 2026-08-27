@@ -31,6 +31,20 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
 
   return (
     <DeviceTree
+      device={{
+        id: device.id,
+        name: device.name,
+        macAddress: device.macAddress,
+        apiKey: device.apiKey,
+        modelLabel: panel?.label ?? "Unknown panel",
+        width: panel?.width ?? 800,
+        height: panel?.height ?? 480,
+        refreshRate: device.refreshRate,
+        imageTimeout: device.imageTimeout,
+        sleepStartMinute: device.sleepStartMinute,
+        sleepStopMinute: device.sleepStopMinute,
+        firmwareVersion: device.firmwareVersion,
+      }}
       deviceId={device.id}
       deviceRefreshSeconds={device.refreshRate}
       modelId={device.modelId}

@@ -17,6 +17,8 @@ import { contextFor } from "@/lib/flow/context";
 import { activeNotices } from "@/lib/flow/notices";
 import { walk, type Node, type Walk } from "@/lib/flow/tree";
 import { panelFor } from "@/lib/panel";
+import { inQuietHours, secondsUntilAwake } from "@/lib/quiet-hours";
+import { environment } from "@/lib/settings";
 import { fingerprint, renderEmpty, renderScreen } from "@/lib/render";
 import { store } from "@/lib/storage";
 import { refreshScreen } from "@/lib/extensions/fetcher";
@@ -33,6 +35,8 @@ export interface Served {
   storageKey: string;
   filename: string;
   refreshSeconds: number;
+  /** True while quiet hours are on; the device is told to sleep through them. */
+  asleep: boolean;
   walk: Walk;
   screenName: string;
 }
@@ -136,12 +140,26 @@ export async function serve(device: Device, now = new Date()): Promise<Served> {
 
   const name = (screen?.name ?? "screen").toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
+  /*
+   * Quiet hours are measured on the displays' clock, not the server's, and
+   * they stop the device *waking* rather than blanking it: an e-ink panel
+   * costs nothing to leave lit and a lot to refresh, so one long sleep beats
+   * forty short ones.
+   */
+  const { timezoneOffset } = await environment();
+  const local = new Date(now.getTime() + timezoneOffset * 60_000);
+  const minutesOfDay = local.getUTCHours() * 60 + local.getUTCMinutes();
+
+  const quiet = { startMinute: device.sleepStartMinute, stopMinute: device.sleepStopMinute };
+  const asleep = inQuietHours(quiet, minutesOfDay);
+
   return {
     storageKey: key,
     // The device caches by filename, so it must change when the picture does
     // and must not change when it does not. The fingerprint gives both.
     filename: `${name}-${key.slice(0, 10)}`,
-    refreshSeconds: result.refreshSeconds,
+    refreshSeconds: asleep ? secondsUntilAwake(quiet, minutesOfDay) : result.refreshSeconds,
+    asleep,
     walk: result,
     screenName: screen?.name ?? "Nothing set up",
   };

@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { LayoutTemplate, Plus } from "lucide-react";
 
-import { ScreenPreview } from "@/components/screen-preview";
+import { ScreenCard } from "@/components/screen-card";
 import { db } from "@/lib/db";
-import { screens, widgets } from "@/lib/db/schema";
+import { decisionNodes, screens, widgets } from "@/lib/db/schema";
 import { DEFAULT_PANEL } from "@/lib/panel";
 
 export const dynamic = "force-dynamic";
@@ -26,10 +26,13 @@ export default async function ScreensPage() {
       name: screens.name,
       description: screens.description,
       updatedAt: screens.updatedAt,
-      widgetCount: sql<number>`count(${widgets.id})::int`,
+      widgetCount: sql<number>`count(distinct ${widgets.id})::int`,
+      // How many device rules point here, so deleting one is an informed choice.
+      usedBy: sql<number>`count(distinct ${decisionNodes.id})::int`,
     })
     .from(screens)
     .leftJoin(widgets, eq(widgets.screenId, screens.id))
+    .leftJoin(decisionNodes, eq(decisionNodes.screenId, screens.id))
     .groupBy(screens.id)
     .orderBy(desc(screens.updatedAt));
 
@@ -64,25 +67,12 @@ export default async function ScreensPage() {
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {rows.map((screen) => (
-            <Link
+            <ScreenCard
               key={screen.id}
-              href={`/screens/${screen.id}`}
-              className="group rounded-panel border border-line bg-surface p-3 transition-colors hover:border-line-strong"
-            >
-              <ScreenPreview
-                src={`/api/preview/screen/${screen.id}`}
-                width={DEFAULT_PANEL.width}
-                height={DEFAULT_PANEL.height}
-                alt={screen.name}
-                className="paper-shadow"
-              />
-              <div className="px-1 pt-3 pb-1">
-                <h2 className="truncate text-[14px] font-medium">{screen.name}</h2>
-                <p className="mt-0.5 text-[12px] text-faint">
-                  {screen.widgetCount} widget{screen.widgetCount === 1 ? "" : "s"}
-                </p>
-              </div>
-            </Link>
+              screen={screen}
+              width={DEFAULT_PANEL.width}
+              height={DEFAULT_PANEL.height}
+            />
           ))}
         </div>
       )}

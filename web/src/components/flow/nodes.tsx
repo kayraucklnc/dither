@@ -135,6 +135,8 @@ export interface ScreenData extends Record<string, unknown> {
   isRoot: boolean;
   panel: { width: number; height: number };
   modelId: number;
+  /** So the thumbnail includes this device's notices, as the panel would. */
+  deviceId: number;
 }
 
 export function ScreenNode({ data, selected }: NodeProps & { data: ScreenData }) {
@@ -168,7 +170,7 @@ export function ScreenNode({ data, selected }: NodeProps & { data: ScreenData })
       <div className="px-2">
         {data.screenId ? (
           <ScreenPreview
-            src={`/api/preview/screen/${data.screenId}?modelId=${data.modelId}`}
+            src={`/api/preview/screen/${data.screenId}?modelId=${data.modelId}&deviceId=${data.deviceId}`}
             width={data.panel.width}
             height={data.panel.height}
             alt={data.screenName ?? data.label}
