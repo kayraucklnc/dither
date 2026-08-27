@@ -23,6 +23,8 @@ export const FIELD_TYPES = [
   "number",
   "boolean",
   "select",
+  /** Typed into, with matches from a source. For lists too long to open. */
+  "search",
   "time",
   "url",
 ] as const;
@@ -41,11 +43,20 @@ export const fieldSchema = z.object({
     .array(z.union([z.string(), z.object({ value: z.string(), label: z.string() })]))
     .optional(),
   /**
-   * Narrows the choices of one field by the value of another: a city list that
-   * depends on the country picked above it. The dashboard reloads the options
-   * when the named field changes.
+   * Where the choices come from, when the code already knows them: which
+   * operators answer for a city, which stations exist. Resolved server-side,
+   * so a manifest never has to list three hundred stations.
+   *
+   * See lib/fields/sources.ts. The source declares what narrows it, so
+   * `depends_on` is not needed alongside.
    */
-  depends_on: z.string().optional(),
+  options_from: z.string().optional(),
+  /**
+   * Hide this field unless the current settings can do the named thing - a
+   * metro board has no destination and no platform, and a field for something
+   * the operator ignores is worse than a missing one.
+   */
+  needs_capability: z.string().optional(),
   min: z.number().optional(),
   max: z.number().optional(),
 });
@@ -139,6 +150,8 @@ export const manifestSchema = z.object({
   unit: z.enum(["none", "minute", "hour", "day"]).default("minute"),
 
   fields: z.array(fieldSchema).default([]),
+  /** Where "what can these settings do" is answered, for `needs_capability`. */
+  capabilities_from: z.string().optional(),
   facts: z.array(factSchema).default([]),
   notices: z.array(noticeSchema).default([]),
   /**

@@ -39,6 +39,7 @@ export interface EditorSource {
   /** What each fact currently reads, so you can see what you are comparing to. */
   values: Record<string, string>;
   fields?: Field[];
+  capabilitiesFrom?: string;
   settings?: Record<string, unknown>;
   error?: string;
   /** How many checks and notices read from it. */
@@ -279,6 +280,7 @@ function Leaf({
             <div className="border-t border-line p-3">
               <SettingsForm
                 fields={source.fields}
+                capabilitiesFrom={source.capabilitiesFrom}
                 values={source.settings ?? {}}
                 onChange={(key, value) =>
                   onEditSource(source.id, { ...(source.settings ?? {}), [key]: value })

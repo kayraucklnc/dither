@@ -1,12 +1,18 @@
 import { chromium } from "playwright";
 
+import { scratch } from "./scratch.mts";
+
+// Its own screen and device: these save, and saving over a real one has
+// already scrambled somebody's work.
+const { screenId, deviceId } = await scratch();
+
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const problems: string[] = [];
 page.on("pageerror", (error) => problems.push(String(error)));
 page.on("console", (m) => m.type() === "error" && problems.push(m.text().slice(0, 120)));
 
-await page.goto("http://localhost:3000/devices/8", { waitUntil: "domcontentloaded" });
+await page.goto(`http://localhost:3000/devices/${deviceId}`, { waitUntil: "domcontentloaded" });
 await page.waitForTimeout(3500);
 
 await page.getByRole("button", { name: "Notices", exact: true }).click();
