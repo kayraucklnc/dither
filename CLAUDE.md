@@ -220,6 +220,29 @@ introduces itself again afterwards, as a new device with a new key.
   The fetch still trims to the "Departures to show" setting; the two are
   different questions and both have to be asked.
 
+- **A source's settings form shows less than a widget's, and the same flag says
+  how much less.** A source is an extension asked a question so something can
+  branch on the answer; it draws nothing, so "Heading", "Show where" and "Mark
+  the gaps" are not settings it has, and offering them invites the reasonable
+  question of why a trigger needs a heading. `SettingsForm` takes
+  `purpose="deciding"` and drops every `presentation: true` field, so one
+  declaration serves both this and the fetch-sharing above. It says how many it
+  dropped rather than silently showing a short list.
+
+- **"Has a location" is not "somewhere to go".** A Google Meet reports a
+  location - the literal string `"Meet"` - because that is what
+  `placeOf` makes of a conference link, and a link pasted into the location box
+  becomes its host name. So a rule that fires on `next_meeting_location present`
+  sends you to the station for a call you take at your desk. The pair that means
+  a place is `next_meeting_location present` **and** `next_meeting_is_remote
+  is_false`.
+
+- **Merging two accounts is a setting, not a check.** "Either of my calendars"
+  is the source's `Calendars` field naming both primaries; the provider merges
+  them into one list in time order, so `calendar.next` is already the soonest
+  across all of them. A tree that mentions an account is a tree working around
+  a source that was configured too narrowly.
+
 - **A field the provider never reads is `presentation: true`, or it costs a
   fetch.** The transit heading and `show_platform` never reach the operator, and
   the weather `place`, `style` and `show_hours` never reach Open-Meteo - the

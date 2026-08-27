@@ -284,6 +284,7 @@ function Leaf({
                 fields={source.fields}
                 capabilitiesFrom={source.capabilitiesFrom}
                 values={source.settings ?? {}}
+                purpose="deciding"
                 onChange={(key, value) =>
                   onEditSource(source.id, { ...(source.settings ?? {}), [key]: value })
                 }

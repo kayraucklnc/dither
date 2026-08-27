@@ -20,6 +20,14 @@ import type { Field } from "@/lib/extensions/manifest";
  *
  * It edits the *widget's* settings - this placement of this extension - never
  * the extension itself.
+ *
+ * The same form serves a *source*, and there it has to show less. A source is
+ * an extension asked a question so that something can branch on the answer; it
+ * draws nothing, so "Heading", "Show where" and "Mark the gaps" are not
+ * settings it has. They are already declared `presentation: true`, because that
+ * is what keeps six revenue widgets down to one trip to Stripe - so the same
+ * declaration answers this too, and `purpose` is how the caller says which half
+ * it wants.
  */
 
 interface Choice {
@@ -186,10 +194,11 @@ function visible(field: Field, values: Record<string, unknown>, design: string):
 }
 
 export function SettingsForm({
-  fields,
+  fields: declared,
   values,
   capabilitiesFrom,
   design = "",
+  purpose = "drawing",
   onChange,
 }: {
   fields: Field[];
@@ -198,6 +207,11 @@ export function SettingsForm({
   capabilitiesFrom?: string;
   /** The style actually drawing this widget, for `visible_when: {field: design}`. */
   design?: string;
+  /**
+   * What these settings are for. "drawing" is a widget and gets every field;
+   * "deciding" is a source and gets only the ones that change the answer.
+   */
+  purpose?: "drawing" | "deciding";
   onChange: (key: string, value: unknown) => void;
 }) {
   const [remote, setRemote] = useState<Record<string, Choice[]>>({});
@@ -209,6 +223,9 @@ export function SettingsForm({
    */
   const [refusals, setRefusals] = useState<Record<string, string>>({});
   const [can, setCan] = useState<string[]>([]);
+
+  const fields = purpose === "deciding" ? declared.filter((one) => !one.presentation) : declared;
+  const hidden = declared.length - fields.length;
 
   const listed = fields.filter(
     (field) => field.options_from && field.field_type !== "search",
@@ -256,11 +273,25 @@ export function SettingsForm({
   }, [load]);
 
   if (!fields.length) {
-    return <p className="text-[13px] text-faint">This extension takes no settings.</p>;
+    return (
+      <p className="text-[13px] text-faint">
+        {hidden
+          ? "Everything this extension takes only changes how it is drawn, so there is nothing here to ask it."
+          : "This extension takes no settings."}
+      </p>
+    );
   }
 
   return (
     <div className="space-y-4">
+      {hidden > 0 && (
+        <p className="rounded-lg border border-line bg-ground/50 px-2.5 py-2 text-[11px] leading-relaxed text-faint">
+          Only what decides the answer. {hidden} setting{hidden === 1 ? "" : "s"} that just{" "}
+          {hidden === 1 ? "changes" : "change"} how this is drawn — headings, what to show under
+          each entry — belong to a widget on a screen, not to a source.
+        </p>
+      )}
+
       {fields.map((field) => {
         // A field for something the chosen operator ignores is worse than a
         // missing one, because it looks like it works.
