@@ -1,31 +1,46 @@
-{% comment %} Half width: 400x480. Line and time on one row, direction beneath. {% endcomment %}
+{% comment %} Half width: 400x480. A board down a column. {% endcomment %}
+
+{% assign board = transit %}
 
 <div class="screen">
   <div class="title-bar">
-    <div class="title">{{ transit.origin | truncate: 18 }}</div>
+    <div class="title truncate">{{ board.origin | truncate: 16 }}</div>
+    <div class="t-sm">{{ board.destination | truncate: 10 }}</div>
   </div>
 
-  <div class="content content--tight">
-    {% if transit.empty %}
-      <div class="layout layout--col layout--center">
-        <p class="t-bold">No departures</p>
-      </div>
-    {% else %}
+  {% if board.empty %}
+    <div class="content layout layout--col layout--center" style="gap: 8px">
+      <span class="i i-train i-lg"></span>
+      <p class="t-md t-bold">No departures</p>
+    </div>
+  {% else %}
+    <div class="content content--tight">
       <div class="list">
-        {% for departure in transit.departures limit: 5 %}
-          <div class="stack stack--tight" style="padding: 8px 0">
-            <div class="kv">
-              <span class="k t-bold">{{ departure.line }}</span>
-              <span class="v t-mono t-bold">
-                {% if departure.cancelled %}CANC{% else %}{{ departure.expected }}{% if departure.delayed %}<span class="t-sm">+{{ departure.delay }}</span>{% endif %}{% endif %}
+        {% for train in board.departures limit: 6 %}
+          <div class="list-item">
+            <span style="min-width: 0">
+              <span class="primary">{{ train.line }}</span>
+              <span class="t-xs truncate" style="display: block">{{ train.direction }}</span>
+            </span>
+            <span style="text-align: right">
+              <span class="secondary t-mono t-bold" style="display: block">
+                {% if train.cancelled %}CANC{% else %}{{ train.expected }}{% endif %}
               </span>
-            </div>
-            <div class="t-sm clamp-2">{{ departure.direction }}</div>
+              {% if train.delayed and train.cancelled == false %}
+                <span class="t-xs">+{{ train.delay }}</span>
+              {% endif %}
+            </span>
           </div>
         {% endfor %}
       </div>
-    {% endif %}
-  </div>
+    </div>
+  {% endif %}
+
+  {% if board.alert != blank %}
+    <div class="footer-bar">
+      <span class="with-icon t-sm"><span class="i i-alert i-xs"></span>{{ board.alert | truncate: 34 }}</span>
+    </div>
+  {% endif %}
 
   {% comment %} Where another extension gets to say something on this screen. {% endcomment %}
   {% if notices.size > 0 %}

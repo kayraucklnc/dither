@@ -1,24 +1,62 @@
-{% comment %} Third height: 800x160. Three departures across, rules between. {% endcomment %}
+{% comment %}
+  Third height: 800x160, and taller when the family stands in. A band shows the
+  next train; a taller band shows the ones behind it too.
+{% endcomment %}
+
+{% assign board = transit %}
+{% assign next = board.departures[0] %}
 
 <div class="screen">
-  <div class="content content--tight">
-    {% if transit.empty %}
-      <div class="layout layout--row layout--center">
-        <p class="t-bold">No departures from {{ transit.origin }}</p>
+  {% if board.empty or next == nil %}
+    <div class="content layout layout--row layout--center" style="gap: 12px">
+      <span class="i i-train i-md"></span>
+      <p class="t-md t-bold">No departures</p>
+    </div>
+  {% else %}
+    <div class="content layout layout--row" style="align-items: center; gap: 22px">
+      <div class="hero" style="gap: 2px; min-width: 120px">
+        <p class="t-bold" style="font-size: 38px; line-height: 1">{{ next.line }}</p>
+        <p class="t-xs t-upper">{{ next.minutes_until | in_words }}</p>
       </div>
-    {% else %}
-      <div class="layout layout--row layout--split divide-x">
-        {% for departure in transit.departures limit: 3 %}
-          <div class="stack stack--tight fit">
-            <span class="t-mono t-xl t-bold">
-              {% if departure.cancelled %}CANC{% else %}{{ departure.expected }}{% if departure.delayed %}<span class="t-sm">+{{ departure.delay }}</span>{% endif %}{% endif %}
-            </span>
-            <span class="t-sm truncate">{{ departure.line }} &rarr; {{ departure.direction }}</span>
-          </div>
-        {% endfor %}
+
+      <div class="fit" style="border-left: var(--rule) solid var(--ink); padding-left: 22px">
+        <p class="t-lg t-bold truncate">{{ next.direction }}</p>
+        <p class="t-sm">
+          {% if extension.values.show_platform and next.platform != blank %}
+            Platform {{ next.platform }} &middot;
+          {% endif %}
+          arrives {{ next.arrival }}
+        </p>
+      </div>
+
+      <p class="t-mono t-bold" style="font-size: 44px">
+        {% if next.cancelled %}—{% else %}{{ next.expected }}{% endif %}
+      </p>
+    </div>
+
+    {% if shape.rows > 2 %}
+      <div style="border-top: var(--rule) solid var(--ink); flex: 1; min-height: 0; padding: 4px var(--pad)">
+        <div class="list">
+          {% assign behind = 3 %}
+          {% if shape.rows > 3 %}{% assign behind = 5 %}{% endif %}
+          {% for train in board.departures offset: 1 limit: behind %}
+            <div class="list-item">
+              <span class="truncate">{{ train.line }} &middot; {{ train.direction }}</span>
+              <span class="secondary t-mono t-bold">
+                {% if train.cancelled %}—{% else %}{{ train.expected }}{% endif %}
+              </span>
+            </div>
+          {% endfor %}
+        </div>
       </div>
     {% endif %}
-  </div>
+  {% endif %}
+
+  {% if board.alert != blank and shape.rows <= 2 %}
+    <div class="footer-bar" style="padding: 6px var(--pad)">
+      <span class="with-icon t-sm"><span class="i i-alert i-xs"></span>{{ board.alert }}</span>
+    </div>
+  {% endif %}
 
   {% comment %} Where another extension gets to say something on this screen. {% endcomment %}
   {% if notices.size > 0 %}

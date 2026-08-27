@@ -71,9 +71,13 @@ check("the image is reachable without any headers", image.status === 200, String
 check("is served as image/png", image.headers.get("content-type") === "image/png");
 check("really is a PNG", bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47);
 
-const width = new DataView(bytes.buffer).getUint32(16);
-const height = new DataView(bytes.buffer).getUint32(20);
-check("matches the panel size", width === 800 && height === 480, `${width}x${height}`);
+if (bytes.length > 24) {
+  const width = new DataView(bytes.buffer).getUint32(16);
+  const height = new DataView(bytes.buffer).getUint32(20);
+  check("matches the panel size", width === 800 && height === 480, `${width}x${height}`);
+} else {
+  check("matches the panel size", false, `only ${bytes.length} bytes came back`);
+}
 
 console.log("\ncaching");
 const second = await fetch(`${base}/api/display`, { headers: firmwareHeaders(setupBody.api_key) });

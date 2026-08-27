@@ -1,6 +1,7 @@
 import { Liquid } from "liquidjs";
 
 import { templateFor, type Extension } from "@/lib/extensions/registry";
+import { shape } from "@/lib/shapes";
 
 /**
  * Extension templates are Liquid, the same dialect TRMNL uses, so designs
@@ -15,14 +16,53 @@ import { templateFor, type Extension } from "@/lib/extensions/registry";
  *   <anything a provider adds> e.g. `departures` for transit
  */
 
-const engine = new Liquid({
-  cache: process.env.NODE_ENV === "production",
-  strictFilters: false,
-  // A missing value renders empty rather than throwing. A template that
-  // half-renders while a provider is down beats a screen that goes blank.
-  strictVariables: false,
-  jsTruthy: true,
-});
+/**
+ * One engine per locale and offset.
+ *
+ * The date filter needs both, and they come from installation settings rather
+ * than from the server's own environment - a box running in Istanbul should
+ * not put Turkish month names on a panel in Milan. Engines are cached because
+ * building one parses nothing but registering the filters is not free.
+ */
+const engines = new Map<string, Liquid>();
+
+export interface Environment {
+  locale: string;
+  timezone: string;
+  timezoneOffset: number;
+}
+
+export const DEFAULT_ENVIRONMENT: Environment = {
+  locale: "en-GB",
+  timezone: "UTC",
+  timezoneOffset: 0,
+};
+
+function engineFor(environment: Environment): Liquid {
+  const key = `${environment.locale}|${environment.timezoneOffset}`;
+  const existing = engines.get(key);
+  if (existing) return existing;
+
+  const built = new Liquid({
+    cache: process.env.NODE_ENV === "production",
+    strictFilters: false,
+    // A missing value renders empty rather than throwing. A template that
+    // half-renders while a provider is down beats a screen that goes blank.
+    strictVariables: false,
+    jsTruthy: true,
+    locale: environment.locale,
+    // Liquid counts minutes *west* of UTC, the way Date.getTimezoneOffset does.
+    // Environment.timezoneOffset counts minutes east, which is how anyone
+    // reading "UTC+2" thinks about it, so it is negated here rather than
+    // stored backwards everywhere else.
+    timezoneOffset: -environment.timezoneOffset,
+  });
+
+  register(built);
+  engines.set(key, built);
+
+  return built;
+}
 
 /**
  * Filters an extension author would otherwise write by hand in every template.
@@ -65,53 +105,55 @@ const WEATHER: Record<number, { icon: string; label: string; short: string }> = 
 
 const COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
 
-engine.registerFilter("weather_icon", (code: unknown) => WEATHER[Number(code)]?.icon ?? "cloud");
-engine.registerFilter("weather_label", (code: unknown) => WEATHER[Number(code)]?.label ?? "—");
-engine.registerFilter("weather_short", (code: unknown) => WEATHER[Number(code)]?.short ?? "—");
-
-/** Compass point from a bearing in degrees. */
-engine.registerFilter("compass", (degrees: unknown) => {
-  const value = Number(degrees);
-  return Number.isFinite(value) ? COMPASS[Math.round(((value % 360) / 22.5)) % 16] : "";
-});
 
 /** "in 24 min", "in 2h 10m", "now". */
-engine.registerFilter("in_words", (minutes: unknown) => {
-  const value = Number(minutes);
-  if (!Number.isFinite(value)) return "";
-  if (value <= 0) return "now";
-  if (value < 60) return `in ${Math.round(value)} min`;
-
-  const hours = Math.floor(value / 60);
-  const rest = Math.round(value % 60);
-  return rest ? `in ${hours}h ${rest}m` : `in ${hours}h`;
-});
 
 /** Just the hour of an ISO timestamp or "HH:MM", for compact strips. */
-engine.registerFilter("hour_of", (value: unknown) => {
-  const match = /(\d{1,2}):(\d{2})/.exec(String(value));
-  return match ? `${match[1].padStart(2, "0")}` : String(value);
-});
 
 /** "HH:MM" out of an ISO timestamp, for sunrise, sunset and departure times. */
-engine.registerFilter("clock_of", (value: unknown) => {
-  const match = /(\d{1,2}):(\d{2})/.exec(String(value));
-  return match ? `${match[1].padStart(2, "0")}:${match[2]}` : String(value ?? "");
-});
 
 /** Clamp a number into a 0-100 percentage, for bars that must not overflow. */
-engine.registerFilter("as_percent", (value: unknown, max: unknown = 100) => {
-  const number = Number(value);
-  const ceiling = Number(max) || 100;
-  if (!Number.isFinite(number)) return 0;
-  return Math.max(0, Math.min(100, Math.round((number / ceiling) * 100)));
-});
 
 /** The larger of two numbers, so a chart can find its own scale in Liquid. */
-engine.registerFilter("at_least", (value: unknown, floor: unknown) =>
-  Math.max(Number(value) || 0, Number(floor) || 0),
-);
 
+function register(engine: Liquid): void {
+  engine.registerFilter("weather_icon", (code: unknown) => WEATHER[Number(code)]?.icon ?? "cloud");
+  engine.registerFilter("weather_label", (code: unknown) => WEATHER[Number(code)]?.label ?? "—");
+  engine.registerFilter("weather_short", (code: unknown) => WEATHER[Number(code)]?.short ?? "—");
+
+  /** Compass point from a bearing in degrees. */
+  engine.registerFilter("compass", (degrees: unknown) => {
+    const value = Number(degrees);
+    return Number.isFinite(value) ? COMPASS[Math.round(((value % 360) / 22.5)) % 16] : "";
+  });
+  engine.registerFilter("in_words", (minutes: unknown) => {
+    const value = Number(minutes);
+    if (!Number.isFinite(value)) return "";
+    if (value <= 0) return "now";
+    if (value < 60) return `in ${Math.round(value)} min`;
+
+    const hours = Math.floor(value / 60);
+    const rest = Math.round(value % 60);
+    return rest ? `in ${hours}h ${rest}m` : `in ${hours}h`;
+  });
+  engine.registerFilter("hour_of", (value: unknown) => {
+    const match = /(\d{1,2}):(\d{2})/.exec(String(value));
+    return match ? `${match[1].padStart(2, "0")}` : String(value);
+  });
+  engine.registerFilter("clock_of", (value: unknown) => {
+    const match = /(\d{1,2}):(\d{2})/.exec(String(value));
+    return match ? `${match[1].padStart(2, "0")}:${match[2]}` : String(value ?? "");
+  });
+  engine.registerFilter("as_percent", (value: unknown, max: unknown = 100) => {
+    const number = Number(value);
+    const ceiling = Number(max) || 100;
+    if (!Number.isFinite(number)) return 0;
+    return Math.max(0, Math.min(100, Math.round((number / ceiling) * 100)));
+  });
+  engine.registerFilter("at_least", (value: unknown, floor: unknown) =>
+    Math.max(Number(value) || 0, Number(floor) || 0),
+  );
+}
 
 const DOCUMENT = /<body[^>]*>([\s\S]*)<\/body>/i;
 
@@ -126,12 +168,36 @@ export interface RenderContext {
   data: Record<string, unknown>;
   /** Things another extension wants said here. Empty unless this widget hosts them. */
   notices?: { icon: string; text: string; loud: boolean }[];
+  environment?: Environment;
+  /** The shape actually being drawn, which may differ from the one authored. */
+  shape?: string;
 }
 
 export async function renderTemplate(template: string, context: RenderContext): Promise<string> {
+  const environment = context.environment ?? DEFAULT_ENVIRONMENT;
+  const box = context.shape ? shape(context.shape) : undefined;
+
   const scope = {
     ...context.data,
     notices: context.notices ?? [],
+    // Installation-wide facts a template may want without being configured
+    // for them twice - the clock's offset, most obviously.
+    dither: {
+      locale: environment.locale,
+      timezone: environment.timezone,
+      offset_hours: Math.round(environment.timezoneOffset / 60),
+      offset_seconds: environment.timezoneOffset * 60,
+    },
+    /**
+     * The box this template is actually drawing into.
+     *
+     * A design authored for a wide band may be asked to fill a taller one, and
+     * knowing which lets it show a fifth departure or an hourly strip instead
+     * of leaving the extra room empty. Columns and rows are out of six.
+     */
+    shape: box
+      ? { id: box.id, label: box.label, columns: box.columns, rows: box.rows }
+      : { id: "full", label: "Full screen", columns: 6, rows: 6 },
     extension: {
       name: context.extension.name,
       label: context.extension.manifest.label,
@@ -139,7 +205,7 @@ export async function renderTemplate(template: string, context: RenderContext): 
     },
   };
 
-  return fragment(await engine.parseAndRender(template, scope));
+  return fragment(await engineFor(environment).parseAndRender(template, scope));
 }
 
 /** Render a widget at a shape, or say why it cannot be rendered at that shape. */
@@ -149,6 +215,7 @@ export async function renderWidget(
   settings: Record<string, unknown>,
   data: Record<string, unknown>,
   notices: { icon: string; text: string; loud: boolean }[] = [],
+  environment: Environment = DEFAULT_ENVIRONMENT,
 ): Promise<{ html: string } | { problem: string }> {
   const template = templateFor(extension, shape);
 
@@ -163,7 +230,16 @@ export async function renderWidget(
   }
 
   try {
-    return { html: await renderTemplate(template, { extension, settings, data, notices }) };
+    return {
+      html: await renderTemplate(template, {
+        extension,
+        settings,
+        data,
+        notices,
+        environment,
+        shape,
+      }),
+    };
   } catch (error) {
     return { problem: `${extension.manifest.label} failed to render: ${error}` };
   }

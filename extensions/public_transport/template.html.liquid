@@ -1,46 +1,83 @@
 {% comment %}
-  Full page. A transit extension gets {{ transit }} rather than {{ source_1 }}:
-  the provider has already normalised whatever the operator's API returned.
+  Full: 800x480. A departure board. The next train is the one you are deciding
+  about, so it gets the room; the rest are a list you scan.
 {% endcomment %}
+
+{% assign board = transit %}
+{% assign next = board.departures[0] %}
 
 <div class="screen">
   <div class="title-bar">
-    <div class="title">{{ transit.origin }}{% if transit.destination %} &rarr; {{ transit.destination }}{% endif %}</div>
-    <div class="meta">{{ transit.provider | upcase }}</div>
+    <div class="title truncate">
+      {{ board.origin | truncate: 22 }}
+      {% if board.destination != blank %}<span class="i i-arrow-right i-sm"></span> {{ board.destination | truncate: 16 }}{% endif %}
+    </div>
+    <div class="chip self-start"><span class="i i-train"></span>{{ board.provider | upcase }}</div>
   </div>
 
-  <div class="content">
-    {% if transit.empty %}
-      <div class="layout layout--col layout--center">
-        <p class="t-lg t-bold">No departures</p>
-        <p class="t-sm">Nothing scheduled from here right now.</p>
-      </div>
-    {% else %}
-      <div class="list">
-        {% for departure in transit.departures %}
-          <div class="list-item">
-            <span class="primary truncate">
-              <span class="t-bold">{{ departure.line }}</span>
-              {{ departure.direction }}
-              {% if departure.platform %}<span class="t-sm">plat {{ departure.platform }}</span>{% endif %}
-            </span>
-            <span class="secondary t-mono t-bold">
-              {% if departure.cancelled %}
-                CANC
-              {% else %}
-                {{ departure.expected }}{% if departure.delayed %}<span class="t-sm">+{{ departure.delay }}</span>{% endif %}
-              {% endif %}
-            </span>
+  {% if board.empty or next == nil %}
+    <div class="content layout layout--col layout--center" style="gap: 10px">
+      <span class="i i-train i-xl"></span>
+      <p class="t-xl t-bold">No departures</p>
+      <p class="t-sm">Nothing scheduled from here for now.</p>
+    </div>
+  {% else %}
+    <div class="content">
+      <div class="split-detail">
+        <div class="stack fit" style="justify-content: center; gap: 8px">
+          <span class="chip self-start">
+            <span class="i i-clock"></span>{{ next.minutes_until | in_words }}
+          </span>
+
+          <p class="with-icon" style="gap: 12px">
+            <span class="t-bold" style="font-size: 54px; line-height: 1">{{ next.line }}</span>
+            {% if next.cancelled %}
+              <span class="badge" style="font-size: 18px; padding: 4px 10px">CANCELLED</span>
+            {% else %}
+              <span class="t-mono t-bold" style="font-size: 44px; line-height: 1">{{ next.expected }}</span>
+            {% endif %}
+          </p>
+
+          <p class="t-lg clamp-2">{{ next.direction }}</p>
+
+          <p class="t-sm">
+            {% if next.delayed and next.cancelled == false %}
+              <span class="i i-alert i-xs"></span> {{ next.delay }} min late &middot;
+            {% endif %}
+            {% if extension.values.show_platform and next.platform != blank %}
+              Platform {{ next.platform }} &middot;
+            {% endif %}
+            arrives {{ next.arrival }}
+          </p>
+        </div>
+
+        <div class="fit" style="overflow: hidden">
+          <div class="list">
+            {% for train in board.departures offset: 1 limit: 5 %}
+              <div class="list-item">
+                <span style="min-width: 0">
+                  <span class="primary truncate" style="display: block">
+                    {{ train.line }} &middot; {{ train.direction | truncate: 20 }}
+                  </span>
+                  {% if extension.values.show_platform and train.platform != blank %}
+                    <span class="t-xs">Platform {{ train.platform }}</span>
+                  {% endif %}
+                </span>
+                <span class="secondary t-mono t-bold">
+                  {% if train.cancelled %}—{% else %}{{ train.expected }}{% endif %}
+                </span>
+              </div>
+            {% endfor %}
           </div>
-        {% endfor %}
+        </div>
       </div>
-    {% endif %}
-  </div>
+    </div>
+  {% endif %}
 
-  {% if transit.alerts.size > 0 %}
+  {% if board.alert != blank %}
     <div class="footer-bar">
-      <span class="truncate">{{ transit.alerts[0].title }}</span>
-      <span class="badge">alert</span>
+      <span class="with-icon"><span class="i i-alert i-sm"></span>{{ board.alert }}</span>
+      <span class="badge">Alert</span>
     </div>
   {% endif %}
 
