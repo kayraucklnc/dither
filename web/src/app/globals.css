@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+/**
+ * Dither's surface is dark on purpose. Every important object in this app is a
+ * white rectangle - the e-ink screen you are designing - and on a dark ground
+ * those previews read as the thing itself rather than as another panel of UI.
+ */
+@theme {
+  --color-ground: oklch(0.16 0.006 260);
+  --color-surface: oklch(0.20 0.007 260);
+  --color-raised: oklch(0.245 0.008 260);
+  --color-line: oklch(0.31 0.009 260);
+  --color-line-strong: oklch(0.40 0.011 260);
+
+  --color-ink: oklch(0.97 0.003 260);
+  --color-muted: oklch(0.72 0.012 260);
+  --color-faint: oklch(0.56 0.013 260);
+
+  --color-accent: oklch(0.78 0.16 88);
+  --color-accent-ink: oklch(0.2 0.05 88);
+  --color-live: oklch(0.76 0.16 155);
+  --color-warn: oklch(0.72 0.16 45);
+  --color-danger: oklch(0.66 0.19 22);
+
+  --font-sans: ui-sans-serif, -apple-system, "Inter", "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", monospace;
+
+  --radius-panel: 14px;
+}
+
+html { color-scheme: dark; }
+
+body {
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* A scrollbar that does not shout on a dark ground. */
+* { scrollbar-color: var(--color-line-strong) transparent; scrollbar-width: thin; }
+
+/* The checkerboard behind a screen preview, so white-on-white still has an edge. */
+.paper-shadow {
+  box-shadow:
+    0 0 0 1px oklch(0.31 0.009 260),
+    0 18px 40px -18px oklch(0 0 0 / 0.8);
+}
+
+@keyframes shimmer { to { background-position: 200% 0; } }
+
+.loading-sheen {
+  background: linear-gradient(
+    90deg,
+    var(--color-raised) 0%,
+    var(--color-line) 50%,
+    var(--color-raised) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
