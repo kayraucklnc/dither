@@ -1,0 +1,12 @@
+import { defineConfig } from "drizzle-kit";
+import { config } from "dotenv";
+
+// drizzle-kit runs outside Next, so it does not pick up .env.local on its own.
+config({ path: ".env.local", quiet: true });
+
+export default defineConfig({
+  schema: "./src/lib/db/schema.ts",
+  out: "./drizzle",
+  dialect: "postgresql",
+  dbCredentials: { url: process.env.DATABASE_URL! },
+});

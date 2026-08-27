@@ -1,0 +1,89 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+import { cn } from "@/lib/cn";
+
+/**
+ * A rendered e-ink screen, shown at whatever size the layout gives it.
+ *
+ * Previews are the most important object in this app, so they get real states:
+ * a shimmer while the render happens, the reason when it cannot, and never a
+ * broken-image icon. The aspect ratio is fixed up front so nothing reflows when
+ * the picture lands.
+ */
+export function ScreenPreview({
+  src,
+  width,
+  height,
+  alt,
+  className,
+  fit = "contain",
+}: {
+  src: string;
+  width: number;
+  height: number;
+  alt: string;
+  className?: string;
+  fit?: "contain" | "cover";
+}) {
+  const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
+  const [reason, setReason] = useState<string>();
+
+  useEffect(() => {
+    setState("loading");
+    setReason(undefined);
+
+    let cancelled = false;
+    const image = new Image();
+
+    image.onload = () => !cancelled && setState("ready");
+    image.onerror = async () => {
+      if (cancelled) return;
+      // The endpoint answers JSON on failure, so the card can say what is
+      // actually wrong instead of showing a torn-image glyph.
+      try {
+        const response = await fetch(src);
+        const body = await response.json();
+        if (!cancelled) setReason(body?.error);
+      } catch {
+        /* leave the generic message */
+      }
+      if (!cancelled) setState("failed");
+    };
+    image.src = src;
+
+    return () => {
+      cancelled = true;
+      image.onload = null;
+      image.onerror = null;
+    };
+  }, [src]);
+
+  return (
+    <div
+      className={cn("relative overflow-hidden rounded-md bg-white", className)}
+      style={{ aspectRatio: `${width} / ${height}` }}
+    >
+      {state === "loading" && <div className="loading-sheen absolute inset-0" />}
+
+      {state === "failed" && (
+        <div className="absolute inset-0 grid place-items-center bg-raised p-4">
+          <p className="text-center text-xs leading-relaxed text-faint">
+            {reason ?? "This design could not be rendered."}
+          </p>
+        </div>
+      )}
+
+      {state === "ready" && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt={alt}
+          className={cn("h-full w-full", fit === "cover" ? "object-cover" : "object-contain")}
+          style={{ imageRendering: "pixelated" }}
+        />
+      )}
+    </div>
+  );
+}
