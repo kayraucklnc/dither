@@ -124,6 +124,15 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
   resolves into a stipple. The area under the revenue line is a ramp from ink
   to paper and reads as depth; the solid black it replaced was a blot.
   Opacity, by contrast, dithers to noise - use a ramp, never `opacity`.
+- **"All time" is bounded, so it is a floor and has to say so.** Nobody can
+  promise to page through an account's whole history on a display's refresh, so
+  the lifetime figure walks back three thousand movements and stops. When the
+  bound bites, the figure carries a "+" and the detail line says there is more
+  behind it - the same way the customer count does. A number that quietly means
+  "at least" is the one kind of wrong figure a dashboard is never forgiven for.
+- **Padding a band off its width eats the band.** A full-width strip is 800 by
+  80; a twentieth of the *width* either side is 80 pixels of an 80-pixel box.
+  Anything that draws at a band size takes its padding from the shorter side.
 - **Stripe counts in minor units, and a few currencies have none.** Divide a
   yen amount by a hundred and every figure is wrong by two orders of magnitude.
   See `web/src/lib/money.ts`.

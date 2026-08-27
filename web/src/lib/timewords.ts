@@ -147,6 +147,28 @@ export function throughDay(minutes: number, startMinute: number, endMinute: numb
   return Math.round((since / span) * 1000) / 10;
 }
 
+/**
+ * A number of days, said the way somebody waiting for it would say it.
+ *
+ * Nobody says "in 96 hours". Past a fortnight nobody says "in 34 days"
+ * either, and the further off a milestone is the less precision it can carry
+ * without sounding like a promise.
+ */
+export function daysInWords(days: number): string {
+  const count = Math.round(days);
+
+  if (!Number.isFinite(count) || count <= 0) return "any day now";
+  if (count === 1) return "a day";
+  if (count < 14) return `${count} days`;
+  if (count < 60) {
+    const weeks = Math.round(count / 7);
+    return weeks === 1 ? "a week" : `${weeks} weeks`;
+  }
+
+  const months = Math.round(count / 30.44);
+  return months === 1 ? "a month" : `${months} months`;
+}
+
 /** "4h 20m", "35m" - a span said the way a person would say it. */
 export function spanInWords(minutes: number): string {
   const total = Math.max(0, Math.round(minutes));

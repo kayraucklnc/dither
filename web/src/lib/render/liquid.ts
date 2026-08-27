@@ -1,7 +1,7 @@
 import { Liquid } from "liquidjs";
 
 import { refusal } from "@/lib/designs";
-import { partOfDay, spanInWords, throughDay, timeInWords } from "@/lib/timewords";
+import { daysInWords, partOfDay, spanInWords, throughDay, timeInWords } from "@/lib/timewords";
 import { templateFor, type Extension } from "@/lib/extensions/registry";
 import { COLUMNS, ROWS, sizeLabel, type Size } from "@/lib/shapes";
 
@@ -190,6 +190,7 @@ function register(engine: Liquid): void {
   );
   engine.registerFilter("part_of_day", (minutes: unknown) => partOfDay(Number(minutes) || 0));
   engine.registerFilter("span_in_words", (minutes: unknown) => spanInWords(Number(minutes) || 0));
+  engine.registerFilter("days_in_words", (days: unknown) => daysInWords(Number(days) || 0));
   /** How far through a stretch of the day, as a percentage. For arcs and bars. */
   engine.registerFilter("through_day", (minutes: unknown, start: unknown, end: unknown) =>
     throughDay(Number(minutes) || 0, Number(start) || 0, Number(end) || 0),

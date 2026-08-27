@@ -6,7 +6,10 @@ import {
   bucketByDay,
   bucketByHour,
   forecastNext,
+  milestoneOf,
   monthlyValue,
+  nextMilestone,
+  previousMilestone,
   runningTotal,
   sumBetween,
   sumSince,
@@ -210,5 +213,47 @@ describe("runningTotal", () => {
 
   it("answers an empty series with an empty one", () => {
     expect(runningTotal([])).toEqual([]);
+  });
+});
+
+describe("milestones", () => {
+  it("puts the next rung within reach rather than at the next power of ten", () => {
+    // 1,284 customers is told to reach 1,500, not 10,000. One is a target and
+    // the other is a wall.
+    expect(nextMilestone(1284)).toBe(1500);
+    expect(nextMilestone(18_420)).toBe(20_000);
+    expect(nextMilestone(386)).toBe(400);
+    expect(nextMilestone(3184)).toBe(4000);
+  });
+
+  it("always moves on when you arrive, so a milestone is never already met", () => {
+    expect(nextMilestone(1000)).toBe(1500);
+    expect(nextMilestone(1_000_000)).toBe(1_500_000);
+  });
+
+  it("knows where the last one was, which is where the bar starts", () => {
+    expect(previousMilestone(1284)).toBe(1000);
+    expect(previousMilestone(400)).toBe(400);
+    expect(previousMilestone(0)).toBe(0);
+  });
+
+  it("measures the way from one rung to the next", () => {
+    const milestone = milestoneOf(1250);
+
+    expect(milestone.previous).toBe(1000);
+    expect(milestone.next).toBe(1500);
+    expect(milestone.to_go).toBe(250);
+    expect(milestone.percent).toBe(50);
+  });
+
+  it("says when only when there is a rate behind it", () => {
+    expect(milestoneOf(1250).in_days).toBe(null);
+    expect(milestoneOf(1250, 25).in_days).toBe(10);
+  });
+
+  it("survives the figures nobody plans for", () => {
+    expect(milestoneOf(0).next).toBeGreaterThan(0);
+    expect(milestoneOf(0).percent).toBe(0);
+    expect(nextMilestone(Number.NaN)).toBe(0);
   });
 });

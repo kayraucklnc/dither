@@ -127,6 +127,9 @@
     {%- assign last = count | minus: 1 -%}
     {%- assign stepped = false -%}
     {%- if extension.values.line_style == "steps" %}{% assign stepped = true %}{% endif -%}
+    {%- assign curved = false -%}
+    {%- if extension.values.line_style == "smooth" %}{% assign curved = true %}{% endif -%}
+    {%- if extension.values.line_style == "smooth_area" %}{% assign curved = true %}{% endif -%}
 
     {%- comment %} The line itself, as a list of points in a thousand-unit
       viewBox. Built with append rather than with anything cleverer, because
@@ -148,6 +151,67 @@
       {%- endif -%}
     {%- endfor -%}
 
+    {%- comment %} The curve, when one was asked for.
+
+      A Catmull-Rom spline written out as cubic Béziers: each segment gets two
+      control points a third of a step either side, aimed along the line
+      through its neighbours. It passes through every point exactly - the
+      figures are not moved, only the shape between two of them is invented,
+      which is a decoration rather than a claim.
+
+      The control points are clamped to the plot. A run of quiet days either
+      side of a spike sends a control point below the axis, and a curve that
+      dips under its own baseline reads as a loss that never happened. {% endcomment -%}
+    {%- assign curve = "" -%}
+    {%- if curved -%}
+      {%- assign step = 1000 | divided_by: last -%}
+      {%- assign reach = step | divided_by: 3 -%}
+      {%- for point in series -%}
+        {%- unless forloop.last -%}
+          {%- assign here = forloop.index0 -%}
+          {%- assign before = here | minus: 1 | at_least: 0 -%}
+          {%- assign after = here | plus: 1 -%}
+          {%- assign beyond = here | plus: 2 | at_most: last -%}
+
+          {%- assign v0 = series[before].amount -%}
+          {%- assign v1 = series[here].amount -%}
+          {%- assign v2 = series[after].amount -%}
+          {%- assign v3 = series[beyond].amount -%}
+          {%- if racing -%}
+            {%- assign v0 = series[before].total -%}
+            {%- assign v1 = series[here].total -%}
+            {%- assign v2 = series[after].total -%}
+            {%- assign v3 = series[beyond].total -%}
+          {%- endif -%}
+
+          {%- assign y0 = v0 | minus: trough | times: 250 | divided_by: spread -%}
+          {%- assign y0 = 275 | minus: y0 -%}
+          {%- assign y1 = v1 | minus: trough | times: 250 | divided_by: spread -%}
+          {%- assign y1 = 275 | minus: y1 -%}
+          {%- assign y2 = v2 | minus: trough | times: 250 | divided_by: spread -%}
+          {%- assign y2 = 275 | minus: y2 -%}
+          {%- assign y3 = v3 | minus: trough | times: 250 | divided_by: spread -%}
+          {%- assign y3 = 275 | minus: y3 -%}
+
+          {%- assign c1y = y2 | minus: y0 | divided_by: 6.0 | plus: y1 | at_least: 12 | at_most: 275 -%}
+          {%- assign c2y = y3 | minus: y1 | divided_by: 6.0 -%}
+          {%- assign c2y = y2 | minus: c2y | at_least: 12 | at_most: 275 -%}
+
+          {%- assign x1 = here | times: 1000 | divided_by: last -%}
+          {%- assign x2 = after | times: 1000 | divided_by: last -%}
+          {%- assign c1x = x1 | plus: reach -%}
+          {%- assign c2x = x2 | minus: reach -%}
+
+          {%- if forloop.first -%}
+            {%- assign curve = curve | append: "M " | append: x1 | append: "," | append: y1 -%}
+          {%- endif -%}
+          {%- assign curve = curve | append: " C " | append: c1x | append: "," | append: c1y
+                                   | append: " " | append: c2x | append: "," | append: c2y
+                                   | append: " " | append: x2 | append: "," | append: y2 -%}
+        {%- endunless -%}
+      {%- endfor -%}
+    {%- endif -%}
+
     {%- assign trail = "" -%}
     {%- if racing -%}
       {%- for point in shadow -%}
@@ -158,8 +222,12 @@
       {%- endfor -%}
     {%- endif -%}
 
+    {%- comment %} Filled by default, and never when two periods are drawn on
+      top of each other - a solid mass under one of them hides the other. {% endcomment -%}
     {%- assign filled = false -%}
-    {%- if extension.values.line_style == blank or extension.values.line_style == "area" -%}
+    {%- if extension.values.line_style == blank
+        or extension.values.line_style == "area"
+        or extension.values.line_style == "smooth_area" -%}
       {%- if racing == false %}{% assign filled = true %}{% endif -%}
     {%- endif -%}
 
@@ -240,7 +308,12 @@
           <line x1="0" y1="275" x2="1000" y2="275" stroke-width="2" vector-effect="non-scaling-stroke"/>
 
           {% if filled %}
-            <polygon points="0,275 {{ points }}1000,275" fill="url(#fade)" stroke="none"/>
+            {% if curved %}
+              <path d="M 0,275 L {{ curve | remove_first: 'M ' | prepend: '' }} L 1000,275 Z"
+                    fill="url(#fade)" stroke="none"/>
+            {% else %}
+              <polygon points="0,275 {{ points }}1000,275" fill="url(#fade)" stroke="none"/>
+            {% endif %}
           {% endif %}
 
           {% if racing %}
@@ -249,8 +322,13 @@
                       stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
           {% endif %}
 
-          <polyline points="{{ points }}" stroke-width="{% if filled %}2{% else %}4{% endif %}"
-                    stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+          {% if curved %}
+            <path d="{{ curve }}" stroke-width="{% if filled %}2{% else %}4{% endif %}"
+                  stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+          {% else %}
+            <polyline points="{{ points }}" stroke-width="{% if filled %}2{% else %}4{% endif %}"
+                      stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+          {% endif %}
         </svg>
 
         {%- comment %} The last point, marked in the paper margin rather than
