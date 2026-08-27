@@ -1,0 +1,26 @@
+{% comment %} Quarter: 400x240. Only the next thing fits, so only that is shown. {% endcomment %}
+
+<div class="screen">
+  {% if calendar.empty or calendar.next == nil %}
+    <div class="content layout layout--col layout--center">
+      <p class="t-bold">Nothing next</p>
+    </div>
+  {% else %}
+    <div class="content layout layout--col" style="justify-content: space-between">
+      <div class="kv">
+        <span class="k t-xs t-upper muted">{{ extension.values.heading | default: "Next" }}</span>
+        <span class="v t-xs t-mono">{{ calendar.next.start }}</span>
+      </div>
+
+      <div class="stack stack--tight">
+        <p class="t-lg t-bold clamp-2">{{ calendar.next.title }}</p>
+        <p class="t-sm">
+          {% if calendar.next.minutes_until <= 0 %}Now{% else %}in {{ calendar.next.minutes_until }} min{% endif %}
+          {% if extension.values.show_location and calendar.next.location != blank %}
+            · <span class="truncate">{{ calendar.next.location }}</span>
+          {% endif %}
+        </p>
+      </div>
+    </div>
+  {% endif %}
+</div>

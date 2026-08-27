@@ -1,0 +1,21 @@
+{% comment %} Third height: 800x160. A wide band - one line, read at a glance. {% endcomment %}
+
+<div class="screen">
+  <div class="content layout layout--row" style="align-items: center; justify-content: space-between">
+    {% if calendar.empty or calendar.next == nil %}
+      <p class="t-md t-bold">Nothing scheduled</p>
+    {% else %}
+      <div class="stack stack--tight" style="min-width: 0">
+        <p class="t-xs t-upper muted">
+          {% if calendar.next.minutes_until <= 0 %}Now{% else %}In {{ calendar.next.minutes_until }} min{% endif %}
+        </p>
+        <p class="t-lg t-bold truncate">{{ calendar.next.title }}</p>
+        {% if extension.values.show_location and calendar.next.location != blank %}
+          <p class="t-xs truncate">{{ calendar.next.location }}</p>
+        {% endif %}
+      </div>
+
+      <p class="t-xl t-mono t-bold">{{ calendar.next.start }}</p>
+    {% endif %}
+  </div>
+</div>

@@ -2,18 +2,18 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { db } from "@/lib/db";
-import { devices, flowStates, flowTransitions } from "@/lib/db/schema";
+import { decisionNodes, devices } from "@/lib/db/schema";
+import { toNodes } from "@/lib/device-screen";
+import { valueAt } from "@/lib/facts";
 import { contextFor } from "@/lib/flow/context";
-import { decide } from "@/lib/flow/machine";
-import type { Condition } from "@/lib/flow/conditions";
+import { walk } from "@/lib/flow/tree";
 
 /**
- * What the flow would decide right now, and why.
+ * What the tree answers right now, and the path it took to get there.
  *
  * This is the answer to "my display is showing the wrong thing and I cannot
- * tell why". It runs the real machine against the real current values and
- * reports every transition it looked at, whether it held, and what value it
- * actually saw - without moving the device.
+ * tell why". The canvas lights the path up, so the explanation is the picture
+ * you are already looking at.
  */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const id = Number((await params).id);
@@ -22,35 +22,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const [device] = await db.select().from(devices).where(eq(devices.id, id));
   if (!device) return NextResponse.json({ error: "No such device." }, { status: 404 });
 
-  const states = await db.select().from(flowStates).where(eq(flowStates.deviceId, id));
-  const transitions = await db.select().from(flowTransitions).where(eq(flowTransitions.deviceId, id));
+  const rows = await db.select().from(decisionNodes).where(eq(decisionNodes.deviceId, id));
   const context = await contextFor(device);
 
-  const decision = decide(
-    states,
-    transitions.map((transition) => ({
-      id: transition.id,
-      fromStateId: transition.fromStateId,
-      toStateId: transition.toStateId,
-      condition: transition.condition as unknown as Condition,
-      priority: transition.priority,
-    })),
-    { currentStateId: device.currentStateId, stateEnteredAt: device.stateEnteredAt },
+  const result = walk(
+    toNodes(rows),
+    device.rootNodeId,
+    { currentNodeId: device.currentNodeId, nodeEnteredAt: device.nodeEnteredAt },
     context,
     device.refreshRate,
   );
 
-  if (!decision) {
-    return NextResponse.json({
-      reason: "This device has no states yet, so there is nothing to show.",
-      stateId: null,
-      steps: [],
-      values: [],
-    });
-  }
-
-  // Current fact values, so the panel can show what each widget knows even
-  // when no transition mentions it.
   const values = [...context.widgets.entries()].flatMap(([widgetId, widget]) =>
     widget.facts.map((fact) => ({
       widgetId,
@@ -58,32 +40,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       key: fact.key,
       label: fact.label,
       unit: fact.unit,
-      value: String(
-        fact.path.split(".").reduce<unknown>(
-          (current, step) =>
-            current && typeof current === "object"
-              ? (current as Record<string, unknown>)[step]
-              : undefined,
-          widget.payload,
-        ) ?? "—",
-      ),
+      value: String(valueAt(widget.payload, fact.path) ?? "—"),
     })),
   );
 
   return NextResponse.json({
-    stateId: decision.state.id,
-    stateName: decision.state.name,
-    moved: decision.moved,
-    refreshSeconds: decision.refreshSeconds,
-    reason: decision.reason,
-    steps: decision.steps.map((step) => ({
-      transitionId: step.transitionId,
-      label: step.label,
-      holds: step.trace.holds,
-      sentence: step.trace.sentence,
-      actual: step.trace.actual,
-      blockedBy: step.blockedBy,
-    })),
+    leafId: result.leaf?.id ?? null,
+    leafLabel: result.leaf?.label ?? null,
+    refreshSeconds: result.refreshSeconds,
+    held: result.held,
+    reason: result.reason,
+    steps: result.steps,
     values,
   });
 }

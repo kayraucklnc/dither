@@ -72,6 +72,7 @@ export function ScreenEditor({
   const [problems, setProblems] = useState<string[]>([]);
   const [save, setSave] = useState<SaveState>("idle");
   const [nextId, setNextId] = useState(-1);
+  const [dragging, setDragging] = useState(false);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const selected = widgets.find((widget) => widget.id === selectedId);
@@ -218,6 +219,7 @@ export function ScreenEditor({
   const startDrag = (event: React.PointerEvent, widget: EditorWidget) => {
     event.preventDefault();
     setSelectedId(widget.id);
+    setDragging(true);
 
     const cell = cellSize();
     const origin = { x: event.clientX, y: event.clientY };
@@ -233,6 +235,7 @@ export function ScreenEditor({
     };
 
     const stop = () => {
+      setDragging(false);
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", stop);
     };
@@ -250,6 +253,7 @@ export function ScreenEditor({
     event.preventDefault();
     event.stopPropagation();
     setSelectedId(widget.id);
+    setDragging(true);
 
     const entry = byName.get(widget.extension);
     const available = (entry?.shapes ?? []).map((id) => findShape(id)!).filter(Boolean);
@@ -287,6 +291,7 @@ export function ScreenEditor({
     };
 
     const stop = () => {
+      setDragging(false);
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", stop);
     };
@@ -360,9 +365,13 @@ export function ScreenEditor({
                 />
               )}
 
-              {/* Grid guides, so the six-by-six is visible while arranging. */}
+              {/* Guides only while arranging. A permanent grid over the render
+                  makes the picture look dirty and hides what is actually there. */}
               <div
-                className="pointer-events-none absolute inset-0 grid opacity-[0.09]"
+                className={cn(
+                  "pointer-events-none absolute inset-0 grid transition-opacity",
+                  dragging ? "opacity-[0.22]" : "opacity-0",
+                )}
                 style={{
                   gridTemplateColumns: `repeat(${COLUMNS}, 1fr)`,
                   gridTemplateRows: `repeat(${ROWS}, 1fr)`,
@@ -375,17 +384,13 @@ export function ScreenEditor({
 
               {widgets.map((widget) => {
                 const active = widget.id === selectedId;
+                const entry = byName.get(widget.extension);
 
                 return (
                   <div
                     key={widget.id}
                     onPointerDown={(event) => startDrag(event, widget)}
-                    className={cn(
-                      "absolute cursor-grab touch-none transition-[box-shadow,background-color]",
-                      active
-                        ? "bg-[oklch(0.78_0.16_88/0.14)] shadow-[inset_0_0_0_2px_oklch(0.7_0.15_88)]"
-                        : "hover:bg-[oklch(0.78_0.16_88/0.07)] hover:shadow-[inset_0_0_0_1.5px_oklch(0.7_0.15_88/0.6)]",
-                    )}
+                    className="group absolute cursor-grab touch-none"
                     style={{
                       left: `${((widget.column - 1) / COLUMNS) * 100}%`,
                       top: `${((widget.row - 1) / ROWS) * 100}%`,
@@ -393,10 +398,34 @@ export function ScreenEditor({
                       height: `${(widget.rowSpan / ROWS) * 100}%`,
                     }}
                   >
+                    {/* An outline on every widget, always. Without it a screen of
+                        four quarters is one white rectangle you cannot read. */}
+                    <span
+                      className={cn(
+                        "pointer-events-none absolute inset-0 rounded-[3px] transition-all",
+                        active
+                          ? "shadow-[inset_0_0_0_2px_oklch(0.62_0.21_285)]"
+                          : "shadow-[inset_0_0_0_1px_oklch(0.62_0.21_285/0.45)] group-hover:shadow-[inset_0_0_0_2px_oklch(0.62_0.21_285/0.8)]",
+                      )}
+                    />
+
+                    {/* Its name, so you can tell two quarters apart at a glance. */}
+                    <span
+                      className={cn(
+                        "pointer-events-none absolute top-1 left-1 max-w-[calc(100%-0.5rem)] truncate",
+                        "rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors",
+                        active
+                          ? "bg-[oklch(0.55_0.216_285)] text-white"
+                          : "bg-[oklch(0.55_0.216_285/0.75)] text-white opacity-0 group-hover:opacity-100",
+                      )}
+                    >
+                      {widget.label || entry?.label || widget.extension}
+                    </span>
+
                     {active && (
                       <span
                         onPointerDown={(event) => startResize(event, widget)}
-                        className="absolute -right-1 -bottom-1 h-4 w-4 cursor-nwse-resize touch-none rounded-full border-2 border-white bg-[oklch(0.7_0.15_88)]"
+                        className="absolute -right-1.5 -bottom-1.5 h-4 w-4 cursor-nwse-resize touch-none rounded-full border-2 border-white bg-[oklch(0.55_0.216_285)]"
                       />
                     )}
                   </div>

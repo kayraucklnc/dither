@@ -2,91 +2,52 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  addEdge,
   Background,
   BackgroundVariant,
   Controls,
-  Handle,
   MarkerType,
-  Position,
   ReactFlow,
   ReactFlowProvider,
-  useEdgesState,
-  useNodesState,
-  type Connection,
   type Edge,
-  type Node,
-  type NodeProps,
+  type Node as RFNode,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Check, Loader2, Plus, Trash2, TriangleAlert, Zap } from "lucide-react";
+import { Check, GitBranch, Loader2, Trash2, TriangleAlert } from "lucide-react";
 
 import { ConditionEditor, type WidgetFactGroup } from "@/components/flow/condition-editor";
-import { StateNode, type StateNodeData } from "@/components/flow/state-node";
+import { QuestionNode, ScreenNode, type QuestionData, type ScreenData } from "@/components/flow/nodes";
 import { ScreenPreview } from "@/components/screen-preview";
 import { cn } from "@/lib/cn";
 import { summarise, type Condition } from "@/lib/flow/conditions";
-
-export interface FlowState {
-  id: number;
-  name: string;
-  screenId: number | null;
-  refreshSeconds: number | null;
-  isInitial: boolean;
-  minDwellSeconds: number;
-  x: number;
-  y: number;
-}
-
-export interface FlowTransition {
-  id: number;
-  fromStateId: number | null;
-  toStateId: number;
-  condition: Condition;
-  priority: number;
-}
+import { layout } from "@/lib/flow/layout";
+import type { Node } from "@/lib/flow/tree";
 
 export interface ScreenOption {
   id: number;
   name: string;
-  widgetCount: number;
 }
 
 interface Trace {
-  stateId: number | null;
+  leafId: number | null;
   reason: string;
-  steps: { transitionId: number; holds: boolean; sentence: string; actual?: string; blockedBy?: string }[];
+  held: boolean;
+  steps: { nodeId: number; question: string; answer: boolean; actual?: string; toNodeId: number | null }[];
   values: { widgetId: number; widgetLabel: string; key: string; label: string; unit: string; value: string }[];
-}
-
-/** The origin of every "from anywhere" transition, drawn so it is not invisible. */
-const ANYWHERE = "anywhere";
-
-function AnywhereNode() {
-  return (
-    <div className="w-40 rounded-xl border border-dashed border-line-strong bg-raised px-3 py-3 text-center">
-      <p className="text-[12px] font-medium text-muted">Any state</p>
-      <p className="mt-1 text-[10px] leading-relaxed text-faint">
-        Edges from here fire wherever the device currently is.
-      </p>
-      <Handle type="source" position={Position.Right} className="!h-2 !w-2 !border-0 !bg-line-strong" />
-    </div>
-  );
 }
 
 const control =
   "w-full rounded-md border border-line bg-ground px-2.5 py-1.5 text-[13px] text-ink " +
   "outline-none transition-colors focus:border-accent/70";
 
-function FlowCanvas({
+function TreeCanvas({
   deviceId,
   deviceRefreshSeconds,
   modelId,
   panel,
   screens,
   factGroups,
-  initialStates,
-  initialTransitions,
+  initialNodes,
+  initialRootId,
 }: {
   deviceId: number;
   deviceRefreshSeconds: number;
@@ -94,18 +55,19 @@ function FlowCanvas({
   panel: { width: number; height: number };
   screens: ScreenOption[];
   factGroups: WidgetFactGroup[];
-  initialStates: FlowState[];
-  initialTransitions: FlowTransition[];
+  initialNodes: Node[];
+  initialRootId: number | null;
 }) {
-  const [states, setStates] = useState(initialStates);
-  const [transitions, setTransitions] = useState(initialTransitions);
-  const [selected, setSelected] = useState<{ kind: "state" | "transition"; id: number } | null>(null);
+  const [nodes, setNodes] = useState(initialNodes);
+  const [rootId, setRootId] = useState(initialRootId);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [trace, setTrace] = useState<Trace>();
   const [save, setSave] = useState<"idle" | "saving" | "saved" | "failed">("idle");
   const [error, setError] = useState<string>();
   const [nextId, setNextId] = useState(-1);
 
-  const nodeTypes = useMemo(() => ({ state: StateNode, anywhere: AnywhereNode }), []);
+  const nodeTypes = useMemo(() => ({ question: QuestionNode, screen: ScreenNode }), []);
+  const selected = nodes.find((node) => node.id === selectedId);
 
   /* ------------------------------------------------------------------ trace */
 
@@ -133,10 +95,15 @@ function FlowCanvas({
     setSave("saving");
 
     const timer = setTimeout(async () => {
-      const response = await fetch(`/api/devices/${deviceId}/flow`, {
+      const positions = layout(nodes, rootId);
+
+      const response = await fetch(`/api/devices/${deviceId}/tree`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ states, transitions }),
+        body: JSON.stringify({
+          rootNodeId: rootId,
+          nodes: nodes.map((node) => ({ ...node, ...(positions.get(node.id) ?? { x: 0, y: 0 }) })),
+        }),
       });
 
       if (!response.ok) {
@@ -144,21 +111,29 @@ function FlowCanvas({
         return setSave("failed");
       }
 
-      const body = (await response.json()) as { states: FlowState[]; transitions: FlowTransition[] };
+      const body = await response.json();
       setError(undefined);
       setSave("saved");
 
-      // Rows created on the server come back with real ids; adopting them
-      // keeps the next save from inserting duplicates.
-      if (states.some((state) => state.id < 0) || transitions.some((t) => t.id < 0)) {
+      // Adopt server ids once, or the next save inserts duplicates.
+      if (nodes.some((node) => node.id < 0)) {
         settled.current = false;
-        setStates(body.states);
-        setTransitions(
-          body.transitions.map((transition) => ({
-            ...transition,
-            condition: transition.condition as Condition,
-          })),
+        setNodes(
+          body.nodes.map(
+            (node: Record<string, unknown>): Node => ({
+              id: node.id as number,
+              kind: node.kind === "question" ? "question" : "screen",
+              label: node.label as string,
+              condition: (node.condition as Condition) ?? null,
+              yesNodeId: node.yesNodeId as number | null,
+              noNodeId: node.noNodeId as number | null,
+              screenId: node.screenId as number | null,
+              refreshSeconds: node.refreshSeconds as number | null,
+              holdSeconds: node.holdSeconds as number,
+            }),
+          ),
         );
+        setRootId(body.rootNodeId);
       }
 
       refreshTrace();
@@ -166,150 +141,207 @@ function FlowCanvas({
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [states, transitions, deviceId]);
+  }, [nodes, rootId, deviceId]);
+
+  /* -------------------------------------------------------------- mutations */
+
+  const update = (id: number, patch: Partial<Node>) =>
+    setNodes((current) => current.map((node) => (node.id === id ? { ...node, ...patch } : node)));
+
+  /**
+   * Adding a check wraps whatever is currently there.
+   *
+   * "When it rains, show the weather" is one gesture at the top of the tree,
+   * and everything already set up slides into the "no" branch untouched. This
+   * is the move that a state machine needed an edge out of every state for.
+   */
+  const addCheck = (above: number | null) => {
+    const leafId = nextId;
+    const questionId = nextId - 1;
+    setNextId((value) => value - 2);
+
+    const leaf: Node = {
+      id: leafId,
+      kind: "screen",
+      label: "New screen",
+      condition: null,
+      yesNodeId: null,
+      noNodeId: null,
+      screenId: screens[0]?.id ?? null,
+      refreshSeconds: null,
+      holdSeconds: 0,
+    };
+
+    const question: Node = {
+      id: questionId,
+      kind: "question",
+      label: "Check",
+      condition: factGroups.length
+        ? {
+            kind: "fact",
+            widgetId: factGroups[0].widgetId,
+            factKey: factGroups[0].facts[0]?.key ?? "",
+            operator: "present",
+            value: "",
+          }
+        : { kind: "always" },
+      yesNodeId: leafId,
+      noNodeId: above,
+      screenId: null,
+      refreshSeconds: null,
+      holdSeconds: 0,
+    };
+
+    setNodes((current) => [...current, leaf, question]);
+
+    // Re-point whoever used to lead here, or make it the new root.
+    if (above === rootId) setRootId(questionId);
+    else
+      setNodes((current) =>
+        current.map((node) =>
+          node.yesNodeId === above
+            ? { ...node, yesNodeId: questionId }
+            : node.noNodeId === above
+              ? { ...node, noNodeId: questionId }
+              : node,
+        ),
+      );
+
+    setSelectedId(questionId);
+  };
+
+  /** Removing a question splices it out, keeping its "no" branch. */
+  const removeQuestion = (id: number) => {
+    const question = nodes.find((node) => node.id === id);
+    if (!question || question.kind !== "question") return;
+
+    const survivor = question.noNodeId;
+
+    // The "yes" branch goes with it, so collect everything only it reached.
+    const doomed = new Set<number>();
+    const collect = (from: number | null) => {
+      if (from === null || doomed.has(from) || from === survivor) return;
+      doomed.add(from);
+      const node = nodes.find((candidate) => candidate.id === from);
+      collect(node?.yesNodeId ?? null);
+      collect(node?.noNodeId ?? null);
+    };
+    collect(question.yesNodeId);
+    doomed.add(id);
+
+    setNodes((current) =>
+      current
+        .filter((node) => !doomed.has(node.id))
+        .map((node) => ({
+          ...node,
+          yesNodeId: node.yesNodeId === id ? survivor : node.yesNodeId,
+          noNodeId: node.noNodeId === id ? survivor : node.noNodeId,
+        })),
+    );
+
+    if (rootId === id) setRootId(survivor);
+    setSelectedId(null);
+  };
 
   /* ------------------------------------------------------------------ graph */
 
-  const nodes: Node[] = useMemo(() => {
-    const hasGlobal = transitions.some((transition) => transition.fromStateId === null);
+  const answered = useMemo(
+    () => new Map(trace?.steps.map((step) => [step.nodeId, step]) ?? []),
+    [trace],
+  );
 
-    const stateNodes = states.map<Node>((state) => ({
-      id: String(state.id),
-      type: "state",
-      position: { x: state.x, y: state.y },
-      selected: selected?.kind === "state" && selected.id === state.id,
-      data: {
-        name: state.name,
-        screenId: state.screenId,
-        screenName: screens.find((screen) => screen.id === state.screenId)?.name ?? null,
-        refreshSeconds: state.refreshSeconds,
-        deviceRefreshSeconds,
-        isInitial: state.isInitial,
-        isCurrent: trace?.stateId === state.id,
-        panel,
-        modelId,
-      } satisfies StateNodeData,
-    }));
-
-    if (!hasGlobal) return stateNodes;
-
-    return [
-      {
-        id: ANYWHERE,
-        type: "anywhere",
-        position: { x: 40, y: -40 },
-        draggable: true,
-        data: {},
-      },
-      ...stateNodes,
-    ];
-  }, [states, transitions, screens, trace, panel, modelId, deviceRefreshSeconds, selected]);
-
-  // summarise() needs the widgets to turn a fact condition into a sentence;
-  // without them every fact edge reads "Extension value".
-  const summariseContext = useMemo(
-    () => ({
-      widgets: new Map(
+  const widgetMap = useMemo(
+    () =>
+      new Map(
         factGroups.map((group) => [
           group.widgetId,
           { payload: {}, facts: group.facts, label: group.label, fetchedAt: null },
         ]),
       ),
-    }),
     [factGroups],
   );
 
-  const edges: Edge[] = useMemo(
-    () =>
-      transitions.map<Edge>((transition) => {
-        const step = trace?.steps.find((candidate) => candidate.transitionId === transition.id);
-        const live = step?.holds;
+  const flowNodes: RFNode[] = useMemo(() => {
+    const positions = layout(nodes, rootId);
 
-        return {
-          id: String(transition.id),
-          source: transition.fromStateId === null ? ANYWHERE : String(transition.fromStateId),
-          target: String(transition.toStateId),
-          label: summarise(transition.condition, summariseContext),
-          selected: selected?.kind === "transition" && selected.id === transition.id,
-          animated: live,
-          markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
+    return nodes.map<RFNode>((node) => {
+      const at = positions.get(node.id) ?? { x: 0, y: 0 };
+      const step = answered.get(node.id);
+
+      return node.kind === "question"
+        ? {
+            id: String(node.id),
+            type: "question",
+            position: at,
+            selected: selectedId === node.id,
+            data: {
+              question: node.condition ? summarise(node.condition, { widgets: widgetMap }) : "No question set",
+              actual: step?.actual,
+              answer: step?.answer,
+              isRoot: rootId === node.id,
+            } satisfies QuestionData,
+          }
+        : {
+            id: String(node.id),
+            type: "screen",
+            position: at,
+            selected: selectedId === node.id,
+            data: {
+              label: node.label,
+              screenId: node.screenId,
+              screenName: screens.find((screen) => screen.id === node.screenId)?.name ?? null,
+              refreshSeconds: node.refreshSeconds,
+              deviceRefreshSeconds,
+              holdSeconds: node.holdSeconds,
+              isShowing: trace?.leafId === node.id,
+              isRoot: rootId === node.id,
+              panel,
+              modelId,
+            } satisfies ScreenData,
+          };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes, rootId, selectedId, answered, trace, screens, panel, modelId, deviceRefreshSeconds, widgetMap]);
+
+  const flowEdges: Edge[] = useMemo(() => {
+    const result: Edge[] = [];
+
+    for (const node of nodes) {
+      if (node.kind !== "question") continue;
+      const step = answered.get(node.id);
+
+      const edge = (branch: "yes" | "no", target: number | null) => {
+        if (target === null) return;
+        const taken = step?.answer === (branch === "yes");
+
+        result.push({
+          id: `${node.id}-${branch}`,
+          source: String(node.id),
+          sourceHandle: branch,
+          target: String(target),
+          label: branch,
+          animated: taken,
+          markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 },
           style: {
-            stroke: live ? "oklch(0.76 0.16 155)" : "oklch(0.40 0.011 260)",
-            strokeWidth: live ? 2 : 1.5,
+            stroke: taken ? "oklch(0.76 0.16 155)" : "oklch(0.35 0.011 260)",
+            strokeWidth: taken ? 2.2 : 1.4,
           },
-          labelStyle: { fill: "oklch(0.97 0.003 260)", fontSize: 11 },
-          labelBgStyle: { fill: "oklch(0.245 0.008 260)" },
-          labelBgPadding: [6, 3] as [number, number],
-          labelBgBorderRadius: 5,
-        };
-      }),
-    [transitions, trace, selected, summariseContext],
-  );
-
-  const [flowNodes, setFlowNodes, onNodesChange] = useNodesState(nodes);
-  const [flowEdges, setFlowEdges, onEdgesChange] = useEdgesState(edges);
-
-  useEffect(() => setFlowNodes(nodes), [nodes, setFlowNodes]);
-  useEffect(() => setFlowEdges(edges), [edges, setFlowEdges]);
-
-  /* -------------------------------------------------------------- mutations */
-
-  const addState = () => {
-    const state: FlowState = {
-      id: nextId,
-      name: `State ${states.length + 1}`,
-      screenId: screens[0]?.id ?? null,
-      refreshSeconds: null,
-      isInitial: states.length === 0,
-      minDwellSeconds: 0,
-      x: 80 + states.length * 300,
-      y: 320,
-    };
-
-    setNextId((value) => value - 1);
-    setStates((current) => [...current, state]);
-    setSelected({ kind: "state", id: state.id });
-  };
-
-  const onConnect = useCallback(
-    (connection: Connection) => {
-      if (!connection.source || !connection.target) return;
-
-      const transition: FlowTransition = {
-        id: nextId,
-        fromStateId: connection.source === ANYWHERE ? null : Number(connection.source),
-        toStateId: Number(connection.target),
-        condition: { kind: "always" },
-        priority: 0,
+          labelStyle: {
+            fill: taken ? "oklch(0.76 0.16 155)" : "oklch(0.56 0.013 260)",
+            fontSize: 10,
+          },
+          labelBgStyle: { fill: "oklch(0.16 0.006 260)" },
+          labelBgPadding: [4, 2] as [number, number],
+          labelBgBorderRadius: 4,
+        });
       };
 
-      setNextId((value) => value - 1);
-      setTransitions((current) => [...current, transition]);
-      setSelected({ kind: "transition", id: transition.id });
-      setFlowEdges((current) => addEdge(connection, current));
-    },
-    [nextId, setFlowEdges],
-  );
+      edge("yes", node.yesNodeId);
+      edge("no", node.noNodeId);
+    }
 
-  const updateState = (id: number, patch: Partial<FlowState>) =>
-    setStates((current) =>
-      current.map((state) =>
-        state.id === id
-          ? { ...state, ...patch }
-          : patch.isInitial
-            ? { ...state, isInitial: false }
-            : state,
-      ),
-    );
-
-  const updateTransition = (id: number, patch: Partial<FlowTransition>) =>
-    setTransitions((current) =>
-      current.map((transition) => (transition.id === id ? { ...transition, ...patch } : transition)),
-    );
-
-  const selectedState = selected?.kind === "state" ? states.find((s) => s.id === selected.id) : undefined;
-  const selectedTransition =
-    selected?.kind === "transition" ? transitions.find((t) => t.id === selected.id) : undefined;
+    return result;
+  }, [nodes, answered]);
 
   /* ------------------------------------------------------------------- view */
 
@@ -321,57 +353,48 @@ function FlowCanvas({
             nodes={flowNodes}
             edges={flowEdges}
             nodeTypes={nodeTypes}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={(_event, node) =>
-              node.id !== ANYWHERE && setSelected({ kind: "state", id: Number(node.id) })
-            }
-            onEdgeClick={(_event, edge) => setSelected({ kind: "transition", id: Number(edge.id) })}
-            onPaneClick={() => setSelected(null)}
-            onNodeDragStop={(_event, node) =>
-              node.id !== ANYWHERE &&
-              updateState(Number(node.id), { x: node.position.x, y: node.position.y })
-            }
+            nodesDraggable={false}
+            nodesConnectable={false}
+            onNodeClick={(_event, node) => setSelectedId(Number(node.id))}
+            onPaneClick={() => setSelectedId(null)}
             fitView
-            fitViewOptions={{ padding: 0.25 }}
+            fitViewOptions={{ padding: 0.2 }}
             proOptions={{ hideAttribution: true }}
             className="bg-ground"
           >
-            <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="oklch(0.31 0.009 260)" />
-            <Controls className="!border-line !bg-surface [&_button]:!border-line [&_button]:!bg-surface [&_button]:!fill-muted" />
+            <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="oklch(0.29 0.009 260)" />
+            <Controls
+              showInteractive={false}
+              className="!border-line !bg-surface [&_button]:!border-line [&_button]:!bg-surface [&_button]:!fill-muted"
+            />
           </ReactFlow>
         </div>
 
-        {/* The live trace: what the flow decides right now, and why. */}
         <div className="border-t border-line bg-surface px-5 py-3.5">
           <div className="flex items-start gap-3">
-            <span
-              className={cn(
-                "mt-1 h-2 w-2 shrink-0 rounded-full",
-                trace ? "bg-live" : "bg-faint",
-              )}
-            />
+            <span className={cn("mt-1 h-2 w-2 shrink-0 rounded-full", trace ? "bg-live" : "bg-faint")} />
             <div className="min-w-0 flex-1">
               <p className="text-[13px] leading-relaxed">
                 {trace?.reason ?? "Working out what this device would show…"}
               </p>
 
               {trace && trace.steps.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {trace.steps.map((step) => (
-                    <span
-                      key={step.transitionId}
-                      className={cn(
-                        "rounded-md border px-2 py-0.5 text-[11px]",
-                        step.holds
-                          ? "border-live/40 bg-live/10 text-live"
-                          : "border-line bg-raised text-faint",
-                      )}
-                    >
-                      {step.sentence}
-                      {step.actual && <span className="opacity-70"> · {step.actual}</span>}
-                      {step.blockedBy === "dwell" && <span className="opacity-70"> · held</span>}
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {trace.steps.map((step, index) => (
+                    <span key={step.nodeId} className="flex items-center gap-1.5">
+                      {index > 0 && <span className="text-faint">→</span>}
+                      <span
+                        className={cn(
+                          "rounded-md border px-2 py-0.5 text-[11px]",
+                          step.answer
+                            ? "border-live/40 bg-live/10 text-live"
+                            : "border-line bg-raised text-faint",
+                        )}
+                      >
+                        {step.question}
+                        <span className="opacity-70"> · {step.answer ? "yes" : "no"}</span>
+                        {step.actual && <span className="opacity-70"> · {step.actual}</span>}
+                      </span>
                     </span>
                   ))}
                 </div>
@@ -390,59 +413,71 @@ function FlowCanvas({
         </div>
       </div>
 
-      {/* Inspector */}
       <aside className="w-80 shrink-0 overflow-y-auto border-l border-line bg-surface">
         <div className="border-b border-line p-4">
           <button
             type="button"
-            onClick={addState}
+            onClick={() => addCheck(rootId)}
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 py-2 text-[13px] font-medium text-accent-ink transition-opacity hover:opacity-90"
           >
-            <Plus size={15} />
-            Add a state
+            <GitBranch size={15} />
+            Add a check at the top
           </button>
           <p className="mt-2.5 text-[11px] leading-relaxed text-faint">
-            Drag from a state&apos;s right edge to another to say when the display should switch.
+            It gets asked before everything else, so this is how you say &ldquo;whatever else is
+            going on, when it rains show the weather&rdquo;. What is set up now moves into
+            &ldquo;no&rdquo; untouched.
           </p>
         </div>
 
-        {selectedState && (
+        {selected?.kind === "question" && (
           <div className="space-y-4 p-4">
-            <div className="flex items-start justify-between gap-2">
-              <input
-                value={selectedState.name}
-                onChange={(event) => updateState(selectedState.id, { name: event.target.value })}
-                className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent py-0.5 text-[14px] font-semibold outline-none hover:border-line focus:border-accent/70"
-              />
-              {!selectedState.isInitial && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTransitions((current) =>
-                      current.filter(
-                        (t) => t.fromStateId !== selectedState.id && t.toStateId !== selectedState.id,
-                      ),
-                    );
-                    setStates((current) => current.filter((s) => s.id !== selectedState.id));
-                    setSelected(null);
-                  }}
-                  className="shrink-0 rounded-md p-1.5 text-faint hover:bg-danger/15 hover:text-danger"
-                >
-                  <Trash2 size={15} />
-                </button>
-              )}
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[13px] font-semibold">This check</p>
+              <button
+                type="button"
+                onClick={() => removeQuestion(selected.id)}
+                title="Remove this check and everything on its yes branch"
+                className="rounded-md p-1.5 text-faint hover:bg-danger/15 hover:text-danger"
+              >
+                <Trash2 size={15} />
+              </button>
             </div>
+
+            <ConditionEditor
+              condition={selected.condition ?? { kind: "always" }}
+              groups={factGroups}
+              onChange={(condition) => update(selected.id, { condition })}
+            />
+
+            <button
+              type="button"
+              onClick={() => addCheck(selected.noNodeId)}
+              className="w-full rounded-md border border-line bg-raised px-3 py-1.5 text-[12px] text-muted transition-colors hover:text-ink"
+            >
+              Add another check under &ldquo;no&rdquo;
+            </button>
+          </div>
+        )}
+
+        {selected?.kind === "screen" && (
+          <div className="space-y-4 p-4">
+            <input
+              value={selected.label}
+              onChange={(event) => update(selected.id, { label: event.target.value })}
+              className="w-full rounded-md border border-transparent bg-transparent py-0.5 text-[14px] font-semibold outline-none hover:border-line focus:border-accent/70"
+            />
 
             <div>
               <p className="mb-2 text-[12px] font-medium">Shows</p>
               <div className="grid grid-cols-2 gap-2">
                 {screens.map((screen) => {
-                  const active = screen.id === selectedState.screenId;
+                  const active = screen.id === selected.screenId;
                   return (
                     <button
                       key={screen.id}
                       type="button"
-                      onClick={() => updateState(selectedState.id, { screenId: screen.id })}
+                      onClick={() => update(selected.id, { screenId: screen.id })}
                       className={cn(
                         "rounded-lg border p-1.5 text-left transition-colors",
                         active ? "border-accent bg-accent/10" : "border-line hover:border-line-strong",
@@ -463,16 +498,14 @@ function FlowCanvas({
             </div>
 
             <div>
-              <label className="mb-1.5 block text-[12px] font-medium">
-                Wake every (seconds, while here)
-              </label>
+              <label className="mb-1.5 block text-[12px] font-medium">Wake every (seconds)</label>
               <input
                 type="number"
                 min={30}
-                value={selectedState.refreshSeconds ?? ""}
+                value={selected.refreshSeconds ?? ""}
                 placeholder={String(deviceRefreshSeconds)}
                 onChange={(event) =>
-                  updateState(selectedState.id, {
+                  update(selected.id, {
                     refreshSeconds: event.target.value ? event.target.valueAsNumber : null,
                   })
                 }
@@ -481,84 +514,38 @@ function FlowCanvas({
             </div>
 
             <div>
-              <label className="mb-1.5 block text-[12px] font-medium">Stay at least (seconds)</label>
+              <label className="mb-1.5 block text-[12px] font-medium">
+                Once shown, keep it for (seconds)
+              </label>
               <input
                 type="number"
                 min={0}
-                value={selectedState.minDwellSeconds}
+                value={selected.holdSeconds}
                 onChange={(event) =>
-                  updateState(selectedState.id, { minDwellSeconds: event.target.valueAsNumber || 0 })
+                  update(selected.id, { holdSeconds: event.target.valueAsNumber || 0 })
                 }
                 className={control}
               />
               <p className="mt-1.5 text-[11px] leading-relaxed text-faint">
-                Stops the display flickering between two states when a value sits near its threshold.
+                Stops the display flipping back and forth when a value sits on its threshold. Set 1200
+                for &ldquo;stay on the weather for twenty minutes&rdquo;.
               </p>
             </div>
 
-            {!selectedState.isInitial && (
-              <button
-                type="button"
-                onClick={() => updateState(selectedState.id, { isInitial: true })}
-                className="w-full rounded-md border border-line bg-raised px-3 py-1.5 text-[12px] text-muted transition-colors hover:text-ink"
-              >
-                Make this the starting state
-              </button>
-            )}
-          </div>
-        )}
-
-        {selectedTransition && (
-          <div className="space-y-4 p-4">
-            <div className="flex items-center justify-between gap-2">
-              <p className="flex items-center gap-1.5 text-[13px] font-semibold">
-                <Zap size={13} className="text-accent" />
-                Switch to{" "}
-                {states.find((state) => state.id === selectedTransition.toStateId)?.name ?? "…"}
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setTransitions((current) =>
-                    current.filter((t) => t.id !== selectedTransition.id),
-                  );
-                  setSelected(null);
-                }}
-                className="shrink-0 rounded-md p-1.5 text-faint hover:bg-danger/15 hover:text-danger"
-              >
-                <Trash2 size={15} />
-              </button>
-            </div>
-
-            <ConditionEditor
-              condition={selectedTransition.condition}
-              groups={factGroups}
-              onChange={(condition) => updateTransition(selectedTransition.id, { condition })}
-            />
-
-            <div>
-              <label className="mb-1.5 block text-[12px] font-medium">Priority</label>
-              <input
-                type="number"
-                value={selectedTransition.priority}
-                onChange={(event) =>
-                  updateTransition(selectedTransition.id, {
-                    priority: event.target.valueAsNumber || 0,
-                  })
-                }
-                className={control}
-              />
-              <p className="mt-1.5 text-[11px] leading-relaxed text-faint">
-                Lower goes first. When two conditions both hold, the lower number wins.
-              </p>
-            </div>
+            <button
+              type="button"
+              onClick={() => addCheck(selected.id)}
+              className="w-full rounded-md border border-line bg-raised px-3 py-1.5 text-[12px] text-muted transition-colors hover:text-ink"
+            >
+              Ask something before this screen
+            </button>
           </div>
         )}
 
         {!selected && (
           <div className="p-4">
             <p className="text-[13px] leading-relaxed text-faint">
-              Pick a state to choose what it shows, or an arrow to change when it fires.
+              Pick a check to change what it asks, or a screen to choose what it shows.
             </p>
             {trace && trace.values.length > 0 && (
               <>
@@ -593,10 +580,10 @@ function FlowCanvas({
   );
 }
 
-export function DeviceFlow(props: Parameters<typeof FlowCanvas>[0]) {
+export function DeviceTree(props: Parameters<typeof TreeCanvas>[0]) {
   return (
     <ReactFlowProvider>
-      <FlowCanvas {...props} />
+      <TreeCanvas {...props} />
     </ReactFlowProvider>
   );
 }

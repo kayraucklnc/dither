@@ -16,8 +16,10 @@
   --color-muted: oklch(0.72 0.012 260);
   --color-faint: oklch(0.56 0.013 260);
 
-  --color-accent: oklch(0.78 0.16 88);
-  --color-accent-ink: oklch(0.2 0.05 88);
+  /* Dither's own violet, #6C4CE8, carried over from the mark. */
+  --color-accent: oklch(0.55 0.216 285);
+  --color-accent-bright: oklch(0.68 0.17 285);
+  --color-accent-ink: oklch(0.99 0 0);
   --color-live: oklch(0.76 0.16 155);
   --color-warn: oklch(0.72 0.16 45);
   --color-danger: oklch(0.66 0.19 22);

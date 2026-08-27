@@ -4,7 +4,7 @@ import { Battery, MonitorSmartphone, Wifi } from "lucide-react";
 
 import { ScreenPreview } from "@/components/screen-preview";
 import { db } from "@/lib/db";
-import { devices, flowStates, models } from "@/lib/db/schema";
+import { decisionNodes, devices, models } from "@/lib/db/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -21,12 +21,12 @@ export default async function DevicesPage() {
       modelLabel: models.label,
       width: models.width,
       height: models.height,
-      stateName: flowStates.name,
-      screenId: flowStates.screenId,
+      showingLabel: decisionNodes.label,
+      screenId: decisionNodes.screenId,
     })
     .from(devices)
     .innerJoin(models, eq(models.id, devices.modelId))
-    .leftJoin(flowStates, eq(flowStates.id, devices.currentStateId));
+    .leftJoin(decisionNodes, eq(decisionNodes.id, devices.currentNodeId));
 
   return (
     <div className="mx-auto max-w-6xl px-8 py-10">
@@ -59,7 +59,7 @@ export default async function DevicesPage() {
                   src={`/api/preview/screen/${device.screenId}?modelId=${device.modelId}`}
                   width={device.width}
                   height={device.height}
-                  alt={`${device.name} is showing ${device.stateName}`}
+                  alt={`${device.name} is showing ${device.showingLabel}`}
                   className="paper-shadow"
                 />
               ) : (
@@ -78,10 +78,10 @@ export default async function DevicesPage() {
                 </div>
 
                 <div className="mt-1.5 flex items-center gap-3 text-[11px] text-faint">
-                  {device.stateName && (
+                  {device.showingLabel && (
                     <span className="flex items-center gap-1 text-live">
                       <span className="h-1.5 w-1.5 rounded-full bg-live" />
-                      {device.stateName}
+                      {device.showingLabel}
                     </span>
                   )}
                   {device.percentCharged !== null && (

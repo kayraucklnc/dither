@@ -1,4 +1,4 @@
-import { relations, sql } from "drizzle-orm";
+import { relations } from "drizzle-orm";
 import {
   boolean,
   integer,
@@ -8,7 +8,6 @@ import {
   serial,
   text,
   timestamp,
-  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -127,72 +126,62 @@ export const devices = pgTable("devices", {
   sleepStartMinute: integer("sleep_start_minute"),
   sleepStopMinute: integer("sleep_stop_minute"),
 
-  /**
-   * Where the device currently sits in its flow. A flow has memory - that is
-   * what makes it a machine rather than a list of rules - and this is the
-   * memory.
-   */
-  currentStateId: integer("current_state_id"),
-  stateEnteredAt: timestamp("state_entered_at", { withTimezone: true }),
+  /** The top of this device's decision tree. */
+  rootNodeId: integer("root_node_id"),
+  /** The leaf it last landed on, and when - only used to honour a hold. */
+  currentNodeId: integer("current_node_id"),
+  nodeEnteredAt: timestamp("node_entered_at", { withTimezone: true }),
 
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 /**
- * A state is "show this screen, and while you are here wake this often".
- * Every device has at least one, its home state.
- */
-export const flowStates = pgTable(
-  "flow_states",
-  {
-    id: serial("id").primaryKey(),
-    deviceId: integer("device_id")
-      .notNull()
-      .references(() => devices.id, { onDelete: "cascade" }),
-    name: text("name").notNull(),
-    screenId: integer("screen_id").references(() => screens.id, { onDelete: "set null" }),
-    /** Seconds. Null means "use the device default". */
-    refreshSeconds: integer("refresh_seconds"),
-    isInitial: boolean("is_initial").notNull().default(false),
-    /**
-     * Once entered, stay at least this long even if the condition that brought
-     * us here stops holding. Without it a display flickers between states every
-     * time a value crosses a threshold.
-     */
-    minDwellSeconds: integer("min_dwell_seconds").notNull().default(0),
-    /** Canvas position. Layout of the graph is the user's, so we keep it. */
-    x: real("x").notNull().default(0),
-    y: real("y").notNull().default(0),
-  },
-  (table) => [
-    // Partial, and it has to be: a plain unique on (device, is_initial) would
-    // also forbid a device having two states that are *not* initial.
-    uniqueIndex("flow_states_one_initial")
-      .on(table.deviceId)
-      .where(sql`${table.isInitial}`),
-  ],
-);
-
-/**
- * An edge. `fromStateId` null means "from anywhere" - one global transition
- * instead of an edge out of every state, which is what keeps a flow with ten
- * states from needing ninety edges.
+ * One node of a device's decision tree.
  *
- * Transitions out of a state are evaluated in `priority` order; the first
- * whose condition holds wins.
+ * Every wake, the device walks this tree from its root and shows the first
+ * screen it reaches. Questions branch; screens are leaves.
+ *
+ * A tree rather than a state machine, because the hard case is "when it rains,
+ * show the weather wherever you are, then go back". A machine needs an edge
+ * from every state and a memory of where it came from. A tree needs one node
+ * near the top - and when the rain stops it simply re-answers the questions and
+ * lands wherever it should be now, so there is nothing to remember and nothing
+ * to return to.
+ *
+ * Priority is depth: a question nearer the root is asked first, so making a
+ * rule win means dragging it higher. That is the whole ordering model.
  */
-export const flowTransitions = pgTable("flow_transitions", {
+export const decisionNodes = pgTable("decision_nodes", {
   id: serial("id").primaryKey(),
   deviceId: integer("device_id")
     .notNull()
     .references(() => devices.id, { onDelete: "cascade" }),
-  fromStateId: integer("from_state_id").references(() => flowStates.id, { onDelete: "cascade" }),
-  toStateId: integer("to_state_id")
-    .notNull()
-    .references(() => flowStates.id, { onDelete: "cascade" }),
-  condition: jsonb("condition").$type<Record<string, unknown>>().notNull(),
-  priority: integer("priority").notNull().default(0),
+
+  /** "question" branches on a condition; "screen" is a leaf that shows something. */
+  kind: text("kind").notNull(),
+  label: text("label").notNull().default(""),
+
+  /* Questions ------------------------------------------------------------- */
+  condition: jsonb("condition").$type<Record<string, unknown>>(),
+  yesNodeId: integer("yes_node_id"),
+  noNodeId: integer("no_node_id"),
+
+  /* Screens --------------------------------------------------------------- */
+  screenId: integer("screen_id").references(() => screens.id, { onDelete: "set null" }),
+  /** Seconds between wakes while this screen is showing. */
+  refreshSeconds: integer("refresh_seconds"),
+  /**
+   * Once reached, keep showing this for at least this long even if the answers
+   * change. This is the only memory in the system, and it exists because a
+   * value sitting on a threshold would otherwise flip the display back and
+   * forth on every wake.
+   */
+  holdSeconds: integer("hold_seconds").notNull().default(0),
+
+  /** Canvas position. The layout of the tree is the user's, so we keep it. */
+  x: real("x").notNull().default(0),
+  y: real("y").notNull().default(0),
 });
 
 /** A rendered image, cached by the inputs that produced it. */
@@ -208,6 +197,19 @@ export const renders = pgTable("renders", {
   width: integer("width").notNull(),
   height: integer("height").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * An account linked once and used by every widget that names it. Credentials
+ * live here, never in a widget's settings.
+ */
+export const connections = pgTable("connections", {
+  id: serial("id").primaryKey(),
+  provider: text("provider").notNull().unique(),
+  label: text("label").notNull().default(""),
+  /** Whatever the provider needs. Opaque above this table. */
+  credentials: jsonb("credentials").$type<Record<string, unknown>>().notNull().default({}),
+  connectedAt: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 /** Firmware images offered to devices over the air. */
@@ -239,20 +241,13 @@ export const widgetsRelations = relations(widgets, ({ one }) => ({
 
 export const devicesRelations = relations(devices, ({ one, many }) => ({
   model: one(models, { fields: [devices.modelId], references: [models.id] }),
-  states: many(flowStates),
-  transitions: many(flowTransitions),
+  nodes: many(decisionNodes),
   logs: many(deviceLogs),
 }));
 
-export const flowStatesRelations = relations(flowStates, ({ one }) => ({
-  device: one(devices, { fields: [flowStates.deviceId], references: [devices.id] }),
-  screen: one(screens, { fields: [flowStates.screenId], references: [screens.id] }),
-}));
-
-export const flowTransitionsRelations = relations(flowTransitions, ({ one }) => ({
-  device: one(devices, { fields: [flowTransitions.deviceId], references: [devices.id] }),
-  from: one(flowStates, { fields: [flowTransitions.fromStateId], references: [flowStates.id] }),
-  to: one(flowStates, { fields: [flowTransitions.toStateId], references: [flowStates.id] }),
+export const decisionNodesRelations = relations(decisionNodes, ({ one }) => ({
+  device: one(devices, { fields: [decisionNodes.deviceId], references: [devices.id] }),
+  screen: one(screens, { fields: [decisionNodes.screenId], references: [screens.id] }),
 }));
 
 export type Model = typeof models.$inferSelect;
@@ -260,6 +255,5 @@ export type Screen = typeof screens.$inferSelect;
 export type Widget = typeof widgets.$inferSelect;
 export type WidgetData = typeof widgetData.$inferSelect;
 export type Device = typeof devices.$inferSelect;
-export type FlowState = typeof flowStates.$inferSelect;
-export type FlowTransition = typeof flowTransitions.$inferSelect;
+export type DecisionNode = typeof decisionNodes.$inferSelect;
 export type Render = typeof renders.$inferSelect;

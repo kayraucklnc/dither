@@ -1,0 +1,39 @@
+{% comment %} Half width: 400x480. A column of what is coming. {% endcomment %}
+
+<div class="screen">
+  <div class="title-bar">
+    <div class="title">{{ extension.values.heading | default: "Today" }}</div>
+  </div>
+
+  {% if calendar.empty or calendar.next == nil %}
+    <div class="content layout layout--col layout--center">
+      <p class="t-bold">Nothing scheduled</p>
+    </div>
+  {% else %}
+    <div class="content content--tight">
+      <div class="stack stack--tight" style="padding-bottom: 12px">
+        <p class="t-xs t-upper muted">
+          {% if calendar.next.minutes_until <= 0 %}Now{% else %}In {{ calendar.next.minutes_until }} min{% endif %}
+        </p>
+        <p class="t-lg t-bold clamp-2">{{ calendar.next.title }}</p>
+        <p class="t-sm t-mono">{{ calendar.next.start }} – {{ calendar.next.end }}</p>
+        {% if extension.values.show_location and calendar.next.location != blank %}
+          <p class="t-xs clamp-2">{{ calendar.next.location }}</p>
+        {% endif %}
+      </div>
+
+      <div class="rule"></div>
+
+      <div class="list">
+        {% for event in calendar.events offset: 1 limit: 4 %}
+          <div class="list-item">
+            <div class="kv">
+              <span class="k t-sm truncate">{{ event.title }}</span>
+              <span class="v t-sm t-mono">{{ event.start }}</span>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+</div>

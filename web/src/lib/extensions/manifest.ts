@@ -88,11 +88,18 @@ export const manifestSchema = z.object({
   label: z.string().min(1),
   description: z.string().default(""),
   /**
-   * static - renders from settings alone, fetches nothing.
-   * poll   - calls the URLs in `exchanges` on a schedule.
-   * transit- answered by a provider in code rather than a declared URL.
+   * static     - renders from settings alone, fetches nothing.
+   * poll       - calls the URLs in `exchanges` on a schedule.
+   * transit    - answered by a provider in code rather than a declared URL.
+   * connection - answered by an account you linked once under Connections.
    */
-  kind: z.enum(["static", "poll", "transit"]).default("static"),
+  kind: z.enum(["static", "poll", "transit", "connection"]).default("static"),
+  /**
+   * The connection this extension needs, when kind is "connection". One linked
+   * account serves every widget that names it, so linking Google once gives
+   * every calendar widget on every screen its data.
+   */
+  connection: z.string().optional(),
   mode: z.string().default("text"),
   tags: z.array(z.string()).default([]),
 
