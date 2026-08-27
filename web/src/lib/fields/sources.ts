@@ -2,6 +2,7 @@ import { calendars } from "@/lib/connections/google/api";
 import { feedValue } from "@/lib/connections/google/feeds";
 import { readyAccounts } from "@/lib/connections/link";
 import { provider } from "@/lib/connections";
+import { collections, pictures } from "@/lib/gallery/library";
 import { capabilitiesFor, cities, countries, providers } from "@/lib/transit/catalog";
 import { search as searchStations } from "@/lib/transit/trenord";
 
@@ -84,6 +85,48 @@ const SOURCES: Source[] = [
             hint: several ? account.account : one.accessRole === "owner" ? "" : "shared",
           })),
       ]);
+    },
+  },
+  {
+    /**
+     * The folders of pictures in the gallery directory.
+     *
+     * There is no upload and no album table - a collection is a directory, so
+     * this is a `readdir` and nothing else. Listing them is what makes the
+     * bargain visible: put a folder of jpegs on disk, open the inspector, and
+     * it is in the menu.
+     */
+    id: "gallery.collections",
+    async list() {
+      const found = await collections();
+
+      if (!found.length) {
+        throw new Error(
+          "There are no pictures yet. Put some in the gallery folder - see docs/gallery.md.",
+        );
+      }
+
+      const pictures = (count: number) => `${count} picture${count === 1 ? "" : "s"}`;
+      const everything = found.reduce((total, one) => total + one.count, 0);
+
+      return [
+        { value: "", label: "Everything", hint: pictures(everything) },
+        ...found.map((one) => ({ value: one.id, label: one.label, hint: pictures(one.count) })),
+      ];
+    },
+  },
+  {
+    /** The pictures in the chosen collection, for pinning one of them. */
+    id: "gallery.pictures",
+    dependsOn: ["collection"],
+    async list(settings) {
+      const held = await pictures(String(settings.collection ?? "") || undefined);
+
+      return held.map((one, index) => ({
+        value: one.id,
+        label: one.title || `Untitled ${index + 1}`,
+        hint: one.collection,
+      }));
     },
   },
   {

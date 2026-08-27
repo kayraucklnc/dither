@@ -198,6 +198,10 @@ write_env() {
   # and writes to this worktree's render cache rather than another branch's.
   upsert DITHER_EXTENSIONS_DIR "$ROOT/extensions"
   upsert DITHER_STORAGE_DIR "$ROOT/web/.storage"
+  # Your own pictures, for the gallery extension. Outside the repository on
+  # purpose: photographs are not source, and a folder git watches is a folder
+  # you think twice before dropping a hundred megabytes into.
+  upsert DITHER_GALLERY_DIR "$ROOT/web/.gallery"
   upsert PORT "$DEV_PORT"
   upsert DITHER_URL "$URL"
   upsert API_URI "$(api_uri)"

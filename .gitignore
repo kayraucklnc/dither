@@ -13,6 +13,10 @@ next-env.d.ts
 # Rendered screens, which are a cache keyed by their own content
 .storage
 
+# Your own pictures for the gallery. The bundled ones live in
+# extensions/gallery/art and are tracked; anything you put here is yours.
+.gallery
+
 # Left behind by the Ruby app, which no longer lives here. Nothing generates
 # these any more, and public/assets/app.js alone is 76,000 lines of compiled
 # bundle - enough to swamp the diff of any branch that touches the tree.

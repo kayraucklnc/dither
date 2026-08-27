@@ -53,6 +53,10 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
   on one screen is the whole point of the distinction.
 - **A trigger is a source, not a borrowed widget.** Sources belong to a device,
   so you can decide on a station you are not displaying.
+- **Your own files are a source too.** The gallery reads
+  `DITHER_GALLERY_DIR`, one folder per collection, and ships no pictures of its
+  own - see `docs/gallery.md`. It is outside the repository because
+  photographs are not source.
 - **A connection is an account, linked once, used by every placement.** An
   extension says "I need Google Calendar" and the linked account answers on
   every screen; credentials never live in a widget's settings. Stripe takes a
@@ -170,6 +174,33 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
 - **"Today" is a local day, and midnight's offset is not always now's.** On the
   morning the clocks change, the naive answer is an hour into the previous day.
   See `web/src/lib/clock.ts`.
+
+- **A picture is dithered once, at the end, or it is moire.** The render
+  pipeline finishes in Floyd-Steinberg over the whole panel, so `as_image`
+  hands the template *grey* - as many levels as the source has. Dither it on
+  the way in and the browser resamples a stipple that then gets stippled
+  again. Same rule as gradients, applied to a photograph. And enlarge pixel
+  art with `nearest`: Lanczos turns a 524-pixel drawing into a blur, and a
+  blur dithers into mush. See `web/src/lib/gallery/prepare.ts`.
+- **A picture is cropped to the widget, not to the panel.** Sizes are free, so
+  the rectangle worth taking out of a photograph at 12x12 is not the one worth
+  taking at 3x12. The template is the first thing that knows which box it got,
+  which is why the crop is a Liquid filter rather than part of the fetch - and
+  it is what lets a portrait pin fill a widescreen panel.
+- **A rotation with any memory in it redraws the panel for nothing.** Which
+  gallery picture is up is a pure function of the clock: a cursor, a
+  last-shown column or a random number would answer differently on every
+  refetch, the fingerprint is taken over the payload, and a gallery meant to
+  change hourly would hand the device a new file every five minutes for as
+  long as it hung there. Nothing that moves between two fetches inside one
+  hold - no countdown, no "fetched at" - may go in the payload either. See
+  `web/src/lib/gallery/pick.ts`.
+- **An extension that ships no data has no sample, and should not invent one.**
+  Every other sample is plausible fiction that lets a screen be laid out before
+  anyone owns an API key. A gallery's would be a picture id naming a file that
+  is not there, so it is empty and a fresh installation gets the fault card
+  with the path to fill. Inventing one would only have produced the
+  missing-picture state with an extra step.
 
 - **A Google grant issues one refresh token, not one per handshake.** Drop
   `prompt=consent` from the authorize URL and re-linking an account that has

@@ -1,6 +1,7 @@
 import { Liquid } from "liquidjs";
 
 import { refusal } from "@/lib/designs";
+import { prepareById } from "@/lib/gallery/prepare";
 import { daysInWords, partOfDay, spanInWords, throughDay, timeInWords } from "@/lib/timewords";
 import { templateFor, type Extension } from "@/lib/extensions/registry";
 import { COLUMNS, ROWS, sizeLabel, type Size } from "@/lib/shapes";
@@ -216,6 +217,54 @@ function register(engine: Liquid): void {
   engine.registerFilter("minutes_of", (value: unknown) => {
     const match = /(\d{1,2}):(\d{2})/.exec(String(value ?? ""));
     return match ? Number(match[1]) * 60 + Number(match[2]) : 0;
+  });
+
+  /**
+   * A picture from the gallery, cropped to the box asking for it.
+   *
+   * The only filter here that touches the disk, and the only asynchronous one.
+   * It exists because cropping is a decision that cannot be made any earlier:
+   * a design covers a range of sizes, and the rectangle worth taking out of a
+   * photograph for a 12x12 wallpaper is not the one worth taking for a 2x12
+   * strip. The template is the first thing that knows which it is.
+   *
+   * What comes back is a data URI. A screenshotted page has no origin, so a
+   * URL - even our own - has nothing to resolve against; the same reason the
+   * brand mark is inlined into the empty panel.
+   *
+   *   {{ shot.id | as_image: width: shape.width, height: shape.height }}
+   *
+   * An id that no longer resolves renders as empty, which templates test for.
+   * A missing folder should leave a gap in a gallery, not take a screen down.
+   */
+  engine.registerFilter("as_image", async (id: unknown, ...args: unknown[]) => {
+    const wanted = String(id ?? "").trim();
+    if (!wanted) return "";
+
+    // liquidjs hands keyword arguments over as [key, value] pairs and
+    // positional ones as bare values, so both spellings are accepted: the
+    // keyword form because five positional arguments is a puzzle, and
+    // `width, height` because that is all most calls need.
+    const named: Record<string, unknown> = {};
+    const loose: unknown[] = [];
+
+    for (const argument of args) {
+      if (Array.isArray(argument) && argument.length === 2 && typeof argument[0] === "string") {
+        named[argument[0]] = argument[1];
+      } else {
+        loose.push(argument);
+      }
+    }
+
+    const prepared = await prepareById(wanted, {
+      width: Number(named.width ?? loose[0] ?? 0) || 0,
+      height: Number(named.height ?? loose[1] ?? 0) || 0,
+      fit: named.fit === "whole" ? "whole" : "fill",
+      tone: String(named.tone ?? "as_is"),
+      invert: named.invert === true || named.invert === "true",
+    });
+
+    return prepared?.source ?? "";
   });
 }
 

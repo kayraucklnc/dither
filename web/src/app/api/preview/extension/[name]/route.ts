@@ -6,6 +6,7 @@ import { fingerprint, renderSolo } from "@/lib/render";
 import { store } from "@/lib/storage";
 import { refusal } from "@/lib/designs";
 import { COLUMNS, ROWS, parseSize, pixelsFor } from "@/lib/shapes";
+import { previewData } from "@/lib/widget-data";
 
 /**
  * A thumbnail of one extension at one shape.
@@ -91,7 +92,8 @@ export async function GET(
     : [];
 
   const settings = { ...defaultSettings(extension), ...settingsFromQuery(url) };
-  const data = extension.manifest.sample as Record<string, unknown>;
+
+  const data = await previewData(extension, settings);
   const [width, height] = pixelsFor(size, DEFAULT_PANEL.width, DEFAULT_PANEL.height);
 
   // Same material the renderer would hash, computed without rendering.
