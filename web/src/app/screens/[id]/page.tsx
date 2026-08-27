@@ -37,6 +37,7 @@ export default async function ScreenPage({ params }: { params: Promise<{ id: str
       defaults: defaultSettings(extension),
       headline: summarise(extension).headline,
       noticeShapes: extension.shapes.filter((shape) => rendersNotices(extension, shape)),
+      capabilitiesFrom: extension.manifest.capabilities_from,
     }));
 
   return (

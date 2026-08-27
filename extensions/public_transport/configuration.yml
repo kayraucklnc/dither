@@ -31,75 +31,93 @@ start_at: "2026-01-01T00:00:00Z"
 static_body: {}
 data: {}
 
+# Where the choices come from, and what the chosen operator can actually do.
+# Both are resolved in code (lib/fields/sources.ts), so this file never lists
+# three hundred stations and never guesses what Trenord supports.
+capabilities_from: transit.capabilities
+
 fields:
   - keyname: country
     name: Country
-    field_type: string
+    field_type: select
+    options_from: transit.countries
     default: "it"
-    help_text: Two letter code. Only "it" is supported so far.
     optional: false
 
   - keyname: city
     name: City
-    field_type: string
+    field_type: select
+    options_from: transit.cities
     default: "milan"
-    help_text: City code from the catalog.
+    help_text: Narrowed by the country above.
     optional: false
 
   - keyname: provider
     name: Operator
-    field_type: string
+    field_type: select
+    options_from: transit.providers
     default: "trenord"
-    help_text: Which operator answers for this city.
+    help_text: Who answers for this city. Different operators support different things.
     optional: false
 
   - keyname: origin
     name: From
-    field_type: string
+    field_type: search
+    options_from: transit.stations
     default: "Milano Cadorna"
-    help_text: Station name. The settings page offers a search.
+    help_text: Start typing a station name.
     optional: false
 
   - keyname: destination
     name: To
-    field_type: string
+    field_type: search
+    options_from: transit.stations
+    needs_capability: journey
     default: "Saronno"
-    help_text: Leave blank to show every departure from the origin.
+    help_text: Leave blank for every departure from the origin, wherever it is going.
     optional: true
 
   - keyname: lead_time
-    name: Walking time
-    field_type: string
-    default: "0"
-    help_text: Minutes to reach the platform. Departures sooner than this are hidden.
+    name: Time to reach the platform
+    field_type: number
+    default: 0
+    min: 0
+    max: 60
+    help_text: >
+      Minutes it takes you to get there. Departures sooner than this are hidden,
+      because you could not catch them.
     optional: true
 
   - keyname: limit
     name: Departures to show
-    field_type: string
-    default: "5"
-    help_text: Keep it low. The panel is 800x480.
+    field_type: number
+    default: 5
+    min: 1
+    max: 12
+    help_text: Keep it low. The whole panel is 800x480.
     optional: true
 
   - keyname: show_platform
-    name: Show platform
-    field_type: string
-    default: "true"
-    help_text: "true or false."
+    name: Show the platform
+    field_type: boolean
+    needs_capability: platforms
+    default: true
     optional: true
 
   - keyname: hide_cancelled
-    name: Hide cancelled
-    field_type: string
-    default: "false"
-    help_text: "true or false."
+    name: Hide cancelled departures
+    field_type: boolean
+    default: false
+    help_text: Off is usually better - a cancelled train is worth knowing about.
     optional: true
 
   - keyname: title
     name: Heading
     field_type: string
     default: ""
-    help_text: Defaults to "origin to destination".
+    help_text: >
+      The line across the top. Left blank it reads "Milano Cadorna to Saronno",
+      which is usually what you want.
     optional: true
 
 # What a rule may ask this extension about.

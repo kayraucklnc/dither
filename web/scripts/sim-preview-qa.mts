@@ -1,5 +1,11 @@
 import { chromium } from "playwright";
 
+import { scratch } from "./scratch.mts";
+
+// Its own screen and device: these save, and saving over a real one has
+// already scrambled somebody's work.
+const { screenId, deviceId } = await scratch();
+
 /** Toggling an alert in Test must change the thumbnails, not only the trace. */
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
@@ -8,7 +14,7 @@ page.on("request", (request) => {
   if (request.url().includes("/api/preview/screen/")) seen.push(request.url());
 });
 
-await page.goto("http://localhost:3000/devices/8", { waitUntil: "domcontentloaded" });
+await page.goto(`http://localhost:3000/devices/${deviceId}`, { waitUntil: "domcontentloaded" });
 await page.waitForTimeout(4000);
 
 const plain = seen.filter((url) => !url.includes("sim=")).length;

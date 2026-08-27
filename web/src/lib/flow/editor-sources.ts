@@ -71,6 +71,7 @@ export async function editorSources(device: Device, now = new Date()): Promise<E
       facts: source.facts,
       values,
       fields: extension?.manifest.fields,
+      capabilitiesFrom: extension?.manifest.capabilities_from,
       settings: trigger?.settings,
       error: source.error,
       usedBy: uses.get(source.id) ?? 0,

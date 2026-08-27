@@ -30,6 +30,8 @@ export interface PaletteEntry {
   headline: ShapeId;
   /** Sizes whose design has somewhere to show another extension's alert. */
   noticeShapes: ShapeId[];
+  /** Where "what can these settings do" is answered, for hiding fields. */
+  capabilitiesFrom?: string;
 }
 
 export interface EditorWidget {
@@ -82,6 +84,8 @@ export function ScreenEditor({
   const [save, setSave] = useState<SaveState>("idle");
   const [nextId, setNextId] = useState(-1);
   const [dragging, setDragging] = useState(false);
+  const [dataVersion, setDataVersion] = useState(0);
+  const [fetching, setFetching] = useState(false);
   const [armed, setArmed] = useState<Layout | undefined>(() => matching(initialWidgets));
 
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -89,6 +93,42 @@ export function ScreenEditor({
   const byName = useMemo(() => new Map(palette.map((entry) => [entry.name, entry])), [palette]);
 
   /* ---------------------------------------------------------------- preview */
+
+  /**
+   * Settings decide what a widget asks the world, so changing them makes the
+   * answer it is holding wrong. Refetching is debounced hard - this fires on
+   * keystrokes - and only for widgets the server already knows about.
+   */
+  const settingsSignature = JSON.stringify(
+    widgets.filter((widget) => widget.id > 0).map((widget) => [widget.id, widget.settings]),
+  );
+  const firstSettings = useRef(true);
+
+  useEffect(() => {
+    if (firstSettings.current) {
+      firstSettings.current = false;
+      return;
+    }
+
+    const ids = widgets.filter((widget) => widget.id > 0).map((widget) => widget.id);
+    if (!ids.length) return;
+
+    const timer = setTimeout(async () => {
+      setFetching(true);
+
+      await fetch("/api/widgets/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ widgetIds: ids }),
+      }).catch(() => undefined);
+
+      setFetching(false);
+      setDataVersion((value) => value + 1);
+    }, 900);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsSignature]);
 
   useEffect(() => {
     let cancelled = false;
@@ -127,7 +167,7 @@ export function ScreenEditor({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [widgets, modelId]);
+  }, [widgets, modelId, dataVersion]);
 
   /* ------------------------------------------------------------------- save */
 
@@ -518,9 +558,9 @@ export function ScreenEditor({
                 );
               })}
 
-              {rendering && (
+              {(rendering || fetching) && (
                 <span className="absolute top-2 right-2 rounded-full bg-black/70 px-2 py-1 text-[10px] text-white">
-                  rendering
+                  {fetching ? "fetching" : "rendering"}
                 </span>
               )}
             </div>
@@ -696,6 +736,7 @@ export function ScreenEditor({
             <div className="border-t border-line pt-5">
               <SettingsForm
                 fields={selectedEntry.fields}
+                capabilitiesFrom={selectedEntry.capabilitiesFrom}
                 values={selected.settings}
                 onChange={(key, value) =>
                   update(selected.id, { settings: { ...selected.settings, [key]: value } })
