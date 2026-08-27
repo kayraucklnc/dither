@@ -65,6 +65,67 @@ export function bucketByDay(
   });
 }
 
+export interface HourBucket {
+  /** "09". */
+  hour: string;
+  /** "09:00". */
+  label: string;
+  amount: number;
+  /** True once the hour has not happened yet, so a chart can stop drawing. */
+  ahead: boolean;
+}
+
+/**
+ * Today, hour by hour, in the installation's zone.
+ *
+ * The one series that says something the daily bars cannot: whether a quiet
+ * day is quiet because it is nine in the morning. Hours that have not happened
+ * yet are marked rather than dropped - a chart that ends at the current hour
+ * looks like a chart of a whole day, and reads as a collapse.
+ */
+export function bucketByHour(
+  entries: Entry[],
+  timezone: string,
+  since: Date,
+  now: Date,
+): HourBucket[] {
+  const totals = new Array<number>(24).fill(0);
+  const hourOf = new Intl.DateTimeFormat("en-GB", {
+    timeZone: timezone,
+    hour: "2-digit",
+    hourCycle: "h23",
+  });
+
+  for (const entry of entries) {
+    if (entry.at < since) continue;
+    totals[Number(hourOf.format(entry.at))] += entry.amount;
+  }
+
+  const current = Number(hourOf.format(now));
+
+  return totals.map((amount, hour) => ({
+    hour: String(hour).padStart(2, "0"),
+    label: `${String(hour).padStart(2, "0")}:00`,
+    amount,
+    ahead: hour > current,
+  }));
+}
+
+/**
+ * A running total across a series.
+ *
+ * What makes two periods comparable on one chart: day seven of last week
+ * against day seven of this one is a race, where two jagged daily lines are a
+ * pair of scribbles.
+ */
+export function runningTotal(amounts: number[]): number[] {
+  let carried = 0;
+  return amounts.map((amount) => {
+    carried += amount;
+    return carried;
+  });
+}
+
 /** Everything on or after an instant. The rolling windows - "the last 24 hours". */
 export function sumSince(entries: Entry[], since: Date): number {
   return entries.reduce((total, entry) => (entry.at >= since ? total + entry.amount : total), 0);

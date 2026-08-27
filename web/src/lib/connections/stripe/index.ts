@@ -8,6 +8,8 @@ import {
   WINDOWS,
   afterDiscounts,
   bucketByDay,
+  bucketByHour,
+  runningTotal,
   forecastNext,
   monthlyValue,
   sumBetween,
@@ -371,9 +373,23 @@ async function fetchRevenue(
 
   const sign = (value: number) => `${value >= 0 ? "+" : ""}${value}`;
 
-  const compact = settings.compact_figures !== false;
-  const money = (amount: number) =>
-    formatMoney(toMajorUnits(amount, currency), currency, locale, { compact });
+  /**
+   * Every figure in both lengths, because how long a number is drawn is the
+   * widget's business and not the account's.
+   *
+   * This used to read `settings.compact_figures` and format one way, which
+   * quietly made "shorten large numbers" a *question* rather than a style: two
+   * revenue widgets that disagreed about it asked Stripe twice for the same
+   * numbers. Sending both costs a dozen bytes and buys a screenful of widgets
+   * one fetch between them.
+   */
+  const money = (amount: number) => {
+    const major = toMajorUnits(amount, currency);
+    const short = formatMoney(major, currency, locale, { compact: true });
+    const full = formatMoney(major, currency, locale, { compact: false });
+
+    return { ...short, figure_full: full.figure, text_full: full.text };
+  };
 
   const windows = Object.fromEntries(
     WINDOWS.map((window) => {
@@ -417,7 +433,7 @@ async function fetchRevenue(
           detail:
             window.key === "today"
               ? `${succeededToday} payment${succeededToday === 1 ? "" : "s"}`
-              : `against ${money(previous).text} ${window.against}`,
+              : `against ${money(previous).text_full} ${window.against}`,
           delta: delta === null ? null : `${sign(delta)}% on ${window.against}`,
           // The same figure with nothing after it, for a box too small to hold
           // the sentence. A design should be able to drop the words without
@@ -428,6 +444,41 @@ async function fetchRevenue(
       ];
     }),
   );
+
+  /**
+   * The last seven days against the seven before, both as running totals.
+   *
+   * Two jagged daily lines on one chart are a pair of scribbles. Two running
+   * totals are a race, and a race is readable across a room: either this week's
+   * line is above last week's or it is not.
+   *
+   * Seven against seven rather than this month against last, because the fetch
+   * only reaches back thirty days - a month-against-month comparison would be
+   * built on data that is not there for most of the month, and a chart missing
+   * half its history is worse than a chart of a shorter period.
+   */
+  const paceDays = days.slice(-14);
+  const before = runningTotal(paceDays.slice(0, 7).map((bucket) => bucket.amount));
+  const lately = runningTotal(paceDays.slice(7).map((bucket) => bucket.amount));
+
+  const pace = {
+    label: "the last 7 days",
+    against: "the 7 before",
+    ahead: (lately[lately.length - 1] ?? 0) >= (before[before.length - 1] ?? 0),
+    change_percent: changePercent(lately[lately.length - 1] ?? 0, before[before.length - 1] ?? 0),
+    current: paceDays.slice(7).map((bucket, index) => ({
+      day: bucket.day,
+      date: bucket.date,
+      amount: toMajorUnits(bucket.amount, currency),
+      total: toMajorUnits(lately[index], currency),
+    })),
+    previous: paceDays.slice(0, 7).map((bucket, index) => ({
+      day: bucket.day,
+      date: bucket.date,
+      amount: toMajorUnits(bucket.amount, currency),
+      total: toMajorUnits(before[index], currency),
+    })),
+  };
 
   /* -- subscribers -------------------------------------------------------- */
 
@@ -464,7 +515,7 @@ async function fetchRevenue(
       figure: money(subscriptions.mrr).figure,
       symbol: symbolFor(currency),
       detail:
-        `${money(subscriptions.mrr * 12).text} a year` +
+        `${money(subscriptions.mrr * 12).text_full} a year` +
         (subscriptions.unpriced ? `, ${subscriptions.unpriced} usage-priced left out` : ""),
       delta: null as string | null,
       delta_short: null as string | null,
@@ -478,7 +529,7 @@ async function fetchRevenue(
       symbol: "",
       detail: subscriptions.trialing
         ? `${plain(subscriptions.trialing)} on trial`
-        : `${money(subscriptions.mrr).text} a month between them`,
+        : `${money(subscriptions.mrr).text_full} a month between them`,
       delta: null as string | null,
       delta_short: null as string | null,
       rising: true,
@@ -516,7 +567,7 @@ async function fetchRevenue(
       figure: renewal ? whenInWords(renewal.at.getTime() - now.getTime()) : "—",
       symbol: "",
       detail: renewal
-        ? `${money(renewal.amount).text}${renewal.customer ? ` from ${renewal.customer}` : ""}`
+        ? `${money(renewal.amount).text_full}${renewal.customer ? ` from ${renewal.customer}` : ""}`
         : "nothing scheduled",
       delta: null as string | null,
       delta_short: null as string | null,
@@ -595,7 +646,14 @@ async function fetchRevenue(
         : null,
 
       /* Charts. `week` is the last seven of `days`, so a design can take
-         either without a second fetch. */
+         either without a second fetch, and `hours` is today alone - the one
+         series that can say whether a quiet day is quiet because it is nine in
+         the morning. */
+      hours: bucketByHour(gross, timezone, starts.today, now).map((bucket) => ({
+        ...bucket,
+        amount: toMajorUnits(bucket.amount, currency),
+      })),
+      pace,
       week: week.map((bucket) => ({
         day: bucket.day,
         date: bucket.date,

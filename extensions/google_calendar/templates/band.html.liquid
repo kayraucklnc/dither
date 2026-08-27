@@ -1,0 +1,135 @@
+{% comment %}
+  Band - a shallow strip: what is now, what is next, and the day across it.
+
+  A band has one line of height, so the day goes in sideways. The same ribbon
+  as the tall design turned on its side, at a tenth of the resolution: no
+  titles, just where the solid parts of the day are and where you are in it.
+  From across a room that is the whole question - is the afternoon a wall or a
+  field.
+{% endcomment %}
+
+{%- assign day = calendar -%}
+{%- assign hh = "now" | date: "%H" | times: 60 -%}
+{%- assign now_mins = "now" | date: "%M" | plus: hh -%}
+
+{%- assign running = false -%}
+{%- assign coming = false -%}
+{%- for event in day.upcoming -%}
+  {%- if event.start_minutes > now_mins -%}
+    {%- if coming == false %}{% assign coming = event %}{% endif -%}
+  {%- elsif running == false and event.end_minutes > now_mins -%}
+    {%- assign running = event -%}
+  {%- endif -%}
+{%- endfor -%}
+
+{%- assign open = extension.values.day_start | default: "08:00" | minutes_of -%}
+{%- assign close = extension.values.day_end | default: "20:00" | minutes_of -%}
+{%- for event in day.events -%}
+  {%- if event.start_minutes < open -%}
+    {%- assign open = event.start_minutes | divided_by: 60 | times: 60 -%}
+  {%- endif -%}
+  {%- if event.end_minutes > close -%}
+    {%- assign close = event.end_minutes | plus: 59 | divided_by: 60 | times: 60 -%}
+  {%- endif -%}
+{%- endfor -%}
+{%- if now_mins < open %}{% assign open = now_mins | divided_by: 60 | times: 60 %}{% endif -%}
+{%- if now_mins > close %}{% assign close = now_mins | plus: 59 | divided_by: 60 | times: 60 %}{% endif -%}
+{%- assign span = close | minus: open | at_least: 120 -%}
+
+{%- assign box_w = shape.width | at_least: 300 -%}
+{%- assign box_h = shape.height | at_least: 60 -%}
+{%- assign pad = box_h | divided_by: 5 | at_least: 8 | at_most: 18 -%}
+{%- assign title_size = box_h | divided_by: 5 | at_least: 15 | at_most: 30 -%}
+
+<div class="screen">
+  <div class="content layout layout--row" style="align-items: center; gap: {{ pad | times: 1.5 | round }}px; padding: {{ pad }}px {{ pad | times: 1.6 | round }}px">
+    {%- comment %} The left third: what you are in, or what is coming, and how
+      long you have. Everything else on the band is context for this. {% endcomment -%}
+    <div style="flex: 0 0 40%; min-width: 0">
+      {% if running %}
+        {%- assign left = running.end_minutes | minus: now_mins -%}
+        <p class="with-icon t-xs t-upper t-bold" style="gap: 5px">
+          <span class="badge">Now</span>{{ left | at_least: 1 }} min left
+        </p>
+        <p class="t-bold truncate" style="font-size: {{ title_size }}px; line-height: 1.15">{{ running.title }}</p>
+      {% elsif coming %}
+        {%- assign until = coming.start_minutes | minus: now_mins -%}
+        <p class="with-icon t-xs t-upper t-bold" style="gap: 5px">
+          <span class="i i-clock i-xs"></span>{{ until | in_words }}{% if coming.start_minutes >= 1440 %} &middot; tomorrow{% endif %}
+        </p>
+        <p class="t-bold truncate" style="font-size: {{ title_size }}px; line-height: 1.15">
+          <span class="t-mono">{{ coming.start }}</span> {{ coming.title }}
+        </p>
+      {% else %}
+        <p class="with-icon t-bold" style="font-size: {{ title_size }}px; gap: 8px">
+          <span class="i i-calendar-check i-sm"></span>Nothing left today
+        </p>
+      {% endif %}
+      {% if shape.rows > 3 and extension.values.show_location != false and running == false and coming.location != blank %}
+        <p class="with-icon t-xs truncate" style="margin-top: 2px">
+          <span class="i i-{% if coming.remote %}video{% else %}pin{% endif %} i-xs"></span>
+          <span class="truncate">{{ coming.location }}</span>
+        </p>
+      {% endif %}
+    </div>
+
+    {%- comment %} The day, sideways. Solid where something is booked, hatched
+      where it is already spent, with a rule at now. {% endcomment -%}
+    <div class="fit" style="min-width: 120px">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px">
+        <span class="t-xs t-bold">{{ day.today.busy_text }} booked</span>
+        <span class="t-xs">{{ day.today.remaining }} left &middot; {{ day.today.free_text }} free</span>
+      </div>
+
+      <div style="position: relative; border: 2px solid var(--ink); width: 100%;
+                  height: {{ box_h | divided_by: 4 | at_least: 14 | at_most: 34 }}px">
+        {% for event in day.events %}
+          {%- assign from = event.start_minutes | minus: open -%}
+          {%- assign until = event.end_minutes | minus: open -%}
+          {%- if until > 0 and from < span -%}
+            {%- if from < 0 %}{% assign from = 0 %}{% endif -%}
+            {%- if until > span %}{% assign until = span %}{% endif -%}
+            {%- assign at = from | times: 1000 | divided_by: span -%}
+            {%- assign wide = until | minus: from | times: 1000 | divided_by: span -%}
+            {%- assign done = false -%}
+            {%- if event.end_minutes <= now_mins %}{% assign done = true %}{% endif -%}
+            <span style="position: absolute; top: 0; bottom: 0; left: {{ at | divided_by: 10.0 }}%;
+                         width: {{ wide | divided_by: 10.0 }}%; min-width: 3px;
+                         {% if done %}background: repeating-linear-gradient(45deg, var(--ink) 0 2px, var(--paper) 2px 5px)
+                         {% else %}background: var(--ink){% endif %}"></span>
+          {%- endif -%}
+        {% endfor %}
+
+        {%- assign now_at = now_mins | minus: open | times: 1000 | divided_by: span -%}
+        {% if now_at >= 0 and now_at <= 1000 %}
+          <span style="position: absolute; top: -4px; bottom: -4px; left: {{ now_at | divided_by: 10.0 }}%;
+                       width: 3px; background: var(--ink); box-shadow: -2px 0 0 var(--paper), 2px 0 0 var(--paper)"></span>
+        {% endif %}
+      </div>
+
+      {% if shape.rows > 2 %}
+        <div style="display: flex; justify-content: space-between; margin-top: 3px">
+          <span class="t-xs">{{ open | divided_by: 60 }}:00</span>
+          <span class="t-xs">{{ close | divided_by: 60 }}:00</span>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if notices.size > 0 and shape.rows > 2 %}
+    <div class="notice-strip" style="padding: 5px {{ pad | times: 1.6 | round }}px">
+      {% for notice in notices %}
+        {% if notice.overflow %}
+          <span class="notice notice--more">+{{ notice.overflow }}</span>
+        {% else %}
+          <span class="notice notice--{{ notice.level }}" title="{{ notice.text }}">
+            <span class="i i-{{ notice.icon }}"></span>
+          </span>
+        {% endif %}
+      {% endfor %}
+      {% if shape.wide and notices[0].text != blank %}
+        <span class="notice-said">{{ notices[0].text }}</span>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>

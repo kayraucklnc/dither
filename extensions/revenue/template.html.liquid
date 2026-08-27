@@ -23,6 +23,13 @@
   {%- assign series = money.week -%}
 {%- elsif chart == "month" -%}
   {%- assign series = money.days -%}
+{%- elsif chart == "pace" -%}
+  {%- assign series = money.pace.current -%}
+{%- elsif chart == "today" -%}
+  {%- assign series = "" | split: "" -%}
+  {%- for hour in money.hours -%}
+    {%- unless hour.ahead %}{% assign series = series | concat: hour %}{% endunless -%}
+  {%- endfor -%}
 {%- elsif card.bars == "week" -%}
   {%- assign series = money.week -%}
 {%- else -%}
@@ -46,7 +53,11 @@
       <p class="t-sm">Paste a Stripe secret key under Connections and this fills in.</p>
     </div>
   {%- else -%}
-    {%- assign shown = card.symbol | append: card.figure -%}
+    {%- assign digits = card.figure -%}
+    {%- if extension.values.compact_figures == false and card.figure_full != blank -%}
+      {%- assign digits = card.figure_full -%}
+    {%- endif -%}
+    {%- assign shown = card.symbol | append: digits -%}
     {%- assign chars = shown | size | at_least: 3 -%}
     {%- comment %} The left column is a little over half the panel. {% endcomment -%}
     {%- assign by_width = shape.width | at_least: 400 | times: 52 | divided_by: 100 | times: 100 | divided_by: chars | divided_by: 56 -%}
@@ -101,36 +112,81 @@
       </div>
     </div>
 
-    {%- assign peak = 0 -%}
-    {%- assign trough = 999999999 -%}
-    {%- for point in series -%}
-      {%- if point.amount > peak %}{% assign peak = point.amount %}{% endif -%}
-      {%- if point.amount < trough %}{% assign trough = point.amount %}{% endif -%}
-    {%- endfor -%}
-    {%- assign span = peak | minus: trough -%}
-    {%- if span <= 0 %}{% assign span = 1 %}{% endif -%}
-    {%- assign count = series | size -%}
+    {%- comment %} A month of trading, drawn as a line rather than as bars. The
+    board has the width for thirty points, and thirty bars two pixels apart is
+    a comb - a line is what that many points actually want to be.
 
-    <div style="border-top: var(--rule) solid var(--ink); height: {{ box_h | divided_by: 4 | at_least: 88 | at_most: 130 }}px; padding: 10px var(--pad) 8px">
-      <div class="bars" style="gap: {% if count > 12 %}2{% else %}4{% endif %}px">
-        {% for point in series %}
-          <div class="bar">
-            {% if count <= 8 %}<span class="tick t-bold">{{ point.amount }}</span>{% endif %}
-            <span class="fill{% unless forloop.last %} fill--hatch{% endunless %}"
-                  style="height: {{ point.amount | minus: trough | times: 74 | divided_by: span | plus: 16 }}%"></span>
-            {%- comment %} A filter cannot appear inside an `if`, so the test is
-              assigned first. Every fifth day is labelled when there are thirty
-              of them; a week gets every one. {% endcomment -%}
-            {%- assign nth = forloop.index0 | modulo: 5 -%}
-            {% if count <= 8 or nth == 0 %}
-              <span class="tick">{{ point.day }}</span>
-            {% else %}
-              <span class="tick">&nbsp;</span>
-            {% endif %}
-          </div>
-        {% endfor %}
-      </div>
+    Scaled between the low and the high, never from zero: a month that runs
+    2180 to 4680 drawn from zero is a flat line that says nothing about the
+    month. Both ends are printed above it, so the scale is never a mystery.
+  {% endcomment -%}
+  {%- assign peak = 0 -%}
+  {%- assign trough = 999999999 -%}
+  {%- for point in series -%}
+    {%- if point.amount > peak %}{% assign peak = point.amount %}{% endif -%}
+    {%- if point.amount < trough %}{% assign trough = point.amount %}{% endif -%}
+  {%- endfor -%}
+  {%- assign spread = peak | minus: trough -%}
+  {%- if spread <= 0 %}{% assign spread = 1 %}{% endif -%}
+
+  {%- assign count = series | size | at_least: 2 -%}
+  {%- assign last = count | minus: 1 -%}
+  {%- assign stepped = false -%}
+  {%- if extension.values.line_style == "steps" %}{% assign stepped = true %}{% endif -%}
+
+  {%- assign points = "" -%}
+  {%- for point in series -%}
+    {%- assign height = point.amount | minus: trough | times: 250 | divided_by: spread -%}
+    {%- assign y = 275 | minus: height -%}
+    {%- if stepped -%}
+      {%- assign x0 = forloop.index0 | times: 1000 | divided_by: count -%}
+      {%- assign x1 = forloop.index | times: 1000 | divided_by: count -%}
+      {%- assign points = points | append: x0 | append: "," | append: y | append: " "
+                                 | append: x1 | append: "," | append: y | append: " " -%}
+    {%- else -%}
+      {%- assign x = forloop.index0 | times: 1000 | divided_by: last -%}
+      {%- assign points = points | append: x | append: "," | append: y | append: " " -%}
+    {%- endif -%}
+  {%- endfor -%}
+
+  {%- assign filled = true -%}
+  {%- if extension.values.line_style == "line" %}{% assign filled = false %}{% endif -%}
+
+  <div style="border-top: var(--rule) solid var(--ink); height: {{ box_h | divided_by: 3 | at_least: 96 | at_most: 150 }}px;
+              padding: 8px var(--pad) 10px; display: flex; flex-direction: column; gap: 4px">
+    <div style="display: flex; justify-content: space-between; flex: none">
+      <span class="t-xs t-bold t-upper">{{ series[0].date }} to today</span>
+      <span class="t-xs">high {{ money.symbol }}{{ peak }} &middot; low {{ money.symbol }}{{ trough }}</span>
     </div>
+    <div class="fit" style="min-height: 30px">
+      <svg viewBox="0 0 1000 300" preserveAspectRatio="none" width="100%" height="100%"
+           fill="none" stroke="black" style="display: block">
+          {%- comment %} The fill is a ramp from ink at the line to paper at the
+            baseline, not a solid mass. The panel is dithered on the way out, so
+            the ramp is resolved into a stipple that thins as it falls - which is
+            the only kind of tint a 1-bit display has, and the one thing it does
+            beautifully. A solid black area is a heavy blot at this size; a
+            stipple reads as depth and leaves the gridline under it visible.
+
+            The gradient is in objectBoundingBox units, so it spans the filled
+            shape itself - darkest along the highest peak, gone by the axis -
+            and the non-uniform stretch of the viewBox does not distort it. {% endcomment -%}
+          <defs>
+            <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#000"/>
+              <stop offset="0.55" stop-color="#8a8a8a"/>
+              <stop offset="1" stop-color="#ffffff"/>
+            </linearGradient>
+          </defs>
+        <line x1="0" y1="275" x2="1000" y2="275" stroke-width="2" vector-effect="non-scaling-stroke"/>
+        {% if filled %}
+          <polygon points="0,275 {{ points }}1000,275" fill="url(#fade)" stroke="none"/>
+        {% endif %}
+        <polyline points="{{ points }}" stroke-width="{% if filled %}2{% else %}4{% endif %}"
+                  stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+      </svg>
+    </div>
+  </div>
   {%- endunless -%}
 
   {% comment %}

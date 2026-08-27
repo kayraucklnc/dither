@@ -1,6 +1,7 @@
 import { Liquid } from "liquidjs";
 
 import { refusal } from "@/lib/designs";
+import { partOfDay, spanInWords, throughDay, timeInWords } from "@/lib/timewords";
 import { templateFor, type Extension } from "@/lib/extensions/registry";
 import { COLUMNS, ROWS, sizeLabel, type Size } from "@/lib/shapes";
 
@@ -26,6 +27,14 @@ import { COLUMNS, ROWS, sizeLabel, type Size } from "@/lib/shapes";
  * building one parses nothing but registering the filters is not free.
  */
 const engines = new Map<string, Liquid>();
+
+/**
+ * What a panel does when nobody has said otherwise, in seconds.
+ *
+ * Shared by the previews, which have no device to ask, so a design tuned
+ * against a thumbnail is tuned against the case it will actually meet.
+ */
+export const DEFAULT_REFRESH_SECONDS = 900;
 
 export interface Environment {
   locale: string;
@@ -166,6 +175,47 @@ function register(engine: Liquid): void {
   engine.registerFilter("at_most", (value: unknown, ceiling: unknown) =>
     Math.min(Number(value) || 0, Number(ceiling) || 0),
   );
+
+  /**
+   * Saying the time in a way that survives being on a wall.
+   *
+   * A panel is redrawn every quarter of an hour at best, so a design that
+   * draws the clock is drawing something that has to still be true when the
+   * device next wakes. These take minutes since local midnight and the window
+   * the drawing has to last - `dither.window_minutes` - and hedge accordingly.
+   * See lib/timewords.ts.
+   */
+  engine.registerFilter("time_in_words", (minutes: unknown, window: unknown = 15) =>
+    timeInWords(Number(minutes) || 0, Number(window) || 15),
+  );
+  engine.registerFilter("part_of_day", (minutes: unknown) => partOfDay(Number(minutes) || 0));
+  engine.registerFilter("span_in_words", (minutes: unknown) => spanInWords(Number(minutes) || 0));
+  /** How far through a stretch of the day, as a percentage. For arcs and bars. */
+  engine.registerFilter("through_day", (minutes: unknown, start: unknown, end: unknown) =>
+    throughDay(Number(minutes) || 0, Number(start) || 0, Number(end) || 0),
+  );
+  /**
+   * Sine and cosine of an angle in degrees, measured the way a clock face is:
+   * zero at twelve, increasing clockwise.
+   *
+   * A template can rotate a shape about a point without any of this, which is
+   * how the hands are drawn. What it cannot do is find a *point* on a circle,
+   * and that is what a filled wedge needs - two corners and an arc between
+   * them. Rather than approximate a slice with a thick stroked arc, which is a
+   * ring segment and reads as one, the geometry is offered honestly.
+   */
+  // Rounded, and never handed back as negative zero: "-0" in the middle of a
+  // path is legal and unreadable.
+  const place = (value: number) => (Math.round(value * 10_000) / 10_000) || 0;
+  const radians = (degrees: unknown) => ((Number(degrees) || 0) - 90) * (Math.PI / 180);
+
+  engine.registerFilter("sin_of", (degrees: unknown) => place(Math.sin(radians(degrees))));
+  engine.registerFilter("cos_of", (degrees: unknown) => place(Math.cos(radians(degrees))));
+  /** "07:30" as minutes since midnight, so a time setting can be arithmetic. */
+  engine.registerFilter("minutes_of", (value: unknown) => {
+    const match = /(\d{1,2}):(\d{2})/.exec(String(value ?? ""));
+    return match ? Number(match[1]) * 60 + Number(match[2]) : 0;
+  });
 }
 
 const DOCUMENT = /<body[^>]*>([\s\S]*)<\/body>/i;
@@ -188,11 +238,20 @@ export interface RenderContext {
   pixels?: { width: number; height: number };
   /** The design doing the drawing, which may not be the one authored for this size. */
   design?: { key: string; label: string };
+  /**
+   * How long this picture has to last, in seconds - the device's own refresh
+   * rate. A design that draws the clock needs it to know how much it may
+   * honestly claim; everything else can ignore it.
+   */
+  refreshSeconds?: number;
 }
 
 export async function renderTemplate(template: string, context: RenderContext): Promise<string> {
   const environment = context.environment ?? DEFAULT_ENVIRONMENT;
   const box = context.size ?? { columns: COLUMNS, rows: ROWS };
+  // A quarter of an hour is what a panel does unless it is told otherwise, and
+  // a preview has no device to ask - so it previews the common case.
+  const refresh = context.refreshSeconds ?? DEFAULT_REFRESH_SECONDS;
 
   const scope = {
     ...context.data,
@@ -204,6 +263,17 @@ export async function renderTemplate(template: string, context: RenderContext): 
       timezone: environment.timezone,
       offset_hours: Math.round(environment.timezoneOffset / 60),
       offset_seconds: environment.timezoneOffset * 60,
+      /**
+       * How long this drawing has to survive before the device wakes again.
+       *
+       * The panel is painted once and then left alone, so anything drawn from
+       * the clock is a claim about the *next* quarter of an hour rather than
+       * about this instant. A design that draws the time reads this and hedges
+       * by it - which is the difference between a clock that is wrong for
+       * fourteen minutes in every fifteen and one that is never wrong at all.
+       */
+      refresh_seconds: refresh,
+      window_minutes: Math.max(1, Math.round(refresh / 60)),
     },
     /**
      * The box this template is actually drawing into.
@@ -250,6 +320,8 @@ export interface WidgetRender {
   notices?: { icon: string; text: string; level: string }[];
   environment?: Environment;
   pixels?: { width: number; height: number };
+  /** How long the picture has to last. See RenderContext. */
+  refreshSeconds?: number;
 }
 
 /** Render a widget at a size, or say why that size cannot be drawn. */
@@ -277,6 +349,7 @@ export async function renderWidget(
         size,
         pixels: request.pixels,
         design: chosen.design,
+        refreshSeconds: request.refreshSeconds,
       }),
     };
   } catch (error) {

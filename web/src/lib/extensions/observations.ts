@@ -3,7 +3,7 @@ import { inArray } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { observations } from "@/lib/db/schema";
-import { find } from "@/lib/extensions/registry";
+import { find, questionSettings } from "@/lib/extensions/registry";
 
 /**
  * One answer per question, shared by everything that asks it.
@@ -23,6 +23,26 @@ export function observationKey(extension: string, settings: Record<string, unkno
   );
 
   return createHash("sha256").update(`${extension} ${canonical}`).digest("hex").slice(0, 32);
+}
+
+/**
+ * The key an answer is *stored* under, which is not always the key a caller
+ * holds.
+ *
+ * A caller identifies a widget by everything it is configured with, and that
+ * is the right identity for "which answer is mine". But two widgets that
+ * differ only in how they draw the same numbers are asking one question, and
+ * they must not cost two trips to Stripe - so the stored key is taken over the
+ * settings that decide what is fetched, with the presentational ones dropped.
+ *
+ * Keeping the two apart means no caller has to remember to filter: pass the
+ * settings you have, get the answer to the question they imply.
+ */
+export async function storedKey(
+  extension: string,
+  settings: Record<string, unknown>,
+): Promise<string> {
+  return observationKey(extension, questionSettings(await find(extension), settings));
 }
 
 export interface Answer {
@@ -48,7 +68,17 @@ export interface Question {
  * or has an API key. It is never handed to a device that has real data.
  */
 export async function answersFor(asked: Question[]): Promise<Map<string, Answer>> {
-  const keys = [...new Set(asked.map((one) => observationKey(one.extension, one.settings)))];
+  // Two keys per question: the one the caller will look this up by, over all
+  // of its settings, and the one it is filed under, over the settings that
+  // decide what was fetched. They are the same for most extensions and differ
+  // wherever a design brings its own settings.
+  const filed = new Map<string, string>();
+  for (const one of asked) {
+    const key = observationKey(one.extension, one.settings);
+    if (!filed.has(key)) filed.set(key, await storedKey(one.extension, one.settings));
+  }
+
+  const keys = [...new Set(filed.values())];
 
   const rows = keys.length
     ? await db.select().from(observations).where(inArray(observations.key, keys))
@@ -61,7 +91,7 @@ export async function answersFor(asked: Question[]): Promise<Map<string, Answer>
     const key = observationKey(one.extension, one.settings);
     if (answers.has(key)) continue;
 
-    const row = stored.get(key);
+    const row = stored.get(filed.get(key)!);
 
     if (row?.fetchedAt && Object.keys(row.payload).length) {
       answers.set(key, {
@@ -94,11 +124,15 @@ export async function record(
   payload: Record<string, unknown>,
   now: Date,
 ): Promise<void> {
-  const key = observationKey(extension, settings);
+  // Filed under the question, and *with* the question: the row's settings are
+  // what would be sent to the provider again, not what one widget happened to
+  // be drawn with.
+  const asked = questionSettings(await find(extension), settings);
+  const key = observationKey(extension, asked);
 
   await db
     .insert(observations)
-    .values({ key, extension, settings, payload, fetchedAt: now, attemptedAt: now, error: null })
+    .values({ key, extension, settings: asked, payload, fetchedAt: now, attemptedAt: now, error: null })
     .onConflictDoUpdate({
       target: observations.key,
       set: { payload, fetchedAt: now, attemptedAt: now, error: null },
@@ -111,13 +145,14 @@ export async function recordFailure(
   error: string,
   now = new Date(),
 ): Promise<void> {
-  const key = observationKey(extension, settings);
+  const asked = questionSettings(await find(extension), settings);
+  const key = observationKey(extension, asked);
 
   // The payload is left alone - a dead provider should not blank a display -
   // but the attempt is written down, so a failure is distinguishable from a
   // question nobody has asked and does not get retried on every preview.
   await db
     .insert(observations)
-    .values({ key, extension, settings, payload: {}, attemptedAt: now, error })
+    .values({ key, extension, settings: asked, payload: {}, attemptedAt: now, error })
     .onConflictDoUpdate({ target: observations.key, set: { attemptedAt: now, error } });
 }

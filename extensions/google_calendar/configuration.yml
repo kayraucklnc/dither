@@ -1,21 +1,42 @@
-# Dither bundled extension: Google Calendar.
+# Dither bundled extension: Calendar.
 #
-# The first extension backed by a *connection* rather than a URL: you link a
-# Google account once under Connections, and every calendar widget on every
-# screen uses it. Settings here choose which calendar and how far ahead to
-# look, per placement - so "work calendar, next 8 hours" and "family calendar,
-# today" can sit on the same screen.
+# Backed by a Google account linked once under Connections. Settings here choose
+# which calendar and how far ahead to look, per placement - so "work calendar,
+# next 8 hours" and "family calendar, today" can sit on the same screen.
 #
-# The Google provider is mocked for now: it answers plausible meetings so the
+# What changed in version 2 is what the payload *is*. It used to be a list of
+# events and a countdown, which is enough to draw "what is next" and nothing
+# else. Everything anybody actually wants from a calendar on a wall is a fact
+# *about* the list rather than a fact in it: am I in something now, when am I
+# next free, how much of today is already spoken for, is anything double-booked,
+# what does tomorrow look like. All of that is interval arithmetic, all of it is
+# easy to get quietly wrong - two overlapping meetings are not two hours, an
+# all-day event is not sixteen hours of busy - so it lives in
+# web/src/lib/calendar/day.ts, under test, and this manifest is layout.
+#
+# One payload answers every question the account can be asked, because an
+# answer is cached by the question and the question is the account rather than
+# the widget. Six calendar widgets on one screen cost one trip between them,
+# and the settings that only choose how a day is *drawn* say so with
+# `presentation: true` so that they cannot split that trip in two.
+#
+# Times are carried as minutes since local midnight as well as as text. That is
+# what lets a design work out a countdown at the moment it draws rather than
+# trusting one computed at the last fetch - the same problem the clock has, and
+# the same answer: `tick` on each design says how often the picture would look
+# different, and the server redraws it exactly that often.
+#
+# The Google provider is still mocked: it answers a plausible, deliberately
+# awkward day - a double booking, an all-day event, one declined thing - so the
 # screens and the triggers can be designed and tested before the OAuth flow
-# exists. Swapping the mock for the real API changes one file and nothing else.
+# exists. Swapping the mock for the real API is one function.
 
-version: "1.0.0"
+version: "2.0.0"
 name: google_calendar
 label: Calendar
 description: >
-  What is next in your day, and what is after that. Links to a Google account
-  once and works on every screen.
+  What is next, what the rest of the day looks like, and where the gaps are.
+  Links to a Google account once and works on every screen.
 
 kind: connection
 connection: google
@@ -32,6 +53,61 @@ start_at: "2026-01-01T00:00:00Z"
 
 static_body: {}
 data: {}
+
+# The looks, and the sizes each will be drawn at.
+#
+# `tick` is how often the picture changes with the clock, in seconds. Every
+# design here counts down to something, so every one of them declares it: a
+# countdown redrawn only when the data moves is a countdown that is wrong by
+# however long ago the last fetch was.
+designs:
+  - template: next
+    label: What is next
+    hint: One meeting, as large as the box allows, with how long you have.
+    columns: [2, 12]
+    rows: [2, 12]
+    nominal: [6, 5]
+    tick: 300
+
+  - template: agenda
+    label: Agenda
+    hint: The day as a list, with the gaps between things marked.
+    columns: [3, 12]
+    rows: [4, 12]
+    nominal: [5, 12]
+    tick: 300
+
+  - template: ribbon
+    label: The day
+    hint: Every meeting drawn where it falls, so the shape of the day is visible at a glance.
+    columns: [3, 8]
+    rows: [6, 12]
+    nominal: [4, 12]
+    tick: 300
+
+  - template: band
+    label: Band
+    hint: A shallow strip - what is now, what is next, and the day drawn across it.
+    columns: [6, 12]
+    rows: [2, 5]
+    nominal: [12, 4]
+    tick: 300
+
+  - template: week
+    label: The week
+    hint: Seven days, how full each one is, and what starts it.
+    columns: [6, 12]
+    rows: [3, 10]
+    nominal: [12, 6]
+    tick: 900
+
+  - template: full
+    label: Board
+    hint: What is next, the whole day beside it, and what is left of it.
+    columns: [8, 12]
+    rows: [8, 12]
+    nominal: [12, 12]
+    tick: 300
 
 fields:
   - keyname: calendar
@@ -54,34 +130,87 @@ fields:
     default: 12
     min: 1
     max: 72
-    help_text: Hours ahead to consider. Meetings past this are ignored.
+    help_text: >
+      Hours ahead to consider. It is what "what is next" is allowed to reach
+      into tomorrow for; the day and week views always show their whole day.
     optional: false
-
-  - keyname: heading
-    name: Heading
-    field_type: string
-    default: "Today"
-    help_text: Label above the list. Leave blank to hide it.
-    optional: true
 
   - keyname: hide_declined
     name: Hide declined
     field_type: boolean
     default: true
-    help_text: Leave out events you have declined.
+    help_text: Leave out events you have declined. They are never counted as busy either way.
+    optional: true
+
+  # Everything below only changes how the day is drawn, never what is fetched
+  # for it - which is what `presentation` says, and what stops a screen with
+  # three differently-styled calendar widgets on it asking Google three times.
+  - keyname: heading
+    name: Heading
+    field_type: string
+    default: ""
+    help_text: Left empty, the design names itself - "Today", or the date.
+    presentation: true
     optional: true
 
   - keyname: show_location
-    name: Show location
+    name: Show where
     field_type: boolean
     default: true
     help_text: Room, address or video link under each meeting.
+    presentation: true
     optional: true
 
-# Everything below becomes a trigger you can build a rule from. The declared
-# type decides which comparisons the editor offers.
-# Its designs have a strip at the bottom where another extension's notice
-# can appear - a service alert while you are looking at the weather.
+  - keyname: show_done
+    name: Keep what has already happened
+    field_type: boolean
+    default: false
+    help_text: >
+      Off, the day empties as it goes and what is left is at the top. On, the
+      whole day stays on screen with the finished part struck through - which
+      is the one you want on a wall somebody walks past all day.
+    visible_when:
+      field: design
+      any_of: [agenda, full]
+    presentation: true
+    optional: true
+
+  - keyname: show_gaps
+    name: Mark the gaps
+    field_type: boolean
+    default: true
+    help_text: >
+      Says how long the holes between meetings are. Seeing the gaps is most of
+      what anybody wants from a day at a glance.
+    visible_when:
+      field: design
+      any_of: [agenda, ribbon, full]
+    presentation: true
+    optional: true
+
+  - keyname: day_start
+    name: The day view starts
+    field_type: time
+    default: "08:00"
+    help_text: >
+      Where the drawn day begins. Anything earlier than this stretches it, so
+      an eight o'clock start never hides a seven o'clock flight.
+    visible_when:
+      field: design
+      any_of: [ribbon, band, full]
+    presentation: true
+    optional: true
+
+  - keyname: day_end
+    name: and ends
+    field_type: time
+    default: "20:00"
+    presentation: true
+    visible_when:
+      field: design
+      any_of: [ribbon, band, full]
+    optional: true
+
 accepts_notices: true
 
 notices:
@@ -94,6 +223,26 @@ notices:
       fact: next_meeting_in
       operator: lt
       value: 10
+
+  - key: double_booked
+    label: Double booked
+    icon: alert
+    level: warn
+    text: "Two things at once today"
+    when:
+      fact: conflicts_today
+      operator: gte
+      value: 1
+
+  - key: clear_day
+    label: Nothing left today
+    icon: calendar-check
+    level: info
+    text: "Nothing left today"
+    when:
+      fact: meetings_left
+      operator: eq
+      value: 0
 
 facts:
   - key: next_meeting_in
@@ -120,49 +269,641 @@ facts:
     path: calendar.next.remote
     unit: ""
 
-  - key: meetings_today
+  - key: next_meeting_at
+    label: Next meeting is at
+    type: time
+    path: calendar.next.start
+    unit: ""
+
+  - key: in_a_meeting
+    label: In a meeting now
+    type: boolean
+    path: calendar.now.in_meeting
+    unit: ""
+
+  - key: current_meeting_title
+    label: In this meeting
+    type: text
+    path: calendar.current.title
+    unit: ""
+
+  - key: minutes_until_free
+    label: Out of this meeting in
+    type: duration
+    path: calendar.current.minutes_left
+    unit: minutes
+
+  - key: meetings_left
     label: Meetings left today
     type: number
-    path: calendar.remaining_today
+    path: calendar.today.remaining
+    unit: ""
+
+  - key: meetings_today
+    label: Meetings today
+    type: number
+    path: calendar.today.total
+    unit: ""
+
+  - key: busy_minutes_today
+    label: Booked today
+    type: duration
+    path: calendar.today.busy_minutes
+    unit: minutes
+
+  - key: day_load
+    label: How full today is
+    type: number
+    path: calendar.today.load_percent
+    unit: percent
+
+  - key: conflicts_today
+    label: Double bookings today
+    type: number
+    path: calendar.today.conflicts
     unit: ""
 
   - key: free_until
     label: Free for
     type: duration
-    path: calendar.free_minutes
+    path: calendar.now.free_minutes
     unit: minutes
 
-# Used for previews until the connection has answered once. Never sent to a
-# device.
+  - key: first_meeting_at
+    label: First meeting today
+    type: time
+    path: calendar.today.first_start
+    unit: ""
+
+  - key: meetings_tomorrow
+    label: Meetings tomorrow
+    type: number
+    path: calendar.tomorrow.count
+    unit: ""
+
+# Stand-in data for previews only, never served to a device. Generated from the
+# same code the mocked provider runs, so a design judged here is a design that
+# works the moment an account is linked - and deliberately awkward: a double
+# booking at a quarter past three, an all-day event that must not read as
+# sixteen hours of busy, and a long empty afternoon.
+#
+# Times are minutes since midnight as well as text, so a preview drawn at any
+# hour still counts down correctly against its own clock.
 sample:
   calendar:
-    remaining_today: 3
-    free_minutes: 24
+    account: Stand-in account
+    name: Primary
+    connected: true
     empty: false
+    now:
+      minutes_of_day: 581
+      text: 09:41
+      in_meeting: false
+      free_minutes: 49
+    current: null
     next:
-      title: "Design review"
-      minutes_until: 24
-      start: "10:30"
-      end: "11:15"
-      location: "Milano Centrale, Sala 4"
+      id: primary-1
+      title: Design review
+      start: 10:30
+      end: 11:15
+      start_minutes: 630
+      end_minutes: 675
+      at_epoch: 1787819400
+      ends_epoch: 1787822100
+      minutes_until: 49
+      minutes_left: 94
+      duration: 45
+      duration_text: 45m
+      location: Sala 4
       remote: false
       accepted: true
+      declined: false
+      tentative: false
+      all_day: false
+      organiser: Ana Ferrari
+      attendees: 6
+      calendar: primary
+      conflict: false
+      lane: 0
+      lanes: 1
+      done: false
+      running: false
+    after:
+      id: primary-2
+      title: Standup
+      start: 11:30
+      end: 11:45
+      start_minutes: 690
+      end_minutes: 705
+      at_epoch: 1787823000
+      ends_epoch: 1787823900
+      minutes_until: 109
+      minutes_left: 124
+      duration: 15
+      duration_text: 15m
+      location: Meet
+      remote: true
+      accepted: true
+      declined: false
+      tentative: false
+      all_day: false
+      organiser: ""
+      attendees: 9
+      calendar: primary
+      conflict: false
+      lane: 0
+      lanes: 1
+      done: false
+      running: false
     events:
-      - title: "Design review"
-        start: "10:30"
-        end: "11:15"
-        location: "Milano Centrale, Sala 4"
+      - id: primary-0
+        title: Gym
+        start: 07:00
+        end: 08:00
+        start_minutes: 420
+        end_minutes: 480
+        at_epoch: 1787806800
+        ends_epoch: 1787810400
+        minutes_until: -161
+        minutes_left: -101
+        duration: 60
+        duration_text: 1h
+        location: Virgin Active
         remote: false
-        minutes_until: 24
-      - title: "Standup"
-        start: "11:30"
-        end: "11:45"
-        location: "Meet"
+        accepted: true
+        declined: false
+        tentative: false
+        all_day: false
+        organiser: ""
+        attendees: 1
+        calendar: primary
+        conflict: false
+        lane: 0
+        lanes: 1
+        done: true
+        running: false
+      - id: primary-1
+        title: Design review
+        start: 10:30
+        end: 11:15
+        start_minutes: 630
+        end_minutes: 675
+        at_epoch: 1787819400
+        ends_epoch: 1787822100
+        minutes_until: 49
+        minutes_left: 94
+        duration: 45
+        duration_text: 45m
+        location: Sala 4
+        remote: false
+        accepted: true
+        declined: false
+        tentative: false
+        all_day: false
+        organiser: Ana Ferrari
+        attendees: 6
+        calendar: primary
+        conflict: false
+        lane: 0
+        lanes: 1
+        done: false
+        running: false
+      - id: primary-2
+        title: Standup
+        start: 11:30
+        end: 11:45
+        start_minutes: 690
+        end_minutes: 705
+        at_epoch: 1787823000
+        ends_epoch: 1787823900
+        minutes_until: 109
+        minutes_left: 124
+        duration: 15
+        duration_text: 15m
+        location: Meet
         remote: true
-        minutes_until: 84
-      - title: "1:1 with Ana"
-        start: "15:00"
-        end: "15:30"
-        location: "Sala 2"
+        accepted: true
+        declined: false
+        tentative: false
+        all_day: false
+        organiser: ""
+        attendees: 9
+        calendar: primary
+        conflict: false
+        lane: 0
+        lanes: 1
+        done: false
+        running: false
+      - id: primary-3
+        title: Lunch with Marco
+        start: 13:00
+        end: 14:00
+        start_minutes: 780
+        end_minutes: 840
+        at_epoch: 1787828400
+        ends_epoch: 1787832000
+        minutes_until: 199
+        minutes_left: 259
+        duration: 60
+        duration_text: 1h
+        location: Trattoria Milanese
         remote: false
-        minutes_until: 294
+        accepted: true
+        declined: false
+        tentative: false
+        all_day: false
+        organiser: ""
+        attendees: 2
+        calendar: primary
+        conflict: false
+        lane: 0
+        lanes: 1
+        done: false
+        running: false
+      - id: primary-4
+        title: Vendor call
+        start: 15:00
+        end: 15:30
+        start_minutes: 900
+        end_minutes: 930
+        at_epoch: 1787835600
+        ends_epoch: 1787837400
+        minutes_until: 319
+        minutes_left: 349
+        duration: 30
+        duration_text: 30m
+        location: Zoom
+        remote: true
+        accepted: true
+        declined: false
+        tentative: false
+        all_day: false
+        organiser: ""
+        attendees: 4
+        calendar: primary
+        conflict: true
+        lane: 0
+        lanes: 2
+        done: false
+        running: false
+      - id: primary-5
+        title: Quarterly planning
+        start: 15:15
+        end: 16:45
+        start_minutes: 915
+        end_minutes: 1005
+        at_epoch: 1787836500
+        ends_epoch: 1787841900
+        minutes_until: 334
+        minutes_left: 424
+        duration: 90
+        duration_text: 1h 30m
+        location: Sala 2
+        remote: false
+        accepted: true
+        declined: false
+        tentative: false
+        all_day: false
+        organiser: Priya Raman
+        attendees: 12
+        calendar: primary
+        conflict: true
+        lane: 1
+        lanes: 2
+        done: false
+        running: false
+      - id: primary-6
+        title: School run
+        start: 17:00
+        end: 17:30
+        start_minutes: 1020
+        end_minutes: 1050
+        at_epoch: 1787842800
+        ends_epoch: 1787844600
+        minutes_until: 439
+        minutes_left: 469
+        duration: 30
+        duration_text: 30m
+        location: ""
+        remote: false
+        accepted: false
+        declined: false
+        tentative: true
+        all_day: false
+        organiser: ""
+        attendees: 1
+        calendar: primary
+        conflict: false
+        lane: 0
+        lanes: 1
+        done: false
+        running: false
+    upcoming:
+      - id: primary-1
+        title: Design review
+        start: 10:30
+        end: 11:15
+        start_minutes: 630
+        end_minutes: 675
+        at_epoch: 1787819400
+        ends_epoch: 1787822100
+        minutes_until: 49
+        minutes_left: 94
+        duration: 45
+        duration_text: 45m
+        location: Sala 4
+        remote: false
+        accepted: true
+        declined: false
+        tentative: false
+        all_day: false
+        organiser: Ana Ferrari
+        attendees: 6
+        calendar: primary
+        conflict: false
+        lane: 0
+        lanes: 1
+        done: false
+        running: false
+      - id: primary-2
+        title: Standup
+        start: 11:30
+        end: 11:45
+        start_minutes: 690
+        end_minutes: 705
+        at_epoch: 1787823000
+        ends_epoch: 1787823900
+        minutes_until: 109
+        minutes_left: 124
+        duration: 15
+        duration_text: 15m
+        location: Meet
+        remote: true
+        accepted: true
+        declined: false
+        tentative: false
+        all_day: false
+        organiser: ""
+        attendees: 9
+        calendar: primary
+        conflict: false
+        lane: 0
+        lanes: 1
+        done: false
+        running: false
+      - id: primary-3
+        title: Lunch with Marco
+        start: 13:00
+        end: 14:00
+        start_minutes: 780
+        end_minutes: 840
+        at_epoch: 1787828400
+        ends_epoch: 1787832000
+        minutes_until: 199
+        minutes_left: 259
+        duration: 60
+        duration_text: 1h
+        location: Trattoria Milanese
+        remote: false
+        accepted: true
+        declined: false
+        tentative: false
+        all_day: false
+        organiser: ""
+        attendees: 2
+        calendar: primary
+        conflict: false
+        lane: 0
+        lanes: 1
+        done: false
+        running: false
+      - id: primary-4
+        title: Vendor call
+        start: 15:00
+        end: 15:30
+        start_minutes: 900
+        end_minutes: 930
+        at_epoch: 1787835600
+        ends_epoch: 1787837400
+        minutes_until: 319
+        minutes_left: 349
+        duration: 30
+        duration_text: 30m
+        location: Zoom
+        remote: true
+        accepted: true
+        declined: false
+        tentative: false
+        all_day: false
+        organiser: ""
+        attendees: 4
+        calendar: primary
+        conflict: true
+        lane: 0
+        lanes: 1
+        done: false
+        running: false
+      - id: primary-5
+        title: Quarterly planning
+        start: 15:15
+        end: 16:45
+        start_minutes: 915
+        end_minutes: 1005
+        at_epoch: 1787836500
+        ends_epoch: 1787841900
+        minutes_until: 334
+        minutes_left: 424
+        duration: 90
+        duration_text: 1h 30m
+        location: Sala 2
+        remote: false
+        accepted: true
+        declined: false
+        tentative: false
+        all_day: false
+        organiser: Priya Raman
+        attendees: 12
+        calendar: primary
+        conflict: true
+        lane: 0
+        lanes: 1
+        done: false
+        running: false
+      - id: primary-6
+        title: School run
+        start: 17:00
+        end: 17:30
+        start_minutes: 1020
+        end_minutes: 1050
+        at_epoch: 1787842800
+        ends_epoch: 1787844600
+        minutes_until: 439
+        minutes_left: 469
+        duration: 30
+        duration_text: 30m
+        location: ""
+        remote: false
+        accepted: false
+        declined: false
+        tentative: true
+        all_day: false
+        organiser: ""
+        attendees: 1
+        calendar: primary
+        conflict: false
+        lane: 0
+        lanes: 1
+        done: false
+        running: false
+    all_day:
+      - title: Ana on leave
+        calendar: primary
+    gaps:
+      - from: 09:41
+        to: 10:30
+        from_minutes: 581
+        to_minutes: 630
+        minutes: 49
+        text: 49m free
+      - from: 11:45
+        to: 13:00
+        from_minutes: 705
+        to_minutes: 780
+        minutes: 75
+        text: 1h 15m free
+      - from: 14:00
+        to: 15:00
+        from_minutes: 840
+        to_minutes: 900
+        minutes: 60
+        text: 1h free
+      - from: 17:30
+        to: 20:00
+        from_minutes: 1050
+        to_minutes: 1200
+        minutes: 150
+        text: 2h 30m free
+    longest_gap:
+      from: 17:30
+      to: 20:00
+      from_minutes: 1050
+      to_minutes: 1200
+      minutes: 150
+      text: 2h 30m free
+    today:
+      date: 27 Aug
+      day: Thu
+      total: 7
+      done: 1
+      remaining: 6
+      busy_minutes: 315
+      busy_text: 5h 15m
+      free_minutes: 465
+      free_text: 7h 45m
+      load_percent: 35
+      first_start: 07:00
+      last_end: 17:30
+      conflicts: 2
+    tomorrow:
+      count: 2
+      first:
+        id: primary-8
+        title: Dentist
+        start: 08:30
+        end: 09:15
+        start_minutes: 1950
+        end_minutes: 1995
+        at_epoch: 1787898600
+        ends_epoch: 1787901300
+        minutes_until: 1369
+        minutes_left: 1414
+        duration: 45
+        duration_text: 45m
+        location: Via Meravigli 12
+        remote: false
+        accepted: true
+        declined: false
+        tentative: false
+        all_day: false
+        organiser: ""
+        attendees: 0
+        calendar: primary
+        conflict: false
+        lane: 0
+        lanes: 1
+        done: false
+        running: false
+      busy_text: 2h 45m
+    days:
+      - day: Thu
+        date: 27 Aug
+        count: 7
+        busy_minutes: 315
+        busy_text: 5h 15m
+        load_percent: 44
+        first: 07:00
+        is_today: true
+        is_weekend: false
+      - day: Fri
+        date: 28 Aug
+        count: 2
+        busy_minutes: 165
+        busy_text: 2h 45m
+        load_percent: 23
+        first: 08:30
+        is_today: false
+        is_weekend: false
+      - day: Sat
+        date: 29 Aug
+        count: 1
+        busy_minutes: 60
+        busy_text: 1h
+        load_percent: 8
+        first: 16:00
+        is_today: false
+        is_weekend: true
+      - day: Sun
+        date: 30 Aug
+        count: 1
+        busy_minutes: 110
+        busy_text: 1h 50m
+        load_percent: 15
+        first: 06:40
+        is_today: false
+        is_weekend: true
+      - day: Mon
+        date: 31 Aug
+        count: 0
+        busy_minutes: 0
+        busy_text: ""
+        load_percent: 0
+        first: ""
+        is_today: false
+        is_weekend: false
+      - day: Tue
+        date: 1 Sept
+        count: 0
+        busy_minutes: 0
+        busy_text: ""
+        load_percent: 0
+        first: ""
+        is_today: false
+        is_weekend: false
+      - day: Wed
+        date: 2 Sept
+        count: 0
+        busy_minutes: 0
+        busy_text: ""
+        load_percent: 0
+        first: ""
+        is_today: false
+        is_weekend: false
+    window:
+      open: 420
+      close: 1200
+      span: 780
+      now_percent: 20.6
+    remaining_today: 6
+    free_minutes: 49
+
+exchanges: []

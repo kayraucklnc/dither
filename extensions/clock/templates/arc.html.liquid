@@ -1,0 +1,169 @@
+{% comment %}
+  The day - how much of it has gone, drawn as an arc.
+
+  The face that does not care about the refresh rate at all. A quarter of an
+  hour is one and a half per cent of a waking day, which is a pixel and a half
+  of arc: this drawing is as true when the device wakes as it was when it was
+  made. That is not a trick, it is what choosing a coarser question buys you.
+
+  The day it measures is *yours* - `day_start` to `day_end` - because "half the
+  day gone" at midday is arithmetic, and at half past two it is information.
+
+  The arc is a dashed semicircle: a hundred-radius arc is 314 units long, so a
+  percentage of the day is a percentage of that. No trigonometry, which a
+  templating language does not have.
+{% endcomment %}
+
+{%- assign shift = 0 -%}
+{%- if extension.values.utc_offset_hours != blank -%}
+  {%- assign shift = extension.values.utc_offset_hours | times: 3600 | minus: dither.offset_seconds -%}
+{%- endif -%}
+{%- assign stamp = "now" | date: "%s" | plus: shift -%}
+
+{%- assign hour24 = stamp | date: "%H" | times: 1 -%}
+{%- assign minute = stamp | date: "%M" | times: 1 -%}
+{%- assign mins = hour24 | times: 60 | plus: minute -%}
+{%- assign window = dither.window_minutes | at_least: 1 -%}
+
+{%- assign opens = extension.values.day_start | default: "07:00" | minutes_of -%}
+{%- assign closes = extension.values.day_end | default: "23:00" | minutes_of -%}
+{%- assign span = closes | minus: opens -%}
+{%- if span <= 0 %}{% assign span = 1440 | minus: opens | plus: closes %}{% endif -%}
+
+{%- assign through = mins | through_day: opens, closes -%}
+{%- assign gone = through | times: span | divided_by: 100 -%}
+{%- assign left = span | minus: gone -%}
+
+{%- comment %} 314 is the length of a hundred-radius semicircle. {% endcomment -%}
+{%- assign drawn = through | times: 314 | divided_by: 100 -%}
+{%- assign band = window | times: 314 | divided_by: span -%}
+{%- assign band_at = 0 | minus: drawn -%}
+{%- if extension.values.show_window == false %}{% assign band = 0 %}{% endif -%}
+
+{%- assign box_w = shape.width | at_least: 140 -%}
+{%- assign box_h = shape.height | at_least: 140 -%}
+{%- assign shorter = box_w | at_most: box_h -%}
+{%- assign pad = shorter | divided_by: 16 | at_least: 8 | at_most: 22 -%}
+
+{%- assign said = mins | time_in_words: window -%}
+{%- assign chars = said | size | at_least: 8 -%}
+
+{%- comment %} In a wide box the arc stands beside its words rather than over
+  them; in a tall one it sits above them. Either way the arc is given whatever
+  height is left *after* the words, because an arc that takes the room and
+  leaves a clipped sentence underneath is the failure this arithmetic exists
+  to avoid. {% endcomment -%}
+{%- assign wide_at = box_h | times: 17 | divided_by: 10 -%}
+{%- assign beside = false -%}
+{%- if box_w > wide_at and box_w > 380 %}{% assign beside = true %}{% endif -%}
+
+{%- assign under = 0 -%}
+{%- if notices.size > 0 %}{% assign under = 34 %}{% endif -%}
+{%- if extension.values.heading != blank %}{% assign under = under | plus: 26 %}{% endif -%}
+
+{%- assign detailed = false -%}
+{%- if shape.rows > 5 %}{% assign detailed = true %}{% endif -%}
+
+{%- if beside -%}
+  {%- assign room_h = box_h | minus: under | minus: pad | minus: pad -%}
+  {%- assign by_width = box_w | times: 52 | divided_by: 100 -%}
+  {%- assign arc_w = by_width | at_most: 520 -%}
+  {%- assign by_height = room_h | times: 172 | divided_by: 100 -%}
+  {%- assign arc_w = arc_w | at_most: by_height | at_least: 150 -%}
+  {%- assign words_size = box_w | minus: arc_w | times: 100 | divided_by: chars | divided_by: 46 | at_most: 44 | at_least: 13 -%}
+{%- else -%}
+  {%- comment %} The sentence first, then whatever height is left is the arc. {% endcomment -%}
+  {%- assign words_size = box_h | times: 12 | divided_by: 100 | at_most: 34 | at_least: 12 -%}
+  {%- assign by_chars = box_w | minus: pad | minus: pad | times: 100 | divided_by: chars | divided_by: 52 -%}
+  {%- assign words_size = words_size | at_most: by_chars | at_least: 11 -%}
+  {%- assign spent = words_size | times: 12 | divided_by: 10 | plus: pad -%}
+  {%- if detailed %}{% assign spent = spent | plus: 22 %}{% endif -%}
+  {%- assign room_h = box_h | minus: under | minus: pad | minus: pad | minus: spent -%}
+  {%- assign arc_w = box_w | minus: pad | minus: pad -%}
+  {%- assign by_height = room_h | times: 172 | divided_by: 100 -%}
+  {%- assign arc_w = arc_w | at_most: by_height | at_least: 120 -%}
+{%- endif -%}
+
+{%- assign arc_h = arc_w | times: 58 | divided_by: 100 -%}
+
+<div class="screen">
+  <div class="content layout layout--col layout--center" style="gap: {{ pad | divided_by: 2 }}px; padding: {{ pad }}px">
+    {% if extension.values.heading != blank %}
+      <p class="t-bold t-upper t-center truncate" style="font-size: 13px; width: 100%">{{ extension.values.heading }}</p>
+    {% endif %}
+
+    <div class="layout layout--{% if beside %}row{% else %}col{% endif %} layout--center" style="gap: {{ pad }}px; width: 100%">
+    <div style="flex: none; position: relative; width: {{ arc_w }}px; height: {{ arc_h }}px">
+      <svg viewBox="0 0 240 140" width="{{ arc_w }}" height="{{ arc_h }}" fill="none" stroke="black">
+        {%- comment %} The day not yet spent, drawn thin so the spent part
+          reads as weight rather than as colour - there being no colour. {% endcomment -%}
+        <path d="M 20 120 A 100 100 0 0 1 220 120" stroke-width="3" stroke-linecap="round"/>
+
+        {% if band > 0 %}
+          {%- comment %} Where the next quarter of an hour will take it. {% endcomment -%}
+          <path d="M 20 120 A 100 100 0 0 1 220 120" stroke-width="19" stroke-linecap="butt"
+                stroke-dasharray="{{ band }} 314" stroke-dashoffset="{{ band_at }}"/>
+          <path d="M 20 120 A 100 100 0 0 1 220 120" stroke="white" stroke-width="13" stroke-linecap="butt"
+                stroke-dasharray="{{ band }} 314" stroke-dashoffset="{{ band_at }}"/>
+        {% endif %}
+
+        <path d="M 20 120 A 100 100 0 0 1 220 120" stroke-width="16" stroke-linecap="butt"
+              stroke-dasharray="{{ drawn }} 314"/>
+
+        {%- comment %} The two ends of your day, said in figures at the feet of
+          the arc where they cannot be mistaken for the time now. {% endcomment -%}
+        <text x="20" y="136" text-anchor="middle" fill="black" stroke="none"
+              font-family="Inter, sans-serif" font-size="13" font-weight="600">{{ extension.values.day_start | default: "07:00" }}</text>
+        <text x="220" y="136" text-anchor="middle" fill="black" stroke="none"
+              font-family="Inter, sans-serif" font-size="13" font-weight="600">{{ extension.values.day_end | default: "23:00" }}</text>
+      </svg>
+
+      {%- comment %} The figure sits in the bowl of the arc, where a sundial
+        would put its shadow. {% endcomment -%}
+      <div style="position: absolute; left: 0; right: 0; bottom: {{ arc_h | divided_by: 8 }}px; text-align: center">
+        <p class="t-bold" style="font-size: {{ arc_w | divided_by: 6 | at_most: 62 | at_least: 20 }}px; line-height: 1; letter-spacing: -0.03em">
+          {{ through | round }}<span style="font-size: 0.45em">%</span>
+        </p>
+        <p class="t-upper t-bold" style="font-size: {{ arc_w | divided_by: 22 | at_least: 10 | at_most: 15 }}px">
+          {{ mins | part_of_day }}
+        </p>
+      </div>
+    </div>
+
+    <div style="min-width: 0; {% if beside %}flex: 1{% else %}width: 100%{% endif %}">
+    <p class="t-bold truncate {% unless beside %}t-center{% endunless %}" style="font-size: {{ words_size }}px; line-height: 1.15; width: 100%">
+      {{ said }}
+    </p>
+
+    {% if detailed or beside %}
+      <p class="truncate {% unless beside %}t-center{% endunless %}" style="margin-top: 4px; font-size: {{ words_size | divided_by: 2 | at_least: 11 | at_most: 20 }}px; width: 100%">
+        {% if through >= 100 %}
+          the day is done
+        {% elsif through <= 0 %}
+          {{ opens | minus: mins | span_in_words }} until it starts
+        {% else %}
+          {{ left | span_in_words }} left{% if extension.values.show_date != false %} &middot; {{ stamp | date: "%a %-d %b" }}{% endif %}
+        {% endif %}
+      </p>
+    {% endif %}
+    </div>
+    </div>
+  </div>
+
+  {% if notices.size > 0 %}
+    <div class="notice-strip" style="padding: 6px {{ pad }}px">
+      {% for notice in notices %}
+        {% if notice.overflow %}
+          <span class="notice notice--more">+{{ notice.overflow }}</span>
+        {% else %}
+          <span class="notice notice--{{ notice.level }}" title="{{ notice.text }}">
+            <span class="i i-{{ notice.icon }}"></span>
+          </span>
+        {% endif %}
+      {% endfor %}
+      {% if shape.wide and notices[0].text != blank %}
+        <span class="notice-said">{{ notices[0].text }}</span>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>

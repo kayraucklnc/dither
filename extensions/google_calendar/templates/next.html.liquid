@@ -1,0 +1,160 @@
+{% comment %}
+  What is next - one meeting, as large as the box allows.
+
+  The countdown is worked out *here*, against the clock at the moment of
+  drawing, rather than taken from the payload. The payload's countdown was true
+  when Google was last asked, which is up to ten minutes ago, and "in 49 min"
+  on a wall when the thing starts in four is worse than no clock at all. Every
+  card carries the minutes since midnight it starts at, so the subtraction is
+  cheap and always current - and the design declares `tick: 300`, so the server
+  redraws it every five minutes whether or not anything was fetched.
+
+  Which meeting is "next" is decided the same way and for the same reason: a
+  meeting that has started since the last fetch is not the next one any more.
+{% endcomment %}
+
+{%- assign day = calendar -%}
+{%- assign hh = "now" | date: "%H" | times: 60 -%}
+{%- assign now_mins = "now" | date: "%M" | plus: hh -%}
+
+{%- assign running = false -%}
+{%- assign coming = false -%}
+{%- for event in day.upcoming -%}
+  {%- if event.start_minutes > now_mins -%}
+    {%- if coming == false %}{% assign coming = event %}{% endif -%}
+  {%- elsif running == false and event.end_minutes > now_mins -%}
+    {%- assign running = event -%}
+  {%- endif -%}
+{%- endfor -%}
+
+{%- assign card = coming -%}
+{%- if running %}{% assign card = running %}{% endif -%}
+
+{%- assign box_w = shape.width | at_least: 110 -%}
+{%- assign box_h = shape.height | at_least: 60 -%}
+{%- comment %} Padding off the shorter side rather than off the width: a
+  full-width band is 800 by 80, and a twentieth of the width either side of it
+  is more than half the height gone before anything is drawn. {% endcomment -%}
+{%- assign shorter = box_w | at_most: box_h -%}
+{%- assign pad = shorter | divided_by: 7 | at_least: 7 | at_most: 24 -%}
+
+<div class="screen">
+  {%- if card == false -%}
+    <div class="content layout layout--col layout--center" style="gap: 8px; padding: {{ pad }}px">
+      <span class="i i-calendar-check {% if shape.rows > 5 %}i-xl{% elsif shape.rows > 3 %}i-lg{% else %}i-md{% endif %}"></span>
+      <p class="t-bold t-center truncate" style="font-size: {{ box_h | divided_by: 8 | at_least: 14 | at_most: 34 }}px; width: 100%">
+        Nothing left today
+      </p>
+      {% if shape.rows > 3 %}
+        <p class="t-sm t-center truncate" style="width: 100%">
+          {% if day.tomorrow.count > 0 %}
+            Tomorrow: {{ day.tomorrow.first.start }} {{ day.tomorrow.first.title }}
+          {% else %}
+            Tomorrow is clear too.
+          {% endif %}
+        </p>
+      {% endif %}
+    </div>
+  {%- else -%}
+    {%- comment %} Minutes to go, or minutes left of the thing you are in.
+      Both are the same subtraction against the same clock. {% endcomment -%}
+    {%- assign until = card.start_minutes | minus: now_mins -%}
+    {%- assign left = card.end_minutes | minus: now_mins -%}
+
+    {%- assign chars = card.title | size | at_least: 8 -%}
+    {%- assign lines = 2 -%}
+    {%- if shape.rows < 4 %}{% assign lines = 1 %}{% endif -%}
+
+    {%- comment %} Everything that is not the title, counted with the gap it
+      brings with it. Leaving the gaps out is what wrapped "Lunch with Marco"
+      onto a second line the box did not have room for - and a clamped line
+      clipped in half reads as a broken screen rather than as a long title. {% endcomment -%}
+    {%- assign gap = pad | divided_by: 2 -%}
+    {%- assign spent = 0 -%}
+    {%- if shape.rows > 2 %}{% assign spent = spent | plus: 26 | plus: gap %}{% endif -%}
+    {%- if shape.rows > 4 %}{% assign spent = spent | plus: 30 | plus: gap %}{% endif -%}
+    {%- if shape.rows <= 2 %}{% assign spent = spent | plus: 22 | plus: gap %}{% endif -%}
+    {%- assign roomy = false -%}
+    {%- if shape.rows > 6 and extension.values.show_location != false and card.location != blank -%}
+      {%- assign roomy = true -%}
+      {%- assign spent = spent | plus: 30 | plus: gap -%}
+    {%- endif -%}
+    {%- if notices.size > 0 %}{% assign spent = spent | plus: 34 %}{% endif -%}
+
+    {%- assign room_h = box_h | minus: pad | minus: pad | minus: spent | at_least: 20 -%}
+    {%- assign per_line = chars | divided_by: lines | plus: 2 -%}
+    {%- assign by_width = box_w | minus: pad | minus: pad | times: 100 | divided_by: per_line | divided_by: 52 -%}
+    {%- assign by_height = room_h | times: 92 | divided_by: 100 | divided_by: lines -%}
+    {%- assign title_size = by_width | at_most: by_height | at_most: 64 | at_least: 13 -%}
+
+    <div class="content layout layout--col" style="justify-content: center; gap: {{ pad | divided_by: 2 }}px; padding: {{ pad }}px">
+      {% if shape.rows > 2 %}
+        <div class="with-icon" style="gap: 6px">
+          {% if running %}
+            <span class="badge">Now</span>
+            <span class="t-bold truncate" style="font-size: {{ title_size | divided_by: 2 | at_least: 12 | at_most: 22 }}px">
+              {{ left | at_least: 1 }} min left
+            </span>
+          {% else %}
+            <span class="i i-clock i-sm"></span>
+            <span class="t-bold truncate" style="font-size: {{ title_size | divided_by: 2 | at_least: 12 | at_most: 22 }}px">
+              {{ until | in_words }}{% if card.start_minutes >= 1440 %} &middot; tomorrow{% endif %}
+            </span>
+          {% endif %}
+          {% if card.conflict %}<span class="i i-alert i-xs" title="Double booked"></span>{% endif %}
+        </div>
+      {% endif %}
+
+      <p class="t-bold clamp-{{ lines }}" style="font-size: {{ title_size }}px; line-height: 1.06; letter-spacing: -0.02em">
+        {{ card.title }}
+      </p>
+
+      {% if shape.rows > 4 %}
+        <p class="t-mono t-bold truncate" style="font-size: {{ title_size | divided_by: 2 | at_least: 13 | at_most: 26 }}px">
+          {{ card.start }}{% if card.end != blank %} &ndash; {{ card.end }}{% endif %}
+        </p>
+      {% elsif shape.rows <= 2 %}
+        {%- comment %} A band has no room for the chip above, so the one line
+          under the title has to carry both the time and the state - and a
+          meeting you are sitting in reads "until", not "now". {% endcomment -%}
+        <p class="t-mono t-bold truncate" style="font-size: {{ title_size | divided_by: 2 | at_least: 11 | at_most: 18 }}px">
+          {% if running %}
+            {{ card.start }}&ndash;{{ card.end }} &middot; {{ left | at_least: 1 }} min left
+          {% else %}
+            {{ card.start }} &middot; {{ until | in_words }}
+          {% endif %}
+        </p>
+      {% endif %}
+
+      {% if roomy %}
+        <p class="with-icon truncate" style="font-size: {{ title_size | divided_by: 2.6 | round | at_least: 12 | at_most: 20 }}px">
+          <span class="i i-{% if card.remote %}video{% else %}pin{% endif %} i-sm"></span>
+          <span class="truncate">{{ card.location }}</span>
+        </p>
+      {% endif %}
+    </div>
+  {%- endif -%}
+
+  {% comment %}
+    Where another extension gets to say something on this screen. Glyphs like
+    dashboard warning lights, with the loudest one's words beside them when the
+    box is wide enough to carry them.
+  {% endcomment %}
+  {% if notices.size > 0 and shape.rows > 2 %}
+    <div class="notice-strip" style="padding: 6px {{ pad }}px">
+      {% for notice in notices %}
+        {% if notice.overflow %}
+          <span class="notice notice--more">+{{ notice.overflow }}</span>
+        {% else %}
+          <span class="notice notice--{{ notice.level }}" title="{{ notice.text }}">
+            <span class="i i-{{ notice.icon }}"></span>
+          </span>
+        {% endif %}
+      {% endfor %}
+
+      {% if shape.wide and notices[0].text != blank %}
+        <span class="notice-said">{{ notices[0].text }}</span>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>

@@ -1,0 +1,200 @@
+{% comment %}
+  The day - every meeting drawn where it falls.
+
+  A list tells you what is on. This tells you what the day is *shaped* like:
+  where the wall of back-to-back things is, where the two free hours are, and
+  which two meetings somebody booked on top of each other. It is the one view
+  that answers "can I take this call at four" without arithmetic.
+
+  Three things it has to get right, all of which the list views get away with
+  ignoring:
+
+    - The window has to hold everything. It starts as the hours the widget was
+      given and stretches to cover any meeting outside them, so an eight
+      o'clock start never hides a seven o'clock flight.
+    - Two things at once go side by side. Which column each takes is worked out
+      in lib/calendar/day.ts, because it is a graph colouring and a template is
+      a bad place to find that out.
+    - A block too short to hold its own title has to say something anyway. A
+      fifteen-minute standup is four per cent of a day, and four per cent of
+      480 pixels is nineteen - enough for a rule and a time, not for words.
+{% endcomment %}
+
+{%- assign day = calendar -%}
+{%- assign hh = "now" | date: "%H" | times: 60 -%}
+{%- assign now_mins = "now" | date: "%M" | plus: hh -%}
+
+{%- assign box_w = shape.width | at_least: 160 -%}
+{%- assign box_h = shape.height | at_least: 240 -%}
+{%- assign pad = box_w | divided_by: 24 | at_least: 8 | at_most: 18 -%}
+
+{%- comment %} The stretch of day to draw: what was asked for, widened to hold
+  anything outside it, and always containing the time it is now. {% endcomment -%}
+{%- assign open = extension.values.day_start | default: "08:00" | minutes_of -%}
+{%- assign close = extension.values.day_end | default: "20:00" | minutes_of -%}
+
+{%- for event in day.events -%}
+  {%- if event.start_minutes < open -%}
+    {%- assign open = event.start_minutes | divided_by: 60 | times: 60 -%}
+  {%- endif -%}
+  {%- if event.end_minutes > close -%}
+    {%- assign close = event.end_minutes | plus: 59 | divided_by: 60 | times: 60 -%}
+  {%- endif -%}
+{%- endfor -%}
+
+{%- if now_mins < open %}{% assign open = now_mins | divided_by: 60 | times: 60 %}{% endif -%}
+{%- if now_mins > close %}{% assign close = now_mins | plus: 59 | divided_by: 60 | times: 60 %}{% endif -%}
+{%- assign span = close | minus: open | at_least: 120 -%}
+
+{%- assign header = 44 -%}
+{%- if day.all_day.size > 0 and box_h > 260 %}{% assign header = header | plus: 26 %}{% endif -%}
+{%- if notices.size > 0 %}{% assign header = header | plus: 34 %}{% endif -%}
+{%- assign track_h = box_h | minus: header | minus: pad | minus: pad | at_least: 120 -%}
+
+{%- comment %} How often the hours are labelled, so they never collide: a
+  twelve-hour day in 300 pixels is 25 pixels an hour, which is one label every
+  two. {% endcomment -%}
+{%- assign hours = span | divided_by: 60 -%}
+{%- assign per_hour = track_h | divided_by: hours | at_least: 1 -%}
+{%- assign every = 1 -%}
+{%- if per_hour < 30 %}{% assign every = 2 %}{% endif -%}
+{%- if per_hour < 15 %}{% assign every = 3 %}{% endif -%}
+
+{%- assign gutter = 34 -%}
+{%- if box_w < 220 %}{% assign gutter = 28 %}{% endif -%}
+
+<div class="screen{% if box_w < 260 %} dense{% endif %}">
+  <div class="title-bar" style="padding: {{ pad }}px {{ pad }}px 7px">
+    <div class="title" style="font-size: {{ box_w | divided_by: 18 | at_least: 15 | at_most: 28 }}px">
+      {{ extension.values.heading | default: day.today.day }}
+    </div>
+    <div class="t-xs t-bold">{{ day.today.busy_text }} booked</div>
+  </div>
+
+  {% if day.all_day.size > 0 and box_h > 260 %}
+    <div style="border-bottom: 2px solid var(--ink); padding: 4px {{ pad }}px">
+      <p class="t-xs t-bold truncate">
+        {% for entry in day.all_day %}{{ entry.title }}{% unless forloop.last %} &middot; {% endunless %}{% endfor %}
+      </p>
+    </div>
+  {% endif %}
+
+  <div class="content" style="padding: {{ pad }}px {{ pad }}px {{ pad }}px 0">
+    <div style="position: relative; height: 100%; width: 100%">
+      {%- comment %} The hours, as rules across the track with their labels in
+        the gutter beside it. The track is its own box inset by the gutter, so
+        that every percentage below is a percentage of the *track* - work them
+        out against the whole width instead and a meeting in the second column
+        hangs off the right-hand edge by exactly one gutter. {% endcomment -%}
+      {%- assign first_hour = open | divided_by: 60 -%}
+      {%- assign last_hour = close | divided_by: 60 -%}
+      {% for hour in (first_hour..last_hour) %}
+        {%- assign at = hour | times: 60 | minus: open | times: 1000 | divided_by: span -%}
+        {%- assign since = hour | minus: first_hour -%}
+        {%- assign nth = since | modulo: every -%}
+        {% if at >= 0 and at <= 1000 and nth == 0 %}
+          <span class="t-xs" style="position: absolute; top: {{ at | divided_by: 10.0 }}%; left: 0;
+                      width: {{ gutter | minus: 6 }}px; text-align: right;
+                      transform: translateY(-50%); font-variant-numeric: tabular-nums">{{ hour }}</span>
+        {% endif %}
+      {% endfor %}
+
+      <div style="position: absolute; top: 0; bottom: 0; left: {{ gutter }}px; right: 0">
+      {% for hour in (first_hour..last_hour) %}
+        {%- assign at = hour | times: 60 | minus: open | times: 1000 | divided_by: span -%}
+        {% if at >= 0 and at <= 1000 %}
+          <div style="position: absolute; top: {{ at | divided_by: 10.0 }}%; left: 0; right: 0;
+                      border-top: 1px solid var(--ink)"></div>
+        {% endif %}
+      {% endfor %}
+
+      {%- comment %} Where the day has got to, drawn *under* the meetings. A
+        rule across the whole track says where you are at a glance; laid over
+        the top it also puts a black bar through the title of whatever you are
+        sitting in. {% endcomment -%}
+      {%- assign now_at = now_mins | minus: open | times: 1000 | divided_by: span -%}
+      {% if now_at >= 0 and now_at <= 1000 %}
+        <div style="position: absolute; top: {{ now_at | divided_by: 10.0 }}%; left: 0; right: 0; height: 3px;
+                    background: var(--ink)"></div>
+      {% endif %}
+
+      {%- comment %} The meetings. Overlapping ones share the width by the
+        lanes worked out at fetch, so a double booking reads as two blocks side
+        by side rather than as one block hiding another. {% endcomment -%}
+      {% for event in day.events %}
+        {%- assign from = event.start_minutes | minus: open -%}
+        {%- assign until = event.end_minutes | minus: open -%}
+        {%- if until > 0 and from < span -%}
+          {%- if from < 0 %}{% assign from = 0 %}{% endif -%}
+          {%- if until > span %}{% assign until = span %}{% endif -%}
+          {%- assign top = from | times: 1000 | divided_by: span -%}
+          {%- assign tall = until | minus: from | times: 1000 | divided_by: span -%}
+          {%- assign block_px = until | minus: from | times: track_h | divided_by: span -%}
+          {%- assign lane_w = 100 | divided_by: event.lanes -%}
+          {%- assign lane_at = event.lane | times: lane_w -%}
+          {%- assign done = false -%}
+          {%- if event.end_minutes <= now_mins %}{% assign done = true %}{% endif -%}
+          {%- assign running = false -%}
+          {%- if done == false and event.start_minutes <= now_mins %}{% assign running = true %}{% endif -%}
+
+          {%- comment %} What is over is drawn anyway, hatched. A day view that
+            empties as it goes loses the thing it is for - at four o'clock you
+            want to see that the morning was solid, not a blank half a
+            ribbon. {% endcomment -%}
+          <div style="position: absolute; top: {{ top | divided_by: 10.0 }}%; height: {{ tall | divided_by: 10.0 }}%;
+                      left: {{ lane_at }}%; width: calc({{ lane_w }}% - 3px);
+                      min-height: 10px; overflow: hidden;
+                      border: 2px solid var(--ink); padding: 1px 4px;
+                      {% if running %}border-left-width: 7px; padding-left: 3px;{% endif %}
+                      {% if done %}background: repeating-linear-gradient(45deg, var(--paper) 0 4px, var(--ink) 4px 5px)
+                      {% else %}background: var(--paper){% endif %}">
+            {% if block_px >= 34 %}
+              <span class="t-xs t-bold" style="display: block; line-height: 1.15">{{ event.start }}</span>
+              <span class="t-xs truncate" style="display: block; font-weight: 700; line-height: 1.2">{{ event.title }}</span>
+              {% if block_px >= 64 and extension.values.show_location != false and event.location != blank %}
+                <span class="t-xs truncate" style="display: block; font-weight: 400">{{ event.location }}</span>
+              {% endif %}
+            {% elsif block_px >= 16 %}
+              {%- comment %} Too short for two lines: the time and as much of
+                the title as the width carries, on one. Shorter than this and
+                it carries none at all and is filled in instead - a quarter of
+                an hour is six pixels of a twelve-hour day, and six pixels of
+                clipped type reads as a broken screen rather than as a short
+                meeting. {% endcomment -%}
+              <span class="truncate" style="display: block; line-height: 1; font-size: 10px; font-weight: 700;
+                           {% if done %}background: var(--paper){% endif %}">
+                {{ event.start }} {{ event.title }}
+              </span>
+            {% endif %}
+          </div>
+        {%- endif -%}
+      {% endfor %}
+
+      </div>
+
+      {% if now_at >= 0 and now_at <= 1000 %}
+        <div style="position: absolute; top: {{ now_at | divided_by: 10.0 }}%; left: {{ gutter | minus: 8 }}px;
+                    transform: translateY(-50%); width: 0; height: 0;
+                    border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+                    border-left: 7px solid var(--ink)"></div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if notices.size > 0 %}
+    <div class="notice-strip" style="padding: 6px {{ pad }}px">
+      {% for notice in notices %}
+        {% if notice.overflow %}
+          <span class="notice notice--more">+{{ notice.overflow }}</span>
+        {% else %}
+          <span class="notice notice--{{ notice.level }}" title="{{ notice.text }}">
+            <span class="i i-{{ notice.icon }}"></span>
+          </span>
+        {% endif %}
+      {% endfor %}
+      {% if shape.wide and notices[0].text != blank %}
+        <span class="notice-said">{{ notices[0].text }}</span>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
