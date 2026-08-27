@@ -30,6 +30,32 @@
 {%- assign card = coming -%}
 {%- if running %}{% assign card = running %}{% endif -%}
 
+{%- comment %} Out of day, but not out of calendar.
+  "Nothing left today" with nothing beside it is a panel reporting what it does
+  not know, and it is what this design showed every evening from six o'clock
+  until midnight. `next_any` is the next thing anywhere in the window that was
+  actually fetched, so the card carries on being a card - tomorrow's first
+  meeting rather than a shrug - and the fact that today is finished becomes the
+  line above it instead of the whole picture. When the widget was only asked
+  about today there is genuinely nothing to show, and only then does the empty
+  branch below draw. {% endcomment -%}
+{%- assign later = false -%}
+{%- if card == false and day.next_any and day.next_any.start_minutes > now_mins -%}
+  {%- comment %} Only when it is genuinely still ahead. A payload is up to ten
+    minutes old, and `next_any` was the next thing when Google was last asked -
+    so it has to be checked against the clock at the moment of drawing, exactly
+    as the countdown is. Left unchecked, a meeting that started while nobody
+    was looking is drawn as the next one with "now" beside it. {% endcomment -%}
+  {%- assign card = day.next_any -%}
+  {%- comment %} "Nothing left today" only when it is genuinely not today. A
+    horizon shorter than the day leaves a late meeting out of `upcoming` while
+    it is still ahead of you, and announcing that today is over across the top
+    of it would be the one kind of wrong a calendar is never forgiven for. That
+    case wants the ordinary countdown, which is what falls out of leaving
+    `later` alone. {% endcomment -%}
+  {%- if day.next_any_day != "Today" %}{% assign later = true %}{% endif -%}
+{%- endif -%}
+
 {%- assign box_w = shape.width | at_least: 110 -%}
 {%- assign box_h = shape.height | at_least: 60 -%}
 {%- comment %} Padding off the shorter side rather than off the width: a
@@ -40,21 +66,82 @@
 
 <div class="screen">
   {%- if card == false -%}
-    <div class="content layout layout--col layout--center" style="gap: 8px; padding: {{ pad }}px">
-      <span class="i i-calendar-check {% if shape.rows > 5 %}i-xl{% elsif shape.rows > 3 %}i-lg{% else %}i-md{% endif %}"></span>
-      <p class="t-bold t-center truncate" style="font-size: {{ box_h | divided_by: 8 | at_least: 14 | at_most: 34 }}px; width: 100%">
-        Nothing left today
+    {%- comment %} Nothing ahead anywhere in what was asked for. What is left
+      to draw is the day that has just gone, and it is worth drawing: seven
+      meetings and five hours of them is a *shape*, and a sentence saying so is
+      the one thing on this panel nobody would cross a room to read. {% endcomment -%}
+    {%- assign held = day.today.total | plus: day.all_day.size -%}
+    {%- assign said = day.empty_label | default: "Nothing left today" -%}
+    {%- capture summary -%}
+      {% if day.today.total > 0 %}{{ day.today.total }} today, {{ day.today.busy_text }} of it{% if day.today.last_end != blank %}, done by {{ day.today.last_end }}{% endif %}{% elsif day.all_day.size > 0 %}{{ day.all_day.size }} all-day, nothing timed{% endif %}
+    {%- endcapture -%}
+
+    {%- comment %} A shallow box is a different picture, not a smaller one. Full
+      width and eighty pixels tall, the column below sizes its words off the
+      height and produces ten-point type in the middle of 800 pixels of white.
+      Laid along the band instead, the same words are thirty. {% endcomment -%}
+    {%- if shape.rows <= 3 and box_w > 300 -%}
+      <div class="content layout layout--row layout--center" style="gap: {{ pad }}px; padding: {{ pad }}px {{ pad | times: 1.5 | round }}px">
+        <span class="i i-calendar-check i-md" style="flex: none"></span>
+        <p class="t-bold truncate" style="font-size: {{ box_h | divided_by: 2.6 | round | at_least: 14 | at_most: 30 }}px">
+          {{ said }}
+        </p>
+        {% if box_w > 460 and summary != blank %}
+          <p class="t-xs truncate" style="flex: none">{{ summary }}</p>
+        {% endif %}
+      </div>
+    {%- else -%}
+    <div class="content layout layout--col layout--center" style="gap: {{ pad | divided_by: 2 }}px; padding: {{ pad }}px">
+      {% if box_w > 170 %}
+        <span class="i i-calendar-check {% if shape.rows > 5 %}i-xl{% elsif shape.rows > 3 %}i-lg{% else %}i-md{% endif %}"></span>
+      {% endif %}
+      {%- comment %} Bounded by the width as well as the height. A two-column
+        column is 133 pixels wide and 480 tall, and sized off the height alone
+        "Nothing left today" is set at 34 and clipped mid-word. {% endcomment -%}
+      {%- assign said_size = box_w | divided_by: 7 | at_most: 34 -%}
+      <p class="t-bold t-center clamp-2" style="font-size: {{ box_h | divided_by: 8 | at_most: said_size | at_least: 13 }}px; width: 100%; line-height: 1.1">
+        {{ said }}
       </p>
-      {% if shape.rows > 3 %}
-        <p class="t-sm t-center truncate" style="width: 100%">
-          {% if day.tomorrow.count > 0 %}
-            Tomorrow: {{ day.tomorrow.first.start }} {{ day.tomorrow.first.title }}
-          {% else %}
-            Tomorrow is clear too.
-          {% endif %}
+
+      {% if shape.rows > 3 and held > 0 %}
+        {%- comment %} The day behind you, drawn rather than counted. Hatched
+          because every one of these is over - the same fill the ribbon uses
+          for what is done, so the two designs mean the same thing by it. {% endcomment -%}
+        <div class="fit" style="flex: none; width: 100%; max-width: 320px">
+          <div style="position: relative; border: 2px solid var(--ink); width: 100%;
+                      height: {{ box_h | divided_by: 9 | at_least: 10 | at_most: 20 }}px">
+            {%- assign open = day.window.open -%}
+            {%- assign span = day.window.span | at_least: 120 -%}
+            {% for event in day.events %}
+              {%- assign from = event.start_minutes | minus: open -%}
+              {%- assign until = event.end_minutes | minus: open -%}
+              {%- if until > 0 and from < span -%}
+                {%- if from < 0 %}{% assign from = 0 %}{% endif -%}
+                {%- if until > span %}{% assign until = span %}{% endif -%}
+                {%- assign at = from | times: 1000 | divided_by: span -%}
+                {%- assign wide = until | minus: from | times: 1000 | divided_by: span -%}
+                <span style="position: absolute; top: 0; bottom: 0; left: {{ at | divided_by: 10.0 }}%;
+                             width: {{ wide | divided_by: 10.0 }}%; min-width: 3px;
+                             background: repeating-linear-gradient(45deg, var(--ink) 0 2px, var(--paper) 2px 5px)"></span>
+              {%- endif -%}
+            {% endfor %}
+          </div>
+          <p class="t-xs t-center" style="margin-top: 4px">{{ summary }}</p>
+        </div>
+      {% elsif shape.rows > 3 %}
+        <p class="t-sm t-center truncate" style="width: 100%">Nothing on it at all.</p>
+      {% endif %}
+
+      {% if shape.rows > 5 and day.all_day.size > 0 %}
+        <p class="with-icon t-xs truncate" style="max-width: 100%">
+          <span class="i i-calendar i-xs"></span>
+          <span class="truncate">
+            {% for entry in day.all_day %}{{ entry.title }}{% unless forloop.last %} &middot; {% endunless %}{% endfor %}
+          </span>
         </p>
       {% endif %}
     </div>
+    {%- endif -%}
   {%- else -%}
     {%- comment %} Minutes to go, or minutes left of the thing you are in.
       Both are the same subtraction against the same clock. {% endcomment -%}
@@ -95,6 +182,13 @@
             <span class="t-bold truncate" style="font-size: {{ title_size | divided_by: 2 | at_least: 12 | at_most: 22 }}px">
               {{ left | at_least: 1 }} min left
             </span>
+          {% elsif later %}
+            {%- comment %} Two facts, and the order matters: today being over is
+              why this card is showing something that is not today. {% endcomment -%}
+            <span class="i i-calendar-check i-sm"></span>
+            <span class="t-bold truncate" style="font-size: {{ title_size | divided_by: 2 | at_least: 12 | at_most: 22 }}px">
+              Nothing left today
+            </span>
           {% else %}
             <span class="i i-clock i-sm"></span>
             <span class="t-bold truncate" style="font-size: {{ title_size | divided_by: 2 | at_least: 12 | at_most: 22 }}px">
@@ -111,15 +205,22 @@
 
       {% if shape.rows > 4 %}
         <p class="t-mono t-bold truncate" style="font-size: {{ title_size | divided_by: 2 | at_least: 13 | at_most: 26 }}px">
-          {{ card.start }}{% if card.end != blank %} &ndash; {{ card.end }}{% endif %}
+          {% if later %}<span class="t-upper">{{ day.next_any_day }}</span> {% endif %}{{ card.start }}{% if card.end != blank %} &ndash; {{ card.end }}{% endif %}
         </p>
-      {% elsif shape.rows <= 2 %}
+      {% elsif shape.rows <= 2 or later %}
         {%- comment %} A band has no room for the chip above, so the one line
           under the title has to carry both the time and the state - and a
-          meeting you are sitting in reads "until", not "now". {% endcomment -%}
+          meeting you are sitting in reads "until", not "now".
+
+          A card showing tomorrow needs the same line for a different reason:
+          between three and four rows there is no room for the full time, and
+          the chip above has been spent saying that today is over. A day and a
+          time is the least that card can be worth looking at. {% endcomment -%}
         <p class="t-mono t-bold truncate" style="font-size: {{ title_size | divided_by: 2 | at_least: 11 | at_most: 18 }}px">
           {% if running %}
             {{ card.start }}&ndash;{{ card.end }} &middot; {{ left | at_least: 1 }} min left
+          {% elsif later %}
+            {{ day.next_any_day }} {{ card.start }} &middot; nothing left today
           {% else %}
             {{ card.start }} &middot; {{ until | in_words }}
           {% endif %}

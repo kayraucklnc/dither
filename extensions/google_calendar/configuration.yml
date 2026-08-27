@@ -191,6 +191,7 @@ fields:
     optional: true
 
   - keyname: show_done
+    variants: true
     name: Keep what has already happened
     field_type: boolean
     default: false
@@ -205,6 +206,7 @@ fields:
     optional: true
 
   - keyname: show_gaps
+    variants: true
     name: Mark the gaps
     field_type: boolean
     default: true
@@ -432,6 +434,34 @@ sample:
       lanes: 1
       done: false
       running: false
+    next_any:
+      id: primary-1
+      title: Design review
+      start: 10:30
+      end: 11:15
+      start_minutes: 630
+      end_minutes: 675
+      at_epoch: 1787819400
+      ends_epoch: 1787822100
+      minutes_until: 49
+      minutes_left: 94
+      duration: 45
+      duration_text: 45m
+      location: Sala 4
+      remote: false
+      accepted: true
+      declined: false
+      tentative: false
+      all_day: false
+      organiser: Ana Ferrari
+      attendees: 6
+      calendar: primary
+      conflict: false
+      lane: 0
+      lanes: 1
+      done: false
+      running: false
+    next_any_day: Today
     after:
       id: primary-2
       title: Standup

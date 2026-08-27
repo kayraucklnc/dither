@@ -6,6 +6,7 @@ import { Check, Loader2, Search, TriangleAlert } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/cn";
 import { MultiSelect } from "./multi-select";
+import { visible } from "@/lib/extensions/looks";
 import type { Field } from "@/lib/extensions/manifest";
 
 /**
@@ -174,23 +175,6 @@ function SearchField({
       )}
     </div>
   );
-}
-
-/**
- * Whether a field's `visible_when` is satisfied.
- *
- * A settings form should follow the choice already made rather than asking
- * every question at once: pick "money taken" and a period appears, pick "how
- * many subscribers" and it does not, because there is no such thing as
- * subscribers over the last seven days. `design` is the reserved name for the
- * style the widget is drawn in, so a design can bring its own settings.
- */
-function visible(field: Field, values: Record<string, unknown>, design: string): boolean {
-  const rule = field.visible_when;
-  if (!rule) return true;
-
-  const actual = rule.field === "design" ? design : values[rule.field];
-  return rule.any_of.includes(String(actual ?? ""));
 }
 
 export function SettingsForm({

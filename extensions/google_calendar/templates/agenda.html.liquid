@@ -16,6 +16,18 @@
 {%- assign hh = "now" | date: "%H" | times: 60 -%}
 {%- assign now_mins = "now" | date: "%M" | plus: hh -%}
 
+{%- comment %} How many are actually left, counted against the clock at the
+  moment of drawing rather than taken from the payload. `today.remaining` was
+  true when Google was last asked, which is up to ten minutes ago, and this
+  design decides what to *say* from the live clock - so the two disagree for
+  the whole of that window and the panel prints "6 left" beside "Nothing left
+  today". Same reason the countdowns are worked out here. {% endcomment -%}
+{%- assign left = 0 -%}
+{%- for event in day.events -%}
+  {%- if event.end_minutes > now_mins %}{% assign left = left | plus: 1 %}{% endif -%}
+{%- endfor -%}
+{%- assign gone = day.today.total | minus: left | at_least: 0 -%}
+
 {%- assign box_w = shape.width | at_least: 160 -%}
 {%- assign box_h = shape.height | at_least: 140 -%}
 {%- assign pad = box_w | divided_by: 24 | at_least: 10 | at_most: 22 -%}
@@ -36,7 +48,12 @@
 {%- assign header = 46 -%}
 {%- if day.all_day.size > 0 and box_h > 200 %}{% assign header = header | plus: 28 %}{% endif -%}
 {%- if notices.size > 0 %}{% assign header = header | plus: 34 %}{% endif -%}
-{%- assign slots = box_h | minus: header | minus: pad | divided_by: row_h | at_least: 1 | at_most: 9 -%}
+{%- comment %} Floored, or the count of what did not fit is a fraction. The
+  panel is 800 by 480 and a three-column box is 200 wide, so `pad` comes out of
+  a division that is not exact - and one float anywhere in this chain reaches
+  the screen as "+2.5333333333333 more", which reads as a broken widget rather
+  than as a full list. {% endcomment -%}
+{%- assign slots = box_h | minus: header | minus: pad | divided_by: row_h | floor | at_least: 1 | at_most: 9 -%}
 {%- assign hidden = shown | size | minus: slots -%}
 
 <div class="screen{% if box_w < 260 %} dense{% endif %}">
@@ -44,12 +61,19 @@
     <div class="title" style="font-size: {{ box_w | divided_by: 18 | at_least: 16 | at_most: 30 }}px">
       {{ extension.values.heading | default: "Today" }}
     </div>
+    {%- comment %} "0 left" is arithmetic rather than news. A day that is over
+      says so, and a day that never had anything says that instead. {% endcomment -%}
     {% if box_w > 210 %}
       <div class="chip">
-        <span class="i i-calendar"></span>{{ day.today.remaining }} left
+        <span class="i i-calendar"></span>
+        {% if left > 0 %}{{ left }} left
+        {% elsif day.today.total > 0 %}all done
+        {% else %}clear{% endif %}
       </div>
     {% else %}
-      <div class="t-sm t-bold">{{ day.today.remaining }}</div>
+      <div class="t-sm t-bold">
+        {% if left > 0 %}{{ left }}{% else %}&check;{% endif %}
+      </div>
     {% endif %}
   </div>
 
@@ -63,16 +87,109 @@
   {% endif %}
 
   {%- if shown.size == 0 -%}
-    <div class="content layout layout--col layout--center" style="gap: 8px">
-      <span class="i i-calendar-check i-lg"></span>
-      <p class="t-md t-bold t-center">
-        {% if calendar.window_empty %}{{ calendar.empty_label | default: "Nothing left today" }}{% else %}Nothing left today{% endif %}
-      </p>
-      {% if day.tomorrow.count > 0 and box_h > 200 %}
-        <p class="t-sm t-center truncate" style="width: 100%">
-          Tomorrow: {{ day.tomorrow.first.start }} {{ day.tomorrow.first.title }}
+    {%- comment %} An empty list is still a list design, so it draws one.
+
+      A centred "Nothing left today" is the correct fact and the least useful
+      picture on the panel: it is what the screen shows from six o'clock until
+      midnight every day, and it says nothing a person crossing the room wanted
+      to know. What they wanted is what is coming, and the days that were
+      fetched already carry it - a count, a first time and how much of each day
+      is spoken for. Drawn as bars, that is a week at a glance.
+
+      Only the days that were actually asked for, though. "The rest of today"
+      fetches one day, and seven empty bars under it would be an invented
+      week - so a one-day window draws the day that has just gone instead,
+      which is a thing this widget does know. {% endcomment -%}
+    {%- assign ahead = day.days | size -%}
+    {%- assign peak = 60 -%}
+    {%- for entry in day.days -%}
+      {%- if entry.busy_minutes > peak %}{% assign peak = entry.busy_minutes %}{% endif -%}
+    {%- endfor -%}
+    {%- comment %} The rows share out the height rather than sitting at a fixed
+      one: six days stacked 26 pixels tall at the top of a twelve-row box is a
+      list that looks like it stopped loading. Bounded either side, so two days
+      are not drawn as two bands and nine are still legible. {% endcomment -%}
+    {%- assign day_count = day.days.size | minus: 1 | at_least: 1 -%}
+    {%- assign room = box_h | minus: header | minus: pad | minus: 34 | at_least: 40 -%}
+    {%- assign day_row = room | divided_by: day_count | floor | at_least: 20 | at_most: 46 -%}
+    {%- assign day_slots = room | divided_by: day_row | floor | at_least: 1 | at_most: 9 -%}
+
+    <div class="content" style="padding: 6px {{ pad }}px {{ pad }}px">
+      <div class="layout layout--col" style="gap: 6px">
+        {%- comment %} `empty_label` is about the whole window - "Nothing this
+          week" - and printing it over a list of what is on this week is a
+          screen arguing with itself. It is only the true sentence when there
+          is nothing anywhere ahead. Something still to come *today* but past a
+          short horizon is neither case, and `empty_label` is right there too:
+          for a rolling window it says how many hours it looked at. {% endcomment -%}
+        {%- assign said = day.empty_label | default: "Nothing left today" -%}
+        {%- if day.next_any and day.next_any_day != "Today" %}{% assign said = "Nothing left today" %}{% endif -%}
+        <p class="with-icon t-bold truncate" style="flex: none; gap: 6px">
+          <span class="i i-calendar-check i-sm"></span>
+          <span class="truncate">{{ said }}</span>
         </p>
-      {% endif %}
+
+        {% if ahead > 1 %}
+          <div class="fit" style="display: flex; flex-direction: column; min-height: 0; overflow: hidden">
+            {% for entry in day.days offset: 1 limit: day_slots %}
+              {%- assign width = entry.busy_minutes | times: 100 | divided_by: peak -%}
+              <div style="display: flex; align-items: center; gap: 8px; flex: none;
+                          box-sizing: border-box; height: {{ day_row }}px;
+                          border-top: 1px solid var(--ink)">
+                <span class="t-xs t-bold" style="flex: none; width: {% if box_w > 260 %}30{% else %}22{% endif %}px">
+                  {% if box_w > 260 %}{{ entry.day }}{% else %}{{ entry.day | slice: 0, 1 }}{% endif %}
+                </span>
+
+                {%- comment %} A day with nothing on it is an outlined box
+                  rather than no box, or a clear Saturday reads as a row that
+                  failed to draw. {% endcomment -%}
+                <div class="fit" style="height: 11px; border: 2px solid var(--ink)">
+                  {% if entry.busy_minutes > 0 %}
+                    <div style="height: 100%; width: {{ width | at_least: 4 }}%;
+                                {% if entry.is_weekend %}background: repeating-linear-gradient(45deg, var(--ink) 0 3px, var(--paper) 3px 6px){% else %}background: var(--ink){% endif %}"></div>
+                  {% endif %}
+                </div>
+
+                <span class="t-xs" style="flex: none; white-space: nowrap">
+                  {% if entry.count > 0 %}{{ entry.count }} &middot; {{ entry.first }}{% else %}clear{% endif %}
+                </span>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          {%- comment %} One day was asked for and it is over. The day that has
+            just gone, hatched because every part of it is behind you. {% endcomment -%}
+          <div class="fit layout layout--col layout--center" style="gap: 8px">
+            {% if day.today.total > 0 %}
+              <div style="flex: none; width: 100%">
+                {%- assign open = day.window.open -%}
+                {%- assign span = day.window.span | at_least: 120 -%}
+                <div style="position: relative; border: 2px solid var(--ink); width: 100%;
+                            height: {{ box_h | divided_by: 10 | at_least: 12 | at_most: 24 }}px">
+                  {% for event in day.events %}
+                    {%- assign from = event.start_minutes | minus: open -%}
+                    {%- assign until = event.end_minutes | minus: open -%}
+                    {%- if until > 0 and from < span -%}
+                      {%- if from < 0 %}{% assign from = 0 %}{% endif -%}
+                      {%- if until > span %}{% assign until = span %}{% endif -%}
+                      {%- assign at = from | times: 1000 | divided_by: span -%}
+                      {%- assign wide = until | minus: from | times: 1000 | divided_by: span -%}
+                      <span style="position: absolute; top: 0; bottom: 0; left: {{ at | divided_by: 10.0 }}%;
+                                   width: {{ wide | divided_by: 10.0 }}%; min-width: 3px;
+                                   background: repeating-linear-gradient(45deg, var(--ink) 0 2px, var(--paper) 2px 5px)"></span>
+                    {%- endif -%}
+                  {% endfor %}
+                </div>
+                <p class="t-xs t-center" style="margin-top: 5px">
+                  {{ day.today.total }} today, {{ day.today.busy_text }} of it{% if day.today.last_end != blank %}, done by {{ day.today.last_end }}{% endif %}
+                </p>
+              </div>
+            {% else %}
+              <p class="t-sm t-center">Nothing on it at all.</p>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
     </div>
   {%- else -%}
     <div class="content content--tight" style="padding: 6px {{ pad }}px">
