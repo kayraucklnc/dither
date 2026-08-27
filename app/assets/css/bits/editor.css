@@ -1,9 +1,0 @@
-.cm-editor {
-  border: 0.15rem solid var(--site-darkgrey);
-  border-radius: 0.5rem;
-  min-height: 10rem;
-}
-
-.cm-scroller {
-  overscroll-behavior: contain;
-}

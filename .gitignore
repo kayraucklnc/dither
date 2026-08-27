@@ -1,17 +1,14 @@
+# Secrets. `.env` holds the database password and must never be committed.
 *.env*
 !*.env*.tt
-*.log
-*.log.*
-.bundle
+
 .DS_Store
-# compose.dev.yml is committed here: it is this fork's hand-written dev overlay,
-# not the file upstream's bin/setup generates.
-coverage
-db/*.sqlite
+*.log
+
+# Node and Next
 node_modules
-Procfile.dev
-public/*
-!public/404.html
-!public/500.html
-tmp
-log/*.log.*
+.next
+next-env.d.ts
+
+# Rendered screens, which are a cache keyed by their own content
+.storage
