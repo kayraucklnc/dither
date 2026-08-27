@@ -2,8 +2,9 @@ import { db } from "@/lib/db";
 import { decisionNodes, devices, notices, triggers } from "@/lib/db/schema";
 import { answersFor, observationKey, reading } from "@/lib/extensions/observations";
 import { all, find } from "@/lib/extensions/registry";
-import { valueAt, type Fact } from "@/lib/facts";
+import { readFact, showFact, type Fact } from "@/lib/facts";
 import type { Field } from "@/lib/extensions/manifest";
+import { staleFrom } from "@/lib/flow/context";
 import { FRESHNESS_FACT } from "@/lib/flow/sources";
 
 /**
@@ -35,8 +36,6 @@ export interface SourceKindOption {
   factCount: number;
 }
 
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
 export async function sourcesOverview(): Promise<SourceOverview[]> {
   const rows = await db.select().from(triggers);
   const panels = new Map((await db.select().from(devices)).map((row) => [row.id, row.name]));
@@ -62,7 +61,7 @@ export async function sourcesOverview(): Promise<SourceOverview[]> {
     count(notice.condition, panels.get(notice.deviceId) ?? "a device");
   }
 
-  const now = Date.now();
+  const asked = new Date();
   const answers = await answersFor(rows);
   const overview: SourceOverview[] = [];
 
@@ -71,28 +70,23 @@ export async function sourcesOverview(): Promise<SourceOverview[]> {
     // What it *reads*, which is nothing until it has answered for itself. The
     // page would otherwise recite the extension's sample as this source's
     // current values, and every rule built on them would look sound.
-    const answer = reading(answers.get(observationKey(row.extension, row.settings)));
+    const answer = reading(
+      answers.get(observationKey(row.extension, row.settings)),
+      staleFrom(extension, asked),
+    );
     const age = answer.fetchedAt
-      ? Math.floor((now - answer.fetchedAt.getTime()) / 60_000)
+      ? Math.floor((asked.getTime() - answer.fetchedAt.getTime()) / 60_000)
       : null;
 
     const facts = [...(extension?.manifest.facts ?? []), FRESHNESS_FACT];
     const payload = { ...answer.payload, _dither: { minutes_since_update: age } };
     const values: Record<string, string> = {};
 
+    // Read as a check would read it, at this instant - a stored countdown is
+    // a number from the last fetch and reciting it here is how a source looks
+    // sound while deciding on a moment that has gone. See lib/facts.
     for (const fact of facts) {
-      const raw = valueAt(payload, fact.path);
-
-      values[fact.key] =
-        raw === null || raw === undefined
-          ? "—"
-          : fact.type === "boolean"
-            ? raw
-              ? "yes"
-              : "no"
-            : fact.type === "weekday"
-              ? (DAYS[Number(raw)] ?? String(raw))
-              : String(raw);
+      values[fact.key] = showFact(fact, readFact(fact, payload, asked));
     }
 
     overview.push({
