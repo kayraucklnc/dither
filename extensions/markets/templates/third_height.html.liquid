@@ -1,0 +1,46 @@
+{% comment %} Third height: 800x160. A ticker band. {% endcomment %}
+
+{% assign q = market %}
+{% assign span = q.high | minus: q.low %}
+{% if span <= 0 %}{% assign span = 1 %}{% endif %}
+{% assign sym = extension.values.currency_symbol | default: "$" %}
+
+<div class="screen">
+  <div class="content layout layout--row" style="align-items: center; gap: 24px">
+    <div style="min-width: 150px">
+      <p class="t-lg t-bold">{{ q.symbol }}</p>
+      <p class="t-xs">{{ q.name }}</p>
+    </div>
+
+    <div style="border-left: var(--rule) solid var(--ink); padding-left: 24px">
+      <p class="t-bold" style="font-size: 42px; line-height: 1">{{ sym }}{{ q.price }}</p>
+    </div>
+
+    <div class="with-icon">
+      <span class="i i-trending-{% if q.rising %}up{% else %}down{% endif %} i-md"></span>
+      <p class="t-lg t-bold">{% if q.rising %}+{% endif %}{{ q.change_percent }}%</p>
+    </div>
+
+    {% if extension.values.show_session and q.history %}
+      <div class="fit" style="height: 74px; margin-left: auto; max-width: 260px">
+        <div class="bars" style="gap: 3px">
+          {% for point in q.history %}
+            {% assign height = point | minus: q.low | times: 82 | divided_by: span | plus: 12 %}
+            <div class="bar"><span class="fill" style="height: {{ height }}%"></span></div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  {% comment %} Where another extension gets to say something on this screen. {% endcomment %}
+  {% if notices.size > 0 %}
+    <div class="notice-strip">
+      {% for notice in notices %}
+        <span class="notice{% if notice.loud %} notice--loud{% endif %}">
+          <span class="i i-{{ notice.icon }}"></span>{{ notice.text }}
+        </span>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

@@ -1,0 +1,26 @@
+{% comment %} Quarter: 400x240. One thing, and whether it is on. {% endcomment %}
+
+<div class="screen dense">
+  <div class="content layout layout--row" style="align-items: center; gap: 18px">
+    <span class="i i-{{ home.entity.icon }} i-xl"></span>
+
+    <div class="stack stack--tight fit" style="gap: 4px">
+      <p class="t-xs t-upper">{{ extension.values.heading | default: "Home" }}</p>
+      <p class="t-lg t-bold truncate">{{ home.entity.label }}</p>
+      <p class="{% if home.entity.on %}badge{% else %}chip{% endif %} self-start">
+        {% if home.entity.on %}ON{% else %}OFF{% endif %}
+      </p>
+    </div>
+  </div>
+
+  {% comment %} Where another extension gets to say something on this screen. {% endcomment %}
+  {% if notices.size > 0 %}
+    <div class="notice-strip">
+      {% for notice in notices %}
+        <span class="notice{% if notice.loud %} notice--loud{% endif %}">
+          <span class="i i-{{ notice.icon }}"></span>{{ notice.text }}
+        </span>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

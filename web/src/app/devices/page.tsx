@@ -2,12 +2,19 @@ import { eq } from "drizzle-orm";
 import Link from "next/link";
 import { Battery, MonitorSmartphone, Wifi } from "lucide-react";
 
-import { ScreenPreview } from "@/components/screen-preview";
+import { DeviceCard } from "@/components/device-card";
 import { db } from "@/lib/db";
 import { decisionNodes, devices, models } from "@/lib/db/schema";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * What every panel is showing, right now.
+ *
+ * Each card renders the device's decision for real - the tree walked, the
+ * notices evaluated, the same renderer - rather than a stand-in. If it is on
+ * this page it is on the wall.
+ */
 export default async function DevicesPage() {
   const rows = await db
     .select({
@@ -17,12 +24,11 @@ export default async function DevicesPage() {
       percentCharged: devices.percentCharged,
       rssi: devices.rssi,
       lastSeenAt: devices.lastSeenAt,
-      modelId: models.id,
+      refreshRate: devices.refreshRate,
       modelLabel: models.label,
       width: models.width,
       height: models.height,
-      showingLabel: decisionNodes.label,
-      screenId: decisionNodes.screenId,
+      showing: decisionNodes.label,
     })
     .from(devices)
     .innerJoin(models, eq(models.id, devices.modelId))
@@ -33,8 +39,8 @@ export default async function DevicesPage() {
       <header className="mb-8">
         <h1 className="text-2xl font-semibold tracking-tight">Devices</h1>
         <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-muted">
-          Each panel on your network, and what it is showing right now. Open one to change how it
-          decides.
+          Every panel on your network and what it is showing. These are real renders, not
+          approximations — the same picture the device would be handed if it woke up now.
         </p>
       </header>
 
@@ -47,58 +53,9 @@ export default async function DevicesPage() {
           </p>
         </div>
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 lg:grid-cols-2">
           {rows.map((device) => (
-            <Link
-              key={device.id}
-              href={`/devices/${device.id}`}
-              className="rounded-panel border border-line bg-surface p-3 transition-colors hover:border-line-strong"
-            >
-              {device.screenId ? (
-                <ScreenPreview
-                  src={`/api/preview/screen/${device.screenId}?modelId=${device.modelId}`}
-                  width={device.width}
-                  height={device.height}
-                  alt={`${device.name} is showing ${device.showingLabel}`}
-                  className="paper-shadow"
-                />
-              ) : (
-                <div
-                  className="grid place-items-center rounded-md border border-dashed border-line text-[12px] text-faint"
-                  style={{ aspectRatio: `${device.width} / ${device.height}` }}
-                >
-                  Nothing set up yet
-                </div>
-              )}
-
-              <div className="px-1 pt-3 pb-1">
-                <div className="flex items-baseline justify-between gap-2">
-                  <h2 className="truncate text-[14px] font-medium">{device.name}</h2>
-                  <span className="shrink-0 text-[11px] text-faint">{device.modelLabel}</span>
-                </div>
-
-                <div className="mt-1.5 flex items-center gap-3 text-[11px] text-faint">
-                  {device.showingLabel && (
-                    <span className="flex items-center gap-1 text-live">
-                      <span className="h-1.5 w-1.5 rounded-full bg-live" />
-                      {device.showingLabel}
-                    </span>
-                  )}
-                  {device.percentCharged !== null && (
-                    <span className="flex items-center gap-1">
-                      <Battery size={11} />
-                      {Math.round(device.percentCharged)}%
-                    </span>
-                  )}
-                  {device.rssi !== null && (
-                    <span className="flex items-center gap-1">
-                      <Wifi size={11} />
-                      {device.rssi}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </Link>
+            <DeviceCard key={device.id} device={device} />
           ))}
         </div>
       )}

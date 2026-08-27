@@ -1,0 +1,38 @@
+{% comment %} Third width: 267x480. A narrow quote. {% endcomment %}
+
+{% assign q = market %}
+{% assign sym = extension.values.currency_symbol | default: "$" %}
+
+<div class="screen dense">
+  <div class="content content--tight layout layout--col" style="gap: 14px">
+    <div class="t-center">
+      <p class="t-lg t-bold">{{ q.symbol }}</p>
+      <p class="t-xs">{{ q.name }}</p>
+    </div>
+
+    <div class="hero" style="gap: 4px">
+      <p class="t-bold" style="font-size: 34px; line-height: 1">{{ sym }}{{ q.price }}</p>
+      <p class="with-icon t-sm t-bold">
+        <span class="i i-trending-{% if q.rising %}up{% else %}down{% endif %} i-xs"></span>
+        {% if q.rising %}+{% endif %}{{ q.change_percent }}%
+      </p>
+    </div>
+
+    <div class="facts">
+      <div class="row"><span class="name">High</span><span class="figure">{{ q.high }}</span></div>
+      <div class="row"><span class="name">Low</span><span class="figure">{{ q.low }}</span></div>
+      <div class="row"><span class="name">Open</span><span class="figure">{{ q.open }}</span></div>
+    </div>
+  </div>
+
+  {% comment %} Where another extension gets to say something on this screen. {% endcomment %}
+  {% if notices.size > 0 %}
+    <div class="notice-strip">
+      {% for notice in notices %}
+        <span class="notice{% if notice.loud %} notice--loud{% endif %}">
+          <span class="i i-{{ notice.icon }}"></span>{{ notice.text }}
+        </span>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

@@ -1,0 +1,31 @@
+{% comment %} Quarter: 400x240. Today's number and how it compares. {% endcomment %}
+
+{% assign money = revenue %}
+
+<div class="screen dense">
+  <div class="content layout layout--col" style="justify-content: space-between">
+    <div class="kv">
+      <span class="k t-xs t-upper">{{ extension.values.heading | default: "Revenue" }}</span>
+      <span class="v t-xs">{{ money.payments_today }} payments</span>
+    </div>
+
+    <div class="stack stack--tight" style="gap: 2px">
+      <p class="t-bold" style="font-size: 52px; line-height: 1">{{ money.symbol }}{{ money.today }}</p>
+      <p class="with-icon t-sm t-bold">
+        <span class="i i-trending-{% if money.change_percent >= 0 %}up{% else %}down{% endif %} i-xs"></span>
+        {{ money.change_percent }}%
+      </p>
+    </div>
+  </div>
+
+  {% comment %} Where another extension gets to say something on this screen. {% endcomment %}
+  {% if notices.size > 0 %}
+    <div class="notice-strip">
+      {% for notice in notices %}
+        <span class="notice{% if notice.loud %} notice--loud{% endif %}">
+          <span class="i i-{{ notice.icon }}"></span>{{ notice.text }}
+        </span>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

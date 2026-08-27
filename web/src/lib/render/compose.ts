@@ -108,6 +108,40 @@ async function noticeHost(widgets: PlacedWidget[]): Promise<number | undefined> 
   return undefined;
 }
 
+/**
+ * What a panel shows before anyone has set it up.
+ *
+ * A blank white rectangle is indistinguishable from a broken one, and it is
+ * the first thing a new device ever displays. This says what to do instead.
+ */
+let mark: string | undefined;
+
+export async function composeEmpty(
+  width: number,
+  height: number,
+  heading: string,
+  detail: string,
+): Promise<Composition> {
+  const css = await framework();
+
+  // Inlined, not linked: a rendered page has no origin, so a relative URL
+  // cannot resolve.
+  mark ??= (await readFile(path.join(process.cwd(), "public", "brand", "mark.svg"), "utf8"))
+    .replace("<svg", `<svg width="${Math.round(height / 5)}" height="${Math.round(height / 5)}"`);
+
+  return {
+    html: `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style>
+<style>html,body{width:${width}px;height:${height}px;overflow:hidden}
+.screen{height:${height}px;width:${width}px}</style></head>
+<body><div class="screen"><div class="content layout layout--col layout--center" style="gap:14px">
+${mark}
+<p class="t-xl t-bold t-center">${escape(heading)}</p>
+<p class="t-sm t-center" style="max-width:70%">${escape(detail)}</p>
+</div></div></body></html>`,
+    problems: [],
+  };
+}
+
 export async function compose(
   widgets: PlacedWidget[],
   width: number,

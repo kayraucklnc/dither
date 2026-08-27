@@ -1,0 +1,65 @@
+{% comment %} Half width: 400x480. The number, the change, the week. {% endcomment %}
+
+{% assign money = revenue %}
+
+<div class="screen">
+  <div class="title-bar">
+    <div class="title">{{ extension.values.heading | default: "Revenue" }}</div>
+  </div>
+
+  <div class="content content--tight layout layout--col">
+    <div class="stack stack--tight" style="gap: 4px; padding-bottom: 12px">
+      <p class="caption">Today</p>
+      <p class="t-bold" style="font-size: 58px; line-height: 1">{{ money.symbol }}{{ money.today }}</p>
+      <p class="with-icon t-sm t-bold">
+        <span class="i i-trending-{% if money.change_percent >= 0 %}up{% else %}down{% endif %} i-xs"></span>
+        {{ money.change_percent }}% on yesterday
+      </p>
+    </div>
+
+    <div class="facts">
+      <div class="row">
+        <span class="name">Month to date</span>
+        <span class="figure">{{ money.symbol }}{{ money.month_to_date }}</span>
+      </div>
+      <div class="row">
+        <span class="name">New customers</span>
+        <span class="figure">{{ money.new_customers }}</span>
+      </div>
+    </div>
+
+    {% if extension.values.show_week and money.week %}
+      {% assign peak = 0 %}
+      {% assign trough = 99999999 %}
+      {% for day in money.week %}
+        {% if day.amount > peak %}{% assign peak = day.amount %}{% endif %}
+        {% if day.amount < trough %}{% assign trough = day.amount %}{% endif %}
+      {% endfor %}
+      {% assign span = peak | minus: trough %}
+      {% if span <= 0 %}{% assign span = 1 %}{% endif %}
+
+      <div class="fit" style="margin-top: 12px; min-height: 90px">
+        <div class="bars">
+          {% for day in money.week %}
+            <div class="bar">
+              <span class="fill{% unless forloop.last %} fill--hatch{% endunless %}"
+                    style="height: {{ day.amount | minus: trough | times: 76 | divided_by: span | plus: 18 }}%"></span>
+              <span class="tick">{{ day.day | slice: 0, 1 }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  {% comment %} Where another extension gets to say something on this screen. {% endcomment %}
+  {% if notices.size > 0 %}
+    <div class="notice-strip">
+      {% for notice in notices %}
+        <span class="notice{% if notice.loud %} notice--loud{% endif %}">
+          <span class="i i-{{ notice.icon }}"></span>{{ notice.text }}
+        </span>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

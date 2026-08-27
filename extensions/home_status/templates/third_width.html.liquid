@@ -1,0 +1,34 @@
+{% comment %} Third width: 267x480. A narrow column of switches. {% endcomment %}
+
+<div class="screen dense">
+  <div class="title-bar" style="padding: 14px 14px 8px">
+    <div class="title" style="font-size: 18px">{{ extension.values.heading | default: "Home" }}</div>
+  </div>
+
+  <div class="content content--tight">
+    <div class="list">
+      {% for thing in home.entities limit: 6 %}
+        <div class="list-item" style="padding: 8px 0">
+          <span class="with-icon" style="min-width: 0; gap: 6px">
+            <span class="i i-{{ thing.icon }} i-xs"></span>
+            <span class="truncate t-sm">{{ thing.label }}</span>
+          </span>
+          <span class="{% if thing.on %}badge{% else %}chip{% endif %}" style="font-size: 10px; padding: 1px 5px">
+            {% if thing.on %}ON{% else %}OFF{% endif %}
+          </span>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% comment %} Where another extension gets to say something on this screen. {% endcomment %}
+  {% if notices.size > 0 %}
+    <div class="notice-strip">
+      {% for notice in notices %}
+        <span class="notice{% if notice.loud %} notice--loud{% endif %}">
+          <span class="i i-{{ notice.icon }}"></span>{{ notice.text }}
+        </span>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

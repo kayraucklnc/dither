@@ -1,0 +1,109 @@
+# Dither bundled extension: Markets.
+#
+# One source is one instrument, the same way one transit source is one route:
+# add two and you get two, with their own settings and their own triggers.
+
+version: "1.0.0"
+name: markets
+label: Markets
+description: >
+  A price, what it has done today, and the session behind it. Shares, indices
+  or crypto.
+
+kind: connection
+connection: markets
+mode: text
+tags:
+  - money
+  - markets
+
+interval: 15
+unit: minute
+days: []
+last_day_of_month: false
+start_at: "2026-01-01T00:00:00Z"
+
+static_body: {}
+data: {}
+
+fields:
+  - keyname: symbol
+    name: Instrument
+    field_type: select
+    default: AAPL
+    options:
+      - value: AAPL
+        label: Apple
+      - value: MSFT
+        label: Microsoft
+      - value: NVDA
+        label: NVIDIA
+      - value: GOOGL
+        label: Alphabet
+      - value: SPY
+        label: S&P 500
+      - value: BTC
+        label: Bitcoin
+      - value: ETH
+        label: Ethereum
+    optional: false
+
+  - keyname: currency_symbol
+    name: Currency symbol
+    field_type: string
+    default: "$"
+    optional: true
+
+  - keyname: show_session
+    name: Show the session
+    field_type: boolean
+    default: true
+    help_text: The shape of the day behind the price.
+    optional: true
+
+accepts_notices: true
+
+notices:
+  - key: big_move
+    label: Moved sharply today
+    icon: trending-up
+    loud: true
+    text: "{{ market.symbol }} {{ market.change_percent }}%"
+    when:
+      fact: change_percent
+      operator: gte
+      value: 3
+
+facts:
+  - key: price
+    label: Price
+    type: number
+    path: market.price
+    unit: ""
+
+  - key: change_percent
+    label: Change today
+    type: number
+    path: market.change_percent
+    unit: percent
+
+  - key: rising
+    label: Up on the day
+    type: boolean
+    path: market.rising
+    unit: ""
+
+sample:
+  market:
+    symbol: AAPL
+    name: Apple
+    price: 234.18
+    open: 231.4
+    change: 2.78
+    change_percent: 1.2
+    rising: true
+    high: 235.9
+    low: 230.1
+    history: [231.4, 231.9, 232.6, 232.1, 233.4, 234.8, 234.2, 233.6, 234.0, 234.7, 235.1, 234.18]
+
+exchanges: []

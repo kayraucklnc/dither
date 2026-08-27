@@ -1,0 +1,144 @@
+# Dither bundled extension: Revenue.
+#
+# Backed by the Stripe connection. Link the account once and every revenue
+# widget and trigger uses it; settings here choose the currency and how much
+# detail to show, per placement.
+#
+# The Stripe provider is mocked. It answers a day that fills up as it goes so
+# the design can be judged against numbers that move, which a frozen sample
+# never lets you do.
+
+version: "1.0.0"
+name: revenue
+label: Revenue
+description: >
+  What came in today, how that compares with yesterday, and the week behind it.
+
+kind: connection
+connection: stripe
+mode: text
+tags:
+  - money
+  - business
+
+interval: 15
+unit: minute
+days: []
+last_day_of_month: false
+start_at: "2026-01-01T00:00:00Z"
+
+static_body: {}
+data: {}
+
+fields:
+  - keyname: heading
+    name: Heading
+    field_type: string
+    default: "Revenue"
+    optional: true
+
+  - keyname: currency
+    name: Currency
+    field_type: select
+    default: EUR
+    options:
+      - value: EUR
+        label: Euro
+      - value: USD
+        label: US dollar
+      - value: GBP
+        label: Pound sterling
+    optional: false
+
+  - keyname: style
+    name: Style
+    field_type: select
+    default: rich
+    options:
+      - value: rich
+        label: Rich — the week, the breakdown, the lot
+      - value: compact
+        label: Compact — today's number and the change
+    optional: false
+
+  - keyname: show_week
+    name: Show the week
+    field_type: boolean
+    default: true
+    help_text: A bar per day behind today. Turned off, the number gets the room.
+    optional: true
+
+accepts_notices: true
+
+notices:
+  - key: failed_payments
+    label: Payments failing
+    icon: alert
+    loud: true
+    text: "{{ revenue.failed_today }} payments failed today"
+    when:
+      fact: failed_today
+      operator: gte
+      value: 3
+
+  - key: strong_day
+    label: Well ahead of yesterday
+    icon: trending-up
+    text: "Up {{ revenue.change_percent }}% on yesterday"
+    when:
+      fact: change_percent
+      operator: gte
+      value: 25
+
+facts:
+  - key: today
+    label: Taken today
+    type: number
+    path: revenue.today
+    unit: ""
+
+  - key: change_percent
+    label: Change on yesterday
+    type: number
+    path: revenue.change_percent
+    unit: percent
+
+  - key: month_to_date
+    label: Month to date
+    type: number
+    path: revenue.month_to_date
+    unit: ""
+
+  - key: new_customers
+    label: New customers today
+    type: number
+    path: revenue.new_customers
+    unit: ""
+
+  - key: failed_today
+    label: Failed payments today
+    type: number
+    path: revenue.failed_today
+    unit: ""
+
+sample:
+  revenue:
+    currency: EUR
+    symbol: "€"
+    today: 3184
+    yesterday: 2760
+    change_percent: 15
+    month_to_date: 74120
+    payments_today: 41
+    new_customers: 7
+    failed_today: 2
+    week:
+      - { day: Mon, amount: 2980 }
+      - { day: Tue, amount: 3420 }
+      - { day: Wed, amount: 3110 }
+      - { day: Thu, amount: 3890 }
+      - { day: Fri, amount: 4260 }
+      - { day: Sat, amount: 2760 }
+      - { day: Sun, amount: 3184 }
+
+exchanges: []

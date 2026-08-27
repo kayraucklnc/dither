@@ -8,8 +8,9 @@ const errors: string[] = [];
 page.on("console", (message) => message.type() === "error" && errors.push(message.text()));
 page.on("pageerror", (error) => errors.push(String(error)));
 
-await page.goto(url, { waitUntil: "networkidle" });
-await page.waitForTimeout(600);
+await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 });
+// networkidle never settles on pages that poll; wait for paint instead.
+await page.waitForTimeout(Number(process.env.SHOT_WAIT ?? 3500));
 await page.screenshot({ path: out, fullPage: true });
 await browser.close();
 

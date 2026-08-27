@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, Loader2, Plus, Trash2, TriangleAlert } from "lucide-react";
 
+import { LayoutPicker } from "@/components/composer/layout-picker";
 import { SettingsForm } from "@/components/composer/settings-form";
 import { ShapeGlyph } from "@/components/shape-badge";
 import { cn } from "@/lib/cn";
+import { layout as findLayout, matching, type Layout } from "@/lib/layouts";
 import type { Field } from "@/lib/extensions/manifest";
 import {
   COLUMNS,
@@ -73,6 +75,7 @@ export function ScreenEditor({
   const [save, setSave] = useState<SaveState>("idle");
   const [nextId, setNextId] = useState(-1);
   const [dragging, setDragging] = useState(false);
+  const [armed, setArmed] = useState<Layout | undefined>(() => matching(initialWidgets));
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const selected = widgets.find((widget) => widget.id === selectedId);
@@ -170,12 +173,26 @@ export function ScreenEditor({
   }, []);
 
   const add = (entry: PaletteEntry) => {
-    const shape = findShape(entry.shapes[0]);
-    if (!shape) return;
+    // With a layout armed, a new widget takes the next free slot at that
+    // slot's size. That is what makes "top half this, bottom half that" two
+    // clicks rather than a drag and a resize.
+    const slot = armed?.slots.find(
+      (candidate) => !widgets.some((widget) => overlaps(candidate, widget)),
+    );
 
-    const spot = firstFreeSpot(widgets, shape.columns, shape.rows);
+    const spot =
+      slot ??
+      (() => {
+        const shape = findShape(entry.shapes[0]);
+        return shape ? firstFreeSpot(widgets, shape.columns, shape.rows) : undefined;
+      })();
+
     if (!spot) {
-      setProblems([`No room left for a ${shape.label.toLowerCase()} widget. Remove something first.`]);
+      setProblems([
+        armed
+          ? `Every slot in ${armed.label.toLowerCase()} is taken. Remove something, or pick another layout.`
+          : "No room left. Remove something first.",
+      ]);
       return;
     }
 
@@ -208,6 +225,32 @@ export function ScreenEditor({
     },
     [],
   );
+
+  /** Arm a layout, and move whatever is already placed into its slots. */
+  const applyLayout = (id: string) => {
+    const chosen = findLayout(id);
+    if (!chosen) return;
+
+    setArmed(chosen);
+
+    setWidgets((current) => {
+      if (!current.length) return current;
+
+      const seated = current.slice(0, chosen.slots.length).map((widget, index) => ({
+        ...widget,
+        ...chosen.slots[index],
+      }));
+
+      const dropped = current.length - seated.length;
+      setProblems(
+        dropped > 0
+          ? [`${chosen.label} has ${chosen.slots.length} slots; ${dropped} widget${dropped === 1 ? " was" : "s were"} left off.`]
+          : [],
+      );
+
+      return seated;
+    });
+  };
 
   /* ---------------------------------------------------------------- pointer */
 
@@ -347,7 +390,14 @@ export function ScreenEditor({
           </span>
         </header>
 
-        <div className="flex flex-1 items-center justify-center p-8">
+        <div className="flex flex-1 flex-col items-center justify-center gap-5 p-8">
+          <div className="w-full max-w-5xl">
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-faint">
+              Arrangement
+            </p>
+            <LayoutPicker value={armed?.id} onChange={applyLayout} />
+          </div>
+
           <div className="w-full max-w-5xl">
             <div
               ref={canvasRef}
@@ -361,7 +411,10 @@ export function ScreenEditor({
                   src={preview}
                   alt="What the display will show"
                   className="pointer-events-none absolute inset-0 h-full w-full"
-                  style={{ imageRendering: "pixelated" }}
+                  /* The canvas is fit to width, so it is nearly always shown
+                     smaller than 800x480. Nearest-neighbour at that scale
+                     turns a careful dither into aliased noise; smoothed, it
+                     reads as the greys the panel actually makes. */
                 />
               )}
 
