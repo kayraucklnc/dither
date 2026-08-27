@@ -101,21 +101,43 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       )
     : [];
 
-  const key = await fingerprint(placed, panel, said, { at: simulation.at.getTime() });
+  /**
+   * The moment being drawn, which reaches the key as `now` and is quantised
+   * there by whatever tick the designs on this screen declare.
+   *
+   * It used to go in raw, as milliseconds, which made every request a key
+   * nothing had ever used: the stored render was never reused, so every
+   * thumbnail was drawn again from scratch, and the ETag below could never
+   * match, so no browser was ever told its copy was still good.
+   */
+  const when = { now: simulation.at };
+
+  const key = await fingerprint(placed, panel, said, undefined, when);
 
   if (request.headers.get("if-none-match") === `"${key}"`) {
     return new NextResponse(null, { status: 304 });
   }
 
   const cached = await store().get(`${key}.png`);
-  const bytes = cached ?? (await renderScreen(placed, panel, said)).bytes;
+  const bytes = cached ?? (await renderScreen(placed, panel, said, when)).bytes;
   if (!cached) await store().put(`${key}.png`, bytes, "image/png");
 
   return new NextResponse(new Uint8Array(bytes), {
     headers: {
       "Content-Type": "image/png",
       ETag: `"${key}"`,
-      "Cache-Control": "public, max-age=15, stale-while-revalidate=86400",
+      /*
+       * Keep the copy, but never draw it without asking first.
+       *
+       * The fingerprint above already covers everything that can change the
+       * picture, so revalidating costs a 304 and nothing else - while a
+       * freshness window costs correctness: edit a screen, walk back to the
+       * device that shows it, and the tree hands you the picture from before
+       * the edit. `stale-while-revalidate` made that permanent rather than
+       * momentary, because the fresh copy lands in the cache instead of on
+       * the screen, leaving every thumbnail exactly one visit behind.
+       */
+      "Cache-Control": "no-cache",
     },
   });
 }

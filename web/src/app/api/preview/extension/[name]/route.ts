@@ -118,7 +118,11 @@ export async function GET(
     headers: {
       "Content-Type": "image/png",
       ETag: `"${key}"`,
-      "Cache-Control": "public, max-age=30, stale-while-revalidate=86400",
+      // Ask every time; the key above already covers the template and the
+      // stylesheet, so an unchanged tile costs a 304. A freshness window here
+      // is the same lie the screen previews used to tell - edit a template and
+      // the catalogue keeps yesterday's picture.
+      "Cache-Control": "no-cache",
     },
   });
 }
