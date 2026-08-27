@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Clock, Link2, Radio, Train, Zap } from "lucide-react";
+import { Bell, Clock, Link2, Radio, Train, Zap } from "lucide-react";
 
 import { ScreenPreview } from "@/components/screen-preview";
 import type { ExtensionSummary } from "@/lib/extensions/summary";
@@ -59,6 +59,15 @@ export function ExtensionTile({ extension }: { extension: ExtensionSummary }) {
             <span className="flex items-center gap-1 text-accent-bright">
               <Zap size={10} />
               {extension.factCount} trigger{extension.factCount === 1 ? "" : "s"}
+            </span>
+          )}
+          {extension.noticeShapes > 0 && (
+            <span
+              title={`${extension.noticeShapes} of its sizes have somewhere to show another extension's alert`}
+              className="flex items-center gap-1"
+            >
+              <Bell size={10} />
+              takes alerts
             </span>
           )}
         </div>

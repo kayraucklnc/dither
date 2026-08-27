@@ -11,9 +11,19 @@ export interface Simulation {
   /** Local "YYYY-MM-DDTHH:mm", or empty for "now". */
   at: string;
   overrides: Record<string, Record<string, unknown>>;
+  /** Notices forced on or off, regardless of what their condition says. */
+  notices: Record<string, "on" | "off">;
 }
 
-export const NO_SIMULATION: Simulation = { active: false, at: "", overrides: {} };
+export const NO_SIMULATION: Simulation = { active: false, at: "", overrides: {}, notices: {} };
+
+export interface TestNotice {
+  id: number;
+  label: string;
+  text: string;
+  icon: string;
+  enabled: boolean;
+}
 
 const input =
   "w-full rounded-md border border-line bg-ground px-2 py-1 text-[12px] text-ink " +
@@ -48,15 +58,27 @@ function shiftedFromNow(hours: number, hour?: number): string {
  */
 export function TestPanel({
   sources,
+  notices,
+  firing,
   simulation,
   onChange,
 }: {
   sources: EditorSource[];
+  notices: TestNotice[];
+  firing: number[];
   simulation: Simulation;
   onChange: (simulation: Simulation) => void;
 }) {
   const triggers = sources.filter((source) => source.group === "trigger");
   const overridden = Object.values(simulation.overrides).flatMap(Object.keys).length;
+
+  const force = (id: number, state: "on" | "off" | undefined) => {
+    const next = { ...simulation.notices };
+    if (state === undefined) delete next[String(id)];
+    else next[String(id)] = state;
+
+    onChange({ ...simulation, active: true, notices: next });
+  };
 
   const set = (sourceId: string, key: string, value: unknown) => {
     const forSource = { ...(simulation.overrides[sourceId] ?? {}) };
@@ -218,6 +240,75 @@ export function TestPanel({
                 </p>
               )}
             </div>
+          </div>
+
+          {/*
+            Forcing a notice on runs it as though its condition held, which is
+            the only sane way to judge the wording and the icon of an alert that
+            fires twice a year.
+          */}
+          <div>
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-faint">
+              Fire an alert
+            </p>
+
+            {notices.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-line p-3 text-center text-[11px] text-faint">
+                Add one in the Notices tab and you can fire it here.
+              </p>
+            ) : (
+              <div className="space-y-1.5">
+                {notices.map((notice) => {
+                  const forced = simulation.notices[String(notice.id)];
+                  const live = firing.includes(notice.id);
+
+                  return (
+                    <div
+                      key={notice.id}
+                      className="flex items-center gap-2 rounded-lg border border-line bg-raised p-2"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-1.5">
+                          <span className="truncate text-[12px]">{notice.label || notice.text}</span>
+                          {live && (
+                            <span className="shrink-0 rounded bg-live/15 px-1.5 py-0.5 text-[10px] text-live">
+                              showing
+                            </span>
+                          )}
+                        </span>
+                        {!notice.enabled && (
+                          <span className="block text-[10px] text-faint">turned off</span>
+                        )}
+                      </span>
+
+                      <div className="flex shrink-0 rounded-md border border-line bg-ground p-0.5">
+                        {(
+                          [
+                            ["off", "off"],
+                            [undefined, "real"],
+                            ["on", "on"],
+                          ] as const
+                        ).map(([value, label]) => (
+                          <button
+                            key={label}
+                            type="button"
+                            onClick={() => force(notice.id, value)}
+                            className={cn(
+                              "rounded px-1.5 py-0.5 text-[10px] transition-colors",
+                              forced === value
+                                ? "bg-accent text-accent-ink"
+                                : "text-faint hover:text-ink",
+                            )}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </>
       )}

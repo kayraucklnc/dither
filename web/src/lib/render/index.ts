@@ -177,6 +177,7 @@ export async function renderSolo(
   settings: Record<string, unknown>,
   data: Record<string, unknown>,
   panel: Panel,
+  notices: Notice[] = [],
 ): Promise<Rendered> {
   const widget: PlacedWidget = {
     id: 0,
@@ -203,6 +204,7 @@ export async function renderSolo(
     width,
     height,
     await environment(),
+    notices,
   );
   const screenshot = await shoot(html, width, height);
 
@@ -222,7 +224,7 @@ export async function renderSolo(
     mimeType: "image/png",
     width: info.width,
     height: info.height,
-    fingerprint: await fingerprint([widget], { ...panel, width, height }),
+    fingerprint: await fingerprint([widget], { ...panel, width, height }, notices),
     problems,
   };
 }

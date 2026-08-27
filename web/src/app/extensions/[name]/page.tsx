@@ -4,11 +4,12 @@ import { ArrowLeft, Clock, Link2, Radio, Train, Zap } from "lucide-react";
 
 import { ScreenPreview } from "@/components/screen-preview";
 import { ShapeGlyph } from "@/components/shape-badge";
-import { find } from "@/lib/extensions/registry";
+import { ExtensionShapes, type ShapeFamily } from "@/components/extension-shapes";
+import { find, rendersNotices } from "@/lib/extensions/registry";
 import { summarise } from "@/lib/extensions/summary";
 import { operatorsFor } from "@/lib/facts";
 import { DEFAULT_PANEL } from "@/lib/panel";
-import { pixelsFor, shape as findShape } from "@/lib/shapes";
+import { FAMILIES, pixelsFor, shape as findShape, standIn } from "@/lib/shapes";
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +20,48 @@ const KIND = {
   connection: { icon: Link2, label: "Needs an account", hint: "Answered by an account you link once." },
 } as const;
 
+const FAMILY_LABELS: Record<string, { label: string; hint: string }> = {
+  full: { label: "Full screen", hint: "The whole panel" },
+  band: { label: "Wide bands", hint: "Full width, varying height — one design covers all three" },
+  column: { label: "Tall columns", hint: "Full height, varying width — one design covers all three" },
+  block: { label: "Corner", hint: "A quarter of the panel" },
+};
+
 export default async function ExtensionPage({ params }: { params: Promise<{ name: string }> }) {
   const extension = await find((await params).name);
   if (!extension) notFound();
 
   const summary = summarise(extension);
   const kind = KIND[summary.kind];
+
+  // Grouped by family, because the family is the thing worth understanding:
+  // it is why four templates cover eight sizes.
+  const families: ShapeFamily[] = Object.entries(FAMILIES)
+    .map(([id, members]) => ({
+      id,
+      label: FAMILY_LABELS[id]?.label ?? id,
+      hint: FAMILY_LABELS[id]?.hint ?? "",
+      shapes: members
+        .filter((member) => summary.shapes.includes(member))
+        .map((member) => {
+          const shape = findShape(member)!;
+          const [width, height] = pixelsFor(shape, DEFAULT_PANEL.width, DEFAULT_PANEL.height);
+          const drawnBy = standIn(member, extension.authored);
+
+          return {
+            id: member,
+            label: shape.label,
+            columns: shape.columns,
+            rows: shape.rows,
+            width,
+            height,
+            authored: extension.authored.includes(member),
+            standInFor: drawnBy ? findShape(drawnBy)?.label.toLowerCase() : undefined,
+            takesNotices: rendersNotices(extension, member),
+          };
+        }),
+    }))
+    .filter((family) => family.shapes.length > 0);
 
   return (
     <div className="mx-auto max-w-5xl px-8 py-10">
@@ -70,38 +107,13 @@ export default async function ExtensionPage({ params }: { params: Promise<{ name
         </div>
       )}
 
-      <section className="mb-10">
-        <h2 className="mb-1 text-[15px] font-semibold">Sizes it can be drawn at</h2>
-        <p className="mb-4 text-[13px] text-faint">
-          A widget takes the size you draw it. Any size not here is refused rather than scaled.
-        </p>
-
-        <div className="grid gap-5 sm:grid-cols-2">
-          {summary.shapes.map((id) => {
-            const shape = findShape(id)!;
-            const [width, height] = pixelsFor(shape, DEFAULT_PANEL.width, DEFAULT_PANEL.height);
-
-            return (
-              <div key={id} className="rounded-panel border border-line bg-surface p-3">
-                <div className="mb-3 flex items-center gap-2 px-1">
-                  <ShapeGlyph shape={shape} className="h-3.5 w-3.5 text-accent-bright" />
-                  <span className="text-[13px] font-medium">{shape.label}</span>
-                  <span className="ml-auto font-mono text-[11px] text-faint">
-                    {width}×{height}
-                  </span>
-                </div>
-                <ScreenPreview
-                  src={`/api/preview/extension/${summary.name}?shape=${id}`}
-                  width={width}
-                  height={height}
-                  alt={`${summary.label} at ${shape.label}`}
-                  className="paper-shadow"
-                />
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      <div className="mb-10">
+        <ExtensionShapes
+          name={summary.name}
+          families={families}
+          acceptsNotices={extension.manifest.accepts_notices}
+        />
+      </div>
 
       <div className="grid gap-8 md:grid-cols-2">
         <section>
