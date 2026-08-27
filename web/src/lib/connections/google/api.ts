@@ -46,6 +46,11 @@ export interface GoogleEvent {
   organizer?: { self?: boolean };
   transparency?: string;
   eventType?: string;
+  /**
+   * Not from Google. Which linked feed this arrived on, set when a widget is
+   * showing several - so a design can say which "1:1 with Ana" is which.
+   */
+  calendarName?: string;
 }
 
 interface Page<T> {

@@ -198,9 +198,14 @@ describe("building the day", () => {
 
     expect(day.events).toHaveLength(1);
     expect(day.events[0].title).toBe("Design review");
-    expect(day.all_day).toEqual([
-      { title: "Annual leave", today: true, accepted: true, date: "2026-08-27", day: "Thu" },
-    ]);
+    expect(day.all_day).toHaveLength(1);
+    expect(day.all_day[0]).toMatchObject({
+      title: "Annual leave",
+      today: true,
+      accepted: true,
+      date: "2026-08-27",
+      day: "Thu",
+    });
     expect(day.all_day_today).toBe(1);
   });
 

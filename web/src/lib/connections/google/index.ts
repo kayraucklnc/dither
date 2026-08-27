@@ -1,7 +1,7 @@
 import type { FetchContext, Provider, Verification } from "@/lib/connections/provider";
 
 import { agenda } from "./agenda";
-import { calendars, events } from "./api";
+import { calendars, events, type EventsResult } from "./api";
 import { windowFor } from "./range";
 import {
   CLIENT_ID,
@@ -66,12 +66,55 @@ async function verify(credentials: Record<string, unknown>): Promise<Verificatio
 
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Which feeds a widget was pointed at.
+ *
+ * One widget can show several - work and family on one panel is the ordinary
+ * case, and two overlapping widgets is not how anybody would ask for it. The
+ * list is sorted and deduplicated because the settings become the key an
+ * answer is cached under, and "work then family" must not be a different
+ * question from "family then work".
+ *
+ * A string is what a widget saved before this holds, and still means one
+ * calendar.
+ */
+const MAX_CALENDARS = 8;
+
+export function calendarIds(settings: Record<string, unknown>): string[] {
+  const raw = settings.calendar;
+  const listed = Array.isArray(raw) ? raw : [raw];
+
+  const ids = [
+    ...new Set(
+      listed
+        .map((one) => String(one ?? "").trim())
+        .filter((one) => one.length > 0),
+    ),
+  ].sort();
+
+  // Every calendar is a request, and a person who ticked forty of them wants
+  // a wall of text rather than a panel. Bounded, and the bound is reported.
+  return (ids.length ? ids : ["primary"]).slice(0, MAX_CALENDARS);
+}
+
+/** One feed that answered, and one that did not. */
+interface Feed extends EventsResult {
+  id: string;
+}
+
+interface Missed {
+  id: string;
+  failed: string;
+}
+
+const isFeed = (answer: Feed | Missed): answer is Feed => !("failed" in answer);
+
 async function fetchCalendar(
   settings: Record<string, unknown>,
   now: Date,
   context: FetchContext,
 ): Promise<Record<string, unknown>> {
-  const calendarId = String(settings.calendar ?? "").trim() || "primary";
+  const ids = calendarIds(settings);
   const { timezone, locale } = context;
 
   // "The rest of today" is a boundary in a place, not a duration - so the
@@ -79,22 +122,59 @@ async function fetchCalendar(
   // asked of Google.
   const window = windowFor(settings, now, timezone, locale);
 
-  const answered = await events(calendarId, window.from, window.to, context.credentials);
+  const answers = await Promise.all(
+    ids.map(async (id): Promise<Feed | Missed> => {
+      try {
+        const answered = await events(id, window.from, window.to, context.credentials);
+        return { id, ...answered };
+      } catch (error) {
+        return { id, failed: error instanceof Error ? error.message : String(error) };
+      }
+    }),
+  );
 
-  const day = agenda(answered.events, {
-    now,
-    timezone,
-    locale,
-    window,
-    hideDeclined: settings.hide_declined !== false,
-    truncated: answered.truncated,
-  });
+  const read = answers.filter(isFeed);
+  const missing = answers.filter((answer): answer is Missed => !isFeed(answer));
+
+  // Every one of them failed, so there is nothing to draw and the reason is
+  // worth having. One of several failing is different: a shared calendar
+  // somebody stopped sharing should not blank the four that still work.
+  if (!read.length) throw new Error(missing[0]?.failed ?? "No calendar answered.");
+
+  const many = read.length > 1;
+
+  const day = agenda(
+    read.flatMap((feed) =>
+      feed.events.map((event) => ({
+        ...event,
+        // Only when there are several. Labelling every event with the name of
+        // the one calendar it could possibly be from is noise.
+        calendarName: many ? feed.name || feed.id : undefined,
+      })),
+    ),
+    {
+      now,
+      timezone,
+      locale,
+      window,
+      hideDeclined: settings.hide_declined !== false,
+      truncated: read.some((feed) => feed.truncated),
+    },
+  );
+
+  const names = read.map((answer) => answer.name || answer.id);
 
   return {
     calendar: {
       ...day,
       connected: true,
-      name: answered.name,
+      name: names.join(", "),
+      names,
+      /** True when a feed was asked for and did not answer. */
+      incomplete: missing.length > 0,
+      unread: missing.length,
+      /** More than one feed is being shown, so a design may want to say which. */
+      many,
     },
   };
 }

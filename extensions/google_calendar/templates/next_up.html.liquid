@@ -43,6 +43,13 @@
         {% unless next.today %}<span class="t-sm t-upper"> · {{ next.day }}</span>{% endunless %}
       </p>
 
+      {% if calendar.many and next.calendar != blank %}
+        <p class="with-icon t-sm">
+          <span class="i i-calendar i-xs"></span>
+          <span class="truncate">{{ next.calendar }}</span>
+        </p>
+      {% endif %}
+
       {% if extension.values.show_location and next.location != blank %}
         <p class="with-icon t-md">
           <span class="i i-{% if next.remote %}video{% else %}pin{% endif %} i-sm"></span>

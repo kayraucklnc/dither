@@ -238,7 +238,18 @@ export async function loadProblems(): Promise<ExtensionProblem[]> {
 /** The defaults a new widget starts with, straight from the manifest. */
 export function defaultSettings(extension: Extension): Record<string, unknown> {
   return Object.fromEntries(
-    extension.manifest.fields.map((field) => [field.keyname, field.default ?? ""]),
+    extension.manifest.fields.map((field) => [
+      field.keyname,
+      // A field holding several answers defaults to a list, empty or not. An
+      // empty string here would reach a provider as one nameless selection.
+      field.field_type === "multiselect"
+        ? Array.isArray(field.default)
+          ? field.default
+          : field.default === undefined || field.default === ""
+            ? []
+            : [field.default]
+        : (field.default ?? ""),
+    ]),
   );
 }
 

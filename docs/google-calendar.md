@@ -103,11 +103,41 @@ DITHER_OAUTH_ORIGIN=https://dither.example.com
 It wins over everything else, and `make up` does not touch it. Whatever the
 Connections page displays is what Dither will send, so register that.
 
+## Choosing what a widget shows
+
+**Which calendars.** Every calendar on the linked account is listed, including
+ones other people have shared with you, and a widget can tick more than one.
+They are merged into a single list in time order, and each entry is marked with
+where it came from — so "1:1 with Ana" appearing on both the work and the
+family calendar is legible rather than baffling. Eight is the most one widget
+will read; every calendar is a request.
+
+Ticking the same two in a different order is the same question, so two widgets
+configured alike still share one answer and one trip to Google.
+
+If one of several feeds fails — a shared calendar somebody stopped sharing —
+the rest still draw, and `calendar.unread` counts what was missed so a rule can
+notice. Only when *every* feed fails does the widget report a fault.
+
+**How far ahead.** The rest of today, today and tomorrow, the rest of this
+week, the rest of this month, or a rolling number of hours. These are calendar
+boundaries in the installation's own time zone, not durations: at 22:00 "the
+rest of today" is two hours and "the next twelve" is most of tomorrow morning
+as well, and only one of those is what somebody meant. Weeks end where the
+locale says they do — Sunday night in London, Saturday night in Chicago.
+
+A window that can leave today is also grouped day by day, which is what the
+Agenda and Week designs draw.
+
+**Which look.** Eight designs, overlapping on purpose, so most sizes offer
+three or four to choose between: the full timeline, a day-grouped agenda, a
+week of columns, one enormous next-thing, and the four band and column shapes.
+
 ## What it reads
 
-One request per refresh, per calendar being shown, at the extension's ten
-minute interval. `events.list` on the chosen calendar between now and the
-widget's look-ahead, with recurring events already expanded into occurrences.
+One request per calendar per refresh, at the extension's ten minute interval.
+`events.list` on each chosen calendar between now and the end of the window,
+with recurring events already expanded into occurrences.
 
 - Meetings already running are included — the one you are in is the most
   relevant thing on a panel — and count as starting "now" rather than as
