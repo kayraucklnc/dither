@@ -109,8 +109,21 @@
 
       {% if shape.rows > 2 %}
         <div style="display: flex; justify-content: space-between; margin-top: 3px">
-          <span class="t-xs">{{ open | divided_by: 60 }}:00</span>
-          <span class="t-xs">{{ close | divided_by: 60 }}:00</span>
+          {%- comment -%}
+            The ends of the drawn day, as clock times.
+
+            `open` and `close` are minutes, and only the two the settings gave
+            are free to be a half hour - the rest are snapped to the hour by the
+            loop above. Printing "{{ minutes }}/60:00" therefore reads "7.5:00"
+            for a day that starts at half past seven, which is the one input a
+            time field positively invites.
+          {%- endcomment -%}
+          {%- assign open_h = open | divided_by: 60 | floor -%}
+          {%- assign open_m = open | modulo: 60 | prepend: "0" | slice: -2, 2 -%}
+          {%- assign close_h = close | divided_by: 60 | floor -%}
+          {%- assign close_m = close | modulo: 60 | prepend: "0" | slice: -2, 2 -%}
+          <span class="t-xs">{{ open_h }}:{{ open_m }}</span>
+          <span class="t-xs">{{ close_h }}:{{ close_m }}</span>
         </div>
       {% endif %}
     </div>

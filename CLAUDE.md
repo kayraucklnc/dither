@@ -86,6 +86,46 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
   hands sit at the *middle* of that window, not at its start - the same error,
   split either side of the truth, so the average miss is halved.
 
+## How a panel gets here
+
+A device is **never created from the dashboard**, and a "new device" form would
+be a row no hardware ever matches. It is identified by its MAC address, the MAC
+is known to the panel and to nobody else, and the panel volunteers it the first
+time it calls `/api/setup` - which provisions it, hands back a key, and gives it
+a one-leaf tree so it has something to show before anyone has touched it.
+
+What a person does instead is at `/devices/new`: copy the address the panel has
+to reach (`API_URI`, not the address in the browser bar), and - if the board has
+no firmware at all - write one over USB from the page. That flasher is the
+WebSerial one the Ruby app had; it came back in Next form and reads merged
+images from `web/public/downloads/`. The binaries are gitignored; the directory
+and its README are not.
+
+The images come from a `trmnl-firmware` checkout, and are never copied in by
+hand:
+
+```bash
+cd web && npx tsx scripts/firmware.mts    # or pass the checkout as an argument
+```
+
+**A merged image is not "the file that starts with 0xE9".** A bare
+`firmware.bin` starts with it too, and written at offset zero it produces a
+board that does not boot while looking entirely plausible in a file listing. The
+test is the partition table at `0x8000` - magic `AA 50` - with a bootloader at
+`0x0` (ESP32-S3/C3/C6) or `0x1000` (classic ESP32). `firmware.mts` opens every
+candidate and applies it before copying.
+
+**The server address is not compiled in, and rebuilding to change it is the
+wrong instinct.** `API_BASE_URL` in the firmware's `config.h` is only the
+fallback; the real value is `api_url` in the board's NVS, which its own Wi-Fi
+setup portal writes. One generic image per board is enough for any number of
+installations.
+
+The other direction *is* a dashboard action. Forgetting a device is on its card
+and in its Device tab, and it says what goes with it, because the tree and the
+notices live here rather than on the panel. A panel still on the network simply
+introduces itself again afterwards, as a new device with a new key.
+
 ## Traps already paid for
 
 - **A render is cached by its design as well as its data.** The fingerprint
@@ -170,6 +210,45 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
 - **"Today" is a local day, and midnight's offset is not always now's.** On the
   morning the clocks change, the naive answer is an hour into the previous day.
   See `web/src/lib/clock.ts`.
+
+- **A design that lists rows takes its count from the box, not from a literal.**
+  The transit board wrote `limit: 6` into the loop, so the same design drawn in
+  a nine-row slot put six rows into room for three and the last one was sliced
+  through the middle by `overflow: hidden` - which reads as a rendering fault
+  rather than as a board that is full. `shape.height` is the budget; subtract
+  the chrome that is actually there (an alert line, a notice strip) and divide.
+  The fetch still trims to the "Departures to show" setting; the two are
+  different questions and both have to be asked.
+
+- **A source's settings form shows less than a widget's, and the same flag says
+  how much less.** A source is an extension asked a question so something can
+  branch on the answer; it draws nothing, so "Heading", "Show where" and "Mark
+  the gaps" are not settings it has, and offering them invites the reasonable
+  question of why a trigger needs a heading. `SettingsForm` takes
+  `purpose="deciding"` and drops every `presentation: true` field, so one
+  declaration serves both this and the fetch-sharing above. It says how many it
+  dropped rather than silently showing a short list.
+
+- **"Has a location" is not "somewhere to go".** A Google Meet reports a
+  location - the literal string `"Meet"` - because that is what
+  `placeOf` makes of a conference link, and a link pasted into the location box
+  becomes its host name. So a rule that fires on `next_meeting_location present`
+  sends you to the station for a call you take at your desk. The pair that means
+  a place is `next_meeting_location present` **and** `next_meeting_is_remote
+  is_false`.
+
+- **Merging two accounts is a setting, not a check.** "Either of my calendars"
+  is the source's `Calendars` field naming both primaries; the provider merges
+  them into one list in time order, so `calendar.next` is already the soonest
+  across all of them. A tree that mentions an account is a tree working around
+  a source that was configured too narrowly.
+
+- **A field the provider never reads is `presentation: true`, or it costs a
+  fetch.** The transit heading and `show_platform` never reach the operator, and
+  the weather `place`, `style` and `show_hours` never reach Open-Meteo - the
+  forecast comes from the coordinates and the unit alone. Left undeclared, two
+  boards of one route with different headings were two questions, which is
+  exactly the failure the presentation flag exists to prevent.
 
 - **A Google grant issues one refresh token, not one per handshake.** Drop
   `prompt=consent` from the authorize URL and re-linking an account that has
