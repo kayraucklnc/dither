@@ -1,14 +1,16 @@
-import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
-import { ArrowRight, Check, FlaskConical, TriangleAlert } from "lucide-react";
+import { ArrowRight, Check, FlaskConical, Plus, TriangleAlert } from "lucide-react";
 
 import { ConnectionIcon } from "@/components/connection-icon";
 import { CredentialForm } from "@/components/credential-form";
 import { RedirectUri } from "@/components/redirect-uri";
 import { allProviders, provider as findProvider } from "@/lib/connections";
 import {
+  CLIENT,
+  accountsOf,
   failure,
+  forgetConnection,
   isHalfway,
   isLinked,
   note,
@@ -18,8 +20,6 @@ import {
   startUrl,
   stored,
 } from "@/lib/connections/link";
-import { db } from "@/lib/db";
-import { connections } from "@/lib/db/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -72,43 +72,39 @@ async function link(formData: FormData) {
     return;
   }
 
-  await db
-    .insert(connections)
-    .values({ provider: id, label: source.label, credentials })
-    .onConflictDoNothing();
-
+  // A provider that asks for nothing and verifies nothing - the stand-ins.
+  await save(id, source.label, credentials);
   revalidatePath("/connections");
 }
 
 /**
- * Letting go of an account, in the smallest step that means anything.
+ * Letting go of one account.
  *
- * For a provider with a handshake, unlinking drops the *grant* and keeps the
- * client ID and secret - so signing back in is one button rather than another
- * trip to the Google Cloud console. That is the common case by a distance: a
- * revoked grant, a rotated secret, a test-user token that aged out. Pressing
- * it again from there discards the client credentials too.
+ * Named, because a provider can hold several and "unlink Google" is no longer
+ * a single thing. The installation's client credentials are left alone: they
+ * identify this server, not the account, and having to paste them again to
+ * re-add an account you removed by mistake would be a poor trade.
  */
-async function unlink(formData: FormData) {
+async function signOut(formData: FormData) {
   "use server";
 
   const id = String(formData.get("provider"));
-  const source = findProvider(id);
-  const row = source ? await stored(id) : undefined;
+  const account = String(formData.get("account") ?? "");
 
-  if (source?.handshake && row && source.handshake.complete(row.credentials)) {
-    const kept = Object.fromEntries(
-      (source.credentials ?? [])
-        .map((field) => [field.key, row.credentials[field.key]])
-        .filter(([, value]) => Boolean(value)),
-    );
+  await forgetConnection(id, account);
+  revalidatePath("/connections");
+}
 
-    await save(id, source.label, kept);
-    revalidatePath("/connections");
-    return;
-  }
+/**
+ * Letting go of the whole provider.
+ *
+ * Every account and the client credentials with them. For a provider that
+ * takes a pasted key this is the only kind of unlinking there is.
+ */
+async function forget(formData: FormData) {
+  "use server";
 
-  await db.delete(connections).where(eq(connections.provider, id));
+  await forgetConnection(String(formData.get("provider")));
   revalidatePath("/connections");
 }
 
@@ -123,16 +119,26 @@ function accountName(label: string, id: string, providerLabel: string): string |
 }
 
 /** The last four characters of a secret, and nothing else. */
-function hint(credentials: Record<string, unknown>, key: string): string {
+function secretHint(credentials: Record<string, unknown>, key: string): string {
   const value = String(credentials[key] ?? "");
   return value ? `••••${value.slice(-4)}` : "";
 }
 
 export default async function ConnectionsPage() {
-  const rows = await db.select().from(connections);
-  const linked = new Map(rows.map((row) => [row.provider, row]));
   const providers = allProviders();
   const mocked = providers.filter((one) => one.mocked).length;
+
+  // One query per provider rather than one for everything: a provider now has
+  // a client row and a row per account, and keeping them apart here is what
+  // stops the page having to know the shape.
+  const state = new Map(
+    await Promise.all(
+      providers.map(
+        async (one) =>
+          [one.id, { client: await stored(one.id, CLIENT), accounts: await accountsOf(one.id) }] as const,
+      ),
+    ),
+  );
 
   // The redirect URI a handshake will use, which has to be registered with the
   // provider before the handshake can succeed. Built from the request rather
@@ -163,12 +169,12 @@ export default async function ConnectionsPage() {
 
       <div className="space-y-2.5">
         {providers.map((one) => {
-          const row = linked.get(one.id);
-          const problem = row ? failure(row.label) : undefined;
-          const connected = isLinked(one, row);
-          // Client credentials in, consent not yet given. The only state that
-          // needs a second button rather than a second form.
-          const halfway = isHalfway(one, row);
+          const { client, accounts } = state.get(one.id)!;
+          const problem = client ? failure(client.label) : undefined;
+          const connected = isLinked(one, client, accounts);
+          // Client credentials in, nobody signed in. The only state that needs
+          // a second button rather than a second form.
+          const halfway = isHalfway(one, client, accounts);
           const needsCredentials = (one.credentials ?? []).length > 0;
           const uri = one.handshake ? redirectUri(origin, one.id) : undefined;
 
@@ -183,14 +189,19 @@ export default async function ConnectionsPage() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="text-[14px] font-medium">{one.label}</h2>
-                      {connected && (
+                      {connected && !one.handshake && (
                         <span className="flex items-center gap-1 rounded-full bg-live/10 px-2 py-0.5 text-[11px] text-live">
                           <Check size={10} />
                           {/* Whose account it turned out to be, when the
                               provider was able to say. A provider that just
                               stores its own id says "Linked" instead of
                               repeating its own name back in lower case. */}
-                          {accountName(row!.label, one.id, one.label) ?? "Linked"}
+                          {accountName(client!.label, one.id, one.label) ?? "Linked"}
+                        </span>
+                      )}
+                      {connected && one.handshake && (
+                        <span className="rounded-full bg-live/10 px-2 py-0.5 text-[11px] text-live">
+                          {accounts.length} account{accounts.length === 1 ? "" : "s"}
                         </span>
                       )}
                       {halfway && (
@@ -212,7 +223,7 @@ export default async function ConnectionsPage() {
                       <p className="mt-1.5 font-mono text-[12px] text-faint">
                         {(one.credentials ?? [])
                           .filter((field) => field.secret)
-                          .map((field) => `${field.label} ${hint(row!.credentials, field.key)}`)
+                          .map((field) => `${field.label} ${secretHint(client?.credentials ?? {}, field.key)}`)
                           .join("  ")}
                       </p>
                     )}
@@ -220,36 +231,84 @@ export default async function ConnectionsPage() {
                 </div>
 
                 <div className="flex shrink-0 items-center gap-2">
-                  {halfway && (
+                  {/* A provider that can hold several offers another sign-in
+                      for as long as it is linked, not only while empty. */}
+                  {(halfway || (connected && one.multiple)) && (
                     <a
                       href={startUrl(one.id)}
-                      className="flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-[13px] font-medium text-accent-ink transition-opacity hover:opacity-90"
+                      className={
+                        halfway
+                          ? "flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-[13px] font-medium text-accent-ink transition-opacity hover:opacity-90"
+                          : "flex items-center gap-1.5 rounded-lg border border-line bg-raised px-3.5 py-2 text-[13px] text-muted transition-colors hover:text-ink"
+                      }
                     >
-                      Sign in to {one.label}
-                      <ArrowRight size={13} />
+                      {halfway ? (
+                        <>
+                          Sign in to {one.label}
+                          <ArrowRight size={13} />
+                        </>
+                      ) : (
+                        <>
+                          <Plus size={13} />
+                          Add account
+                        </>
+                      )}
                     </a>
                   )}
 
                   {(connected || halfway || !needsCredentials) && (
-                    <form action={connected || halfway ? unlink : link}>
+                    <form action={forget}>
                       <input type="hidden" name="provider" value={one.id} />
                       <button
                         type="submit"
-                        className={
-                          connected || halfway
-                            ? "rounded-lg border border-line bg-raised px-3.5 py-2 text-[13px] text-muted transition-colors hover:text-ink"
-                            : "rounded-lg bg-accent px-3.5 py-2 text-[13px] font-medium text-accent-ink transition-opacity hover:opacity-90"
-                        }
+                        className="rounded-lg border border-line bg-raised px-3.5 py-2 text-[13px] text-muted transition-colors hover:text-ink"
                       >
-                        {/* A grant is signed out of; a pasted key is just
-                            removed. And once the grant is gone, the same
-                            button forgets what is left. */}
-                        {connected ? (one.handshake ? "Sign out" : "Unlink") : halfway ? "Forget" : "Link"}
+                        {one.handshake ? "Forget" : "Unlink"}
+                      </button>
+                    </form>
+                  )}
+
+                  {!connected && !halfway && !needsCredentials && (
+                    <form action={link}>
+                      <input type="hidden" name="provider" value={one.id} />
+                      <button
+                        type="submit"
+                        className="rounded-lg bg-accent px-3.5 py-2 text-[13px] font-medium text-accent-ink transition-opacity hover:opacity-90"
+                      >
+                        Link
                       </button>
                     </form>
                   )}
                 </div>
               </div>
+
+              {/* Every account signed in, each removable on its own. */}
+              {accounts.length > 0 && (
+                <ul className="mt-3 space-y-1.5 border-t border-line pt-3">
+                  {accounts.map((account) => (
+                    <li
+                      key={account.account}
+                      className="flex items-center justify-between gap-3 rounded-lg bg-ground px-3 py-2"
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <Check size={12} className="shrink-0 text-live" />
+                        <span className="truncate text-[13px] text-ink">{account.account}</span>
+                      </span>
+
+                      <form action={signOut}>
+                        <input type="hidden" name="provider" value={one.id} />
+                        <input type="hidden" name="account" value={account.account} />
+                        <button
+                          type="submit"
+                          className="shrink-0 text-[12px] text-faint transition-colors hover:text-danger"
+                        >
+                          Sign out
+                        </button>
+                      </form>
+                    </li>
+                  ))}
+                </ul>
+              )}
 
               {problem && (
                 <p className="mt-3 flex items-start gap-2 rounded-lg border border-danger/40 bg-danger/5 px-3 py-2 text-[12px] leading-relaxed text-danger">
@@ -284,7 +343,7 @@ export default async function ConnectionsPage() {
       <p className="mt-6 text-[12px] leading-relaxed text-faint">
         Credentials are stored in this installation&rsquo;s own database and are never sent to a
         browser or to anyone else. Give Dither a restricted, read-only key where the service offers
-        one — it only ever reads.
+        one &mdash; it only ever reads.
       </p>
     </div>
   );

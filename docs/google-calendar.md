@@ -24,6 +24,21 @@ from it an hour at a time and never written down. You can revoke the whole
 thing from [myaccount.google.com/permissions](https://myaccount.google.com/permissions)
 without touching Dither.
 
+## More than one Google account
+
+Press **Add account** on the Google Calendar card and sign in again. The OAuth
+client you registered is the installation's, not the account's, so it is
+pasted once and every account afterwards is one button.
+
+Each account appears on the card with its own **Sign out**. *Forget* removes
+every account and the client credentials with them.
+
+A widget's calendar selection carries the account as well as the calendar,
+because "primary" is a calendar on both of them. If an account is signed out,
+widgets naming its calendars say so rather than quietly showing somebody
+else's — and a selection saved when there was only one account still means
+that account.
+
 ## The four minutes
 
 1. Open the [Google Cloud console](https://console.cloud.google.com/) and
@@ -105,8 +120,10 @@ Connections page displays is what Dither will send, so register that.
 
 ## Choosing what a widget shows
 
-**Which calendars.** Every calendar on the linked account is listed, including
-ones other people have shared with you, and a widget can tick more than one.
+**Which calendars.** Every calendar on every linked account is listed,
+including ones other people have shared with you, and a widget can tick more
+than one — across accounts, so a work meeting and a school pickup can sit on
+one panel.
 They are merged into a single list in time order, and each entry is marked with
 where it came from — so "1:1 with Ana" appearing on both the work and the
 family calendar is legible rather than baffling. Eight is the most one widget

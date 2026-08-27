@@ -3,7 +3,8 @@ import { Liquid } from "liquidjs";
 
 import { provider } from "@/lib/connections";
 import { db } from "@/lib/db";
-import { connections, observations, triggers, widgets, type Widget } from "@/lib/db/schema";
+import { readyAccounts, stored } from "@/lib/connections/link";
+import { observations, triggers, widgets, type Widget } from "@/lib/db/schema";
 import { find, type Extension } from "@/lib/extensions/registry";
 import {
   answersFor,
@@ -76,21 +77,32 @@ async function fromConnection(
 
   if (!source) throw new Error(`${extension.manifest.label} needs a connection that does not exist.`);
 
-  const [linked] = await db.select().from(connections).where(eq(connections.provider, source.id));
+  // A provider with a handshake keeps one row per signed-in account, plus one
+  // for the installation's own client credentials. One without keeps a single
+  // row under the empty account name, which `readyAccounts` skips - so it is
+  // read separately.
+  const [client, accounts] = await Promise.all([
+    stored(source.id),
+    source.handshake ? readyAccounts(source.id) : Promise.resolve([]),
+  ]);
+
+  const usable = source.handshake
+    ? accounts.filter((one) => source.handshake!.complete(one.credentials))
+    : client
+      ? [{ account: "", label: client.label, credentials: client.credentials }]
+      : [];
 
   // A mocked provider answers without a link, so screens can be designed before
   // anyone has signed in. A real one must not - and for a provider whose link
   // finishes in the browser, a row is not a link: the client credentials are
   // stored the moment they are pasted, and nobody has consented to anything
   // yet. Saying so beats a widget that fails with "no refresh token".
-  if (!source.mocked) {
-    if (!linked) {
-      throw new Error(`Link your ${source.label} account to use ${extension.manifest.label}.`);
-    }
-
-    if (source.handshake && !source.handshake.complete(linked.credentials)) {
-      throw new Error(`Finish signing in to ${source.label} under Connections.`);
-    }
+  if (!source.mocked && !usable.length) {
+    throw new Error(
+      source.handshake && client
+        ? `Finish signing in to ${source.label} under Connections.`
+        : `Link your ${source.label} account to use ${extension.manifest.label}.`,
+    );
   }
 
   // The installation's zone, not the server's. "What did we take today" is a
@@ -98,7 +110,8 @@ async function fromConnection(
   const { locale, timezone } = await environment();
 
   return source.fetch(settings, now, {
-    credentials: linked?.credentials ?? {},
+    accounts: usable,
+    credentials: usable[0]?.credentials ?? {},
     locale,
     timezone,
   });
