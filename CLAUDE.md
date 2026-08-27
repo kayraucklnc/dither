@@ -53,6 +53,10 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
   on one screen is the whole point of the distinction.
 - **A trigger is a source, not a borrowed widget.** Sources belong to a device,
   so you can decide on a station you are not displaying.
+- **Your own files are a source too.** The gallery reads
+  `DITHER_GALLERY_DIR`, one folder per collection, and ships no pictures of its
+  own - see `docs/gallery.md`. It is outside the repository because
+  photographs are not source.
 - **A connection is an account, linked once, used by every placement.** An
   extension says "I need Google Calendar" and the linked account answers on
   every screen; credentials never live in a widget's settings. Stripe takes a
@@ -268,6 +272,55 @@ introduces itself again afterwards, as a new device with a new key.
   forecast comes from the coordinates and the unit alone. Left undeclared, two
   boards of one route with different headings were two questions, which is
   exactly the failure the presentation flag exists to prevent.
+
+- **A picture is dithered once, and only where it is placed one pixel for
+  one.** The pipeline finishes in Floyd-Steinberg over the whole panel, so by
+  default `as_image` hands the template *grey*. A picture may be reduced
+  earlier - that is what the gallery's screens are, and a dot screen has to
+  land on the picture's own pixels to be a dot screen at all - but only
+  because every design asks for its crop at the exact size of its box. At any
+  other size the browser resamples the marks back into greys and the page
+  dither finds them again, which is the moire. It is why the contact sheet
+  lays its grid out in pixels rather than in `1fr`, and why the print design's
+  arithmetic has to include the gap under the plate. And enlarge pixel art
+  with `nearest`: Lanczos turns a 524-pixel drawing into a blur, and a blur
+  dithers into mush. See `web/src/lib/gallery/screen.ts`.
+- **A dot screen measures a region, and its geometry is counted, not
+  derived.** Sampling the middle pixel of each cell turns a picture that is
+  already a printed halftone into confetti - the middle pixel is black or
+  white at random - so the tone is a box average. And "area of a circle" gets
+  the dot size wrong at both ends: a circle cannot fill a square, so solid
+  black prints 92% black with paper in the corners, and enlarging the radius
+  until it can makes every mid tone muddy. The table of radii is built by
+  sorting sampled distances, so coverage is linear by construction.
+- **Before a crop there are two other answers, and the panel's bezel decides
+  one of them.** A tall picture on a wide panel can be turned a quarter -
+  1182x1674 becomes 1674x1182, which is nearly the panel's own shape - or
+  letterboxed whole. The bars are ink where the picture is dark and paper where
+  it is light, read from the source down to a single pixel: this idiom is white
+  marks on black, and a black poster in a white surround reads as a mistake on
+  a device whose bezel is already white. The turn happens before the resize, so
+  which way the picture is long has to be settled before anything asks whether
+  it is being enlarged.
+- **A picture is cropped to the widget, not to the panel.** Sizes are free, so
+  the rectangle worth taking out of a photograph at 12x12 is not the one worth
+  taking at 3x12. The template is the first thing that knows which box it got,
+  which is why the crop is a Liquid filter rather than part of the fetch - and
+  it is what lets a portrait pin fill a widescreen panel.
+- **A rotation with any memory in it redraws the panel for nothing.** Which
+  gallery picture is up is a pure function of the clock: a cursor, a
+  last-shown column or a random number would answer differently on every
+  refetch, the fingerprint is taken over the payload, and a gallery meant to
+  change hourly would hand the device a new file every five minutes for as
+  long as it hung there. Nothing that moves between two fetches inside one
+  hold - no countdown, no "fetched at" - may go in the payload either. See
+  `web/src/lib/gallery/pick.ts`.
+- **An extension that ships no data has no sample, and should not invent one.**
+  Every other sample is plausible fiction that lets a screen be laid out before
+  anyone owns an API key. A gallery's would be a picture id naming a file that
+  is not there, so it is empty and a fresh installation gets the fault card
+  with the path to fill. Inventing one would only have produced the
+  missing-picture state with an extra step.
 
 - **A Google grant issues one refresh token, not one per handshake.** Drop
   `prompt=consent` from the authorize URL and re-linking an account that has

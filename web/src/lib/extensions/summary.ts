@@ -6,6 +6,7 @@ import {
   rendersNotices,
   type Extension,
 } from "@/lib/extensions/registry";
+import type { Manifest } from "@/lib/extensions/manifest";
 import { PRESETS, type Size } from "@/lib/shapes";
 
 /** What a page needs to know about an extension, without its templates. */
@@ -13,7 +14,12 @@ export interface ExtensionSummary {
   name: string;
   label: string;
   description: string;
-  kind: "static" | "poll" | "transit" | "connection";
+  /**
+   * Taken from the manifest rather than spelled out again. It was spelled out
+   * once, and adding a kind then type-checked everywhere except the two icon
+   * maps keyed by it, which threw in the browser.
+   */
+  kind: Manifest["kind"];
   interval: number;
   unit: string;
   /** The named sizes it can be drawn at. Only ever for counting and pickers. */

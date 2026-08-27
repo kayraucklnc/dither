@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bell, Clock, Link2, Radio, Train, Zap } from "lucide-react";
+import { Bell, Clock, Image, Link2, Radio, Train, Zap } from "lucide-react";
 
 import { ScreenPreview } from "@/components/screen-preview";
 import type { ExtensionSummary } from "@/lib/extensions/summary";
@@ -10,6 +10,7 @@ const KIND = {
   static: { icon: Clock, label: "Local" },
   poll: { icon: Radio, label: "Polls an API" },
   transit: { icon: Train, label: "Transit" },
+  gallery: { icon: Image, label: "Your pictures" },
   connection: { icon: Link2, label: "Needs an account" },
 } as const;
 

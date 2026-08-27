@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Clock, Link2, Radio, Train, Zap } from "lucide-react";
+import { ArrowLeft, Clock, Image, Link2, Radio, Train, Zap } from "lucide-react";
 
 import { ScreenPreview } from "@/components/screen-preview";
 import { ExtensionDesigns, type DesignEntry } from "@/components/extension-designs";
@@ -17,6 +17,7 @@ const KIND = {
   static: { icon: Clock, label: "Renders locally", hint: "Fetches nothing; draws from its settings." },
   poll: { icon: Radio, label: "Polls an API", hint: "Calls out on a schedule for fresh data." },
   transit: { icon: Train, label: "Transit provider", hint: "Answered by a provider built into Dither." },
+  gallery: { icon: Image, label: "Your pictures", hint: "Answered by the pictures in your gallery folder." },
   connection: { icon: Link2, label: "Needs an account", hint: "Answered by an account you link once." },
 } as const;
 
