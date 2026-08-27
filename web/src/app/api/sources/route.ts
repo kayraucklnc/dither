@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { triggers } from "@/lib/db/schema";
 import { refreshTrigger } from "@/lib/extensions/fetcher";
+import { sameQuestion } from "@/lib/extensions/question";
 import { defaultSettings, find } from "@/lib/extensions/registry";
 
 /**
@@ -45,11 +46,14 @@ export async function POST(request: Request) {
    * The same question asked twice answers with the source that already exists.
    * Two calendars are only useful when they are *different* calendars, and a
    * silent failure that invited a second click once left four identical rows.
+   *
+   * Compared as a question rather than as JSON: a stored row comes back in
+   * Postgres's key order and the body arrives in the caller's, so stringifying
+   * the two found a difference in almost every pair of identical questions -
+   * which is how it went on leaving those rows anyway.
    */
-  const existing = (await db.select().from(triggers)).find(
-    (row) =>
-      row.extension === extension.name &&
-      JSON.stringify(row.settings) === JSON.stringify(settings),
+  const existing = (await db.select().from(triggers)).find((row) =>
+    sameQuestion(row, { extension: extension.name, settings }),
   );
 
   if (existing) return NextResponse.json({ source: existing, reused: true });
