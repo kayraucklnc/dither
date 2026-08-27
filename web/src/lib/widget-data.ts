@@ -1,5 +1,6 @@
 import { answersEnsuring } from "@/lib/extensions/fetcher";
 import { answersFor, observationKey } from "@/lib/extensions/observations";
+import type { Extension } from "@/lib/extensions/registry";
 
 /**
  * The data a widget draws with, and whether it is any good.
@@ -50,4 +51,34 @@ export async function dataFor(
       ];
     }),
   );
+}
+
+/**
+ * What a *preview* draws with: the real answer where there is one, the
+ * extension's sample where there is not.
+ *
+ * A thumbnail is a picture rather than a decision, so the sample is allowed
+ * here - it is the whole reason the catalogue can be browsed before anyone
+ * owns an API key. But it is a fallback, not a preference. A card showing what
+ * your gallery actually holds beats one showing what a gallery might hold, and
+ * the gallery's sample is empty on purpose, so without this its card would say
+ * "no pictures yet" to somebody with two hundred.
+ *
+ * Asking for an answer nobody has yet is only done where answering costs a
+ * directory read. Opening the catalogue must not fire eight HTTP requests at
+ * eight providers.
+ */
+export async function previewData(
+  extension: Extension,
+  settings: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const question = [{ extension: extension.name, settings }];
+  const local = extension.manifest.kind === "gallery";
+
+  const answers = local ? await answersEnsuring(question) : await answersFor(question);
+  const answer = answers.get(observationKey(extension.name, settings));
+
+  return answer && !answer.standIn
+    ? answer.payload
+    : (extension.manifest.sample as Record<string, unknown>);
 }

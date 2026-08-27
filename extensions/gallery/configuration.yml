@@ -1,0 +1,238 @@
+# Dither bundled extension: Gallery.
+#
+# A picture on the wall, which is the one thing an e-ink panel is unarguably
+# good at and the last thing this server learned to do.
+#
+# The pictures are files on this machine, in the folder named by
+# DITHER_GALLERY_DIR. There is no upload, no album table and no "add image"
+# button - a collection is a directory, the way an extension is a directory,
+# and dropping a folder of jpegs in is the whole of the interface.
+#
+# It ships with no pictures at all, on purpose. Photographs are not source, and
+# a gallery padded out with somebody else's stock art is a gallery you never
+# get round to putting your own things in. An empty folder means an empty
+# gallery, and the extension says so plainly rather than inventing something to
+# show. See docs/gallery.md.
+#
+# Two things about it are less obvious than they look.
+#
+# **Which picture is up is a function of the clock, and of nothing else.** No
+# cursor, no last-shown column, no random number. That is not tidiness - a
+# render is cached by the widget's data, so an answer that differed between two
+# fetches would hand the panel a new file, and a redraw, every time it woke. See
+# lib/gallery/pick.ts.
+#
+# **Cropping happens in the template, not here.** A design covers a range of
+# sizes and the rectangle worth taking out of a photograph for a full-bleed
+# wallpaper is not the one worth taking for a strip down the side of a screen,
+# so `as_image` is handed the box it is drawing into and crops to that. It is
+# also why a portrait photograph works on a landscape panel at all.
+
+version: "1.0.0"
+name: gallery
+label: Gallery
+description: >
+  Your pictures, hung on the panel and changed as often as you like. Cropped to
+  whatever rectangle you draw and left as grey for the panel's own dither.
+
+# Answered by this machine's own disk. See lib/gallery.
+kind: gallery
+mode: text
+tags:
+  - pictures
+
+# The pick is a pure function of which hold we are in, so refetching inside one
+# returns byte-identical data and costs the panel nothing. Five minutes is
+# therefore not a rate - it is the resolution at which a change of hold is
+# noticed, and it wants to be finer than the shortest hold on offer.
+interval: 5
+unit: minute
+days: []
+last_day_of_month: false
+start_at: "2026-01-01T00:00:00Z"
+
+static_body: {}
+data: {}
+
+designs:
+  - template: full
+    label: Wallpaper
+    hint: The picture, edge to edge, with nothing else on it. What the panel is for.
+    columns: [6, 12]
+    rows: [5, 12]
+    nominal: [12, 12]
+
+  - template: frame
+    label: Print
+    hint: Matted and captioned, like something hung rather than something displayed.
+    columns: [4, 12]
+    rows: [4, 12]
+    nominal: [8, 9]
+
+  - template: band
+    label: Strip
+    hint: A shallow full-width crop, for the top or the foot of a screen.
+    columns: [6, 12]
+    rows: [2, 4]
+    nominal: [12, 3]
+
+  - template: column
+    label: Column
+    hint: A tall narrow crop down the side of a screen.
+    columns: [2, 5]
+    rows: [6, 12]
+    nominal: [3, 12]
+
+  - template: contact
+    label: Contact sheet
+    hint: The whole collection at once, in a grid, with the one that is up ringed.
+    columns: [5, 12]
+    rows: [4, 12]
+    nominal: [9, 8]
+
+fields:
+  - keyname: collection
+    name: Which pictures
+    field_type: select
+    default: ""
+    options_from: gallery.collections
+    help_text: >
+      A folder inside the gallery directory. Everything loose at the top of it
+      is a collection too, called Loose.
+    optional: true
+
+  - keyname: hold
+    name: Change the picture
+    field_type: select
+    default: hour
+    options:
+      - value: never
+        label: Never - show one picture
+      - value: quarter
+        label: Every quarter of an hour
+      - value: hour
+        label: Hourly
+      - value: half_day
+        label: Twice a day
+      - value: day
+        label: Daily
+    help_text: >
+      A panel is only redrawn every quarter of an hour or so, so nothing faster
+      than that is worth asking for - and every change costs the device a redraw
+      and a little battery.
+    optional: true
+
+  - keyname: pinned
+    name: Which one
+    field_type: select
+    default: ""
+    options_from: gallery.pictures
+    visible_when:
+      field: hold
+      any_of: [never]
+    help_text: >
+      Leave it blank and the collection picks for you and then stops. Name one
+      and it is that one until you say otherwise.
+    optional: true
+
+  - keyname: order
+    name: In what order
+    field_type: select
+    default: shuffle
+    options:
+      - value: shuffle
+        label: Shuffled - every picture once, then a new order
+      - value: sequence
+        label: In turn - the order they are filed in
+    visible_when:
+      field: hold
+      any_of: [quarter, hour, half_day, day]
+    optional: true
+
+  # Everything below only changes how the picture is drawn, never which one is
+  # chosen - so it is marked presentational and left out of the question the
+  # answer is cached under. Two gallery widgets showing one collection two ways
+  # share one row between them.
+  - keyname: fit
+    name: How it fills the box
+    field_type: select
+    default: fill
+    presentation: true
+    options:
+      - value: fill
+        label: Fill it - crop to the shape of the box
+      - value: whole
+        label: Whole picture - fit it in, paper either side
+    help_text: >
+      Filling crops around whatever is most detailed in the picture, which is
+      what makes a portrait photograph work on a widescreen panel.
+    optional: true
+
+  - keyname: tone
+    name: Tone
+    field_type: select
+    default: as_is
+    presentation: true
+    options:
+      - value: as_is
+        label: As it is
+      - value: lift
+        label: Lift - for anything that comes out muddy
+      - value: deepen
+        label: Deepen - harder contrast, fewer greys
+      - value: flatten
+        label: Flatten - softer, more of the middle
+    help_text: >
+      The panel's paper is brighter and its ink weaker than any screen's, so a
+      photograph that looked right on a phone often wants lifting into it.
+    optional: true
+
+  - keyname: invert
+    name: Turn it over
+    field_type: boolean
+    default: false
+    presentation: true
+    help_text: Ink for paper. A large black field costs this display nothing to show.
+    optional: true
+
+  - keyname: caption
+    name: Say what it is
+    field_type: boolean
+    default: false
+    presentation: true
+    help_text: >
+      The picture's name, in a corner. Off by default - a wallpaper with a label
+      on it is a screenshot.
+    optional: true
+
+# A picture is very often the only thing on a screen, so it has to be somewhere
+# a notice can land. Every design draws them along the foot, over the image.
+accepts_notices: true
+notice_capacity: 3
+
+# Worth branching on: a folder someone emptied should be able to send the tree
+# somewhere else rather than leaving a device showing a fault for a week.
+facts:
+  - key: count
+    label: Pictures in the collection
+    type: number
+    path: source_1.count
+    unit: pictures
+
+  - key: title
+    label: Picture showing
+    type: text
+    path: source_1.picture.title
+
+exchanges: []
+
+# Empty, and it has to be.
+#
+# Every other extension's sample is invented data that looks like real data,
+# which is what lets a screen be laid out before anyone owns an API key. A
+# gallery cannot do that: an invented picture id names a file that is not
+# there, so the only thing a sample could produce is the missing-picture state
+# it would produce anyway. Rather than pretend, this leaves it blank, and the
+# designs draw their empty state - which is also, correctly, what a brand new
+# installation with an empty folder sees.
+sample: {}

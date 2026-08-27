@@ -1,0 +1,94 @@
+{% comment %}
+  Column - a tall narrow crop down the side of a screen.
+
+  The one shape where "size is free" earns its keep most obviously. A 3x12
+  strip is 200 by 480, which is portrait - and portrait is the shape almost
+  every picture in this aesthetic was made in, so the crop that gets thrown
+  away here is the one a widescreen panel had to invent in the first place.
+
+  The caption goes along the foot, ink on paper, because a column has no width
+  to put anything beside anything else.
+{% endcomment %}
+
+{%- assign shot = source_1.picture -%}
+{%- assign fit = extension.values.fit | default: "fill" -%}
+{%- assign tone = extension.values.tone | default: "as_is" -%}
+
+{%- assign captioned = false -%}
+{%- assign foot = 0 -%}
+{%- if extension.values.caption and shot.title != blank and shape.rows > 6 -%}
+  {%- assign captioned = true -%}
+  {%- assign foot = shape.width | divided_by: 3.4 | at_least: 26 | at_most: 46 -%}
+{%- endif -%}
+
+{%- assign notice_h = 0 -%}
+{%- if notices.size > 0 %}{% assign notice_h = 30 %}{% endif -%}
+
+{%- assign plate_h = shape.height | minus: foot | minus: notice_h | at_least: 40 -%}
+{%- assign plate = shot.id
+      | as_image: width: shape.width, height: plate_h,
+                  fit: fit, tone: tone, invert: extension.values.invert -%}
+
+{% if plate == "" %}
+{%- comment %} Nothing to hang.
+
+  On a panel this is the state that matters most, because the alternative to
+  drawing it well is a white rectangle - and a white rectangle is exactly what
+  a broken server looks like from across a room. So it draws the mark a missing
+  picture has always been drawn with, and says where to put one.
+{% endcomment -%}
+{%- assign short = shape.width | at_most: shape.height | at_least: 40 -%}
+{%- assign mark = short | divided_by: 3 | at_least: 20 | at_most: 88 -%}
+{%- assign pad = short | divided_by: 10 | at_least: 6 | at_most: 22 -%}
+
+<div class="screen" style="align-items: center; justify-content: center; text-align: center;
+                           gap: {{ pad }}px; padding: {{ pad }}px">
+  <div style="flex: none; width: {{ mark | times: 1.5 | round }}px; height: {{ mark }}px;
+              border: 3px solid var(--ink);
+              background: linear-gradient(to top right, var(--paper) calc(50% - 2px),
+                          var(--ink) calc(50% - 2px), var(--ink) calc(50% + 2px),
+                          var(--paper) calc(50% + 2px))"></div>
+
+  {% if short > 110 %}
+    <p class="t-bold t-upper" style="flex: none; font-size: {{ short | divided_by: 14 | at_least: 11 | at_most: 17 }}px; letter-spacing: 0.08em">
+      No pictures yet
+    </p>
+  {% endif %}
+  {% if short > 190 %}
+    <p class="t-xs" style="flex: none; max-width: 82%">
+      Put some in your gallery folder - see docs/gallery.md
+    </p>
+  {% endif %}
+</div>
+{% else %}
+<div class="screen">
+  <div style="flex: 1 1 auto; min-height: 0; position: relative">
+    <img src="{{ plate }}" alt=""
+         style="position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover">
+  </div>
+
+  {% if captioned %}
+    <div style="flex: none; height: {{ foot }}px; background: var(--ink); color: var(--paper);
+                display: flex; align-items: center; justify-content: center; padding: 0 7px">
+      <p class="t-bold truncate" style="font-size: {{ foot | times: 42 | divided_by: 100 | at_least: 10 | at_most: 16 }}px;
+                                        letter-spacing: 0.06em; text-transform: uppercase">
+        {{ shot.title }}
+      </p>
+    </div>
+  {% endif %}
+
+  {% if notices.size > 0 %}
+    <div class="notice-strip" style="flex: none; margin-top: 0; padding: 5px 7px; justify-content: center">
+      {% for notice in notices %}
+        {% if notice.overflow %}
+          <span class="notice notice--more">+{{ notice.overflow }}</span>
+        {% else %}
+          <span class="notice notice--{{ notice.level }}" title="{{ notice.text }}">
+            <span class="i i-{{ notice.icon }}"></span>
+          </span>
+        {% endif %}
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+{% endif %}

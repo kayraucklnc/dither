@@ -208,9 +208,10 @@ export const manifestSchema = z.object({
    * static     - renders from settings alone, fetches nothing.
    * poll       - calls the URLs in `exchanges` on a schedule.
    * transit    - answered by a provider in code rather than a declared URL.
+   * gallery    - answered by the pictures on this machine's own disk.
    * connection - answered by an account you linked once under Connections.
    */
-  kind: z.enum(["static", "poll", "transit", "connection"]).default("static"),
+  kind: z.enum(["static", "poll", "transit", "gallery", "connection"]).default("static"),
   /**
    * The connection this extension needs, when kind is "connection". One linked
    * account serves every widget that names it, so linking Google once gives

@@ -60,6 +60,7 @@ unit: minute                   # none | minute | hour | day
 | `poll` | the URLs in `exchanges` | `exchanges` |
 | `connection` | an account linked under Connections | `connection: <provider>` |
 | `transit` | a provider built into Dither | — |
+| `gallery` | the pictures in `DITHER_GALLERY_DIR` | — |
 
 ## Settings
 
@@ -323,6 +324,19 @@ Filters that save a hundred lines of `{% case %}`:
 
 `weather_icon` · `weather_label` · `weather_short` · `compass` · `in_words` ·
 `clock_of` · `hour_of` · `as_percent` · `at_least` · `at_most`
+
+And one that reads the disk:
+
+```liquid
+<img src="{{ shot.id | as_image: width: shape.width, height: shape.height }}">
+```
+
+`as_image` turns a picture id from the `gallery` provider into a data URI,
+cropped to the box you hand it and left as grey for the panel's own dither.
+It takes `fit` (`fill` or `whole`), `tone` and `invert` as well, and renders
+empty for an id that no longer resolves - a folder someone tidied should leave
+a gap in a design rather than take the screen down. A screenshotted page has no
+origin, which is why it is inlined rather than linked. See docs/gallery.md.
 
 And for anything that draws time or geometry:
 
