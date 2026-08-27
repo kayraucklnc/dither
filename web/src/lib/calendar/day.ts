@@ -426,6 +426,25 @@ export function dayShape(
   const nowMinutes = minutesOfDay(now, timezone);
   const done = cards.filter((card) => card.done).length;
 
+  /*
+   * The next thing anywhere in what was fetched, even when it is not today.
+   *
+   * `next` stops at midnight and `upcoming` stops at the horizon, which is
+   * right for a design drawing a day and useless to one that has run out of
+   * day: "Nothing left today" with nothing beside it is a panel telling you
+   * what it does not know. This is the one fact that makes an empty evening
+   * worth looking at, and it is only ever drawn from meetings that were
+   * actually asked for - a window of one day answers `null` rather than
+   * implying an empty week.
+   */
+  const later = ordered.filter((meeting) => !meeting.allDay && meeting.startsAt > now);
+  const nextAny = later[0] ?? null;
+  const daysOff = nextAny
+    ? Math.round(
+        (startOfDay(nextAny.startsAt, timezone).getTime() - midnight.getTime()) / DAY,
+      )
+    : 0;
+
   return {
     connected: true,
     empty: todays.length === 0,
@@ -439,6 +458,15 @@ export function dayShape(
     current: running,
     next,
     after: ahead[1] ?? null,
+    /** The next thing at all, and when it is, for a day that has run out. */
+    next_any: nextAny ? cardOf(nextAny, now, timezone, clashing) : null,
+    next_any_day: !nextAny
+      ? ""
+      : daysOff <= 0
+        ? "Today"
+        : daysOff === 1
+          ? "Tomorrow"
+          : dayLabel(nextAny.startsAt, timezone, locale),
     events: cards,
     upcoming,
     all_day: allDay,

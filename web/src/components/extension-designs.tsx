@@ -1,11 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { Bell, BellOff, Maximize2 } from "lucide-react";
+import { Bell, BellOff, Maximize2, Palette } from "lucide-react";
 
 import { ScreenPreview } from "@/components/screen-preview";
 import { cn } from "@/lib/cn";
 import { COLUMNS, ROWS } from "@/lib/shapes";
+
+/** One more picture of a design, with one setting answered differently. */
+export interface LookEntry {
+  key: string;
+  /** The field being varied, as a person reads it. */
+  field: string;
+  /** The value, as a person reads it. */
+  value: string;
+  /** The whole settings object, already JSON, for the preview URL. */
+  settings: string;
+}
 
 export interface DesignEntry {
   key: string;
@@ -22,6 +33,8 @@ export interface DesignEntry {
   takesNotices: boolean;
   /** True when the manifest gave it a range, false when it inherited one. */
   declared: boolean;
+  /** The other pictures this design can be drawn as. Often none. */
+  looks: LookEntry[];
 }
 
 /**
@@ -55,7 +68,8 @@ export function ExtensionDesigns({
           <p className="mt-1 max-w-xl text-[13px] leading-relaxed text-faint">
             A widget takes whatever size you draw it on the {COLUMNS}×{ROWS} grid, and the style
             whose range covers that size draws it. Where more than one covers it, you choose. A
-            size no style covers is refused rather than scaled.
+            size no style covers is refused rather than scaled. Where a setting forks the drawing
+            rather than the data, every fork is drawn out beside the style it belongs to.
           </p>
         </div>
 
@@ -77,68 +91,116 @@ export function ExtensionDesigns({
       </div>
 
       <div className="flex flex-wrap items-start gap-6">
-        {designs.map((design) => (
-          <div
-            key={design.key}
-            // True relative scale: a design's width is its share of the grid,
-            // minus what the gaps between cards take.
-            style={{
-              width: `calc(${(design.columns / COLUMNS) * 100}% - ${(1 - design.columns / COLUMNS) * 24}px)`,
-            }}
-            className="min-w-[170px]"
-          >
-            <ScreenPreview
-              src={`/api/preview/extension/${name}?size=${design.columns}x${design.rows}&design=${design.key}${withNotice ? "&notice=1" : ""}`}
-              width={design.width}
-              height={design.height}
-              alt={design.label}
-              className="paper-shadow"
-            />
+        {designs.flatMap((design) => {
+          // True relative scale: a design's width is its share of the grid,
+          // minus what the gaps between cards take. A look is the same design
+          // drawn differently, so it is the same size and sits beside it.
+          const width = `calc(${(design.columns / COLUMNS) * 100}% - ${(1 - design.columns / COLUMNS) * 24}px)`;
+          const shape = `size=${design.columns}x${design.rows}&design=${design.key}`;
+          const alert = withNotice ? "&notice=1" : "";
 
-            <div className="mt-2 px-0.5">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="truncate text-[12px] font-medium">{design.label}</span>
-                <span className="shrink-0 font-mono text-[11px] text-faint">
-                  {design.width}×{design.height}
-                </span>
-              </div>
+          return [
+            <div key={design.key} style={{ width }} className="min-w-[170px]">
+              <ScreenPreview
+                src={`/api/preview/extension/${name}?${shape}${alert}`}
+                width={design.width}
+                height={design.height}
+                alt={design.label}
+                className="paper-shadow"
+              />
 
-              {design.hint && (
-                <p className="mt-1 text-[11px] leading-relaxed text-faint">{design.hint}</p>
-              )}
-
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                <span
-                  title="Every size on the grid this style will be drawn at"
-                  className="flex items-center gap-1 text-[11px] text-faint"
-                >
-                  <Maximize2 size={10} />
-                  {design.range}
-                </span>
-                {design.takesNotices && (
-                  <span
-                    title="This design has a strip where another extension's alert can appear"
-                    className={cn(
-                      "flex items-center gap-1 text-[11px] transition-colors",
-                      withNotice ? "text-accent-bright" : "text-faint",
-                    )}
-                  >
-                    <Bell size={10} />
-                    takes alerts
+              <div className="mt-2 px-0.5">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="truncate text-[12px] font-medium">{design.label}</span>
+                  <span className="shrink-0 font-mono text-[11px] text-faint">
+                    {design.width}×{design.height}
                   </span>
+                </div>
+
+                {design.hint && (
+                  <p className="mt-1 text-[11px] leading-relaxed text-faint">{design.hint}</p>
                 )}
-                {!design.declared && (
+
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
                   <span
-                    title="Named after one of the original shapes, so it inherited that shape's range"
-                    className="text-[11px] text-faint"
+                    title="Every size on the grid this style will be drawn at"
+                    className="flex items-center gap-1 text-[11px] text-faint"
                   >
-                    inherited range
+                    <Maximize2 size={10} />
+                    {design.range}
                   </span>
-                )}
+                  {design.takesNotices && (
+                    <span
+                      title="This design has a strip where another extension's alert can appear"
+                      className={cn(
+                        "flex items-center gap-1 text-[11px] transition-colors",
+                        withNotice ? "text-accent-bright" : "text-faint",
+                      )}
+                    >
+                      <Bell size={10} />
+                      takes alerts
+                    </span>
+                  )}
+                  {!design.declared && (
+                    <span
+                      title="Named after one of the original shapes, so it inherited that shape's range"
+                      className="text-[11px] text-faint"
+                    >
+                      inherited range
+                    </span>
+                  )}
+                  {design.looks.length > 0 && (
+                    <span className="flex items-center gap-1 text-[11px] text-faint">
+                      <Palette size={10} />
+                      {design.looks.length + 1} looks
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
-        ))}
+            </div>,
+
+            ...design.looks.map((look) => (
+              <div key={`${design.key}-${look.key}`} style={{ width }} className="min-w-[170px]">
+                <ScreenPreview
+                  src={
+                    `/api/preview/extension/${name}?${shape}${alert}` +
+                    `&settings=${encodeURIComponent(look.settings)}`
+                  }
+                  width={design.width}
+                  height={design.height}
+                  alt={`${design.label}, ${look.field}: ${look.value}`}
+                  className="paper-shadow"
+                  // Asked for on the way down the page rather than all at once:
+                  // a catalogue of eighteen is eighteen headless pages racing
+                  // each other, and the design you are looking at loses to the
+                  // three variants of the one below it.
+                  defer
+                />
+
+                <div className="mt-2 px-0.5">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="truncate text-[12px] font-medium text-muted">
+                      {design.label}
+                    </span>
+                    <span className="shrink-0 font-mono text-[11px] text-faint">
+                      {design.width}×{design.height}
+                    </span>
+                  </div>
+
+                  <p
+                    title={`The same style with "${look.field}" set to ${look.value}`}
+                    className="mt-1 flex items-center gap-1 text-[11px] text-faint"
+                  >
+                    <Palette size={10} className="shrink-0" />
+                    <span className="truncate">
+                      {look.field}: <span className="text-ink">{look.value}</span>
+                    </span>
+                  </p>
+                </div>
+              </div>
+            )),
+          ];
+        })}
       </div>
     </section>
   );

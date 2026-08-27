@@ -29,7 +29,11 @@
 
 {%- assign header = 40 -%}
 {%- if notices.size > 0 %}{% assign header = header | plus: 34 %}{% endif -%}
-{%- assign column_w = box_w | minus: pad | minus: pad | divided_by: 7 -%}
+{%- comment %} Divided by the days there are, not by seven: a payload with
+  fewer is drawn at the width it has rather than at a seventh each. Floored at
+  one, because a payload with no days at all must not divide by nothing. {% endcomment -%}
+{%- assign columns = day.days.size | at_least: 1 -%}
+{%- assign column_w = box_w | minus: pad | minus: pad | divided_by: columns -%}
 {%- assign named = false -%}
 {%- if column_w > 62 %}{% assign named = true %}{% endif -%}
 
@@ -41,6 +45,20 @@
     <div class="t-xs t-bold">busiest {{ peak | span_in_words }}</div>
   </div>
 
+  {%- comment %} Seven columns of one day is not a week, it is one bar stretched
+    across the panel - and stretched it reads as a day that is completely full.
+    The fetch decides how many days there are, so a window of "the rest of
+    today" gives this design nothing to draw and the honest answer is to say
+    which setting to change rather than to draw a convincing lie. {% endcomment -%}
+  {% if day.days.size < 3 %}
+    <div class="content layout layout--col layout--center" style="gap: 6px; padding: {{ pad }}px">
+      <span class="i i-calendar {% if box_h > 200 %}i-lg{% else %}i-md{% endif %}"></span>
+      <p class="t-sm t-bold t-center">A week needs more than {% if day.days.size == 1 %}one day{% else %}two days{% endif %}</p>
+      {% if box_h > 150 %}
+        <p class="t-xs t-center">Set &ldquo;Show&rdquo; to the rest of this week.</p>
+      {% endif %}
+    </div>
+  {% else %}
   <div class="content" style="padding: {{ pad }}px">
     <div class="bars" style="gap: {{ column_w | divided_by: 8 | at_least: 3 | at_most: 10 }}px">
       {% for entry in day.days %}
@@ -67,6 +85,7 @@
       {% endfor %}
     </div>
   </div>
+  {% endif %}
 
   {% if notices.size > 0 %}
     <div class="notice-strip" style="padding: 5px {{ pad }}px">
