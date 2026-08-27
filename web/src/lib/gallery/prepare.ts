@@ -54,12 +54,21 @@ export const FOCUS: Record<string, string | number> = {
 /** Quarter turns, clockwise. */
 export const TURNS = [0, 90, 180, 270] as const;
 
+/**
+ * A quarter turn clockwise, or `auto` to let the shapes decide.
+ *
+ * A number is an instruction; `auto` is a question - "is this picture long the
+ * other way from the box it is going into?" - answered against the box at the
+ * moment of drawing, because that is the first point at which the box is known.
+ */
+export type Turn = number | "auto";
+
 export interface Look {
   width: number;
   height: number;
   fit: Fit;
-  /** Quarter turns clockwise, applied before anything is cropped. */
-  turn: number;
+  /** Quarter turns clockwise, applied before anything is cropped, or `auto`. */
+  turn: Turn;
   /** A key of FOCUS. */
   focus: string;
   /** -100 to 100, zero being the picture as it is. */
@@ -154,10 +163,64 @@ export function quarterTurn(value: unknown): number {
   return ((degrees % 360) + 360) % 360;
 }
 
+/**
+ * How far off square a picture has to be before turning it is worth the read.
+ *
+ * A fifth. The library already calls anything within a twentieth of square
+ * "square", and that is the right grain for *filing* a picture but far too
+ * fine for spinning one: a photograph a twentieth off square in a box a
+ * twentieth the other way qualifies on orientation alone and gains nothing at
+ * all by turning. Measured in logs, so that 2:1 and 1:2 are the same distance
+ * from square and the margin means the same thing in both directions.
+ */
+const WORTH_TURNING = 2 * Math.log(1.2);
+
+/**
+ * Which way to turn a picture, given what the setting asked for.
+ *
+ * A number is obeyed. `auto` is the answer that has to be worked out, and it
+ * is worked out here rather than at fetch time because the box is a property
+ * of the widget and a picture is cropped to the widget, not to the panel: the
+ * same photograph is a wallpaper at 12x12 and a strip at 12x2, and only one of
+ * those wants turning.
+ *
+ * The crop settings decide what to *lose*; this decides whether anything has
+ * to be lost at all. A 736x1308 pin in an 800x480 wallpaper keeps about a
+ * third of its height. Turned, it is 1308x736 - within a whisker of the
+ * panel's own shape - and keeps very nearly all of it.
+ *
+ * It compares aspect ratios rather than orientations, and it has to win by
+ * `WORTH_TURNING` before it answers at all, so a nearly-square picture stays
+ * as it is. And it is always clockwise: which way up the subject is, is not
+ * something a server can read out of the pixels, so the choice is to be
+ * predictably one way rather than inconsistently either. The other three turns
+ * are still there to be picked by hand.
+ */
+export function turnFor(
+  value: unknown,
+  picture: { width: number; height: number },
+  box: { width: number; height: number },
+): number {
+  if (String(value).trim().toLowerCase() !== "auto") return quarterTurn(value);
+
+  // A picture nothing could measure - an unreadable file - is left alone. It
+  // is about to draw as a gap anyway, and a guess would only be a guess.
+  if (!picture.width || !picture.height || !box.width || !box.height) return 0;
+
+  const wanted = Math.log(box.width / box.height);
+  const standing = Math.abs(Math.log(picture.width / picture.height) - wanted);
+  const turned = Math.abs(Math.log(picture.height / picture.width) - wanted);
+
+  return standing - turned > WORTH_TURNING ? 90 : 0;
+}
+
 export async function prepare(picture: Picture, look: Look): Promise<Prepared> {
   const box = boxOf(look);
   const screen: Screen = isScreen(look.screen) ? look.screen : "panel";
-  const turn = quarterTurn(look.turn);
+
+  // Resolved before the key is built, so `auto` and the quarter turn it works
+  // out to are one entry in the cache rather than two.
+  const turn = turnFor(look.turn, picture, box);
 
   const key = [
     picture.file,

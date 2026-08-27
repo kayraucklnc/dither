@@ -206,6 +206,8 @@ fields:
     options:
       - value: "0"
         label: Not at all
+      - value: auto
+        label: When it fits better - a quarter turn if the picture is long the other way
       - value: "90"
         label: A quarter turn clockwise
       - value: "180"
@@ -215,7 +217,12 @@ fields:
     help_text: >
       The crop decides what to lose; this decides whether anything has to be
       lost. A tall poster turned a quarter is within a whisker of the panel's
-      own shape, so nearly all of it survives - read sideways.
+      own shape, so nearly all of it survives - read sideways. "When it fits
+      better" makes that trade for you wherever it is worth pixels: a picture a
+      fifth or more off square, lying the other way from its box, is turned
+      clockwise, and anything nearer square is left alone. Worth having on a
+      poster or a texture and worth leaving off a photograph, which is why it
+      is not the default - a crop you can read beats a picture you cannot.
     optional: true
 
   - keyname: focus
