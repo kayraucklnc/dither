@@ -28,7 +28,11 @@ export function observationKey(extension: string, settings: Record<string, unkno
 export interface Answer {
   payload: Record<string, unknown>;
   fetchedAt: Date | null;
+  /** When it was last asked, whether or not that worked. */
+  attemptedAt: Date | null;
   error?: string;
+  /** True when this is the extension's sample rather than a real answer. */
+  standIn: boolean;
 }
 
 export interface Question {
@@ -63,7 +67,9 @@ export async function answersFor(asked: Question[]): Promise<Map<string, Answer>
       answers.set(key, {
         payload: row.payload,
         fetchedAt: row.fetchedAt,
+        attemptedAt: row.attemptedAt,
         error: row.error ?? undefined,
+        standIn: false,
       });
       continue;
     }
@@ -73,7 +79,9 @@ export async function answersFor(asked: Question[]): Promise<Map<string, Answer>
     answers.set(key, {
       payload: (extension?.manifest.sample ?? {}) as Record<string, unknown>,
       fetchedAt: null,
+      attemptedAt: row?.attemptedAt ?? null,
       error: row?.error ?? undefined,
+      standIn: true,
     });
   }
 
@@ -90,10 +98,10 @@ export async function record(
 
   await db
     .insert(observations)
-    .values({ key, extension, settings, payload, fetchedAt: now, error: null })
+    .values({ key, extension, settings, payload, fetchedAt: now, attemptedAt: now, error: null })
     .onConflictDoUpdate({
       target: observations.key,
-      set: { payload, fetchedAt: now, error: null },
+      set: { payload, fetchedAt: now, attemptedAt: now, error: null },
     });
 }
 
@@ -101,12 +109,15 @@ export async function recordFailure(
   extension: string,
   settings: Record<string, unknown>,
   error: string,
+  now = new Date(),
 ): Promise<void> {
   const key = observationKey(extension, settings);
 
-  // Keep whatever was there. A dead provider should not blank a display.
+  // The payload is left alone - a dead provider should not blank a display -
+  // but the attempt is written down, so a failure is distinguishable from a
+  // question nobody has asked and does not get retried on every preview.
   await db
     .insert(observations)
-    .values({ key, extension, settings, payload: {}, error })
-    .onConflictDoUpdate({ target: observations.key, set: { error } });
+    .values({ key, extension, settings, payload: {}, attemptedAt: now, error })
+    .onConflictDoUpdate({ target: observations.key, set: { attemptedAt: now, error } });
 }

@@ -106,7 +106,15 @@ export const observations = pgTable("observations", {
   extension: text("extension").notNull(),
   settings: jsonb("settings").$type<Record<string, unknown>>().notNull(),
   payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
+  /** When an answer last arrived. Null means nothing has ever worked. */
   fetchedAt: timestamp("fetched_at", { withTimezone: true }),
+  /**
+   * When it was last *asked*, which is not the same thing.
+   *
+   * Without it a question whose provider is down looks identical to one nobody
+   * has asked yet, and every preview retries a dead API.
+   */
+  attemptedAt: timestamp("attempted_at", { withTimezone: true }),
   error: text("error"),
 });
 

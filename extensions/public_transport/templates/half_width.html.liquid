@@ -4,7 +4,7 @@
 
 <div class="screen">
   <div class="title-bar">
-    <div class="title truncate">{{ board.origin | truncate: 16 }}</div>
+    <div class="title truncate">{% if extension.values.heading != blank %}{{ extension.values.heading | truncate: 16 }}{% else %}{{ board.origin | truncate: 16 }}{% endif %}</div>
     <div class="t-sm">{{ board.destination | truncate: 10 }}</div>
   </div>
 

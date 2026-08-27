@@ -9,8 +9,12 @@
 <div class="screen">
   <div class="title-bar">
     <div class="title truncate">
-      {{ board.origin | truncate: 22 }}
-      {% if board.destination != blank %}<span class="i i-arrow-right i-sm"></span> {{ board.destination | truncate: 16 }}{% endif %}
+      {% if extension.values.heading != blank %}
+        {{ extension.values.heading | truncate: 34 }}
+      {% else %}
+        {{ board.origin | truncate: 22 }}
+        {% if board.destination != blank %}<span class="i i-arrow-right i-sm"></span> {{ board.destination | truncate: 16 }}{% endif %}
+      {% endif %}
     </div>
     <div class="chip self-start"><span class="i i-train"></span>{{ board.provider | upcase }}</div>
   </div>

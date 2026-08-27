@@ -98,6 +98,7 @@ export async function serve(device: Device, now = new Date()): Promise<Served> {
 
   const data = await dataFor(
     placedRows.map((row) => ({ id: row.id, extension: row.extension, settings: row.settings })),
+    { ensure: true },
   );
   const placed = placedRows.map((row) => ({
     id: row.id,

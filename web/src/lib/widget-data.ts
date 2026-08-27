@@ -1,3 +1,4 @@
+import { answersEnsuring } from "@/lib/extensions/fetcher";
 import { answersFor, observationKey } from "@/lib/extensions/observations";
 
 /**
@@ -9,8 +10,16 @@ import { answersFor, observationKey } from "@/lib/extensions/observations";
  */
 export async function dataFor(
   requests: { id: number; extension: string; settings: Record<string, unknown> }[],
+  /**
+   * Ask for anything never answered, rather than falling back to the
+   * extension's sample. On for anything a person is looking at: a sample that
+   * contradicts the settings just typed reads as a bug.
+   */
+  options: { ensure?: boolean } = {},
 ): Promise<Map<number, Record<string, unknown>>> {
-  const answers = await answersFor(requests);
+  const answers = options.ensure
+    ? await answersEnsuring(requests)
+    : await answersFor(requests);
 
   return new Map(
     requests.map((request) => [

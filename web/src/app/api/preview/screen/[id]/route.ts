@@ -55,6 +55,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const rows = await db.select().from(widgets).where(eq(widgets.screenId, id));
   const data = await dataFor(
     rows.map((row) => ({ id: row.id, extension: row.extension, settings: row.settings })),
+    { ensure: true },
   );
 
   const placed = rows.map((row) => ({

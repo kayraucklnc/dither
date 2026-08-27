@@ -20,7 +20,9 @@
       </div>
 
       <div class="fit" style="border-left: var(--rule) solid var(--ink); padding-left: 22px">
-        <p class="t-lg t-bold truncate">{{ next.direction }}</p>
+        <p class="t-lg t-bold truncate">
+          {% if extension.values.heading != blank %}{{ extension.values.heading }}{% else %}{{ next.direction }}{% endif %}
+        </p>
         <p class="t-sm">
           {% if extension.values.show_platform and next.platform != blank %}
             Platform {{ next.platform }} &middot;
