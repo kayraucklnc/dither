@@ -100,6 +100,40 @@ export function valueAt(data: unknown, path: string): unknown {
   }, data);
 }
 
+/**
+ * Write a value at a dotted path, creating objects on the way.
+ *
+ * Used to pretend: "what would the tree do if the rain chance were 80?". The
+ * override goes into a copy of the payload rather than beside it, so nothing
+ * downstream needs to know it is being lied to.
+ */
+export function setAt(data: unknown, path: string, value: unknown): unknown {
+  const steps = path.split(".");
+  const root: Record<string, unknown> =
+    data && typeof data === "object" && !Array.isArray(data)
+      ? { ...(data as Record<string, unknown>) }
+      : {};
+
+  let current = root;
+
+  for (const [index, step] of steps.entries()) {
+    if (index === steps.length - 1) {
+      current[step] = value;
+      break;
+    }
+
+    const next = current[step];
+    current[step] =
+      next && typeof next === "object" && !Array.isArray(next)
+        ? { ...(next as Record<string, unknown>) }
+        : {};
+
+    current = current[step] as Record<string, unknown>;
+  }
+
+  return root;
+}
+
 const isBlank = (value: unknown) =>
   value === null || value === undefined || value === "" || (Array.isArray(value) && !value.length);
 

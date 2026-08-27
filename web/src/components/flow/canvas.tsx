@@ -15,6 +15,7 @@ import "@xyflow/react/dist/style.css";
 import {
   Check,
   ChevronDown,
+  FlaskConical,
   ChevronUp,
   CornerDownRight,
   GitBranch,
@@ -35,6 +36,7 @@ import {
 import { ContextMenu, type MenuItem } from "@/components/flow/context-menu";
 import { DevicePanel, type DeviceDetails } from "@/components/flow/device-panel";
 import { NoticesPanel } from "@/components/flow/notices-panel";
+import { NO_SIMULATION, TestPanel, type Simulation } from "@/components/flow/test-panel";
 import { QuestionNode, ScreenNode, type QuestionData, type ScreenData } from "@/components/flow/nodes";
 import { ScreenPreview } from "@/components/screen-preview";
 import { Select } from "@/components/ui/select";
@@ -50,10 +52,13 @@ export interface ScreenOption {
 }
 
 interface Trace {
+  simulated: boolean;
+  at: string;
   leafId: number | null;
   reason: string;
   held: boolean;
   steps: { nodeId: number; question: string; answer: boolean; actual?: string }[];
+  notices: { icon: string; text: string; loud: boolean }[];
 }
 
 const control =
@@ -93,7 +98,8 @@ function TreeCanvas({
   const [error, setError] = useState<string>();
   const [nextId, setNextId] = useState(-1);
   const [menu, setMenu] = useState<{ at: { x: number; y: number }; items: MenuItem[] }>();
-  const [tab, setTab] = useState<"decide" | "notices" | "device">("decide");
+  const [tab, setTab] = useState<"decide" | "notices" | "device" | "test">("decide");
+  const [simulation, setSimulation] = useState<Simulation>(NO_SIMULATION);
   const [refreshing, setRefreshing] = useState(false);
 
   const nodeTypes = useMemo(() => ({ question: QuestionNode, screen: ScreenNode }), []);
@@ -103,7 +109,19 @@ function TreeCanvas({
   /* ------------------------------------------------------------------ trace */
 
   const refreshTrace = useCallback(async () => {
-    const response = await fetch(`/api/devices/${deviceId}/trace`);
+    // Simulating asks the same question of a moment and some values that are
+    // not real; the device carries on deciding for itself either way.
+    const response = simulation.active
+      ? await fetch(`/api/devices/${deviceId}/trace`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            at: simulation.at ? new Date(simulation.at).toISOString() : undefined,
+            overrides: simulation.overrides,
+          }),
+        })
+      : await fetch(`/api/devices/${deviceId}/trace`);
+
     if (!response.ok) return;
 
     const body = await response.json();
@@ -111,7 +129,7 @@ function TreeCanvas({
     // The trace carries live values, so the check editor can show what each
     // source currently reads without a second request.
     if (body.sources) setSources(body.sources);
-  }, [deviceId]);
+  }, [deviceId, simulation]);
 
   useEffect(() => {
     refreshTrace();
@@ -613,10 +631,21 @@ function TreeCanvas({
 
         <div className="border-t border-line bg-surface px-5 py-3.5">
           <div className="flex items-start gap-3">
-            <span className={cn("mt-1 h-2 w-2 shrink-0 rounded-full", trace ? "bg-live" : "bg-faint")} />
+            <span
+              className={cn(
+                "mt-1 h-2 w-2 shrink-0 rounded-full",
+                trace?.simulated ? "bg-accent" : trace ? "bg-live" : "bg-faint",
+              )}
+            />
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] leading-relaxed">
-                {trace?.reason ?? "Working out what this device would show…"}
+              <p className="flex flex-wrap items-baseline gap-2 text-[13px] leading-relaxed">
+                {trace?.simulated && (
+                  <span className="flex items-center gap-1 rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent-bright">
+                    <FlaskConical size={9} />
+                    Pretending{simulation.at ? ` · ${simulation.at.replace("T", " ")}` : ""}
+                  </span>
+                )}
+                <span>{trace?.reason ?? "Working out what this device would show…"}</span>
               </p>
 
               {trace && trace.steps.length > 0 && (
@@ -649,13 +678,27 @@ function TreeCanvas({
             </span>
           </div>
 
+          {trace && trace.notices.length > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-5">
+              <span className="text-[11px] text-faint">Also showing:</span>
+              {trace.notices.map((notice) => (
+                <span
+                  key={notice.text}
+                  className="rounded-md border border-line bg-raised px-2 py-0.5 text-[11px] text-muted"
+                >
+                  {notice.text}
+                </span>
+              ))}
+            </div>
+          )}
+
           {error && <p className="mt-2 pl-5 text-[12px] text-danger">{error}</p>}
         </div>
       </div>
 
       <aside className="flex w-84 shrink-0 flex-col border-l border-line bg-surface">
         <div className="flex shrink-0 gap-1 border-b border-line p-2">
-          {(["decide", "notices", "device"] as const).map((name) => (
+          {(["decide", "notices", "device", "test"] as const).map((name) => (
             <button
               key={name}
               type="button"
@@ -665,13 +708,18 @@ function TreeCanvas({
                 tab === name ? "bg-raised text-ink" : "text-faint hover:text-muted",
               )}
             >
-              {{ decide: "Decide", notices: "Notices", device: "Device" }[name]}
+              <span className="flex items-center justify-center gap-1">
+                {name === "test" && <FlaskConical size={11} />}
+                {{ decide: "Decide", notices: "Notices", device: "Device", test: "Test" }[name]}
+              </span>
             </button>
           ))}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-        {tab === "device" ? (
+        {tab === "test" ? (
+          <TestPanel sources={sources} simulation={simulation} onChange={setSimulation} />
+        ) : tab === "device" ? (
           <DevicePanel device={device} />
         ) : tab === "notices" ? (
           <NoticesPanel

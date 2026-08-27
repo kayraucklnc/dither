@@ -5,6 +5,7 @@ import { Check, Loader2, Plus, Trash2, TriangleAlert } from "lucide-react";
 
 import { LayoutPicker } from "@/components/composer/layout-picker";
 import { SettingsForm } from "@/components/composer/settings-form";
+import { ScreenPreview } from "@/components/screen-preview";
 import { ShapeGlyph } from "@/components/shape-badge";
 import { cn } from "@/lib/cn";
 import { layout as findLayout, matching, type Layout } from "@/lib/layouts";
@@ -25,6 +26,8 @@ export interface PaletteEntry {
   shapes: ShapeId[];
   fields: Field[];
   defaults: Record<string, unknown>;
+  /** The biggest shape it draws, so the palette can show what it looks like. */
+  headline: ShapeId;
 }
 
 export interface EditorWidget {
@@ -350,24 +353,28 @@ export function ScreenEditor({
   return (
     <div className="flex h-screen">
       {/* Palette */}
-      <div className="flex w-56 shrink-0 flex-col border-r border-line bg-surface">
-        <p className="px-4 pt-5 pb-3 text-[11px] font-medium uppercase tracking-wide text-faint">
+      <div className="flex w-56 shrink-0 flex-col overflow-y-auto border-r border-line bg-surface">
+        <p className="shrink-0 px-4 pt-5 pb-3 text-[11px] font-medium uppercase tracking-wide text-faint">
           Add to screen
         </p>
-        <div className="space-y-1 px-2">
+        <div className="space-y-1.5 px-2 pb-4">
           {palette.map((entry) => (
             <button
               key={entry.name}
               type="button"
               onClick={() => add(entry)}
-              className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-raised"
+              className="group w-full rounded-lg p-1.5 text-left transition-colors hover:bg-raised"
             >
-              <Plus size={14} className="shrink-0 text-faint group-hover:text-accent" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[13px] font-medium">{entry.label}</span>
-                <span className="block text-[11px] text-faint">
-                  {entry.shapes.length} size{entry.shapes.length === 1 ? "" : "s"}
-                </span>
+              <ScreenPreview
+                src={`/api/preview/extension/${entry.name}?shape=${entry.headline}`}
+                width={panel.width}
+                height={panel.height}
+                alt={entry.label}
+                className="rounded"
+              />
+              <span className="mt-1.5 flex items-center gap-1.5 px-0.5">
+                <Plus size={12} className="shrink-0 text-faint group-hover:text-accent-bright" />
+                <span className="min-w-0 flex-1 truncate text-[12px] font-medium">{entry.label}</span>
               </span>
             </button>
           ))}
