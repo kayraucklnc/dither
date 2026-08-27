@@ -184,6 +184,79 @@ describe("a window that covers more than one day", () => {
     expect(day.range_label).toBe("This month");
   });
 
+  it("keeps a one-day all-day entry on one day, east of Greenwich", () => {
+    // The bug this pins down, found against a real account in Istanbul: an
+    // all-day date floats - "2026-08-28" is the 28th wherever you are, with no
+    // instant behind it. Read as midnight UTC and compared against local
+    // midnights, a one-day birthday appeared on both the 28th and the 29th
+    // everywhere east of UTC. It has to be compared as a calendar date.
+    const at = new Date("2026-08-27T09:00:00Z");
+    const birthday: GoogleEvent = {
+      summary: "Lesya BD 02",
+      start: { date: "2026-08-28" },
+      end: { date: "2026-08-29" },
+    };
+
+    for (const timezone of ["Europe/Istanbul", "Asia/Tokyo", "UTC", "America/Los_Angeles"]) {
+      const day = agenda([birthday], {
+        now: at,
+        timezone,
+        locale: "en-GB",
+        window: windowFor({ range: "week" }, at, timezone, "en-GB"),
+        hideDeclined: true,
+      });
+
+      const drawnOn = day.days.filter((one) => one.all_day.length).map((one) => one.date);
+      expect(drawnOn, timezone).toEqual(["2026-08-28"]);
+    }
+  });
+
+  it("still spreads a genuinely multi-day entry across its days", () => {
+    const at = new Date("2026-08-27T09:00:00Z");
+    const leave: GoogleEvent = {
+      summary: "Annual leave",
+      start: { date: "2026-08-28" },
+      end: { date: "2026-08-31" },
+    };
+
+    const day = agenda([leave], {
+      now: at,
+      timezone: "Europe/Istanbul",
+      locale: "en-GB",
+      window: windowFor({ range: "week" }, at, "Europe/Istanbul", "en-GB"),
+      hideDeclined: true,
+    });
+
+    expect(day.days.filter((one) => one.all_day.length).map((one) => one.date)).toEqual([
+      "2026-08-28",
+      "2026-08-29",
+      "2026-08-30",
+    ]);
+  });
+
+  it("knows whether an all-day entry is today by the local date", () => {
+    // 22:00 UTC on the 27th is already the 28th in Istanbul, so the birthday
+    // on the 28th is today there and tomorrow in London.
+    const at = new Date("2026-08-27T22:00:00Z");
+    const birthday: GoogleEvent = {
+      summary: "Lesya BD 02",
+      start: { date: "2026-08-28" },
+      end: { date: "2026-08-29" },
+    };
+
+    const build = (timezone: string) =>
+      agenda([birthday], {
+        now: at,
+        timezone,
+        locale: "en-GB",
+        window: windowFor({ range: "week" }, at, timezone, "en-GB"),
+        hideDeclined: true,
+      });
+
+    expect(build("Europe/Istanbul").all_day_today).toBe(1);
+    expect(build("Europe/London").all_day_today).toBe(0);
+  });
+
   it("builds no groups for a window that cannot leave today", () => {
     const day = agenda([], {
       now,

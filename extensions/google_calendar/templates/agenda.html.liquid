@@ -21,7 +21,13 @@
     </div>
   </div>
 
-  {% if calendar.empty and calendar.all_day_today == 0 %}
+  {% comment %}
+    `empty` is about timed events, and `all_day_today` is about today - but
+    this design draws the whole window. An account whose week holds two all-day
+    entries and no meetings satisfied both and drew "Nothing scheduled" over
+    the top of them.
+  {% endcomment %}
+  {% if calendar.empty and calendar.all_day.size == 0 %}
     <div class="content layout layout--col layout--center" style="gap: 8px">
       <span class="i i-calendar-check i-lg"></span>
       <p class="t-md t-bold">Nothing scheduled</p>

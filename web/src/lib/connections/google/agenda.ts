@@ -116,6 +116,18 @@ export interface Agenda {
 export const isAllDay = (event: GoogleEvent): boolean =>
   Boolean(event.start?.date) && !event.start?.dateTime;
 
+/**
+ * The day after a floating "2026-08-28", as another floating date.
+ *
+ * Stepped through UTC because a bare date has no zone to be wrong about - it
+ * is arithmetic on a calendar, not on an instant.
+ */
+function nextDate(date: string): string {
+  const at = new Date(`${date}T00:00:00Z`);
+  at.setUTCDate(at.getUTCDate() + 1);
+  return at.toISOString().slice(0, 10);
+}
+
 function instant(time: { dateTime?: string; date?: string } | undefined): Date | null {
   const value = time?.dateTime ?? time?.date;
   if (!value) return null;
@@ -245,7 +257,8 @@ function localDays(from: Date, to: Date, timezone: string): Date[] {
 export function agenda(source: GoogleEvent[], options: AgendaOptions): Agenda {
   const { now, timezone, locale, window, hideDeclined } = options;
   const dayEnds = endOfDay(now, timezone).getTime();
-  const today = startOfDay(now, timezone).getTime();
+  /** Today as a calendar date here, which is what an all-day entry compares to. */
+  const todayDate = dayKey(now, timezone);
 
   const kept = source.filter((event) => {
     if (event.status === "cancelled") return false;
@@ -254,29 +267,34 @@ export function agenda(source: GoogleEvent[], options: AgendaOptions): Agenda {
 
   const allDay: AllDay[] = [];
   const meetings: Meeting[] = [];
-  /** Which local days each all-day entry covers, so a week can place it. */
-  const spans: { entry: AllDay; from: number; to: number }[] = [];
+  /** The floating dates each all-day entry covers, end exclusive. */
+  const spans: { entry: AllDay; from: string; until: string }[] = [];
 
   for (const event of kept) {
     const title = (event.summary ?? "").trim() || "Busy";
 
     if (isAllDay(event)) {
-      const from = instant(event.start)?.getTime() ?? 0;
-      // An all-day entry's own dates are midnight UTC, so "does it cover this
-      // day" is a comparison of ranges rather than of a single instant.
-      const until = instant(event.end)?.getTime() ?? from + DAY;
+      // An all-day entry's dates float: "2026-08-28" is the 28th wherever you
+      // are, with no instant behind it. Reading it as midnight UTC and then
+      // comparing against local midnights smears a one-day birthday across two
+      // days everywhere east of Greenwich - which is exactly what it did.
+      //
+      // So the comparison stays in calendar dates, where ISO strings compare
+      // correctly on their own. The end date is exclusive, as Google sends it.
+      const from = event.start?.date ?? "";
+      const until = event.end?.date ?? nextDate(from);
 
       const entry: AllDay = {
         title,
-        today: from < dayEnds && until > today,
+        today: from <= todayDate && todayDate < until,
         accepted: !isDeclined(event),
-        date: dayKey(new Date(from), timezone),
-        day: dayLabel(new Date(from), timezone, locale),
+        date: from,
+        day: dayLabel(new Date(`${from}T12:00:00Z`), "UTC", locale),
         calendar: event.calendarName ?? "",
       };
 
       allDay.push(entry);
-      spans.push({ entry, from, to: until });
+      spans.push({ entry, from, until });
       continue;
     }
 
@@ -322,9 +340,10 @@ export function agenda(source: GoogleEvent[], options: AgendaOptions): Agenda {
         const onThisDay = meetings.filter((meeting) => meeting.date === date);
         // An entry covering Monday to Friday belongs on all five, which is
         // what a calendar shows and what makes "am I off on Thursday"
-        // answerable from the group rather than from the flat list.
+        // answerable from the group rather than from the flat list. Compared
+        // as dates, for the same reason they were read as dates.
         const covering = spans
-          .filter((span) => span.from < ends && span.to > midnight.getTime())
+          .filter((span) => span.from <= date && date < span.until)
           .map((span) => span.entry);
 
         return {
