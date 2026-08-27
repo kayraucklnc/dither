@@ -94,6 +94,13 @@ designs:
     rows: [3, 12]
     nominal: [6, 5]
 
+  - template: purchases
+    label: Recent payments
+    hint: Who just paid, how much and when - the newest one large, the rest as a tape under it.
+    columns: [4, 12]
+    rows: [3, 12]
+    nominal: [6, 6]
+
   - template: spark
     label: Figure and spark
     hint: One number with a hairline of history beside it, for a box too small for a chart.
@@ -109,6 +116,33 @@ designs:
     nominal: [12, 12]
 
 fields:
+  # Which accounts, and in what currency. Neither is marked presentational,
+  # deliberately: both change the *numbers*, not the drawing of them, and a
+  # widget showing one account's takings must never be handed the answer that
+  # was fetched for all three. That is worth an extra trip to Stripe.
+  - keyname: accounts
+    name: Which accounts
+    field_type: multiselect
+    default: []
+    options_from: stripe.accounts
+    help_text: >
+      Leave every one unticked to add up all of them, which is what most people
+      want from more than one key. Tick some to show only those. Accounts in
+      different currencies are converted before they are added, at the day's
+      rate.
+    optional: true
+
+  - keyname: currency
+    name: Shown in
+    field_type: search
+    default: account
+    options_from: money.currencies
+    help_text: >
+      The account's own currency needs no rate behind it and is what Stripe
+      would show you. Anything else is converted at the day's published rate,
+      and a figure that has been converted is an estimate - the panel says so.
+    optional: false
+
   - keyname: metric
     presentation: true
     name: What to show
@@ -388,7 +422,16 @@ sample:
   revenue:
     connected: true
     account: Dither
+    account_count: 2
+    accounts:
+      - { account: acct_1DitherLtd, label: Dither Ltd, currency: EUR }
+      - { account: acct_1DitherUS, label: Dither US, currency: USD }
     currency: EUR
+    # Two accounts added up, so the sample is what a converted panel looks
+    # like - the state a design has to be able to say something about, and the
+    # one nobody would think to check by hand.
+    converted: true
+    rates_at: "2026-08-27T00:02:31Z"
     symbol: "€"
     figure: "3,184"
     text: "€3,184"
@@ -435,6 +478,17 @@ sample:
       figure: "49"
       text: "€49"
       symbol: "€"
+    purchase_count: 8
+    purchases:
+      - { name: Ada Lovelace, symbol: "€", figure: "84", figure_full: "84.00", text: "€84", text_full: "€84.00", amount: 84, currency: EUR, converted: true, at: "2026-08-27T12:41:00Z", at_text: "14:41", day: Today, today: true, account: Dither Ltd, share: 100 }
+      - { name: Grace Hopper, symbol: "€", figure: "29", figure_full: "29.50", text: "€29", text_full: "€29.50", amount: 29.5, currency: EUR, converted: true, at: "2026-08-27T12:18:00Z", at_text: "14:18", day: Today, today: true, account: Dither US, share: 35 }
+      - { name: Katherine Johnson, symbol: "€", figure: "12", figure_full: "12.00", text: "€12", text_full: "€12.00", amount: 12, currency: EUR, converted: true, at: "2026-08-27T11:52:00Z", at_text: "13:52", day: Today, today: true, account: Dither Ltd, share: 14 }
+      - { name: Margaret Hamilton, symbol: "€", figure: "84", figure_full: "84.00", text: "€84", text_full: "€84.00", amount: 84, currency: EUR, converted: true, at: "2026-08-27T10:04:00Z", at_text: "12:04", day: Today, today: true, account: Dither Ltd, share: 100 }
+      - { name: rosa@example.org, symbol: "€", figure: "9", figure_full: "9.00", text: "€9", text_full: "€9.00", amount: 9, currency: EUR, converted: true, at: "2026-08-27T08:37:00Z", at_text: "10:37", day: Today, today: true, account: Dither US, share: 11 }
+      - { name: Joan Clarke, symbol: "€", figure: "240", figure_full: "240.00", text: "€240", text_full: "€240.00", amount: 240, currency: EUR, converted: true, at: "2026-08-26T15:12:00Z", at_text: "17:12", day: Yesterday, today: false, account: Dither Ltd, share: 100 }
+      - { name: Radia Perlman, symbol: "€", figure: "29", figure_full: "29.50", text: "€29", text_full: "€29.50", amount: 29.5, currency: EUR, converted: true, at: "2026-08-26T09:48:00Z", at_text: "11:48", day: Yesterday, today: false, account: Dither US, share: 35 }
+      - { name: Someone, symbol: "€", figure: "84", figure_full: "84.00", text: "€84", text_full: "€84.00", amount: 84, currency: EUR, converted: true, at: "2026-08-25T18:20:00Z", at_text: "20:20", day: Mon, today: false, account: Dither Ltd, share: 100 }
+
     cards:
       mrr:
         key: mrr

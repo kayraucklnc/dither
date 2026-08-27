@@ -152,6 +152,12 @@ export function isLinked(source: Provider, client: Linked | undefined, accounts:
     return accounts.some((one) => source.handshake!.complete(one.credentials));
   }
 
+  // A provider that takes a key and can hold several files each one under the
+  // account it belongs to, so there is no client row to read this from - only
+  // the accounts. Asking the client row would say "linked" for a provider
+  // whose only row is the note left by a key that was refused.
+  if (source.multiple) return accounts.length > 0;
+
   return Boolean(client) && !failure(client!.label);
 }
 
