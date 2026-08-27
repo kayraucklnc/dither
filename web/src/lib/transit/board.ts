@@ -1,17 +1,15 @@
 import { city, provider } from "@/lib/transit/catalog";
+import { trenordBoard } from "@/lib/transit/trenord";
 
 /**
- * A departure board, built from the settings it was given.
+ * A departure board.
  *
- * Stand-in data until the Trenord client is ported - but stand-in data that
- * *reads its settings*, which the previous version did not. It returned the
- * manifest's sample whatever you asked for, so changing From and To on a screen
- * changed nothing and the board still said Milano Cadorna to Saronno. A mock
- * that ignores its inputs is worse than no mock: it looks like a bug in the
- * settings rather than an absent integration.
- *
- * It moves with the clock rather than randomly, so the same minute renders the
- * same way twice and a screenshot is reproducible.
+ * Trenord answers for itself - see trenord/. Operators without a client yet get
+ * a board generated from the settings, which at least respects what it was
+ * asked and moves with the clock, so the same minute renders the same way
+ * twice. A stand-in that ignores its inputs is worse than none: it reads as a
+ * bug in the settings rather than an absent integration, which is exactly how
+ * the last one behaved.
  */
 export interface Departure {
   line: string;
@@ -66,6 +64,24 @@ export async function board(
   }
 
   if (!origin) throw new Error("Choose a station to depart from.");
+
+  // A real client answers for its own operator. Everything else gets a board
+  // built from the settings, which at least respects what it was asked.
+  if (!chosen.mocked) {
+    return trenordBoard(
+      {
+        origin,
+        destination,
+        limit: Math.max(1, Math.min(12, Number(settings.limit ?? 5))),
+        leadTime: Math.max(0, Number(settings.lead_time ?? 0)),
+        transfers: Math.max(0, Number(settings.transfers ?? 1)),
+        language: String(settings.language ?? "en"),
+        hideCancelled: settings.hide_cancelled === true || settings.hide_cancelled === "true",
+        timezone: where?.timezone ?? "Europe/Rome",
+      },
+      now,
+    );
+  }
 
   const limit = Math.max(1, Math.min(12, Number(settings.limit ?? 5)));
   const lead = Math.max(0, Number(settings.lead_time ?? 0));
