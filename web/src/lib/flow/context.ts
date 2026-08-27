@@ -46,6 +46,12 @@ function pretend(source: Source, values: Record<string, unknown>): Source {
   return { ...source, payload };
 }
 
+/** Source id to the extension behind it, for notices placed with their source. */
+export async function sourceExtensions(deviceId: number): Promise<Record<string, string>> {
+  const rows = await db.select().from(triggers).where(eq(triggers.deviceId, deviceId));
+  return Object.fromEntries(rows.map((row) => [String(row.id), row.extension]));
+}
+
 export async function contextFor(
   device: Device,
   now = new Date(),

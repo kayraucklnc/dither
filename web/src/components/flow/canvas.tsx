@@ -8,6 +8,9 @@ import {
   MarkerType,
   ReactFlow,
   ReactFlowProvider,
+  useNodesState,
+  useReactFlow,
+  type Connection,
   type Edge,
   type Node as RFNode,
 } from "@xyflow/react";
@@ -18,7 +21,9 @@ import {
   FlaskConical,
   ChevronUp,
   CornerDownRight,
+  Flag,
   GitBranch,
+  LayoutGrid,
   ImagePlus,
   Loader2,
   Plus,
@@ -41,10 +46,23 @@ import { QuestionNode, ScreenNode, type QuestionData, type ScreenData } from "@/
 import { ScreenPreview } from "@/components/screen-preview";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/cn";
+import { defaultOperator, defaultValue } from "@/lib/facts";
 import { summarise, type Condition } from "@/lib/flow/conditions";
-import { layout } from "@/lib/flow/layout";
+import { reachableFrom, wouldCycle } from "@/lib/flow/graph";
+import { COLUMN_GAP, layout, NODE_WIDTH } from "@/lib/flow/layout";
 import type { Source } from "@/lib/flow/sources";
 import type { Node } from "@/lib/flow/tree";
+
+/**
+ * A node as the canvas holds it: the tree's node plus where it sits.
+ *
+ * Positions are the user's now, not the layout's. A decision tree has a
+ * canonical shape and auto-layout gave it for free, but it also made the
+ * canvas read-only in the one way people expect a node editor to be writable -
+ * you could not put something down where you wanted it. Tidy up is a command
+ * you run, not a thing that happens to you.
+ */
+export type EditorNode = Node & { x: number; y: number };
 
 export interface ScreenOption {
   id: number;
@@ -58,6 +76,7 @@ interface Trace {
   reason: string;
   held: boolean;
   steps: { nodeId: number; question: string; answer: boolean; actual?: string }[];
+  sources?: EditorSource[];
   notices: { id: number; icon: string; text: string; loud: boolean }[];
   firing: number[];
   hosts: NoticeHost[];
@@ -87,7 +106,7 @@ function TreeCanvas({
   screens: ScreenOption[];
   sources: EditorSource[];
   sourceKinds: SourceKind[];
-  initialNodes: Node[];
+  initialNodes: EditorNode[];
   initialRootId: number | null;
 }) {
   const [nodes, setNodes] = useState(initialNodes);
@@ -114,12 +133,27 @@ function TreeCanvas({
   }, [deviceId, tab]);
 
   const nodeTypes = useMemo(() => ({ question: QuestionNode, screen: ScreenNode }), []);
+  const { screenToFlowPosition } = useReactFlow();
+
+  /**
+   * React Flow keeps its own copy of the nodes while you drag one.
+   *
+   * Without that, a drag produces no movement until the mouse comes up: the
+   * component would be rendering from state that only changes on drag *stop*.
+   * The structure below is ours; the position during a drag is theirs, and is
+   * handed back on release.
+   */
+  const dragging = useRef<string | undefined>(undefined);
+
   const selected = nodes.find((node) => node.id === selectedId);
   const byId = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
 
+  // Detached nodes are possible now, so the canvas has to say which are live.
+  const reachable = useMemo(() => reachableFrom(nodes, rootId), [nodes, rootId]);
+
   /* ------------------------------------------------------------------ trace */
 
-  const refreshTrace = useCallback(async () => {
+  const refreshTrace = useCallback(async (): Promise<Trace | undefined> => {
     // Simulating asks the same question of a moment and some values that are
     // not real; the device carries on deciding for itself either way.
     const response = simulation.active
@@ -134,13 +168,15 @@ function TreeCanvas({
         })
       : await fetch(`/api/devices/${deviceId}/trace`);
 
-    if (!response.ok) return;
+    if (!response.ok) return undefined;
 
     const body = await response.json();
     setTrace(body);
     // The trace carries live values, so the check editor can show what each
     // source currently reads without a second request.
     if (body.sources) setSources(body.sources);
+
+    return body as Trace;
   }, [deviceId, simulation]);
 
   useEffect(() => {
@@ -162,15 +198,10 @@ function TreeCanvas({
     setSave("saving");
 
     const timer = setTimeout(async () => {
-      const positions = layout(nodes, rootId);
-
       const response = await fetch(`/api/devices/${deviceId}/tree`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          rootNodeId: rootId,
-          nodes: nodes.map((node) => ({ ...node, ...(positions.get(node.id) ?? { x: 0, y: 0 }) })),
-        }),
+        body: JSON.stringify({ rootNodeId: rootId, nodes }),
       });
 
       if (!response.ok) {
@@ -187,7 +218,7 @@ function TreeCanvas({
         settled.current = false;
         setNodes(
           body.nodes.map(
-            (node: Record<string, unknown>): Node => ({
+            (node: Record<string, unknown>): EditorNode => ({
               id: node.id as number,
               kind: node.kind === "question" ? "question" : "screen",
               label: node.label as string,
@@ -197,6 +228,8 @@ function TreeCanvas({
               screenId: node.screenId as number | null,
               refreshSeconds: node.refreshSeconds as number | null,
               holdSeconds: node.holdSeconds as number,
+              x: node.x as number,
+              y: node.y as number,
             }),
           ),
         );
@@ -229,12 +262,14 @@ function TreeCanvas({
    * gesture rather than an edge out of every screen.
    */
   const addCheck = useCallback(
-    (above: number | null) => {
+    (above: number | null, at?: { x: number; y: number }) => {
       const leafId = nextId;
       const questionId = nextId - 1;
       setNextId((value) => value - 2);
 
-      const leaf: Node = {
+      const anchor = at ?? { x: 40, y: 40 };
+
+      const leaf: EditorNode = {
         id: leafId,
         kind: "screen",
         label: "New screen",
@@ -244,9 +279,11 @@ function TreeCanvas({
         screenId: screens[0]?.id ?? null,
         refreshSeconds: null,
         holdSeconds: 0,
+        x: anchor.x + NODE_WIDTH + COLUMN_GAP,
+        y: anchor.y - 60,
       };
 
-      const question: Node = {
+      const question: EditorNode = {
         id: questionId,
         kind: "question",
         label: "Check",
@@ -256,6 +293,8 @@ function TreeCanvas({
         screenId: null,
         refreshSeconds: null,
         holdSeconds: 0,
+        x: anchor.x,
+        y: anchor.y,
       };
 
       setNodes((current) => {
@@ -277,6 +316,39 @@ function TreeCanvas({
       setSelectedId(questionId);
     },
     [nextId, screens, sources, rootId],
+  );
+
+  /**
+   * A node dropped where you clicked, joined to nothing.
+   *
+   * The point of a node editor is putting something down and wiring it up
+   * afterwards. Until it is wired up it is unreachable, and says so.
+   */
+  const addLoose = useCallback(
+    (kind: "question" | "screen", at: { x: number; y: number }) => {
+      const id = nextId;
+      setNextId((value) => value - 1);
+
+      const node: EditorNode = {
+        id,
+        kind,
+        label: kind === "question" ? "Check" : "New screen",
+        condition: kind === "question" ? blankCondition(sources) : null,
+        yesNodeId: null,
+        noNodeId: null,
+        screenId: kind === "screen" ? (screens[0]?.id ?? null) : null,
+        refreshSeconds: null,
+        holdSeconds: 0,
+        x: at.x,
+        y: at.y,
+      };
+
+      setNodes((current) => [...current, node]);
+      // The first node on an empty canvas is the obvious start.
+      setRootId((current) => current ?? id);
+      setSelectedId(id);
+    },
+    [nextId, screens, sources],
   );
 
   /** Removing a check splices it out, keeping its "no" branch. */
@@ -314,6 +386,25 @@ function TreeCanvas({
     [byId, rootId],
   );
 
+  /** Remove any node, and unhook whatever pointed at it. */
+  const removeNode = useCallback(
+    (id: number) => {
+      setNodes((current) =>
+        current
+          .filter((node) => node.id !== id)
+          .map((node) => ({
+            ...node,
+            yesNodeId: node.yesNodeId === id ? null : node.yesNodeId,
+            noNodeId: node.noNodeId === id ? null : node.noNodeId,
+          })),
+      );
+
+      if (rootId === id) setRootId(null);
+      setSelectedId(null);
+    },
+    [rootId],
+  );
+
   /**
    * Swap a check with the check directly under it on the "no" path.
    *
@@ -349,6 +440,57 @@ function TreeCanvas({
     [byId, parentOf, rootId],
   );
 
+  /**
+   * Point a check's yes or no branch at another node.
+   *
+   * Refused when it would make the walk loop: the evaluator has a ceiling so a
+   * cycle cannot hang a device, but a rule set that silently never reaches a
+   * screen is not something to discover on a wall.
+   */
+  const connect = useCallback(
+    (connection: Connection) => {
+      const from = Number(connection.source);
+      const to = Number(connection.target);
+      const branch = connection.sourceHandle === "no" ? "noNodeId" : "yesNodeId";
+
+      if (!Number.isInteger(from) || !Number.isInteger(to)) return;
+
+      if (wouldCycle(nodes, from, to)) {
+        setError("That would loop: the branch leads back to the check it starts from.");
+        return;
+      }
+
+      setError(undefined);
+      setNodes((current) =>
+        current.map((node) => (node.id === from ? { ...node, [branch]: to } : node)),
+      );
+    },
+    [nodes],
+  );
+
+  const disconnect = useCallback((edges: Edge[]) => {
+    setNodes((current) =>
+      current.map((node) => {
+        const cut = edges.filter((edge) => edge.source === String(node.id));
+        if (!cut.length) return node;
+
+        return {
+          ...node,
+          yesNodeId: cut.some((edge) => edge.sourceHandle === "yes") ? null : node.yesNodeId,
+          noNodeId: cut.some((edge) => edge.sourceHandle === "no") ? null : node.noNodeId,
+        };
+      }),
+    );
+  }, []);
+
+  /** Put the tree back into its canonical shape, on request rather than always. */
+  const tidy = useCallback(() => {
+    const positions = layout(nodes, rootId);
+    setNodes((current) =>
+      current.map((node) => ({ ...node, ...(positions.get(node.id) ?? { x: node.x, y: node.y }) })),
+    );
+  }, [nodes, rootId]);
+
   const move = useCallback(
     (id: number, direction: "up" | "down") => {
       if (direction === "down") return swapDown(id);
@@ -375,28 +517,50 @@ function TreeCanvas({
 
   /* ---------------------------------------------------------------- sources */
 
+  /**
+   * Create a source, then answer with a check that reads from it.
+   *
+   * Returning the check rather than applying it matters: the leaf that asked
+   * may be one member of an all/any group, and writing the node's condition
+   * from here would replace the group with a single check.
+   *
+   * The first fact has to be picked here too. Leaving it blank is what made
+   * this look broken - the source appeared, the value fell back to "Choose…",
+   * and nothing said why.
+   */
   const addSource = useCallback(
-    async (extension: string) => {
+    async (extension: string): Promise<Condition | undefined> => {
       const response = await fetch(`/api/devices/${deviceId}/triggers`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ extension }),
       });
 
-      if (!response.ok) return setError((await response.json())?.error ?? "Could not add that.");
-
-      await refreshTrace();
-
-      // Point the check being edited at the source that was just created.
-      const { trigger } = await response.json();
-      if (selected?.kind === "question" && trigger) {
-        update(selected.id, {
-          condition: { kind: "fact", sourceId: String(trigger.id), factKey: "", operator: "present" },
-        });
+      if (!response.ok) {
+        setError((await response.json())?.error ?? "Could not add that source.");
+        return undefined;
       }
+
+      const { trigger } = await response.json();
+      if (!trigger) return undefined;
+
+      // Read the facts off the refreshed list rather than state, which this
+      // closure captured before the source existed.
+      const fresh = await refreshTrace();
+      const created = fresh?.sources?.find((source) => source.id === String(trigger.id));
+      const first = created?.facts[0];
+
+      setError(undefined);
+
+      return {
+        kind: "fact",
+        sourceId: String(trigger.id),
+        factKey: first?.key ?? "",
+        operator: first ? defaultOperator(first.type) : "present",
+        value: first ? defaultValue(first.type) : "",
+      };
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [deviceId, refreshTrace, selected],
+    [deviceId, refreshTrace],
   );
 
   const editSource = useCallback(
@@ -411,6 +575,14 @@ function TreeCanvas({
         body: JSON.stringify({ id: Number(id), settings }),
       });
 
+      refreshTrace();
+    },
+    [deviceId, refreshTrace],
+  );
+
+  const removeSource = useCallback(
+    async (id: string) => {
+      await fetch(`/api/devices/${deviceId}/triggers?id=${id}`, { method: "DELETE" });
       refreshTrace();
     },
     [deviceId, refreshTrace],
@@ -459,12 +631,11 @@ function TreeCanvas({
     [trace],
   );
 
-  const flowNodes: RFNode[] = useMemo(() => {
-    const positions = layout(nodes, rootId);
-
-    return nodes.map<RFNode>((node) => {
-      const at = positions.get(node.id) ?? { x: 0, y: 0 };
+  const derived: RFNode[] = useMemo(() =>
+    nodes.map<RFNode>((node) => {
+      const at = { x: node.x, y: node.y };
       const step = answered.get(node.id);
+      const orphan = !reachable.has(node.id);
 
       if (node.kind === "question") {
         const moves = canMove(node.id);
@@ -481,6 +652,7 @@ function TreeCanvas({
             actual: step?.actual,
             answer: step?.answer,
             isRoot: rootId === node.id,
+            orphan,
             canMoveUp: moves.up,
             canMoveDown: moves.down,
             onMove: (direction: "up" | "down") => move(node.id, direction),
@@ -502,16 +674,31 @@ function TreeCanvas({
           holdSeconds: node.holdSeconds,
           isShowing: trace?.leafId === node.id,
           isRoot: rootId === node.id,
+          orphan,
           panel,
           modelId,
           deviceId,
         } satisfies ScreenData,
       };
-    });
-  }, [
+    }),
+  [
     nodes, rootId, selectedId, answered, trace, screens, panel, modelId,
-    deviceRefreshSeconds, sourceMap, canMove, move,
+    deviceRefreshSeconds, sourceMap, canMove, move, reachable,
   ]);
+
+  const [flowNodes, setFlowNodes, onNodesChange] = useNodesState<RFNode>([]);
+
+  useEffect(() => {
+    setFlowNodes((current) => {
+      const held = dragging.current;
+      if (!held) return derived;
+
+      // A background refresh mid-drag must not snap the node back under the
+      // cursor, so the one being moved keeps the position React Flow has.
+      const at = current.find((node) => node.id === held)?.position;
+      return derived.map((node) => (node.id === held && at ? { ...node, position: at } : node));
+    });
+  }, [derived, setFlowNodes]);
 
   const flowEdges: Edge[] = useMemo(() => {
     const result: Edge[] = [];
@@ -547,30 +734,59 @@ function TreeCanvas({
   /* ------------------------------------------------------------- right click */
 
   const menuFor = useCallback(
-    (id: number | null): MenuItem[] => {
+    (id: number | null, at?: { x: number; y: number }): MenuItem[] => {
+      const spot = at ?? { x: 80, y: 80 };
+
       if (id === null) {
         return [
           {
+            id: "check-here",
+            label: "New check here",
+            icon: GitBranch,
+            hint: "Wire it up afterwards",
+            onSelect: () => addLoose("question", spot),
+          },
+          {
+            id: "screen-here",
+            label: "New screen here",
+            icon: ImagePlus,
+            hint: "Pick which screen once it is down",
+            onSelect: () => addLoose("screen", spot),
+          },
+          {
             id: "top",
             label: "Add a check at the top",
-            icon: GitBranch,
+            icon: Flag,
             hint: "Asked before everything else",
-            onSelect: () => addCheck(rootId),
+            onSelect: () => addCheck(rootId, spot),
           },
+          { id: "tidy", label: "Tidy up the layout", icon: LayoutGrid, onSelect: tidy },
         ];
       }
 
       const node = byId.get(id);
       if (!node) return [];
 
+      const common: MenuItem[] = [
+        {
+          id: "root",
+          label: "Start here",
+          icon: Flag,
+          hint: rootId === id ? "Already the start" : "Make this the first thing asked",
+          disabled: rootId === id,
+          onSelect: () => setRootId(id),
+        },
+      ];
+
       if (node.kind === "screen") {
         return [
+          ...common,
           {
             id: "before",
             label: "Ask something before this",
             icon: GitBranch,
             hint: "Shows a different screen when it holds",
-            onSelect: () => addCheck(id),
+            onSelect: () => addCheck(id, { x: node.x - 320, y: node.y }),
           },
           {
             id: "screen",
@@ -578,30 +794,39 @@ function TreeCanvas({
             icon: ImagePlus,
             onSelect: () => addScreen(id),
           },
+          {
+            id: "delete-leaf",
+            label: "Remove this screen",
+            icon: Trash2,
+            danger: true,
+            hint: rootId === id ? "It is the start; the tree would have none" : undefined,
+            onSelect: () => removeNode(id),
+          },
         ];
       }
 
       const moves = canMove(id);
 
       return [
+        ...common,
         {
           id: "yes",
           label: "Add a check on the yes branch",
           icon: CornerDownRight,
-          onSelect: () => addCheck(node.yesNodeId),
+          onSelect: () => addCheck(node.yesNodeId, { x: node.x + 320, y: node.y - 140 }),
         },
         {
           id: "no",
           label: "Add a check on the no branch",
           icon: CornerDownRight,
-          onSelect: () => addCheck(node.noNodeId),
+          onSelect: () => addCheck(node.noNodeId, { x: node.x + 320, y: node.y + 140 }),
         },
         { id: "up", label: "Ask this earlier", icon: ChevronUp, disabled: !moves.up, onSelect: () => move(id, "up") },
         { id: "down", label: "Ask this later", icon: ChevronDown, disabled: !moves.down, onSelect: () => move(id, "down") },
         { id: "delete", label: "Remove this check", icon: Trash2, danger: true, onSelect: () => removeQuestion(id) },
       ];
     },
-    [byId, canMove, addCheck, addScreen, move, removeQuestion, rootId],
+    [byId, canMove, addCheck, addLoose, addScreen, move, removeQuestion, removeNode, rootId, tidy],
   );
 
   /* ------------------------------------------------------------------- view */
@@ -614,19 +839,46 @@ function TreeCanvas({
             nodes={flowNodes}
             edges={flowEdges}
             nodeTypes={nodeTypes}
-            nodesDraggable={false}
-            nodesConnectable={false}
+            nodesDraggable
+            nodesConnectable
+            onNodesChange={onNodesChange}
+            onNodeDragStart={(_event, dragged) => {
+              dragging.current = dragged.id;
+            }}
+            onConnect={connect}
+            onEdgesDelete={disconnect}
+            onNodeDragStop={(_event, dragged) => {
+              dragging.current = undefined;
+              setNodes((current) =>
+                current.map((node) =>
+                  node.id === Number(dragged.id)
+                    ? { ...node, x: dragged.position.x, y: dragged.position.y }
+                    : node,
+                ),
+              );
+            }}
             onNodeClick={(_event, node) => setSelectedId(Number(node.id))}
             onPaneClick={() => setSelectedId(null)}
             onNodeContextMenu={(event, node) => {
               event.preventDefault();
               setSelectedId(Number(node.id));
-              setMenu({ at: { x: event.clientX, y: event.clientY }, items: menuFor(Number(node.id)) });
+              setMenu({
+                at: { x: event.clientX, y: event.clientY },
+                items: menuFor(
+                  Number(node.id),
+                  screenToFlowPosition({ x: event.clientX, y: event.clientY }),
+                ),
+              });
             }}
             onPaneContextMenu={(event) => {
               event.preventDefault();
               const pointer = event as unknown as MouseEvent;
-              setMenu({ at: { x: pointer.clientX, y: pointer.clientY }, items: menuFor(null) });
+              setMenu({
+                at: { x: pointer.clientX, y: pointer.clientY },
+                // Where on the canvas, not where on the screen: a node has to
+                // land under the cursor whatever the pan and zoom are.
+                items: menuFor(null, screenToFlowPosition({ x: pointer.clientX, y: pointer.clientY })),
+              });
             }}
             fitView
             fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
@@ -760,9 +1012,23 @@ function TreeCanvas({
             <GitBranch size={15} />
             Add a check at the top
           </button>
+          <button
+            type="button"
+            onClick={tidy}
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-line bg-raised px-3 py-1.5 text-[12px] text-muted transition-colors hover:text-ink"
+          >
+            <LayoutGrid size={13} />
+            Tidy up the layout
+          </button>
+
           <p className="mt-2.5 text-[11px] leading-relaxed text-faint">
-            Asked before everything else, so this is how you say &ldquo;whatever else is going on,
-            when it rains show the weather&rdquo;. Right-click anything for more.
+            A check at the top is asked before everything else — that is how you say
+            &ldquo;whatever else is going on, when it rains show the weather&rdquo;.
+          </p>
+          <p className="mt-2 text-[11px] leading-relaxed text-faint">
+            Right-click the canvas to drop a check or a screen where you click, drag nodes to
+            arrange them, and drag from a check&apos;s <span className="text-live">yes</span> or{" "}
+            <span className="text-no">no</span> dot to wire it up.
           </p>
         </div>
 
@@ -918,13 +1184,40 @@ function TreeCanvas({
                   {sources
                     .filter((source) => source.group === "trigger")
                     .map((source) => (
-                      <div key={source.id} className="rounded-lg border border-line bg-raised p-2.5">
+                      <div key={source.id} className="group/source rounded-lg border border-line bg-raised p-2.5">
                         <div className="flex items-baseline justify-between gap-2">
-                          <span className="truncate text-[12px] font-medium">{source.label}</span>
+                          <span className="min-w-0 truncate text-[12px] font-medium">
+                            {source.label}
+                          </span>
                           <span className="shrink-0 text-[10px] text-faint">
                             {source.extensionLabel}
                           </span>
+                          <button
+                            type="button"
+                            title={
+                              source.usedBy
+                                ? `${source.usedBy} check${source.usedBy === 1 ? "" : "s"} read from this`
+                                : "Nothing reads from this"
+                            }
+                            onClick={() => removeSource(source.id)}
+                            className={cn(
+                              "shrink-0 rounded p-1 opacity-0 transition-opacity group-hover/source:opacity-100",
+                              source.usedBy
+                                ? "text-warn hover:bg-warn/15"
+                                : "text-faint hover:bg-danger/15 hover:text-danger",
+                            )}
+                          >
+                            <Trash2 size={11} />
+                          </button>
                         </div>
+
+                        {source.usedBy ? (
+                          <p className="mt-0.5 text-[10px] text-faint">
+                            {source.usedBy} check{source.usedBy === 1 ? "" : "s"} read from it
+                          </p>
+                        ) : (
+                          <p className="mt-0.5 text-[10px] text-faint">Nothing reads from it yet</p>
+                        )}
                         <dl className="mt-1.5 space-y-0.5">
                           {source.facts.slice(0, 4).map((fact) => (
                             <div key={fact.key} className="flex justify-between gap-2 text-[11px]">

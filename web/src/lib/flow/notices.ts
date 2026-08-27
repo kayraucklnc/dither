@@ -22,12 +22,18 @@ export interface ActiveNotice {
   id: number;
   icon: string;
   text: string;
-  loud: boolean;
+  level: "info" | "warn" | "urgent";
+  /** "screen" for the alert area, "source" to prefer its own extension's widget. */
+  placement: string;
+  /** The extension the condition reads from, for placement: source. */
+  fromExtension?: string;
 }
 
 export async function activeNotices(
   rules: Notice[],
   context: Context,
+  /** Source id to the extension behind it, so a notice knows what it is about. */
+  sourceExtensions: Record<string, string> = {},
   /**
    * Ids to show regardless of their condition, and ids to suppress.
    *
@@ -63,7 +69,14 @@ export async function activeNotices(
       }
     }
 
-    active.push({ id: rule.id, icon: rule.icon, text: text.trim(), loud: rule.loud });
+    active.push({
+      id: rule.id,
+      icon: rule.icon,
+      text: text.trim(),
+      level: (rule.level as ActiveNotice["level"]) ?? "warn",
+      placement: rule.placement,
+      fromExtension: sourceId ? sourceExtensions[sourceId] : undefined,
+    });
   }
 
   return active;

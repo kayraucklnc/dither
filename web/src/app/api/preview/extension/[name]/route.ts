@@ -37,14 +37,31 @@ export async function GET(
   }
 
   /**
-   * A stand-in notice, so the catalogue can show a design with and without one.
-   * Whether the strip appears at all is the template's decision - a design that
-   * ignores `notices` renders identically either way, which is itself the
-   * answer to "does this size take alerts?".
+   * Stand-in notices, so the catalogue can show a design with and without.
+   *
+   * They are this extension's *own* declared alerts where it has any, at their
+   * own levels - a departure board previews a cancellation, a revenue panel
+   * previews failing payments. A generic string tells you the strip exists; its
+   * own alerts tell you whether they fit.
    */
   const withNotice = url.searchParams.get("notice") === "1";
+
   const notices = withNotice
-    ? [{ icon: "alert", text: "Service alert on the S3", loud: true }]
+    ? (extension.manifest.notices.length
+        ? extension.manifest.notices
+        : [
+            { icon: "alert", text: "Something worth knowing", level: "warn" as const },
+            { icon: "info", text: "And something quieter", level: "info" as const },
+          ]
+      )
+        .slice(0, extension.manifest.notice_capacity)
+        .map((notice) => ({
+          icon: notice.icon,
+          // The declared text is Liquid over live data; the label is the plain
+          // sentence, which is what a preview wants.
+          text: "label" in notice ? notice.label : notice.text,
+          level: notice.level,
+        }))
     : [];
 
   const settings = defaultSettings(extension);

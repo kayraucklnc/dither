@@ -5,7 +5,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { decisionNodes, devices, notices } from "@/lib/db/schema";
 import { toNodes } from "@/lib/device-screen";
-import { contextFor, type Overrides } from "@/lib/flow/context";
+import { contextFor, sourceExtensions, type Overrides } from "@/lib/flow/context";
 import { editorSources } from "@/lib/flow/editor-sources";
 import { activeNotices, noticeHosts } from "@/lib/flow/notices";
 import { walk } from "@/lib/flow/tree";
@@ -54,6 +54,7 @@ async function answer(
   const said = await activeNotices(
     rules,
     context,
+    await sourceExtensions(id),
     Object.fromEntries(Object.entries(forced).map(([id, state]) => [Number(id), state])),
   );
 

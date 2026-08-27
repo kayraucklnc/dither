@@ -16,6 +16,8 @@ export interface QuestionData extends Record<string, unknown> {
   /** undefined when this node was not reached on the current walk. */
   answer?: boolean;
   isRoot: boolean;
+  /** Nothing points at it, so the walk never gets here. */
+  orphan?: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
   onMove: (direction: "up" | "down") => void;
@@ -30,6 +32,9 @@ export function QuestionNode({ data, selected }: NodeProps & { data: QuestionDat
       className={cn(
         "rounded-xl border bg-surface px-3 py-2.5 transition-colors",
         selected ? "border-accent" : reached ? "border-live/50" : "border-line",
+        // A node nothing points at is kept, shown, and faded - not hidden, and
+        // certainly not deleted out from under someone mid-build.
+        data.orphan && "border-dashed opacity-60",
       )}
     >
       <Handle type="target" position={Position.Left} className="!h-2 !w-2 !border-0 !bg-line-strong" />
@@ -41,7 +46,7 @@ export function QuestionNode({ data, selected }: NodeProps & { data: QuestionDat
           <CircleHelp size={11} className="shrink-0 text-faint" />
         )}
         <span className="text-[10px] font-medium uppercase tracking-wide text-faint">
-          {data.isRoot ? "Asked first" : "Then if"}
+          {data.orphan ? "Not connected" : data.isRoot ? "Asked first" : "Then if"}
         </span>
 
         {/* Priority is depth, so raising a check is literally moving it up. */}
@@ -133,6 +138,7 @@ export interface ScreenData extends Record<string, unknown> {
   holdSeconds: number;
   isShowing: boolean;
   isRoot: boolean;
+  orphan?: boolean;
   panel: { width: number; height: number };
   modelId: number;
   /** So the thumbnail includes this device's notices, as the panel would. */
@@ -151,7 +157,11 @@ export function ScreenNode({ data, selected }: NodeProps & { data: ScreenData })
       <Handle type="target" position={Position.Left} className="!h-2 !w-2 !border-0 !bg-line-strong" />
 
       <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-2">
-        <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{data.label}</span>
+        {data.isRoot && <Flag size={11} className="shrink-0 text-accent-bright" />}
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
+          {data.label}
+          {data.orphan && <span className="ml-1.5 text-[10px] text-faint">not connected</span>}
+        </span>
         {data.holdSeconds > 0 && (
           <span
             title={`Holds for ${seconds(data.holdSeconds)} once shown`}

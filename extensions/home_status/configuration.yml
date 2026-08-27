@@ -68,6 +68,7 @@ notices:
   - key: left_on
     label: Still on
     icon: bolt
+    level: info
     text: "{{ home.entity.label }} is still on"
     when:
       fact: is_on

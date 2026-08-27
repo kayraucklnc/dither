@@ -6,7 +6,7 @@ import { devices, models, notices, screens, widgets } from "@/lib/db/schema";
 import { DEFAULT_PANEL, panelFor } from "@/lib/panel";
 import { fingerprint, renderScreen } from "@/lib/render";
 import { store } from "@/lib/storage";
-import { contextFor } from "@/lib/flow/context";
+import { contextFor, sourceExtensions } from "@/lib/flow/context";
 import { activeNotices } from "@/lib/flow/notices";
 import { dataFor } from "@/lib/widget-data";
 
@@ -37,6 +37,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     row: row.row,
     columnSpan: row.columnSpan,
     rowSpan: row.rowSpan,
+    hostsNotices: row.hostsNotices,
   }));
 
   // With a device named, the preview shows what that device would actually be

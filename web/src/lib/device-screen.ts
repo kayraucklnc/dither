@@ -13,7 +13,7 @@ import {
 } from "@/lib/db/schema";
 import type { Device } from "@/lib/db/schema";
 import type { Condition } from "@/lib/flow/conditions";
-import { contextFor } from "@/lib/flow/context";
+import { contextFor, sourceExtensions } from "@/lib/flow/context";
 import { activeNotices } from "@/lib/flow/notices";
 import { walk, type Node, type Walk } from "@/lib/flow/tree";
 import { panelFor } from "@/lib/panel";
@@ -73,6 +73,7 @@ export async function serve(device: Device, now = new Date()): Promise<Served> {
   const said = await activeNotices(
     await db.select().from(notices).where(eq(notices.deviceId, device.id)),
     context,
+    await sourceExtensions(device.id),
   );
 
   if (result.leaf && result.leaf.id !== device.currentNodeId) {
@@ -106,6 +107,7 @@ export async function serve(device: Device, now = new Date()): Promise<Served> {
     row: row.row,
     columnSpan: row.columnSpan,
     rowSpan: row.rowSpan,
+    hostsNotices: row.hostsNotices,
   }));
 
   const spec = panelFor(panel);

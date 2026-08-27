@@ -319,7 +319,12 @@
 
   .notice { align-items: center; display: flex; font-size: 14px; font-weight: 600; gap: 6px; min-width: 0; }
   .notice .i { font-size: 17px; }
-  .notice--loud { background: var(--ink); color: var(--paper); padding: 3px 8px; }
+
+  /* Three levels, and on 1 bit they have to differ in *shape*, not in tint.
+     Worth knowing, worth noticing, worth acting on. */
+  .notice--info { font-weight: 500; }
+  .notice--warn { box-shadow: inset 0 0 0 2px var(--ink); padding: 2px 8px; }
+  .notice--urgent { background: var(--ink); color: var(--paper); padding: 3px 9px; }
 
   /* Inside a small shape there is only room for the icons. */
   .dense .notice-strip { gap: 6px 10px; padding: 6px 14px; }

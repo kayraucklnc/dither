@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Settings2, TriangleAlert, X } from "lucide-react";
+import { Loader2, Plus, Settings2, TriangleAlert, X } from "lucide-react";
 
 import { SettingsForm } from "@/components/composer/settings-form";
 import { Select, type SelectOption } from "@/components/ui/select";
@@ -41,6 +41,8 @@ export interface EditorSource {
   fields?: Field[];
   settings?: Record<string, unknown>;
   error?: string;
+  /** How many checks and notices read from it. */
+  usedBy?: number;
 }
 
 export interface SourceKind {
@@ -177,10 +179,16 @@ function Leaf({
   sources: EditorSource[];
   kinds: SourceKind[];
   onChange: (condition: Condition) => void;
-  onAddSource: (extension: string) => void;
+  /**
+   * Creates a source and answers with a check that reads from it. The *leaf*
+   * applies that, not the caller: a leaf inside an all/any group must replace
+   * itself, not the group it sits in.
+   */
+  onAddSource: (extension: string) => Promise<Condition | undefined>;
   onEditSource: (id: string, settings: Record<string, unknown>) => void;
 }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [adding, setAdding] = useState<string>();
 
   const source = sources.find((candidate) => candidate.id === condition.sourceId);
   const fact = source?.facts.find((candidate) => candidate.key === condition.factKey);
@@ -192,12 +200,18 @@ function Leaf({
       hint: candidate.group === "trigger" ? candidate.extensionLabel : undefined,
       group: GROUP_LABEL[candidate.group],
     })),
-    ...kinds.map((kind) => ({
-      value: `${ADD_SOURCE}${kind.extension}`,
-      label: `Add ${kind.label}…`,
-      hint: kind.description,
-      group: "Add a source",
-    })),
+    ...kinds.map((kind) => {
+      const already = sources.some((candidate) => candidate.extension === kind.extension);
+
+      return {
+        value: `${ADD_SOURCE}${kind.extension}`,
+        // Saying "another" makes a second one a decision. The same settings
+        // answer with the source that already exists rather than a copy.
+        label: already ? `Add another ${kind.label}…` : `Add ${kind.label}…`,
+        hint: already ? "A second one, for different settings" : kind.description,
+        group: "Add a source",
+      };
+    }),
   ];
 
   return (
@@ -211,7 +225,16 @@ function Leaf({
           options={sourceOptions}
           ariaLabel="Source"
           onChange={(next) => {
-            if (next.startsWith(ADD_SOURCE)) return onAddSource(next.slice(ADD_SOURCE.length));
+            if (next.startsWith(ADD_SOURCE)) {
+              const extension = next.slice(ADD_SOURCE.length);
+              setAdding(extension);
+
+              onAddSource(extension)
+                .then((created) => created && onChange(created))
+                .finally(() => setAdding(undefined));
+
+              return;
+            }
 
             const chosen = sources.find((candidate) => candidate.id === next);
             const first = chosen?.facts[0];
@@ -225,6 +248,13 @@ function Leaf({
             });
           }}
         />
+
+        {adding && (
+          <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-faint">
+            <Loader2 size={11} className="animate-spin" />
+            Adding {kinds.find((kind) => kind.extension === adding)?.label ?? adding} and fetching it…
+          </p>
+        )}
       </div>
 
       {source?.error && (
@@ -334,7 +364,7 @@ export function ConditionEditor({
   sources: EditorSource[];
   kinds: SourceKind[];
   onChange: (condition: Condition) => void;
-  onAddSource: (extension: string) => void;
+  onAddSource: (extension: string) => Promise<Condition | undefined>;
   onEditSource: (id: string, settings: Record<string, unknown>) => void;
   depth?: number;
 }) {

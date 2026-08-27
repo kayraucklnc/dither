@@ -16,6 +16,8 @@ const widgetSchema = z.object({
   row: z.number().int().min(1).max(ROWS),
   columnSpan: z.number().int().min(1).max(COLUMNS),
   rowSpan: z.number().int().min(1).max(ROWS),
+  /** Pinned as the screen's alert area. */
+  hostsNotices: z.boolean().default(false),
 });
 
 const body = z.object({
@@ -114,6 +116,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         row: widget.row,
         columnSpan: widget.columnSpan,
         rowSpan: widget.rowSpan,
+        hostsNotices: widget.hostsNotices,
         updatedAt: new Date(),
       };
 

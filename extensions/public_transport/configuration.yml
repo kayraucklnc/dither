@@ -114,7 +114,9 @@ notices:
   - key: service_alert
     label: Service alert
     icon: alert
-    loud: true
+    level: urgent
+    # A service alert belongs on the departure board when the screen has one.
+    placement: source
     text: "{{ transit.alert | default: 'Service alert' }}"
     when:
       fact: alert
@@ -123,7 +125,8 @@ notices:
   - key: cancelled
     label: Next departure cancelled
     icon: close
-    loud: true
+    level: urgent
+    placement: source
     text: "{{ transit.origin | truncate: 18 }}: next train cancelled"
     when:
       fact: next_cancelled
@@ -132,6 +135,8 @@ notices:
   - key: delayed
     label: Running late
     icon: train
+    level: info
+    placement: source
     text: "{{ transit.departures[0].line }} +{{ transit.departures[0].delay }} min"
     when:
       fact: next_delay
