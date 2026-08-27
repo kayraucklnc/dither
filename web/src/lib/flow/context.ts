@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { triggers, type Device } from "@/lib/db/schema";
 import { find as findExtension } from "@/lib/extensions/registry";
 import type { Context } from "@/lib/flow/conditions";
+import { setAt } from "@/lib/facts";
 import { clockSource, deviceSource, triggerSource, type Source } from "@/lib/flow/sources";
 
 /**
@@ -26,8 +27,39 @@ export async function sourcesFor(device: Device, now = new Date()): Promise<Sour
   return built;
 }
 
-export async function contextFor(device: Device, now = new Date()): Promise<Context> {
+/**
+ * Values to pretend, keyed by source id and then by fact key.
+ *
+ * Building a rule for "when it is raining" in August means either waiting for
+ * rain or trusting the arithmetic. This is how you check instead.
+ */
+export type Overrides = Record<string, Record<string, unknown>>;
+
+function pretend(source: Source, values: Record<string, unknown>): Source {
+  let payload = source.payload;
+
+  for (const [key, value] of Object.entries(values)) {
+    const fact = source.facts.find((candidate) => candidate.key === key);
+    if (fact) payload = setAt(payload, fact.path, value);
+  }
+
+  return { ...source, payload };
+}
+
+export async function contextFor(
+  device: Device,
+  now = new Date(),
+  overrides: Overrides = {},
+): Promise<Context> {
   const sources = await sourcesFor(device, now);
 
-  return { now, sources: new Map(sources.map((source) => [source.id, source])) };
+  return {
+    now,
+    sources: new Map(
+      sources.map((source) => [
+        source.id,
+        overrides[source.id] ? pretend(source, overrides[source.id]) : source,
+      ]),
+    ),
+  };
 }
