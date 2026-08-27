@@ -12,3 +12,14 @@ next-env.d.ts
 
 # Rendered screens, which are a cache keyed by their own content
 .storage
+
+# Left behind by the Ruby app, which no longer lives here. Nothing generates
+# these any more, and public/assets/app.js alone is 76,000 lines of compiled
+# bundle - enough to swamp the diff of any branch that touches the tree.
+#
+# Anchored with a leading slash on purpose. `web/public/` is real, tracked,
+# and holds the brand mark the renderer inlines into the "nothing set up"
+# panel; an unanchored `public/` would ignore that too.
+/log/
+/public/
+/tmp/
