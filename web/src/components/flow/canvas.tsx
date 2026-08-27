@@ -33,6 +33,7 @@ import {
   type SourceKind,
 } from "@/components/flow/condition-editor";
 import { ContextMenu, type MenuItem } from "@/components/flow/context-menu";
+import { DevicePanel, type DeviceDetails } from "@/components/flow/device-panel";
 import { NoticesPanel } from "@/components/flow/notices-panel";
 import { QuestionNode, ScreenNode, type QuestionData, type ScreenData } from "@/components/flow/nodes";
 import { ScreenPreview } from "@/components/screen-preview";
@@ -60,6 +61,7 @@ const control =
   "outline-none transition-colors focus:border-accent/70";
 
 function TreeCanvas({
+  device,
   deviceId,
   deviceRefreshSeconds,
   modelId,
@@ -70,6 +72,7 @@ function TreeCanvas({
   initialNodes,
   initialRootId,
 }: {
+  device: DeviceDetails;
   deviceId: number;
   deviceRefreshSeconds: number;
   modelId: number;
@@ -90,7 +93,7 @@ function TreeCanvas({
   const [error, setError] = useState<string>();
   const [nextId, setNextId] = useState(-1);
   const [menu, setMenu] = useState<{ at: { x: number; y: number }; items: MenuItem[] }>();
-  const [tab, setTab] = useState<"decide" | "notices">("decide");
+  const [tab, setTab] = useState<"decide" | "notices" | "device">("decide");
   const [refreshing, setRefreshing] = useState(false);
 
   const nodeTypes = useMemo(() => ({ question: QuestionNode, screen: ScreenNode }), []);
@@ -471,6 +474,7 @@ function TreeCanvas({
           isRoot: rootId === node.id,
           panel,
           modelId,
+          deviceId,
         } satisfies ScreenData,
       };
     });
@@ -651,7 +655,7 @@ function TreeCanvas({
 
       <aside className="flex w-84 shrink-0 flex-col border-l border-line bg-surface">
         <div className="flex shrink-0 gap-1 border-b border-line p-2">
-          {(["decide", "notices"] as const).map((name) => (
+          {(["decide", "notices", "device"] as const).map((name) => (
             <button
               key={name}
               type="button"
@@ -661,13 +665,15 @@ function TreeCanvas({
                 tab === name ? "bg-raised text-ink" : "text-faint hover:text-muted",
               )}
             >
-              {name === "decide" ? "Decide" : "Notices"}
+              {{ decide: "Decide", notices: "Notices", device: "Device" }[name]}
             </button>
           ))}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-        {tab === "notices" ? (
+        {tab === "device" ? (
+          <DevicePanel device={device} />
+        ) : tab === "notices" ? (
           <NoticesPanel
             deviceId={deviceId}
             sources={sources}
@@ -752,7 +758,7 @@ function TreeCanvas({
                       )}
                     >
                       <ScreenPreview
-                        src={`/api/preview/screen/${screen.id}?modelId=${modelId}`}
+                        src={`/api/preview/screen/${screen.id}?modelId=${modelId}&deviceId=${deviceId}`}
                         width={panel.width}
                         height={panel.height}
                         alt={screen.name}
