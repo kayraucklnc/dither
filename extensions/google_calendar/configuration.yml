@@ -110,18 +110,43 @@ designs:
     tick: 300
 
 fields:
+  # Several at once, across as many Google accounts as are linked - work and
+  # personal on one panel is the ordinary case, and two overlapping widgets is
+  # not how anybody would ask for it. Listed from the accounts themselves
+  # rather than written down here: a calendar's id is an address, and typing
+  # one from memory is a quiz, not a form.
   - keyname: calendar
-    name: Calendar
+    name: Calendars
+    field_type: multiselect
+    default:
+      - primary
+    options_from: google.calendars
+    help_text: >
+      Which calendars, from any linked Google account. Tick more than one and
+      they are merged into a single list in time order, each entry marked with
+      where it came from.
+    optional: false
+
+  # A boundary in a place, not a duration. At 22:00 "the rest of today" is two
+  # hours and "the next twelve" is most of tomorrow morning, and only one of
+  # those is what somebody meant. It decides what is *fetched*, so it is not a
+  # presentation setting however much it reads like one.
+  - keyname: range
+    name: Show
     field_type: select
-    default: primary
+    default: today
     options:
-      - value: primary
-        label: Primary
-      - value: work
-        label: Work
-      - value: family
-        label: Family
-    help_text: Which calendar from the linked account.
+      - value: today
+        label: The rest of today
+      - value: tomorrow
+        label: Today and tomorrow
+      - value: week
+        label: The rest of this week
+      - value: month
+        label: The rest of this month
+      - value: hours
+        label: The next few hours
+    help_text: How far ahead to fetch. Weeks end where this locale says they do.
     optional: false
 
   - keyname: horizon_hours
@@ -134,6 +159,10 @@ fields:
       Hours ahead to consider. It is what "what is next" is allowed to reach
       into tomorrow for; the day and week views always show their whole day.
     optional: false
+    visible_when:
+      field: range
+      any_of:
+        - hours
 
   - keyname: hide_declined
     name: Hide declined
@@ -349,6 +378,14 @@ facts:
 #
 # Times are minutes since midnight as well as text, so a preview drawn at any
 # hour still counts down correctly against its own clock.
+  # One of several feeds failing should not blank the four that still work, but
+  # it should be something a rule can notice.
+  - key: calendars_unread
+    label: Calendars that did not answer
+    type: number
+    path: calendar.unread
+    unit: ""
+
 sample:
   calendar:
     account: Stand-in account

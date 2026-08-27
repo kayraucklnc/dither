@@ -115,6 +115,71 @@ export function startOfDaysAgo(at: Date, timezone: string, count: number): Date 
   return startOfDay(noon, timezone);
 }
 
+/** Midnight at the end of the local day containing `at`. */
+export const endOfDay = (at: Date, timezone: string): Date => startOfDaysAgo(at, timezone, -1);
+
+/**
+ * Which weekday a week starts on here.
+ *
+ * Monday in most of the world, Sunday in the US and a good part of Asia, and
+ * getting it wrong makes "the rest of this week" mean the wrong six days. The
+ * locale knows, through `getWeekInfo` - which is recent enough that it is
+ * asked for rather than assumed, with ISO Monday as the fallback.
+ */
+export function firstDayOfWeek(locale: string): number {
+  try {
+    const info = (
+      new Intl.Locale(locale) as Intl.Locale & { getWeekInfo?: () => { firstDay: number } }
+    ).getWeekInfo?.();
+
+    // 1 is Monday and 7 is Sunday, which is ISO's numbering, not
+    // `Date.getDay`'s - where Sunday is 0.
+    return info?.firstDay ?? 1;
+  } catch {
+    return 1;
+  }
+}
+
+/** ISO weekday of the local day containing `at`: 1 is Monday, 7 is Sunday. */
+export function isoWeekday(at: Date, timezone: string): number {
+  const local = wallClock(at, timezone);
+  const day = new Date(Date.UTC(local.year, local.month - 1, local.day)).getUTCDay();
+
+  // `getUTCDay` counts Sunday as 0; ISO and `getWeekInfo` count it as 7.
+  return day === 0 ? 7 : day;
+}
+
+/**
+ * Midnight at the end of the local week containing `at`.
+ *
+ * Stepped a day at a time rather than by adding seven days of milliseconds: a
+ * week containing a clocks-change day is 167 or 169 hours long, and the
+ * arithmetic version lands an hour into the wrong date twice a year.
+ */
+export function endOfWeek(at: Date, timezone: string, locale: string): Date {
+  const first = firstDayOfWeek(locale);
+  let cursor = endOfDay(at, timezone);
+
+  for (let step = 0; step < 7; step += 1) {
+    // `cursor` is the midnight that starts some day; the week ends at the
+    // first such midnight that starts the day a week begins on. Noon, because
+    // it is the one hour of a day no clock change can move out of it.
+    if (isoWeekday(new Date(cursor.getTime() + 12 * HOUR), timezone) === first) return cursor;
+    cursor = endOfDay(new Date(cursor.getTime() + 12 * HOUR), timezone);
+  }
+
+  return cursor;
+}
+
+/** Midnight at the end of the local month containing `at`. */
+export function endOfMonth(at: Date, timezone: string): Date {
+  const local = wallClock(at, timezone);
+  const firstOfNext = Date.UTC(local.year, local.month, 1);
+
+  const guess = new Date(firstOfNext - offsetMinutes(at, timezone) * MINUTE);
+  return new Date(firstOfNext - offsetMinutes(guess, timezone) * MINUTE);
+}
+
 /** "2026-08-27" in the local zone. The key a day's takings are bucketed under. */
 export function dayKey(at: Date, timezone: string): string {
   const local = wallClock(at, timezone);

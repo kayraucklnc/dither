@@ -68,7 +68,9 @@ export async function POST(request: Request) {
 
   const placed: PlacedWidget[] = widgets.map((widget) => ({
     ...widget,
-    data: data.get(widget.id) ?? {},
+    data: data.get(widget.id)?.payload ?? {},
+    problem: data.get(widget.id)?.problem,
+    standIn: data.get(widget.id)?.standIn,
   }));
 
   const key = await fingerprint(placed, panel);

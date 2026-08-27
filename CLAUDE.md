@@ -53,6 +53,12 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
   on one screen is the whole point of the distinction.
 - **A trigger is a source, not a borrowed widget.** Sources belong to a device,
   so you can decide on a station you are not displaying.
+- **A connection is an account, linked once, used by every placement.** An
+  extension says "I need Google Calendar" and the linked account answers on
+  every screen; credentials never live in a widget's settings. Stripe takes a
+  pasted key. Google takes an OAuth client this installation registers itself,
+  then a consent screen - see `docs/google-calendar.md`. Markets and Home are
+  still stand-ins and say so on the card.
 - **There is one kind of check: compare a value from a source.** The device is
   a source, the clock is a source, every trigger is a source. A connection
   that reports whether a laptop is awake declares `online: boolean` and the
@@ -164,6 +170,64 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
 - **"Today" is a local day, and midnight's offset is not always now's.** On the
   morning the clocks change, the naive answer is an hour into the previous day.
   See `web/src/lib/clock.ts`.
+
+- **A Google grant issues one refresh token, not one per handshake.** Drop
+  `prompt=consent` from the authorize URL and re-linking an account that has
+  already said yes returns an access token and nothing durable, so the
+  connection dies quietly an hour later. Access tokens are never stored - they
+  are minted from the refresh token and held in memory.
+- **The redirect URI is the address a *browser* reaches, and `API_URI` is not
+  it.** `API_URI` names the host a panel on the wall can reach - a LAN address
+  on a dev box - and Google refuses a plain-HTTP redirect URI that is not
+  `localhost`, so it cannot even be registered. Devices do not do OAuth. It is
+  read from the forwarded headers, then the host the browser sent, with
+  `DITHER_OAUTH_ORIGIN` for a proxy that reveals neither, and shown on the
+  connections page to be copied. Guessing it is `redirect_uri_mismatch` on
+  Google's error page, not ours.
+- **A connection is one row per account, plus one for the installation.** The
+  empty `account` holds the OAuth client, which identifies *this server* and is
+  the same whoever signs in; each real account holds only its refresh token,
+  merged over the client at fetch time. Copy the client onto every grant and
+  rotating a secret becomes an N-row job. A widget names `account|calendar`,
+  because "primary" is a calendar on both of two accounts, and a selection
+  naming an account that is gone is refused rather than pointed at whoever
+  sorts first.
+- **A row is not a link when the link finishes in the browser.** The client
+  credentials are stored the moment they are pasted; only a stored refresh
+  token means anyone consented. `isLinked` in `web/src/lib/connections/link.ts`
+  is the one answer, and the fetcher, the page and the field sources all ask
+  it.
+- **An all-day calendar entry has no start time**, so it cannot go on a
+  timeline. Placed there as 00:00 it takes the hero slot and fires the
+  about-to-start notice at midnight. They are counted separately.
+- **An all-day date floats, and must be compared as a date.** "2026-08-28" is
+  the 28th wherever you are, with no instant behind it. Read as midnight UTC
+  and compared against local midnights, a one-day birthday draws on two days
+  everywhere east of Greenwich - and every test written in UTC passes. ISO date
+  strings compare correctly on their own; use them.
+- **A fetch that failed has to reach the renderer, or the panel lies.** An
+  extension that has never answered draws a *fault* rather than its sample -
+  four invented meetings look exactly like four real ones. One that answered
+  before keeps its last picture with a note over it, in the outer document
+  rather than the iframe, so no template knows about it. The fault is in the
+  cache key too, or a screen that starts failing serves the healthy picture
+  forever. See `web/src/lib/render/compose.ts`.
+- **`.row` and `.entry` are scoped to `.facts` and `.timeline`.** Used outside
+  them they are class names with no rules behind them, and a column layout
+  silently stacks. Check the stylesheet before reaching for a class.
+- **A calendar range is a boundary in a place, not a duration.** "The rest of
+  today" at 22:00 is two hours; "the next twelve" is most of tomorrow. Every
+  boundary is walked a day at a time, because a week containing a clocks change
+  is 167 or 169 hours long. See `web/src/lib/connections/google/range.ts`.
+- **A multiselect's value is sorted before it is stored.** The settings are
+  hashed into the key an answer is cached under, so "work then family" must not
+  be a different question from "family then work".
+- **Migrate stored settings rather than compensating at read time.** Tolerating
+  a missing field is not the same as being able to *show* it: a widget with no
+  `range` was read correctly and drew an empty selector. One script
+  (`web/scripts/calendar-settings.mts`) beat teaching one more component about
+  the invisible state - and it had to cover *triggers* as well as widgets, or a
+  widget and the source beside it stop sharing one answer.
 
 ## Checking the work
 

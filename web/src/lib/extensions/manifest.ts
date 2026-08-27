@@ -23,6 +23,14 @@ export const FIELD_TYPES = [
   "number",
   "boolean",
   "select",
+  /**
+   * Several of the same list at once, kept as an array.
+   *
+   * A calendar widget showing work and family together is one widget asking
+   * one question, not two widgets overlapping - so the answer is a list, and
+   * everything downstream sorts it before it becomes a cache key.
+   */
+  "multiselect",
   /** Typed into, with matches from a source. For lists too long to open. */
   "search",
   "time",

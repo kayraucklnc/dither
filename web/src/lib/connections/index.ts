@@ -1,10 +1,15 @@
-import { dayShape } from "@/lib/calendar/day";
-import { mockMeetings } from "@/lib/calendar/mock";
 import type { Manifest } from "@/lib/extensions/manifest";
+import { google } from "./google";
 import type { Provider } from "./provider";
 import { stripe } from "./stripe";
 
-export type { CredentialField, FetchContext, Provider, Verification } from "./provider";
+export type {
+  CredentialField,
+  FetchContext,
+  Handshake,
+  Provider,
+  Verification,
+} from "./provider";
 
 /**
  * Connections are accounts and services you link once, and every widget or
@@ -15,8 +20,9 @@ export type { CredentialField, FetchContext, Provider, Verification } from "./pr
  * placement of it. That keeps a screen's settings about *what to show* rather
  * than about how to authenticate.
  *
- * Stripe is real: it takes a key you paste once, checks it before storing it,
- * and answers with the account's own numbers. The others are still stand-ins,
+ * Stripe and Google Calendar are real. Stripe takes a key you paste once;
+ * Google needs a consent screen, so it takes the two halves of an OAuth client
+ * and then sends you through Google to say yes. The rest are still stand-ins,
  * answering plausible moving data so screens and rules can be designed before
  * their sign-in flows exist. Each says which it is, and the dashboard says so
  * too - a stand-in that pretends to be real is worse than no stand-in.
@@ -30,53 +36,6 @@ export type { CredentialField, FetchContext, Provider, Verification } from "./pr
 const drift = (now: Date, spread: number, seed = 0) => {
   const minutes = now.getHours() * 60 + now.getMinutes() + seed * 37;
   return Math.sin(minutes / 90) * spread;
-};
-
-/* -------------------------------------------------------------------------- */
-
-/**
- * Calendar, from a Google account.
- *
- * The provider is still a stand-in - the sign-in flow does not exist yet - but
- * the *shape* of what it answers is the real thing, and it is worked out by
- * lib/calendar/day.ts rather than assembled here. That matters more than it
- * looks: everything a design can ask about a day (am I in something, when am I
- * next free, is anything double-booked, how full is tomorrow) is arithmetic on
- * intervals, it is easy to get quietly wrong, and it is tested there. Swapping
- * the mock for the real API means replacing `mockMeetings` with a list call
- * and nothing else.
- *
- * One payload answers every question the account can be asked, because an
- * answer is cached by the question and the question is the account. Six
- * calendar widgets on a screen - what is next, the whole day, the week - cost
- * one trip between them.
- */
-const google: Provider = {
-  id: "google",
-  label: "Google",
-  description: "Calendar events from a Google account.",
-  unlocks: "Calendar",
-  icon: "calendar",
-  mocked: true,
-
-  async fetch(settings, now, context) {
-    const timezone = context?.timezone ?? "UTC";
-    const locale = context?.locale ?? "en-GB";
-    const which = String(settings.calendar ?? "primary");
-
-    return {
-      calendar: {
-        account: "Stand-in account",
-        name: which.charAt(0).toUpperCase() + which.slice(1),
-        ...dayShape(mockMeetings(now, timezone, which), now, {
-          timezone,
-          locale,
-          horizonHours: Number(settings.horizon_hours ?? 12),
-          hideDeclined: settings.hide_declined !== false,
-        }),
-      },
-    };
-  },
 };
 
 /* -------------------------------------------------------------------------- */
