@@ -16,16 +16,31 @@ need the old implementation, it is in the history before the deletion commit.
 ## Running it
 
 ```bash
-cd web
-npm run dev            # http://localhost:3000, hot reload
-npx tsx --env-file=.env.local scripts/seed.mts    # a device, screens, sources, a tree
-npx drizzle-kit push --force                     # apply schema changes
-npx tsx --env-file=.env.local scripts/regrid.mts # 6x6 widgets -> the 12x12 grid, once
+make up      # the shared database, this worktree's .env.local, its dependencies
+make dev     # Next, on a port this worktree owns - `make url` prints it
+make seed    # a device, screens, sources, a tree. Destructive
+make push    # apply this branch's schema
+make help    # everything else
 ```
 
-Postgres comes from `compose.yml` at the repository root. The volume is still
+`make` is a front end for `bin/dev`, which is a front end for docker compose
+and npm; anything it does can still be done by hand from `web/`.
+
+There is **one database for every worktree**. compose.yml names its Compose
+project, so `make up` anywhere starts - or simply finds - the same container,
+and screens seeded in one branch are there in the next. The volume is still
 named `terminus_database-data`, kept through the rename so nobody's screens
 went with the old name.
+
+What is not shared is the port. Each worktree claims the first free one from
+3001 up and caches it in `.context/dev.env`, so two branches can be open in two
+browser tabs. 3000 is left to the packaged app in compose.yml. `make up` writes
+that port, the database URL and this worktree's extension and storage
+directories into `web/.env.local`, rewriting only the keys it owns - an API
+token pasted in by hand survives.
+
+Next allows one dev server per directory, so a second `make dev` in the same
+worktree reports where the first one is rather than starting another.
 
 ## The model, and why
 
@@ -114,12 +129,19 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
 ## Checking the work
 
 ```bash
-npx vitest run                                # unit
-npx tsx scripts/verify-device-api.mts         # the firmware wire contract, live
+make test                                     # unit
+make verify                                   # the firmware wire contract, live
+
+cd web                                        # the rest are still run by hand
 npx tsx --env-file=.env.local scripts/sweep.mts   # every design, at the edges of its range
+npx tsx --env-file=.env.local scripts/qa.mts      # every page, in a browser
 npx tsx scripts/shot.mts <url> <out.png> [h]  # screenshot a page, report console errors
 npx tsx scripts/measure.mts                   # element boxes, for layout bugs
 ```
+
+Anything that talks to a running server reads `DITHER_URL` from `.env.local`,
+which is why they take `--env-file`: without it they walk whatever answers on
+3000, which is usually another worktree.
 
 Screenshots find what green tests do not. Every layout bug in this codebase
 was found by looking, and several by `measure.mts` after looking was not

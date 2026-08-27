@@ -8,6 +8,11 @@ import { chromium } from "playwright";
  * only show up in a browser: images that failed, horizontal overflow, and
  * elements spilling out of the viewport.
  */
+// Every worktree serves on a port of its own, and .env.local names it. Run
+// this with `npx tsx --env-file=.env.local scripts/qa.mts` or it walks
+// whatever answers on 3000, which is usually another branch.
+const base = process.env.DITHER_URL ?? "http://localhost:3000";
+
 const PAGES = [
   ["/devices", "Devices"],
   ["/devices/8", "A device"],
@@ -35,7 +40,7 @@ for (const [path, name] of PAGES) {
     problems.push(`failed request: ${request.url().slice(0, 90)}`),
   );
 
-  await page.goto(`http://localhost:3000${path}`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+  await page.goto(`${base}${path}`, { waitUntil: "domcontentloaded", timeout: 60_000 });
   await page.waitForTimeout(4000);
 
   const checks = await page.evaluate(`

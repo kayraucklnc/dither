@@ -6,7 +6,7 @@ import { scratch } from "./scratch.mts";
  * This was broken for transit in a way nothing caught: the provider returned
  * the manifest's sample whatever it was asked, so From and To were decoration.
  */
-const base = "http://localhost:3000";
+const base = process.env.DITHER_URL ?? "http://localhost:3000";
 const { screenId } = await scratch();
 
 const load = async () => (await fetch(`${base}/api/screens-widgets?screenId=${screenId}`)).json();
