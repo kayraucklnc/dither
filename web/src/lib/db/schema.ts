@@ -166,6 +166,29 @@ export const triggers = pgTable("triggers", {
 });
 
 /**
+ * Something to say on whatever screen is showing.
+ *
+ * The tree answers "which screen"; a notice is additive on top of it. A
+ * service alert should be visible while you are looking at your calendar
+ * without the calendar knowing anything about trains, and without a branch in
+ * the tree for every combination of screen and warning.
+ */
+export const notices = pgTable("notices", {
+  id: serial("id").primaryKey(),
+  deviceId: integer("device_id")
+    .notNull()
+    .references(() => devices.id, { onDelete: "cascade" }),
+  label: text("label").notNull().default(""),
+  condition: jsonb("condition").$type<Record<string, unknown>>().notNull(),
+  icon: text("icon").notNull().default("alert"),
+  /** Liquid, rendered against the source the condition reads from. */
+  text: text("text").notNull().default(""),
+  loud: boolean("loud").notNull().default(false),
+  enabled: boolean("enabled").notNull().default(true),
+  priority: integer("priority").notNull().default(0),
+});
+
+/**
  * One node of a device's decision tree.
  *
  * Every wake, the device walks this tree from its root and shows the first
@@ -272,6 +295,7 @@ export const devicesRelations = relations(devices, ({ one, many }) => ({
   model: one(models, { fields: [devices.modelId], references: [models.id] }),
   nodes: many(decisionNodes),
   triggers: many(triggers),
+  notices: many(notices),
   logs: many(deviceLogs),
 }));
 
@@ -291,4 +315,5 @@ export type WidgetData = typeof widgetData.$inferSelect;
 export type Device = typeof devices.$inferSelect;
 export type DecisionNode = typeof decisionNodes.$inferSelect;
 export type Trigger = typeof triggers.$inferSelect;
+export type Notice = typeof notices.$inferSelect;
 export type Render = typeof renders.$inferSelect;

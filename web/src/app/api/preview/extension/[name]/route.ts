@@ -41,7 +41,7 @@ export async function GET(
   const [width, height] = pixelsFor(shape, DEFAULT_PANEL.width, DEFAULT_PANEL.height);
 
   // Same material the renderer would hash, computed without rendering.
-  const key = fingerprint(
+  const key = await fingerprint(
     [{
       id: 0, extension: name, label: name, settings, data,
       column: 1, row: 1, columnSpan: COLUMNS, rowSpan: ROWS,

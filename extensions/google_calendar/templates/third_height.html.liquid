@@ -1,21 +1,48 @@
-{% comment %} Third height: 800x160. A wide band - one line, read at a glance. {% endcomment %}
+{% comment %} Third height: 800x160. One line, read from across the room. {% endcomment %}
+
+{% assign next = calendar.next %}
 
 <div class="screen">
-  <div class="content layout layout--row" style="align-items: center; justify-content: space-between">
-    {% if calendar.empty or calendar.next == nil %}
+  {% if calendar.empty or next == nil %}
+    <div class="content layout layout--row layout--center" style="gap: 12px">
+      <span class="i i-calendar-check i-md"></span>
       <p class="t-md t-bold">Nothing scheduled</p>
-    {% else %}
-      <div class="stack stack--tight" style="min-width: 0">
-        <p class="t-xs t-upper muted">
-          {% if calendar.next.minutes_until <= 0 %}Now{% else %}In {{ calendar.next.minutes_until }} min{% endif %}
-        </p>
-        <p class="t-lg t-bold truncate">{{ calendar.next.title }}</p>
-        {% if extension.values.show_location and calendar.next.location != blank %}
-          <p class="t-xs truncate">{{ calendar.next.location }}</p>
+    </div>
+  {% else %}
+    <div class="content layout layout--row" style="align-items: center; gap: 24px">
+      <div class="hero" style="gap: 2px; min-width: 130px">
+        <p class="t-mono t-bold" style="font-size: 44px; line-height: 1">{{ next.start }}</p>
+        <p class="t-xs t-upper">{{ next.minutes_until | in_words }}</p>
+      </div>
+
+      <div class="fit" style="border-left: var(--rule) solid var(--ink); padding-left: 24px">
+        <p class="t-lg t-bold truncate">{{ next.title }}</p>
+        {% if extension.values.show_location and next.location != blank %}
+          <p class="with-icon t-sm" style="margin-top: 3px">
+            <span class="i i-{% if next.remote %}video{% else %}pin{% endif %} i-xs"></span>
+            <span class="truncate">{{ next.location }}</span>
+          </p>
         {% endif %}
       </div>
 
-      <p class="t-xl t-mono t-bold">{{ calendar.next.start }}</p>
-    {% endif %}
-  </div>
+      {% if calendar.events.size > 1 %}
+        <div style="min-width: 150px; text-align: right">
+          <p class="t-xs t-upper">Then</p>
+          <p class="t-sm t-bold truncate">{{ calendar.events[1].title }}</p>
+          <p class="t-xs t-mono">{{ calendar.events[1].start }}</p>
+        </div>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {% comment %} Where another extension gets to say something on this screen. {% endcomment %}
+  {% if notices.size > 0 %}
+    <div class="notice-strip">
+      {% for notice in notices %}
+        <span class="notice{% if notice.loud %} notice--loud{% endif %}">
+          <span class="i i-{{ notice.icon }}"></span>{{ notice.text }}
+        </span>
+      {% endfor %}
+    </div>
+  {% endif %}
 </div>

@@ -6,6 +6,7 @@ import {
   devices,
   firmwares,
   models,
+  notices,
   renders,
   screens,
   widgets,
@@ -13,6 +14,7 @@ import {
 import type { Device } from "@/lib/db/schema";
 import type { Condition } from "@/lib/flow/conditions";
 import { contextFor } from "@/lib/flow/context";
+import { activeNotices } from "@/lib/flow/notices";
 import { walk, type Node, type Walk } from "@/lib/flow/tree";
 import { panelFor } from "@/lib/panel";
 import { fingerprint, renderScreen } from "@/lib/render";
@@ -53,13 +55,20 @@ export async function serve(device: Device, now = new Date()): Promise<Served> {
   const [panel] = await db.select().from(models).where(eq(models.id, device.modelId));
 
   const rows = await db.select().from(decisionNodes).where(eq(decisionNodes.deviceId, device.id));
+  const context = await contextFor(device, now);
 
   const result = walk(
     toNodes(rows),
     device.rootNodeId,
     { currentNodeId: device.currentNodeId, nodeEnteredAt: device.nodeEnteredAt },
-    await contextFor(device, now),
+    context,
     device.refreshRate,
+  );
+
+  // Additive on top of whichever screen the tree chose.
+  const said = await activeNotices(
+    await db.select().from(notices).where(eq(notices.deviceId, device.id)),
+    context,
   );
 
   if (result.leaf && result.leaf.id !== device.currentNodeId) {
@@ -96,10 +105,10 @@ export async function serve(device: Device, now = new Date()): Promise<Served> {
   }));
 
   const spec = panelFor(panel);
-  const key = `${fingerprint(placed, spec)}.png`;
+  const key = `${await fingerprint(placed, spec, said)}.png`;
 
   if (!(await store().has(key))) {
-    const rendered = await renderScreen(placed, spec);
+    const rendered = await renderScreen(placed, spec, said);
     await store().put(key, rendered.bytes, "image/png");
 
     await db.insert(renders).values({

@@ -1,26 +1,42 @@
-{% comment %} Quarter: 400x240. Only the next thing fits, so only that is shown. {% endcomment %}
+{% comment %} Quarter: 400x240. Only what is next fits legibly. {% endcomment %}
 
-<div class="screen">
-  {% if calendar.empty or calendar.next == nil %}
-    <div class="content layout layout--col layout--center">
-      <p class="t-bold">Nothing next</p>
+{% assign next = calendar.next %}
+
+<div class="screen dense">
+  {% if calendar.empty or next == nil %}
+    <div class="content layout layout--col layout--center" style="gap: 6px">
+      <span class="i i-calendar-check i-md"></span>
+      <p class="t-sm t-bold">Nothing next</p>
     </div>
   {% else %}
     <div class="content layout layout--col" style="justify-content: space-between">
       <div class="kv">
-        <span class="k t-xs t-upper muted">{{ extension.values.heading | default: "Next" }}</span>
-        <span class="v t-xs t-mono">{{ calendar.next.start }}</span>
+        <span class="k t-xs t-upper">{{ extension.values.heading | default: "Next" }}</span>
+        <span class="v t-xs t-mono t-bold">{{ next.start }}</span>
       </div>
 
-      <div class="stack stack--tight">
-        <p class="t-lg t-bold clamp-2">{{ calendar.next.title }}</p>
-        <p class="t-sm">
-          {% if calendar.next.minutes_until <= 0 %}Now{% else %}in {{ calendar.next.minutes_until }} min{% endif %}
-          {% if extension.values.show_location and calendar.next.location != blank %}
-            · <span class="truncate">{{ calendar.next.location }}</span>
+      <div class="stack stack--tight" style="gap: 4px">
+        <p class="t-lg t-bold clamp-2">{{ next.title }}</p>
+        <p class="with-icon t-sm">
+          <span class="i i-clock i-xs"></span>{{ next.minutes_until | in_words }}
+          {% if extension.values.show_location and next.location != blank %}
+            <span class="i i-{% if next.remote %}video{% else %}pin{% endif %} i-xs"
+                  style="margin-left: 6px"></span>
+            <span class="truncate">{{ next.location }}</span>
           {% endif %}
         </p>
       </div>
+    </div>
+  {% endif %}
+
+  {% comment %} Where another extension gets to say something on this screen. {% endcomment %}
+  {% if notices.size > 0 %}
+    <div class="notice-strip">
+      {% for notice in notices %}
+        <span class="notice{% if notice.loud %} notice--loud{% endif %}">
+          <span class="i i-{{ notice.icon }}"></span>{{ notice.text }}
+        </span>
+      {% endfor %}
     </div>
   {% endif %}
 </div>

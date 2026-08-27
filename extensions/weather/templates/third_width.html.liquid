@@ -1,0 +1,53 @@
+{% comment %} Third width: 267x480. A narrow column beside something wider. {% endcomment %}
+
+{% assign now = source_1.current %}
+{% assign today = source_1.daily %}
+
+<div class="screen dense">
+  {% if now %}
+    <div class="content content--tight layout layout--col" style="gap: 14px">
+      <p class="t-xs t-upper t-center">{{ extension.values.place | default: "Weather" }}</p>
+
+      <div class="hero">
+        <span class="i i-{{ now.weather_code | weather_icon }} i-lg"></span>
+        <p class="t-bold" style="font-size: 52px; line-height: 1">{{ now.temperature_2m | round }}&deg;</p>
+        <p class="t-xs">{{ now.weather_code | weather_short }}</p>
+      </div>
+
+      <div class="facts">
+        <div class="row">
+          <span class="name"><span class="i i-arrow-up i-xs"></span>High</span>
+          <span class="figure">{{ today.temperature_2m_max[0] | round }}&deg;</span>
+        </div>
+        <div class="row">
+          <span class="name"><span class="i i-arrow-down i-xs"></span>Low</span>
+          <span class="figure">{{ today.temperature_2m_min[0] | round }}&deg;</span>
+        </div>
+        <div class="row">
+          <span class="name"><span class="i i-umbrella i-xs"></span>Rain</span>
+          <span class="figure">{{ today.precipitation_probability_max[0] }}%</span>
+        </div>
+        <div class="row">
+          <span class="name"><span class="i i-wind i-xs"></span>Wind</span>
+          <span class="figure">{{ now.wind_speed_10m | round }}</span>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <div class="content layout layout--col layout--center">
+      <span class="i i-cloud i-md"></span>
+      <p class="t-sm t-bold">No forecast</p>
+    </div>
+  {% endif %}
+
+  {% comment %} Where another extension gets to say something on this screen. {% endcomment %}
+  {% if notices.size > 0 %}
+    <div class="notice-strip">
+      {% for notice in notices %}
+        <span class="notice{% if notice.loud %} notice--loud{% endif %}">
+          <span class="i i-{{ notice.icon }}"></span>{{ notice.text }}
+        </span>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

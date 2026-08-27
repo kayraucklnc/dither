@@ -2,7 +2,14 @@ import { createHash } from "node:crypto";
 import sharp from "sharp";
 
 import { shoot } from "./browser";
-import { compose, composeSolo, type PlacedWidget } from "./compose";
+import {
+  compose,
+  composeSolo,
+  frameworkDigest,
+  type Notice,
+  type PlacedWidget,
+} from "./compose";
+import { find as findExtension } from "@/lib/extensions/registry";
 import { floydSteinberg, grayPalette, paletteFromCodes } from "./dither";
 import { COLUMNS, ROWS, pixelsFor, shape } from "@/lib/shapes";
 
@@ -31,13 +38,32 @@ export interface Rendered {
 }
 
 /**
- * The cache key. It has to cover everything that can change the picture -
- * settings, fetched data, placement, panel - and nothing that cannot, or the
- * device is handed a new filename on every wake and redraws for no reason.
+ * The cache key.
+ *
+ * It has to cover everything that can change the picture and nothing that
+ * cannot, or the device is handed a new filename on every wake and redraws for
+ * no reason. That is: the panel, each widget's settings, its fetched data, its
+ * placement - and the *design*, meaning the extension's templates and the
+ * stylesheet they render against. Leaving the design out is the bug where you
+ * edit a template, reload, and see the old picture forever.
  */
-export function fingerprint(widgets: PlacedWidget[], panel: Panel): string {
+export async function fingerprint(
+  widgets: PlacedWidget[],
+  panel: Panel,
+  notices: Notice[] = [],
+): Promise<string> {
+  const digests: Record<string, string> = {};
+
+  for (const widget of widgets) {
+    if (digests[widget.extension]) continue;
+    digests[widget.extension] = (await findExtension(widget.extension))?.digest ?? "missing";
+  }
+
   const material = JSON.stringify({
     panel,
+    design: await frameworkDigest(),
+    digests,
+    notices,
     widgets: widgets
       .map((widget) => ({
         extension: widget.extension,
@@ -56,8 +82,12 @@ function paletteFor(panel: Panel) {
   return grayPalette(Math.max(2, 2 ** panel.bitDepth));
 }
 
-export async function renderScreen(widgets: PlacedWidget[], panel: Panel): Promise<Rendered> {
-  const { html, problems } = await compose(widgets, panel.width, panel.height);
+export async function renderScreen(
+  widgets: PlacedWidget[],
+  panel: Panel,
+  notices: Notice[] = [],
+): Promise<Rendered> {
+  const { html, problems } = await compose(widgets, panel.width, panel.height, notices);
   const screenshot = await shoot(html, panel.width, panel.height);
 
   const rotated = panel.rotation ? sharp(screenshot).rotate(panel.rotation) : sharp(screenshot);
@@ -82,7 +112,7 @@ export async function renderScreen(widgets: PlacedWidget[], panel: Panel): Promi
     mimeType: "image/png",
     width: info.width,
     height: info.height,
-    fingerprint: fingerprint(widgets, panel),
+    fingerprint: await fingerprint(widgets, panel, notices),
     problems,
   };
 }
@@ -140,7 +170,7 @@ export async function renderSolo(
     mimeType: "image/png",
     width: info.width,
     height: info.height,
-    fingerprint: fingerprint([widget], { ...panel, width, height }),
+    fingerprint: await fingerprint([widget], { ...panel, width, height }),
     problems,
   };
 }

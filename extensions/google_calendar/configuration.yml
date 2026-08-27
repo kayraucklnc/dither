@@ -80,6 +80,21 @@ fields:
 
 # Everything below becomes a trigger you can build a rule from. The declared
 # type decides which comparisons the editor offers.
+# Its designs have a strip at the bottom where another extension's notice
+# can appear - a service alert while you are looking at the weather.
+accepts_notices: true
+
+notices:
+  - key: meeting_imminent
+    label: Meeting about to start
+    icon: calendar
+    loud: true
+    text: "{{ calendar.next.title | truncate: 28 }} at {{ calendar.next.start }}"
+    when:
+      fact: next_meeting_in
+      operator: lt
+      value: 10
+
 facts:
   - key: next_meeting_in
     label: Next meeting starts in

@@ -1,28 +1,52 @@
-{% comment %} Third height: 800x160. Everything on one line, rules between. {% endcomment %}
+{% comment %} Third height: 800x160. One band, read at a glance from anywhere. {% endcomment %}
+
+{% assign now = source_1.current %}
+{% assign today = source_1.daily %}
 
 <div class="screen">
-  <div class="content content--tight">
-    {% if source_1.current %}
-      <div class="layout layout--row layout--split divide-x">
-        <div class="stack stack--tight fit">
-          <span class="t-mono t-xl t-bold">{{ source_1.current.temperature_2m | round }}&deg;</span>
-          <span class="t-sm">{{ extension.values.place | default: "Now" }}</span>
+  {% if now %}
+    <div class="content layout layout--row" style="align-items: center; gap: 24px">
+      <div class="with-icon" style="gap: 14px">
+        <span class="i i-{{ now.weather_code | weather_icon }} i-lg"></span>
+        <div>
+          <p class="t-bold" style="font-size: 46px; line-height: 1">{{ now.temperature_2m | round }}&deg;</p>
+          <p class="t-xs t-upper">{{ extension.values.place | default: "Weather" }}</p>
         </div>
-        <div class="stack stack--tight fit">
-          <span class="t-mono t-xl t-bold">
-            {{ source_1.daily.temperature_2m_max[0] | round }}&deg;/{{ source_1.daily.temperature_2m_min[0] | round }}&deg;
+      </div>
+
+      <div class="fit" style="border-left: var(--rule) solid var(--ink); padding-left: 24px">
+        <p class="t-md t-bold">{{ now.weather_code | weather_label }}</p>
+        <p class="t-sm">Feels like {{ now.apparent_temperature | round }}&deg;</p>
+      </div>
+
+      <div class="facts" style="min-width: 250px">
+        <div class="row">
+          <span class="name"><span class="i i-thermometer i-xs"></span>High / low</span>
+          <span class="figure">
+            {{ today.temperature_2m_max[0] | round }}&deg; / {{ today.temperature_2m_min[0] | round }}&deg;
           </span>
-          <span class="t-sm">High / low</span>
         </div>
-        <div class="stack stack--tight fit">
-          <span class="t-mono t-xl t-bold">{{ source_1.daily.precipitation_probability_max[0] }}%</span>
-          <span class="t-sm">Chance of rain</span>
+        <div class="row">
+          <span class="name"><span class="i i-umbrella i-xs"></span>Rain</span>
+          <span class="figure">{{ today.precipitation_probability_max[0] }}%</span>
         </div>
       </div>
-    {% else %}
-      <div class="layout layout--row layout--center">
-        <p class="t-bold">No forecast &middot; check the coordinates</p>
-      </div>
-    {% endif %}
-  </div>
+    </div>
+  {% else %}
+    <div class="content layout layout--row layout--center">
+      <span class="i i-cloud i-md"></span>
+      <p class="t-md t-bold">No forecast</p>
+    </div>
+  {% endif %}
+
+  {% comment %} Where another extension gets to say something on this screen. {% endcomment %}
+  {% if notices.size > 0 %}
+    <div class="notice-strip">
+      {% for notice in notices %}
+        <span class="notice{% if notice.loud %} notice--loud{% endif %}">
+          <span class="i i-{{ notice.icon }}"></span>{{ notice.text }}
+        </span>
+      {% endfor %}
+    </div>
+  {% endif %}
 </div>

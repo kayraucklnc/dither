@@ -1,13 +1,35 @@
-{% comment %} Half width: 400x480. Time over date, still the dominant element. {% endcomment %}
+{% comment %} Half width: 400x480. Time stacked over the date. {% endcomment %}
 
 {% assign shift = extension.values.utc_offset_hours | times: 3600 %}
 {% assign stamp = "now" | date: "%s" | plus: shift %}
+{% if extension.values.twenty_four_hour == false %}
+  {% assign face = stamp | date: "%I:%M" %}{% assign suffix = stamp | date: "%p" %}
+{% else %}
+  {% assign face = stamp | date: "%H:%M" %}{% assign suffix = "" %}
+{% endif %}
 
 <div class="screen">
-  <div class="content layout layout--col layout--center">
-    <p class="t-mono t-bold" style="font-size: 96px; line-height: 1">
-      {{ stamp | date: "%H:%M" }}
+  <div class="content layout layout--col layout--center" style="gap: 12px">
+    {% if extension.values.heading != blank %}
+      <p class="t-sm t-upper">{{ extension.values.heading }}</p>
+    {% endif %}
+    <p class="t-mono t-bold" style="font-size: 104px; line-height: 1; letter-spacing: -0.03em">
+      {{ face }}
     </p>
-    <p class="t-lg">{{ stamp | date: "%a %-d %b" }}</p>
+    {% if suffix != "" %}<p class="t-sm t-upper">{{ suffix }}</p>{% endif %}
+    <div class="rule" style="width: 60%"></div>
+    <p class="t-xxl t-bold" style="font-size: 64px">{{ stamp | date: "%-d" }}</p>
+    <p class="t-md">{{ stamp | date: "%A, %B" }}</p>
   </div>
+
+  {% comment %} Where another extension gets to say something on this screen. {% endcomment %}
+  {% if notices.size > 0 %}
+    <div class="notice-strip">
+      {% for notice in notices %}
+        <span class="notice{% if notice.loud %} notice--loud{% endif %}">
+          <span class="i i-{{ notice.icon }}"></span>{{ notice.text }}
+        </span>
+      {% endfor %}
+    </div>
+  {% endif %}
 </div>

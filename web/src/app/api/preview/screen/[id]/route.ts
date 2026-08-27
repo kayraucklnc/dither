@@ -2,10 +2,12 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { db } from "@/lib/db";
-import { models, screens, widgets } from "@/lib/db/schema";
+import { devices, models, notices, screens, widgets } from "@/lib/db/schema";
 import { DEFAULT_PANEL, panelFor } from "@/lib/panel";
 import { fingerprint, renderScreen } from "@/lib/render";
 import { store } from "@/lib/storage";
+import { contextFor } from "@/lib/flow/context";
+import { activeNotices } from "@/lib/flow/notices";
 import { dataFor } from "@/lib/widget-data";
 
 /** A saved screen, rendered for a panel. Used by every list and thumbnail. */
@@ -37,14 +39,28 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     rowSpan: row.rowSpan,
   }));
 
-  const key = fingerprint(placed, panel);
+  // With a device named, the preview shows what that device would actually be
+  // handed - notices included - rather than the screen in the abstract.
+  const deviceId = Number(new URL(request.url).searchParams.get("deviceId"));
+  const [device] = Number.isInteger(deviceId) && deviceId > 0
+    ? await db.select().from(devices).where(eq(devices.id, deviceId))
+    : [undefined];
+
+  const said = device
+    ? await activeNotices(
+        await db.select().from(notices).where(eq(notices.deviceId, device.id)),
+        await contextFor(device),
+      )
+    : [];
+
+  const key = await fingerprint(placed, panel, said);
 
   if (request.headers.get("if-none-match") === `"${key}"`) {
     return new NextResponse(null, { status: 304 });
   }
 
   const cached = await store().get(`${key}.png`);
-  const bytes = cached ?? (await renderScreen(placed, panel)).bytes;
+  const bytes = cached ?? (await renderScreen(placed, panel, said)).bytes;
   if (!cached) await store().put(`${key}.png`, bytes, "image/png");
 
   return new NextResponse(new Uint8Array(bytes), {

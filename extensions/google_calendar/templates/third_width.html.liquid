@@ -1,19 +1,39 @@
-{% comment %} Third width: 267x480. A narrow full-height column beside something else. {% endcomment %}
+{% comment %} Third width: 267x480. The day as a narrow agenda. {% endcomment %}
 
-<div class="screen">
-  <div class="content content--tight layout layout--col">
-    <p class="t-xs t-upper muted">{{ extension.values.heading | default: "Today" }}</p>
-
-    {% if calendar.empty or calendar.next == nil %}
-      <p class="t-sm t-bold" style="margin-top: 12px">Nothing scheduled</p>
-    {% else %}
-      {% for event in calendar.events limit: 5 %}
-        <div class="stack stack--tight" style="padding: 10px 0">
-          <p class="t-xs t-mono">{{ event.start }}</p>
-          <p class="t-sm t-bold clamp-2">{{ event.title }}</p>
-        </div>
-        {% unless forloop.last %}<div class="rule"></div>{% endunless %}
-      {% endfor %}
-    {% endif %}
+<div class="screen dense">
+  <div class="title-bar" style="padding: 14px 14px 8px">
+    <div class="title" style="font-size: 18px">{{ extension.values.heading | default: "Today" }}</div>
   </div>
+
+  {% if calendar.empty or calendar.next == nil %}
+    <div class="content layout layout--col layout--center" style="gap: 6px">
+      <span class="i i-calendar-check i-md"></span>
+      <p class="t-xs t-bold">Nothing</p>
+    </div>
+  {% else %}
+    <div class="content content--tight">
+      <div class="timeline">
+        {% for event in calendar.events limit: 6 %}
+          <div class="entry" style="grid-template-columns: 46px 12px 1fr; gap: 0 8px">
+            <span class="at" style="font-size: 13px">{{ event.start }}</span>
+            <span class="spine"><span class="node{% if forloop.first %} node--now{% endif %}"></span></span>
+            <span class="body">
+              <span class="what clamp-2" style="display: block; font-size: 13px">{{ event.title }}</span>
+            </span>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  {% comment %} Where another extension gets to say something on this screen. {% endcomment %}
+  {% if notices.size > 0 %}
+    <div class="notice-strip">
+      {% for notice in notices %}
+        <span class="notice{% if notice.loud %} notice--loud{% endif %}">
+          <span class="i i-{{ notice.icon }}"></span>{{ notice.text }}
+        </span>
+      {% endfor %}
+    </div>
+  {% endif %}
 </div>
