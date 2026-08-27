@@ -2,7 +2,7 @@
 
 <div class="screen dense">
   <div class="title-bar" style="padding: 14px 14px 8px">
-    <div class="title" style="font-size: 18px">{{ extension.values.heading | default: "Today" }}</div>
+    <div class="title" style="font-size: 18px">{{ extension.values.heading | default: calendar.range_label }}</div>
   </div>
 
   {% if calendar.empty or calendar.next == nil %}

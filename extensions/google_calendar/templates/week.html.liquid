@@ -1,0 +1,76 @@
+{% comment %}
+  Week: a column per day, gaps included.
+
+  The one design that draws the days with nothing in them, because that is the
+  whole point of looking at a week - you are reading for the shape, and a list
+  that closes up the empty days hides exactly what you were looking for.
+
+  Wants a range that leaves today. Given "the rest of today" it has one column
+  to draw and says so rather than pretending to be a week.
+{% endcomment %}
+
+<div class="screen dense">
+  <div class="title-bar">
+    <div class="title">{{ extension.values.heading | default: calendar.range_label }}</div>
+    <div class="chip">
+      <span class="i i-calendar"></span>
+      {{ calendar.events.size | default: 0 }}
+    </div>
+  </div>
+
+  {% if calendar.spans_days == false or calendar.days.size == 0 %}
+    <div class="content layout layout--col layout--center" style="gap: 8px">
+      <span class="i i-calendar i-lg"></span>
+      <p class="t-md t-bold">{{ calendar.range_label }}</p>
+      <p class="t-xs">Choose a longer range to see the week.</p>
+    </div>
+  {% else %}
+    <div class="content content--tight">
+      <div class="layout layout--row layout--split divide-x" style="align-items: stretch">
+        {% for group in calendar.days limit: 7 %}
+          <div style="min-width: 0; overflow: hidden">
+            <div style="border-bottom: var(--rule) solid var(--ink); padding-bottom: 4px">
+              <p class="t-xs t-upper t-bold">
+                {% if group.today %}Today{% else %}{{ group.day }}{% endif %}
+              </p>
+              <p class="t-xs muted">{{ group.label }}</p>
+            </div>
+
+            {% for entry in group.all_day limit: 1 %}
+              <p class="badge truncate" style="display: block; margin-top: 5px">{{ entry.title }}</p>
+            {% endfor %}
+
+            {% for event in group.events limit: 5 %}
+              <div style="margin-top: 6px">
+                <p class="t-xs t-mono t-bold">{{ event.start }}</p>
+                <p class="t-xs clamp-2">{{ event.title }}</p>
+              </div>
+            {% endfor %}
+
+            {% if group.empty %}
+              <p class="t-xs muted" style="margin-top: 6px">&mdash;</p>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  {% if notices.size > 0 %}
+    <div class="notice-strip">
+      {% for notice in notices %}
+        {% if notice.overflow %}
+          <span class="notice notice--more">+{{ notice.overflow }}</span>
+        {% else %}
+          <span class="notice notice--{{ notice.level }}" title="{{ notice.text }}">
+            <span class="i i-{{ notice.icon }}"></span>
+          </span>
+        {% endif %}
+      {% endfor %}
+
+      {% if shape.wide and notices[0].text != blank %}
+        <span class="notice-said">{{ notices[0].text }}</span>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>

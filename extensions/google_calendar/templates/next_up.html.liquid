@@ -1,0 +1,79 @@
+{% comment %}
+  Next up: the one thing, as large as the box allows, and nothing else.
+
+  Same size as the timeline designs and a different answer to what a calendar
+  is for. A panel by a door wants one sentence you can read while putting your
+  coat on; a list of five is worse at that job however tidy it is. This is what
+  the style picker is for - same widget, same data, a different opinion.
+{% endcomment %}
+
+{% assign next = calendar.next %}
+
+<div class="screen">
+  {% if calendar.empty or next == nil %}
+    <div class="content layout layout--col layout--center" style="gap: 8px">
+      {% if calendar.all_day_today > 0 %}
+        {% for entry in calendar.all_day limit: 3 %}
+          {% if entry.today %}
+            <p class="t-xl t-bold t-center clamp-2">{{ entry.title }}</p>
+          {% endif %}
+        {% endfor %}
+        <p class="t-sm">All day</p>
+      {% else %}
+        <span class="i i-calendar-check i-xl"></span>
+        <p class="t-xl t-bold">Nothing next</p>
+        <p class="t-sm">{{ calendar.range_label }} is clear.</p>
+      {% endif %}
+    </div>
+  {% else %}
+    <div class="content layout layout--col" style="justify-content: center; gap: 10px">
+      <span class="chip self-start">
+        <span class="i i-clock"></span>
+        {% if next.in_progress %}Now{% else %}{{ next.minutes_until | in_words }}{% endif %}
+      </span>
+
+      {% comment %}
+        The heading is the only thing here that has to be big, so it gets the
+        room the rest gives up.
+      {% endcomment %}
+      <p class="t-bold clamp-3" style="font-size: 46px; line-height: 1.03">{{ next.title }}</p>
+
+      <p class="t-lg t-mono t-bold">
+        {{ next.start }}{% if next.end != next.start %} &ndash; {{ next.end }}{% endif %}
+        {% unless next.today %}<span class="t-sm t-upper"> · {{ next.day }}</span>{% endunless %}
+      </p>
+
+      {% if extension.values.show_location and next.location != blank %}
+        <p class="with-icon t-md">
+          <span class="i i-{% if next.remote %}video{% else %}pin{% endif %} i-sm"></span>
+          <span class="clamp-2">{{ next.location }}</span>
+        </p>
+      {% endif %}
+
+      {% comment %} One line of what follows, when there is one and room for it. {% endcomment %}
+      {% if shape.tall and calendar.events.size > 1 %}
+        <p class="t-sm muted truncate" style="margin-top: 4px">
+          Then {{ calendar.events[1].start }} · {{ calendar.events[1].title }}
+        </p>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {% if notices.size > 0 %}
+    <div class="notice-strip">
+      {% for notice in notices %}
+        {% if notice.overflow %}
+          <span class="notice notice--more">+{{ notice.overflow }}</span>
+        {% else %}
+          <span class="notice notice--{{ notice.level }}" title="{{ notice.text }}">
+            <span class="i i-{{ notice.icon }}"></span>
+          </span>
+        {% endif %}
+      {% endfor %}
+
+      {% if shape.wide and notices[0].text != blank %}
+        <span class="notice-said">{{ notices[0].text }}</span>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>

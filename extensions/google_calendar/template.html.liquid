@@ -9,7 +9,7 @@
 
 <div class="screen">
   <div class="title-bar">
-    <div class="title">{{ extension.values.heading | default: "Today" }}</div>
+    <div class="title">{{ extension.values.heading | default: calendar.range_label }}</div>
     <div class="chip">
       <span class="i i-calendar"></span>
       {{ calendar.remaining_today | default: 0 }} left

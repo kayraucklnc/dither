@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { GoogleEvent } from "./api";
 import { agenda, clockAt, isAllDay, isDeclined, placeOf, type AgendaOptions } from "./agenda";
+import { windowFor } from "./range";
 
 /**
  * Everything awkward about a calendar, without a network.
@@ -14,14 +15,32 @@ import { agenda, clockAt, isAllDay, isDeclined, placeOf, type AgendaOptions } fr
 
 const NOW = new Date("2026-08-27T09:00:00Z");
 
-const options = (patch: Partial<AgendaOptions> = {}): AgendaOptions => ({
-  now: NOW,
-  timezone: "UTC",
-  locale: "en-GB",
-  horizonMinutes: 12 * 60,
-  hideDeclined: true,
-  ...patch,
-});
+const options = (patch: Partial<AgendaOptions> = {}): AgendaOptions => {
+  const now = patch.now ?? NOW;
+  const timezone = patch.timezone ?? "UTC";
+  const locale = patch.locale ?? "en-GB";
+
+  return {
+    now,
+    timezone,
+    locale,
+    window: windowFor({ range: "hours", horizon_hours: 12 }, now, timezone, locale),
+    hideDeclined: true,
+    ...patch,
+  };
+};
+
+/** The window a range asks for, in the zone the other options are using. */
+const range = (
+  settings: Record<string, unknown>,
+  patch: Partial<AgendaOptions> = {},
+): Partial<AgendaOptions> => {
+  const now = patch.now ?? NOW;
+  const timezone = patch.timezone ?? "UTC";
+  const locale = patch.locale ?? "en-GB";
+
+  return { ...patch, window: windowFor(settings, now, timezone, locale) };
+};
 
 const timed = (from: string, to: string, patch: Partial<GoogleEvent> = {}): GoogleEvent => ({
   summary: "Design review",
@@ -139,12 +158,12 @@ describe("building the day", () => {
     expect(day.free_minutes).toBe(0);
   });
 
-  it("says the whole horizon is free when nothing is on", () => {
-    const day = agenda([], options({ horizonMinutes: 480 }));
+  it("says the whole window is free when nothing is on", () => {
+    const day = agenda([], options(range({ range: "hours", horizon_hours: 8 })));
 
     expect(day.empty).toBe(true);
     expect(day.next).toBeNull();
-    expect(day.free_minutes).toBe(480);
+    expect(day.free_minutes).toBe(8 * 60);
     expect(day.remaining_today).toBe(0);
   });
 
@@ -179,7 +198,9 @@ describe("building the day", () => {
 
     expect(day.events).toHaveLength(1);
     expect(day.events[0].title).toBe("Design review");
-    expect(day.all_day).toEqual([{ title: "Annual leave", today: true, accepted: true }]);
+    expect(day.all_day).toEqual([
+      { title: "Annual leave", today: true, accepted: true, date: "2026-08-27", day: "Thu" },
+    ]);
     expect(day.all_day_today).toBe(1);
   });
 

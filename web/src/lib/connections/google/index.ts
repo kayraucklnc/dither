@@ -1,8 +1,8 @@
-import { HOUR } from "@/lib/clock";
 import type { FetchContext, Provider, Verification } from "@/lib/connections/provider";
 
 import { agenda } from "./agenda";
 import { calendars, events } from "./api";
+import { windowFor } from "./range";
 import {
   CLIENT_ID,
   CLIENT_SECRET,
@@ -30,15 +30,6 @@ import {
  * only read when the settings form needs a picker, and when a freshly linked
  * account is being named.
  */
-
-/** The extension's own cap, and the widest window anything will ask for. */
-const MAX_HORIZON_HOURS = 72;
-
-function horizonHours(settings: Record<string, unknown>): number {
-  const asked = Number(settings.horizon_hours ?? 12);
-  if (!Number.isFinite(asked)) return 12;
-  return Math.min(MAX_HORIZON_HOURS, Math.max(1, Math.round(asked)));
-}
 
 /** The address of the account itself, which is the primary calendar's id. */
 async function accountName(credentials: Record<string, unknown>): Promise<string> {
@@ -81,16 +72,20 @@ async function fetchCalendar(
   context: FetchContext,
 ): Promise<Record<string, unknown>> {
   const calendarId = String(settings.calendar ?? "").trim() || "primary";
-  const hours = horizonHours(settings);
-  const until = new Date(now.getTime() + hours * HOUR);
+  const { timezone, locale } = context;
 
-  const answered = await events(calendarId, now, until, context.credentials);
+  // "The rest of today" is a boundary in a place, not a duration - so the
+  // window is resolved against the installation's zone before anything is
+  // asked of Google.
+  const window = windowFor(settings, now, timezone, locale);
+
+  const answered = await events(calendarId, window.from, window.to, context.credentials);
 
   const day = agenda(answered.events, {
     now,
-    timezone: context.timezone,
-    locale: context.locale,
-    horizonMinutes: hours * 60,
+    timezone,
+    locale,
+    window,
     hideDeclined: settings.hide_declined !== false,
     truncated: answered.truncated,
   });
@@ -100,7 +95,6 @@ async function fetchCalendar(
       ...day,
       connected: true,
       name: answered.name,
-      horizon_hours: hours,
     },
   };
 }

@@ -1,0 +1,117 @@
+{% comment %}
+  Agenda: what is on, day by day, for a window that reaches past today.
+
+  The timeline designs answer "what is next". This answers "what does the week
+  look like", which is a different question and the reason the range setting
+  exists - a rolling twelve hours cannot be asked it.
+
+  Empty days are skipped here on purpose. The data keeps them, because a week
+  grid needs to draw the gaps; a list does not, and a month with four things in
+  it would otherwise be twenty-seven lines of "nothing".
+{% endcomment %}
+
+{% assign groups = calendar.days %}
+
+<div class="screen dense">
+  <div class="title-bar">
+    <div class="title">{{ extension.values.heading | default: calendar.range_label }}</div>
+    <div class="chip">
+      <span class="i i-calendar"></span>
+      {{ calendar.events.size | default: 0 }}
+    </div>
+  </div>
+
+  {% if calendar.empty and calendar.all_day_today == 0 %}
+    <div class="content layout layout--col layout--center" style="gap: 8px">
+      <span class="i i-calendar-check i-lg"></span>
+      <p class="t-md t-bold">Nothing scheduled</p>
+      <p class="t-xs">{{ calendar.range_label }} is clear.</p>
+    </div>
+  {% else %}
+    <div class="content content--tight">
+      {% if calendar.spans_days %}
+        {% for group in groups limit: 12 %}
+          {% unless group.empty %}
+            <div style="align-items: baseline; display: flex; gap: 8px; margin-top: 10px">
+              <span class="t-xs t-upper t-bold">
+                {% if group.today %}Today{% elsif group.tomorrow %}Tomorrow{% else %}{{ group.day }}{% endif %}
+              </span>
+              <span class="t-xs muted">{{ group.label }}</span>
+            </div>
+
+            {% for entry in group.all_day limit: 2 %}
+              <div style="align-items: center; display: flex; gap: 8px; margin-top: 3px">
+                <span class="badge">All day</span>
+                <span class="t-sm truncate">{{ entry.title }}</span>
+              </div>
+            {% endfor %}
+
+            {% comment %}
+              Wrapped in a timeline because .entry, .at, .what and .where are
+              all scoped to one - outside it they are class names with no rules
+              behind them, and the time stacks above the title instead of
+              sitting beside it. The spine column is dropped: a day heading
+              already says where you are, and a second vertical rule under it
+              is decoration.
+            {% endcomment %}
+            <div class="timeline">
+              {% for event in group.events limit: 5 %}
+                <div class="entry" style="grid-template-columns: 54px 1fr; gap: 0 10px; padding: 4px 0">
+                  <span class="at">{{ event.start }}</span>
+                  <span class="body">
+                    <span class="what truncate" style="display: block">{{ event.title }}</span>
+                    {% if extension.values.show_location and event.location != blank %}
+                      <span class="where">
+                        <span class="i i-{% if event.remote %}video{% else %}pin{% endif %} i-xs"></span>
+                        <span class="truncate">{{ event.location }}</span>
+                      </span>
+                    {% endif %}
+                  </span>
+                </div>
+              {% endfor %}
+            </div>
+          {% endunless %}
+        {% endfor %}
+      {% else %}
+        {% comment %} One day: no headings to hang the list under. {% endcomment %}
+        <div class="timeline">
+          {% for event in calendar.events limit: 8 %}
+            <div class="entry">
+              <span class="at">{{ event.start }}</span>
+              <span class="spine">
+                <span class="node{% if forloop.first %} node--now{% endif %}"></span>
+              </span>
+              <span class="body">
+                <span class="what truncate" style="display: block">{{ event.title }}</span>
+                {% if extension.values.show_location and event.location != blank %}
+                  <span class="where">
+                    <span class="i i-{% if event.remote %}video{% else %}pin{% endif %} i-xs"></span>
+                    <span class="truncate">{{ event.location }}</span>
+                  </span>
+                {% endif %}
+              </span>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {% if notices.size > 0 %}
+    <div class="notice-strip">
+      {% for notice in notices %}
+        {% if notice.overflow %}
+          <span class="notice notice--more">+{{ notice.overflow }}</span>
+        {% else %}
+          <span class="notice notice--{{ notice.level }}" title="{{ notice.text }}">
+            <span class="i i-{{ notice.icon }}"></span>
+          </span>
+        {% endif %}
+      {% endfor %}
+
+      {% if shape.wide and notices[0].text != blank %}
+        <span class="notice-said">{{ notices[0].text }}</span>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
