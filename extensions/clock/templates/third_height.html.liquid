@@ -1,13 +1,37 @@
-{% comment %} Third height: 800x160. A strip, so time and date sit side by side. {% endcomment %}
+{% comment %} Third height: 800x160. A band with the time on one side. {% endcomment %}
 
 {% assign shift = extension.values.utc_offset_hours | times: 3600 %}
 {% assign stamp = "now" | date: "%s" | plus: shift %}
+{% if extension.values.twenty_four_hour == false %}
+  {% assign face = stamp | date: "%I:%M %p" %}
+{% else %}
+  {% assign face = stamp | date: "%H:%M" %}
+{% endif %}
 
 <div class="screen">
-  <div class="content content--tight layout layout--row layout--center" style="justify-content: space-between">
-    <span class="t-mono t-bold" style="font-size: 64px; line-height: 1">
-      {{ stamp | date: "%H:%M" }}
-    </span>
-    <span class="t-lg">{{ stamp | date: "%A, %-d %B" }}</span>
+  <div class="content layout layout--row" style="align-items: center; gap: 28px">
+    <p class="t-mono t-bold" style="font-size: 82px; line-height: 1; letter-spacing: -0.03em">
+      {{ face }}
+    </p>
+
+    <div class="fit" style="border-left: var(--rule) solid var(--ink); padding-left: 28px">
+      <p class="t-lg t-bold">{{ stamp | date: "%A" }}</p>
+      <p class="t-md">{{ stamp | date: "%-d %B %Y" }}</p>
+    </div>
+
+    {% if extension.values.heading != blank %}
+      <span class="chip self-start">{{ extension.values.heading }}</span>
+    {% endif %}
   </div>
+
+  {% comment %} Where another extension gets to say something on this screen. {% endcomment %}
+  {% if notices.size > 0 %}
+    <div class="notice-strip">
+      {% for notice in notices %}
+        <span class="notice{% if notice.loud %} notice--loud{% endif %}">
+          <span class="i i-{{ notice.icon }}"></span>{{ notice.text }}
+        </span>
+      {% endfor %}
+    </div>
+  {% endif %}
 </div>

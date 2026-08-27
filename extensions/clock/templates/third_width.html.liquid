@@ -1,22 +1,17 @@
-{% comment %} Quarter: 400x240. The time, and the date under it. {% endcomment %}
+{% comment %} Third width: 267x480. Hours over minutes, so the digits stay large. {% endcomment %}
 
 {% assign shift = extension.values.utc_offset_hours | times: 3600 %}
 {% assign stamp = "now" | date: "%s" | plus: shift %}
-{% if extension.values.twenty_four_hour == false %}
-  {% assign face = stamp | date: "%I:%M" %}
-{% else %}
-  {% assign face = stamp | date: "%H:%M" %}
-{% endif %}
 
 <div class="screen dense">
-  <div class="content layout layout--col layout--center" style="gap: 4px">
+  <div class="content layout layout--col layout--center" style="gap: 0">
     {% if extension.values.heading != blank %}
-      <p class="t-xs t-upper">{{ extension.values.heading }}</p>
+      <p class="t-xs t-upper" style="margin-bottom: 10px">{{ extension.values.heading }}</p>
     {% endif %}
-    <p class="t-mono t-bold" style="font-size: 84px; line-height: 1; letter-spacing: -0.03em">
-      {{ face }}
-    </p>
-    <p class="t-sm">{{ stamp | date: "%a %-d %b" }}</p>
+    <p class="t-mono t-bold" style="font-size: 96px; line-height: 0.95">{{ stamp | date: "%H" }}</p>
+    <p class="t-mono t-bold" style="font-size: 96px; line-height: 0.95">{{ stamp | date: "%M" }}</p>
+    <div class="rule" style="margin: 14px 0; width: 60%"></div>
+    <p class="t-sm t-center">{{ stamp | date: "%a" }}<br>{{ stamp | date: "%-d %b" }}</p>
   </div>
 
   {% comment %} Where another extension gets to say something on this screen. {% endcomment %}

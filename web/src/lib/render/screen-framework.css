@@ -12,6 +12,16 @@
 
   html, body { margin: 0; padding: 0; }
 
+  /* A reset, and not a cosmetic one: a <p> at 76px carries 76px of margin top
+     and bottom by default, which is enough to push a hero clean off the panel.
+     Every template sets its own spacing with gap. */
+  p, h1, h2, h3, h4, h5, h6, figure, blockquote, dl, dd, ul, ol {
+    margin: 0;
+    padding: 0;
+  }
+
+  ul, ol { list-style: none; }
+
   body {
     background: var(--paper);
     color: var(--ink);
@@ -208,3 +218,125 @@
   .clamp-3 { -webkit-box-orient: vertical; -webkit-line-clamp: 3; display: -webkit-box; overflow: hidden; }
 
   .muted { opacity: 1; }  /* deliberately not faded: opacity dithers to noise */
+
+  /* ---- Charts and meters ---------------------------------------------
+     Everything here is built from solid blocks and rules. A 1-bit panel has
+     no tints, so a bar is either ink or paper: depth has to come from shape
+     and spacing, never from opacity. */
+
+  /* A row of vertical bars: hourly rain, a week of revenue, anything small
+     and comparative. Heights are set inline as a percentage. */
+  /* align-items must stretch, not flex-end: a bar sets its fill height as a
+     percentage, and a percentage of a content-sized box is nothing. The bars
+     sit on the baseline because each column pushes its fill down, not because
+     the row aligns them. */
+  .bars { align-items: stretch; display: flex; gap: 4px; height: 100%; min-height: 0; }
+  .bars .bar { display: flex; flex: 1 1 0; flex-direction: column; gap: 4px; justify-content: flex-end; min-width: 0; }
+  /* display:block matters: a template writes these as spans, and height
+     does not apply to an inline box. */
+  .bars .bar .fill { background: var(--ink); display: block; min-height: 2px; width: 100%; }
+  /* An empty bar still needs to be visible, or a flat run looks like missing
+     data rather than a flat run. */
+  .bars .bar .fill--empty { background: var(--paper); box-shadow: inset 0 0 0 2px var(--ink); }
+  .bars .bar .tick { display: block; font-size: 11px; text-align: center; }
+
+  /* Hatched fill, for the second series in a two-series chart. */
+  .fill--hatch {
+    background: repeating-linear-gradient(45deg, var(--ink) 0 3px, var(--paper) 3px 6px);
+    box-shadow: inset 0 0 0 2px var(--ink);
+  }
+
+  /* A horizontal meter. */
+  .gauge { border: 2px solid var(--ink); height: 12px; overflow: hidden; width: 100%; }
+  .gauge .fill { background: var(--ink); display: block; height: 100%; }
+  .gauge--slim { height: 8px; }
+
+  /* A big number with a caption, and optionally a delta beside it. */
+  .metric { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .metric .value { font-size: 44px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+  .metric .value--lg { font-size: 72px; }
+  .metric .value--sm { font-size: 28px; }
+  .metric .caption { font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+  .metric .delta { align-items: center; display: flex; font-size: 15px; font-weight: 600; gap: 4px; }
+
+  /* Rows of label/value, the workhorse of a detail panel. */
+  .facts { display: grid; gap: 2px 16px; }
+  .facts--2 { grid-template-columns: repeat(2, 1fr); }
+  .facts .row { align-items: baseline; display: flex; gap: 8px; justify-content: space-between; padding: 5px 0; }
+  .facts .row + .row { border-top: 1px solid var(--ink); }
+  .facts .name { align-items: center; display: flex; font-size: 14px; gap: 6px; }
+  .facts .figure { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* A vertical agenda: a spine, a marker per entry, content to the right. */
+  .timeline { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .timeline .entry { display: grid; gap: 0 14px; grid-template-columns: 58px 14px 1fr; min-width: 0; padding: 9px 0; }
+  .timeline .at { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+  .timeline .spine { display: flex; flex-direction: column; align-items: center; position: relative; }
+  .timeline .spine::before { background: var(--ink); content: ""; flex: 1; width: 2px; }
+  .timeline .entry:first-child .spine::before { background: transparent; }
+  .timeline .entry:last-child .spine::after { background: transparent; }
+  .timeline .spine .node { background: var(--paper); border: 3px solid var(--ink); border-radius: 50%; height: 12px; width: 12px; }
+  .timeline .spine .node--now { background: var(--ink); }
+  .timeline .spine::after { background: var(--ink); content: ""; flex: 1; width: 2px; }
+  .timeline .body { min-width: 0; }
+  .timeline .what { font-size: 17px; font-weight: 600; }
+  .timeline .where { align-items: center; display: flex; font-size: 13px; gap: 5px; margin-top: 2px; }
+
+  /* A small outlined tag. Distinct from .badge, which is solid ink. */
+  .chip {
+    border: 2px solid var(--ink);
+    display: inline-flex;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 700;
+    gap: 4px;
+    letter-spacing: 0.04em;
+    padding: 2px 7px;
+    text-transform: uppercase;
+  }
+
+  /* A chip in a stretching column would otherwise run the full width. */
+  .self-start { align-self: flex-start; }
+
+  /* ---- Notices -------------------------------------------------------
+     Somewhere for one extension to say something on another's screen: a
+     service alert while you are looking at your calendar, a low battery
+     while you are looking at the weather. A template opts in by rendering
+     the `notices` it is handed; one that does not simply never shows them,
+     which is what makes the hook optional rather than imposed. */
+
+  .notice-strip {
+    align-items: center;
+    border-top: var(--rule) solid var(--ink);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    margin-top: auto;
+    padding: 9px var(--pad);
+  }
+
+  .notice { align-items: center; display: flex; font-size: 14px; font-weight: 600; gap: 6px; min-width: 0; }
+  .notice .i { font-size: 17px; }
+  .notice--loud { background: var(--ink); color: var(--paper); padding: 3px 8px; }
+
+  /* Inside a small shape there is only room for the icons. */
+  .dense .notice-strip { gap: 6px 10px; padding: 6px 14px; }
+  .dense .notice { font-size: 12px; }
+  .dense .notice .i { font-size: 14px; }
+
+  /* Icon beside text, aligned on the text's centre rather than its baseline. */
+  .with-icon { align-items: center; display: flex; gap: 8px; min-width: 0; }
+
+  /* A hero block: one enormous glyph or number, caption under it. */
+  .hero { align-items: center; display: flex; flex-direction: column; gap: 6px; justify-content: center; }
+  .hero .caption { font-size: 15px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+
+  /* Splits a panel into a dominant left and a detail right, with a rule. */
+  .split-detail { display: grid; gap: 0; grid-template-columns: 1.15fr 1fr; height: 100%; min-height: 0; }
+  .split-detail > * + * { border-left: var(--rule) solid var(--ink); padding-left: var(--pad); }
+  .split-detail > *:first-child { padding-right: var(--pad); }
+
+  /* Denser type for the small shapes, applied by the composer. */
+  .dense .metric .value { font-size: 30px; }
+  .dense .facts .name, .dense .facts .figure { font-size: 12px; }
+  .dense .timeline .what { font-size: 14px; }

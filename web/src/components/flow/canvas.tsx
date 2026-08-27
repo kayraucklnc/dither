@@ -21,6 +21,7 @@ import {
   ImagePlus,
   Loader2,
   Plus,
+  RefreshCw,
   Trash2,
   TriangleAlert,
 } from "lucide-react";
@@ -32,6 +33,7 @@ import {
   type SourceKind,
 } from "@/components/flow/condition-editor";
 import { ContextMenu, type MenuItem } from "@/components/flow/context-menu";
+import { NoticesPanel } from "@/components/flow/notices-panel";
 import { QuestionNode, ScreenNode, type QuestionData, type ScreenData } from "@/components/flow/nodes";
 import { ScreenPreview } from "@/components/screen-preview";
 import { Select } from "@/components/ui/select";
@@ -88,6 +90,8 @@ function TreeCanvas({
   const [error, setError] = useState<string>();
   const [nextId, setNextId] = useState(-1);
   const [menu, setMenu] = useState<{ at: { x: number; y: number }; items: MenuItem[] }>();
+  const [tab, setTab] = useState<"decide" | "notices">("decide");
+  const [refreshing, setRefreshing] = useState(false);
 
   const nodeTypes = useMemo(() => ({ question: QuestionNode, screen: ScreenNode }), []);
   const selected = nodes.find((node) => node.id === selectedId);
@@ -645,7 +649,34 @@ function TreeCanvas({
         </div>
       </div>
 
-      <aside className="w-84 shrink-0 overflow-y-auto border-l border-line bg-surface">
+      <aside className="flex w-84 shrink-0 flex-col border-l border-line bg-surface">
+        <div className="flex shrink-0 gap-1 border-b border-line p-2">
+          {(["decide", "notices"] as const).map((name) => (
+            <button
+              key={name}
+              type="button"
+              onClick={() => setTab(name)}
+              className={cn(
+                "flex-1 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors",
+                tab === name ? "bg-raised text-ink" : "text-faint hover:text-muted",
+              )}
+            >
+              {name === "decide" ? "Decide" : "Notices"}
+            </button>
+          ))}
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto">
+        {tab === "notices" ? (
+          <NoticesPanel
+            deviceId={deviceId}
+            sources={sources}
+            sourceKinds={sourceKinds}
+            sourceMap={sourceMap}
+            onChanged={refreshTrace}
+          />
+        ) : (
+        <>
         <div className="border-b border-line p-4">
           <button
             type="button"
@@ -791,9 +822,24 @@ function TreeCanvas({
 
             {sources.filter((source) => source.group === "trigger").length > 0 && (
               <>
-                <p className="mt-5 mb-2 text-[11px] font-medium uppercase tracking-wide text-faint">
-                  Sources on this device
-                </p>
+                <div className="mt-5 mb-2 flex items-center justify-between">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-faint">
+                    Sources on this device
+                  </p>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setRefreshing(true);
+                      await fetch(`/api/devices/${deviceId}/triggers/refresh`, { method: "POST" });
+                      await refreshTrace();
+                      setRefreshing(false);
+                    }}
+                    className="flex items-center gap-1 text-[11px] text-faint transition-colors hover:text-ink"
+                  >
+                    <RefreshCw size={11} className={cn(refreshing && "animate-spin")} />
+                    Fetch now
+                  </button>
+                </div>
                 <div className="space-y-2">
                   {sources
                     .filter((source) => source.group === "trigger")
@@ -822,6 +868,9 @@ function TreeCanvas({
             )}
           </div>
         )}
+        </>
+        )}
+        </div>
       </aside>
 
       {menu && <ContextMenu at={menu.at} items={menu.items} onClose={() => setMenu(undefined)} />}

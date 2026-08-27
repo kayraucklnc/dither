@@ -1,23 +1,39 @@
-{% comment %} Quarter: 400x240. The temperature, and the day's range under it. {% endcomment %}
+{% comment %} Quarter: 400x240. Icon, number, range. Nothing else fits legibly. {% endcomment %}
 
-<div class="screen">
-  {% if source_1.current %}
-    <div class="content layout layout--col" style="justify-content: space-between">
-      <div class="kv">
-        <span class="k t-xs">{{ extension.values.place | default: "Weather" }}</span>
-      </div>
+{% assign now = source_1.current %}
+{% assign today = source_1.daily %}
 
-      <div class="stat">
-        <span class="value t-mono">{{ source_1.current.temperature_2m | round }}&deg;</span>
-        <span class="label">
-          {{ source_1.daily.temperature_2m_max[0] | round }}&deg; /
-          {{ source_1.daily.temperature_2m_min[0] | round }}&deg;
-        </span>
+<div class="screen dense">
+  {% if now %}
+    <div class="content layout layout--row" style="align-items: center; gap: 18px">
+      <span class="i i-{{ now.weather_code | weather_icon }} i-xl"></span>
+
+      <div class="stack stack--tight fit" style="gap: 2px">
+        <p class="t-xs t-upper">{{ extension.values.place | default: "Weather" }}</p>
+        <p class="t-bold" style="font-size: 58px; line-height: 1">{{ now.temperature_2m | round }}&deg;</p>
+        <p class="t-sm">
+          {{ today.temperature_2m_max[0] | round }}&deg; / {{ today.temperature_2m_min[0] | round }}&deg;
+          {% if today.precipitation_probability_max[0] > 20 %}
+            &middot; <span class="i i-umbrella i-xs"></span> {{ today.precipitation_probability_max[0] }}%
+          {% endif %}
+        </p>
       </div>
     </div>
   {% else %}
     <div class="content layout layout--col layout--center">
-      <p class="t-bold">No forecast</p>
+      <span class="i i-cloud i-md"></span>
+      <p class="t-sm t-bold">No forecast</p>
+    </div>
+  {% endif %}
+
+  {% comment %} Where another extension gets to say something on this screen. {% endcomment %}
+  {% if notices.size > 0 %}
+    <div class="notice-strip">
+      {% for notice in notices %}
+        <span class="notice{% if notice.loud %} notice--loud{% endif %}">
+          <span class="i i-{{ notice.icon }}"></span>{{ notice.text }}
+        </span>
+      {% endfor %}
     </div>
   {% endif %}
 </div>

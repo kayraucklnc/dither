@@ -1,37 +1,70 @@
-{% comment %} Half width: 400x480. Temperature large, the rest stacked beneath. {% endcomment %}
+{% comment %} Half width: 400x480. A tall column: hero, details, hours. {% endcomment %}
+
+{% assign now = source_1.current %}
+{% assign today = source_1.daily %}
+{% assign hours = extension.values.show_hours | default: 12 %}
+{% if hours > 8 %}{% assign hours = 8 %}{% endif %}
 
 <div class="screen">
-  <div class="title-bar">
-    <div class="title">{{ extension.values.place | default: "Weather" }}</div>
-  </div>
+  {% if now %}
+    <div class="title-bar">
+      <div class="title">{{ extension.values.place | default: "Weather" }}</div>
+    </div>
 
-  <div class="content content--tight">
-    {% if source_1.current %}
-      <div class="stack">
-        <div class="stat">
-          <span class="value t-mono" style="font-size: 84px">
-            {{ source_1.current.temperature_2m | round }}&deg;
-          </span>
-          <span class="label">Now</span>
-        </div>
+    <div class="content content--tight layout layout--col">
+      <div class="hero" style="padding: 6px 0 12px">
+        <span class="i i-{{ now.weather_code | weather_icon }} i-xl"></span>
+        <p class="t-bold" style="font-size: 62px; line-height: 1">{{ now.temperature_2m | round }}&deg;</p>
+        <p class="caption">{{ now.weather_code | weather_label }}</p>
+      </div>
 
-        <div class="kv">
-          <span class="k">High / low</span>
-          <span class="v t-mono t-bold">
-            {{ source_1.daily.temperature_2m_max[0] | round }}&deg; /
-            {{ source_1.daily.temperature_2m_min[0] | round }}&deg;
+      <div class="facts">
+        <div class="row">
+          <span class="name"><span class="i i-thermometer i-xs"></span>High / low</span>
+          <span class="figure">
+            {{ today.temperature_2m_max[0] | round }}&deg; / {{ today.temperature_2m_min[0] | round }}&deg;
           </span>
         </div>
-
-        <div class="kv">
-          <span class="k">Rain</span>
-          <span class="v t-mono t-bold">{{ source_1.daily.precipitation_probability_max[0] }}%</span>
+        <div class="row">
+          <span class="name"><span class="i i-umbrella i-xs"></span>Rain</span>
+          <span class="figure">{{ today.precipitation_probability_max[0] }}%</span>
+        </div>
+        <div class="row">
+          <span class="name"><span class="i i-wind i-xs"></span>Wind</span>
+          <span class="figure">{{ now.wind_speed_10m | round }} km/h</span>
         </div>
       </div>
-    {% else %}
-      <div class="layout layout--col layout--center">
-        <p class="t-bold">No forecast</p>
-      </div>
-    {% endif %}
-  </div>
+
+      {% if extension.values.style != "compact" and source_1.hourly %}
+        <div class="fit" style="margin-top: 12px; min-height: 92px">
+          <div class="bars">
+            {% for at in source_1.hourly.time limit: hours %}
+              {% assign chance = source_1.hourly.precipitation_probability[forloop.index0] %}
+              <div class="bar">
+                <span class="fill{% if chance < 5 %} fill--empty{% endif %}"
+                      style="height: {{ chance | as_percent: 100 | at_least: 3 }}%"></span>
+                <span class="tick">{{ at | hour_of }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  {% else %}
+    <div class="content layout layout--col layout--center">
+      <span class="i i-cloud i-lg"></span>
+      <p class="t-bold">No forecast</p>
+    </div>
+  {% endif %}
+
+  {% comment %} Where another extension gets to say something on this screen. {% endcomment %}
+  {% if notices.size > 0 %}
+    <div class="notice-strip">
+      {% for notice in notices %}
+        <span class="notice{% if notice.loud %} notice--loud{% endif %}">
+          <span class="i i-{{ notice.icon }}"></span>{{ notice.text }}
+        </span>
+      {% endfor %}
+    </div>
+  {% endif %}
 </div>

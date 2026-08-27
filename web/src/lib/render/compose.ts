@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -41,16 +42,34 @@ export interface Composition {
 }
 
 let stylesheet: string | undefined;
+let digest: string | undefined;
 
+/**
+ * The stylesheet every extension renders against: the layout and type system,
+ * plus the icon set. One string so a template never has to ask for either.
+ */
 async function framework(): Promise<string> {
   if (stylesheet && process.env.NODE_ENV === "production") return stylesheet;
 
-  stylesheet = await readFile(
-    path.join(process.cwd(), "src", "lib", "render", "screen-framework.css"),
-    "utf8",
-  );
+  const here = path.join(process.cwd(), "src", "lib", "render");
+  const [base, icons] = await Promise.all([
+    readFile(path.join(here, "screen-framework.css"), "utf8"),
+    readFile(path.join(here, "icons.css"), "utf8"),
+  ]);
+
+  stylesheet = `${base}\n${icons}`;
+  digest = createHash("sha256").update(stylesheet).digest("hex").slice(0, 12);
 
   return stylesheet;
+}
+
+/**
+ * A hash of the stylesheet, so a change to the design system invalidates every
+ * cached render rather than leaving old pictures on screen.
+ */
+export async function frameworkDigest(): Promise<string> {
+  await framework();
+  return digest ?? "none";
 }
 
 const escape = (value: string) =>
@@ -63,14 +82,42 @@ function gap(placement: string, message: string): string {
   return `<div class="cell cell--gap" style="${placement}"><p>${escape(message)}</p></div>`;
 }
 
+export interface Notice {
+  icon: string;
+  text: string;
+  loud: boolean;
+}
+
+/**
+ * Which widget hosts the screen's notices.
+ *
+ * The first one, in reading order, whose extension says its designs have
+ * somewhere to put them. One host per screen, so three widgets that all accept
+ * notices do not show the same warning three times.
+ */
+async function noticeHost(widgets: PlacedWidget[]): Promise<number | undefined> {
+  const ordered = [...widgets].sort(
+    (a, b) => a.row - b.row || a.column - b.column,
+  );
+
+  for (const widget of ordered) {
+    const extension = await findExtension(widget.extension);
+    if (extension?.manifest.accepts_notices) return widget.id;
+  }
+
+  return undefined;
+}
+
 export async function compose(
   widgets: PlacedWidget[],
   width: number,
   height: number,
+  notices: Notice[] = [],
 ): Promise<Composition> {
   const problems: string[] = [];
   const cells: string[] = [];
   const css = await framework();
+  const host = notices.length ? await noticeHost(widgets) : undefined;
 
   const cellWidth = width / COLUMNS;
   const cellHeight = height / ROWS;
@@ -97,7 +144,13 @@ export async function compose(
       continue;
     }
 
-    const rendered = await renderWidget(extension, shape.id, widget.settings, widget.data);
+    const rendered = await renderWidget(
+      extension,
+      shape.id,
+      widget.settings,
+      widget.data,
+      widget.id === host ? notices : [],
+    );
 
     if ("problem" in rendered) {
       problems.push(rendered.problem);

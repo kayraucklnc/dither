@@ -84,6 +84,29 @@ export const exchangeSchema = z.object({
 
 export type Exchange = z.infer<typeof exchangeSchema>;
 
+/**
+ * A notice an extension suggests emitting from its own data.
+ *
+ * Adding the extension as a source offers these, so "tell me when there is a
+ * service alert" is a checkbox rather than a rule you have to compose. The
+ * text is Liquid over the source's payload, so it can quote the alert itself.
+ */
+export const noticeSchema = z.object({
+  key: z.string().min(1),
+  label: z.string().min(1),
+  icon: z.string().default("alert"),
+  /** Liquid, rendered against the source's payload. */
+  text: z.string().min(1),
+  loud: z.boolean().default(false),
+  when: z.object({
+    fact: z.string().min(1),
+    operator: z.string().default("present"),
+    value: z.unknown().optional(),
+  }),
+});
+
+export type NoticeSuggestion = z.infer<typeof noticeSchema>;
+
 export const manifestSchema = z.object({
   version: z.string().default("1.0.0"),
   name: z.string().min(1),
@@ -111,6 +134,13 @@ export const manifestSchema = z.object({
 
   fields: z.array(fieldSchema).default([]),
   facts: z.array(factSchema).default([]),
+  notices: z.array(noticeSchema).default([]),
+  /**
+   * Whether this extension's designs have somewhere to show a notice from
+   * another extension. False means notices are simply never routed here - the
+   * hook is offered, not imposed.
+   */
+  accepts_notices: z.boolean().default(false),
   exchanges: z.array(exchangeSchema).default([]),
 
   /**

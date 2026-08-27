@@ -103,6 +103,41 @@ fields:
     optional: true
 
 # What a rule may ask this extension about.
+# Its designs have a strip at the bottom where another extension's notice
+# can appear - a service alert while you are looking at the weather.
+accepts_notices: true
+
+# Suggested notices. Adding this as a source on a device offers these with a
+# click, so "tell me when there is a service alert" is not a rule anyone has
+# to compose by hand.
+notices:
+  - key: service_alert
+    label: Service alert
+    icon: alert
+    loud: true
+    text: "{{ transit.alert | default: 'Service alert' }}"
+    when:
+      fact: alert
+      operator: present
+
+  - key: cancelled
+    label: Next departure cancelled
+    icon: close
+    loud: true
+    text: "{{ transit.origin | truncate: 18 }}: next train cancelled"
+    when:
+      fact: next_cancelled
+      operator: is_true
+
+  - key: delayed
+    label: Running late
+    icon: train
+    text: "{{ transit.departures[0].line }} +{{ transit.departures[0].delay }} min"
+    when:
+      fact: next_delay
+      operator: gte
+      value: 5
+
 facts:
   - key: next_departure_in
     label: Next departure leaves in

@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     data: data.get(widget.id) ?? {},
   }));
 
-  const key = fingerprint(placed, panel);
+  const key = await fingerprint(placed, panel);
   const cached = await store().get(`${key}.png`);
 
   if (cached) {

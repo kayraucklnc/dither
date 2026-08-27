@@ -1,22 +1,24 @@
 # Dither bundled extension: Weather.
 #
-# Polls Open-Meteo, which needs no API key and no account. Change the exchange
-# URL and the field paths in the templates to use a different provider.
+# Open-Meteo by default: free, no key, and it speaks WMO weather codes, which
+# the render pipeline already knows how to turn into an icon and a phrase
+# (see `weather_icon` and `weather_label` in lib/render/liquid.ts).
+#
+# The URL is a Liquid template over this widget's own settings, so two weather
+# widgets on one screen fetch two different cities.
 
 version: "1.0.0"
 name: weather
 label: Weather
 description: >
-  Current temperature and today's range for a location. Open-Meteo by default,
-  which is free and needs no key.
+  Conditions now and the hours ahead, with the day's range, wind, humidity and
+  daylight. Free, and needs no API key.
 
 kind: poll
 mode: text
 tags:
   - weather
 
-# Every 30 minutes. The forecast does not move faster than that, and an e-ink
-# refresh costs battery.
 interval: 30
 unit: minute
 days: []
@@ -27,41 +29,93 @@ static_body: {}
 data: {}
 
 fields:
+  - keyname: place
+    name: Place name
+    field_type: string
+    default: "Milan"
+    help_text: Shown as the heading. Only a label - the coordinates decide the forecast.
+    optional: false
+
   - keyname: latitude
     name: Latitude
     field_type: string
-    default: "52.52"
-    help_text: Decimal degrees. 52.52 is Berlin.
+    default: "45.4642"
+    help_text: Decimal degrees.
     optional: false
 
   - keyname: longitude
     name: Longitude
     field_type: string
-    default: "13.41"
+    default: "9.19"
     help_text: Decimal degrees.
     optional: false
 
-  - keyname: place
-    name: Place name
-    field_type: string
-    default: "Berlin"
-    help_text: Shown as the heading. Purely cosmetic.
-    optional: true
-
   - keyname: units
-    name: Units
-    field_type: string
-    default: "celsius"
-    help_text: "celsius or fahrenheit."
+    name: Temperature
+    field_type: select
+    default: celsius
+    options:
+      - value: celsius
+        label: Celsius
+      - value: fahrenheit
+        label: Fahrenheit
+    optional: false
+
+  - keyname: style
+    name: Style
+    field_type: select
+    default: rich
+    options:
+      - value: rich
+        label: Rich — icon, hours ahead and details
+      - value: compact
+        label: Compact — the number and little else
+    help_text: How much to show. Compact reads across a room; rich rewards a closer look.
+    optional: false
+
+  - keyname: show_hours
+    name: Hours ahead
+    field_type: number
+    default: 12
+    min: 0
+    max: 24
+    help_text: How far the hourly strip looks. Zero hides it.
     optional: true
 
-# What a rule may ask this extension about. Each fact names a path into the
-# data above, so declaring one costs nothing beyond saying where it lives.
+# Its designs have a strip at the bottom where another extension's notice
+# can appear - a service alert while you are looking at the weather.
+accepts_notices: true
+
+notices:
+  - key: rain_soon
+    label: Rain likely today
+    icon: umbrella
+    text: "Rain likely - {{ source_1.daily.precipitation_probability_max[0] }}%"
+    when:
+      fact: rain_chance
+      operator: gte
+      value: 60
+
+  - key: freezing
+    label: Below freezing
+    icon: thermometer
+    text: "Freezing - {{ source_1.current.temperature_2m | round }} degrees"
+    when:
+      fact: temperature
+      operator: lt
+      value: 1
+
 facts:
   - key: temperature
-    label: Current temperature
+    label: Temperature now
     type: number
     path: source_1.current.temperature_2m
+    unit: degrees
+
+  - key: feels_like
+    label: Feels like
+    type: number
+    path: source_1.current.apparent_temperature
     unit: degrees
 
   - key: rain_chance
@@ -76,20 +130,50 @@ facts:
     path: source_1.current.wind_speed_10m
     unit: km/h
 
+  - key: humidity
+    label: Humidity
+    type: number
+    path: source_1.current.relative_humidity_2m
+    unit: percent
+
+  - key: is_daylight
+    label: It is daylight
+    type: boolean
+    path: source_1.current.is_day
+
+  - key: condition
+    label: Condition code
+    type: number
+    path: source_1.current.weather_code
+    unit: ""
+
 sample:
   source_1:
     current:
       temperature_2m: 7.4
+      apparent_temperature: 4.1
+      relative_humidity_2m: 78
       wind_speed_10m: 14.2
+      wind_direction_10m: 210
       weather_code: 61
+      is_day: 1
+    hourly:
+      time: ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"]
+      temperature_2m: [6.1, 6.8, 7.4, 8.2, 9.0, 9.4, 9.1, 8.6, 7.9, 7.1, 6.4, 5.8]
+      precipitation_probability: [70, 65, 55, 40, 25, 15, 10, 10, 20, 35, 45, 40]
+      weather_code: [61, 61, 63, 3, 2, 2, 1, 1, 2, 3, 61, 61]
     daily:
-      temperature_2m_max: [9.1]
+      temperature_2m_max: [9.4]
       temperature_2m_min: [3.2]
       precipitation_probability_max: [70]
+      weather_code: [61]
+      sunrise: ["2026-08-27T06:41"]
+      sunset: ["2026-08-27T20:12"]
 
 exchanges:
   - verb: get
-    template: "https://api.open-meteo.com/v1/forecast?latitude={{ extension.values.latitude }}&longitude={{ extension.values.longitude }}&current=temperature_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=1&temperature_unit={{ extension.values.units }}&timezone=auto"
+    template: >-
+      https://api.open-meteo.com/v1/forecast?latitude={{ extension.values.latitude }}&longitude={{ extension.values.longitude }}&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,is_day&hourly=temperature_2m,precipitation_probability,weather_code&forecast_hours=24&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code,sunrise,sunset&forecast_days=1&temperature_unit={{ extension.values.units }}&timezone=auto
     headers:
       Accept: application/json
     body: {}

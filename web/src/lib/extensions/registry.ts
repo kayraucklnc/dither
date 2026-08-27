@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import type { Dirent } from "node:fs";
 import path from "node:path";
@@ -29,6 +30,14 @@ export interface Extension {
   shapes: ShapeId[];
   /** Template source per shape, already read. */
   templates: Record<string, string>;
+  /**
+   * A short hash of the manifest and every template.
+   *
+   * Rendered images are cached by the things that can change the picture, and
+   * the design is one of those things. Without this, editing a template leaves
+   * every cached render stale and the change simply does not appear.
+   */
+  digest: string;
   problems: string[];
 }
 
@@ -121,8 +130,15 @@ async function load(): Promise<Map<string, Extension>> {
     if (!shapes.length) extensionProblems.push("No templates, so it cannot be placed on a screen.");
     extensionProblems.forEach((message) => problems.push({ extension: entry.name, message }));
 
+    const digest = createHash("sha256")
+      .update(JSON.stringify(parsed.data))
+      .update(Object.entries(templates).sort().map(([shape, source]) => shape + source).join(""))
+      .digest("hex")
+      .slice(0, 12);
+
     loaded.set(parsed.data.name, {
       manifest: parsed.data,
+      digest,
       name: parsed.data.name,
       directory,
       shapes,

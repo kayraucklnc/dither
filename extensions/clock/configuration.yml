@@ -1,18 +1,20 @@
 # Dither bundled extension: Clock.
 #
-# No data source at all - it renders the server's clock, shifted by whatever
-# offset you configure. Useful on its own, and useful as the simplest possible
-# worked example of the format.
+# Fetches nothing - it renders the server's clock shifted by an offset. Useful
+# on its own, and the simplest worked example of the format: a manifest, a
+# template per shape, no exchanges, no connection.
+#
+# It declares no facts. Anything you would want to branch on about the time is
+# already reported by the built-in Time source, so duplicating it here would
+# give you two answers to the same question.
 
 version: "1.0.0"
 name: clock
 label: Clock
 description: >
-  The time and date, large enough to read across a room. Shifted to your
-  timezone by a fixed offset.
+  The time, in three styles: a plain readout, a dated panel, or an analogue
+  face. Large enough to read across a room.
 
-# static = nothing is fetched. The alternative is poll, where Dither calls an
-# API on a schedule.
 kind: static
 mode: text
 tags:
@@ -29,18 +31,44 @@ data: {}
 sample: {}
 
 fields:
+  - keyname: style
+    name: Style
+    field_type: select
+    default: digital
+    options:
+      - value: digital
+        label: Digital — the time, very large
+      - value: dated
+        label: Dated — the time with the day beside it
+      - value: analogue
+        label: Analogue — a drawn face
+    optional: false
+
   - keyname: utc_offset_hours
     name: Hours from UTC
-    field_type: string
-    default: "0"
-    help_text: "The server clock is UTC. Berlin in summer is 2, New York is -4."
+    field_type: number
+    default: 0
+    min: -12
+    max: 14
+    help_text: The server runs on UTC. Berlin in summer is 2, New York is -4.
     optional: true
 
   - keyname: heading
     name: Heading
     field_type: string
     default: ""
-    help_text: Optional label above the time. Leave blank to hide it.
+    help_text: A label above the time - a city, usually. Blank hides it.
     optional: true
 
+  - keyname: twenty_four_hour
+    name: 24-hour clock
+    field_type: boolean
+    default: true
+    optional: true
+
+# Its designs have a strip at the bottom where another extension's notice
+# can appear - a service alert while you are looking at the weather.
+accepts_notices: true
+
+facts: []
 exchanges: []
