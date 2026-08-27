@@ -4,7 +4,7 @@ import type { Dirent } from "node:fs";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 
-import { isShapeId, type ShapeId } from "@/lib/shapes";
+import { isShapeId, SHAPES, standIn, type ShapeId } from "@/lib/shapes";
 import { manifestSchema, type Manifest } from "./manifest";
 
 /**
@@ -26,8 +26,13 @@ export interface Extension {
   /** Directory name, and the value stored on a widget. */
   name: string;
   directory: string;
-  /** Sizes this extension knows how to draw, in vocabulary order. */
+  /**
+   * Sizes this extension can be drawn at: the ones it authored, plus the rest
+   * of each family it authored into. See `standIn` in lib/shapes.
+   */
   shapes: ShapeId[];
+  /** Sizes it has a template of its own for. */
+  authored: ShapeId[];
   /** Template source per shape, already read. */
   templates: Record<string, string>;
   /**
@@ -122,12 +127,17 @@ async function load(): Promise<Map<string, Extension>> {
     }
 
     const { templates, unknown } = await readTemplates(directory);
-    const shapes = (Object.keys(templates) as ShapeId[]).filter(isShapeId);
+    const authored = (Object.keys(templates) as ShapeId[]).filter(isShapeId);
+    const shapes = SHAPES.map((shape) => shape.id).filter(
+      (shape) => standIn(shape, authored) !== undefined,
+    );
 
     const extensionProblems = unknown.map(
       (file) => `templates/${file} is not a shape Dither knows; it was not loaded.`,
     );
-    if (!shapes.length) extensionProblems.push("No templates, so it cannot be placed on a screen.");
+    if (!authored.length && !parsed.data.facts.length) {
+      extensionProblems.push("No templates and no facts, so it can neither be shown nor decided on.");
+    }
     extensionProblems.forEach((message) => problems.push({ extension: entry.name, message }));
 
     const digest = createHash("sha256")
@@ -142,6 +152,7 @@ async function load(): Promise<Map<string, Extension>> {
       name: parsed.data.name,
       directory,
       shapes,
+      authored,
       templates,
       problems: extensionProblems,
     });
@@ -175,4 +186,10 @@ export function defaultSettings(extension: Extension): Record<string, unknown> {
 
 export function supportsShape(extension: Extension, shape: string): boolean {
   return extension.shapes.includes(shape as ShapeId);
+}
+
+/** The template that should draw `shape`, exact or the nearest in its family. */
+export function templateFor(extension: Extension, shape: string): string | undefined {
+  const chosen = standIn(shape as ShapeId, extension.authored);
+  return chosen ? extension.templates[chosen] : undefined;
 }

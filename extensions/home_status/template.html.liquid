@@ -1,0 +1,55 @@
+{% comment %}
+  Full: 800x480. Either the whole house at once, or one thing very large.
+
+  On is solid ink, off is outline. On a 1-bit panel that reads from across a
+  room where a colour or a tint would not.
+{% endcomment %}
+
+{% assign one = false %}
+{% if extension.values.style == "one" %}{% assign one = true %}{% endif %}
+
+<div class="screen">
+  <div class="title-bar">
+    <div class="title">{{ extension.values.heading | default: "Home" }}</div>
+    <div class="chip self-start">{{ home.on_count }} on</div>
+  </div>
+
+  {% if one %}
+    <div class="content layout layout--col layout--center" style="gap: 14px">
+      <span class="i i-{{ home.entity.icon }}" style="font-size: 140px"></span>
+      <p class="t-xxl t-bold">{{ home.entity.label }}</p>
+      <p class="badge" style="font-size: 22px; padding: 6px 16px">
+        {% if home.entity.on %}ON{% else %}OFF{% endif %}
+      </p>
+      <p class="t-sm">{{ home.entity.detail }} &middot; {{ home.entity.minutes_since_change }} min ago</p>
+    </div>
+  {% else %}
+    <div class="content">
+      <div class="cols cols--3" style="grid-auto-rows: 1fr">
+        {% for thing in home.entities limit: 6 %}
+          <div class="box layout layout--col" style="gap: 8px; justify-content: space-between; padding: 14px">
+            <span class="i i-{{ thing.icon }} i-md"></span>
+            <div>
+              <p class="t-md t-bold truncate">{{ thing.label }}</p>
+              <p class="t-xs truncate">{{ thing.detail }}</p>
+            </div>
+            <span class="{% if thing.on %}badge{% else %}chip{% endif %}">
+              {% if thing.on %}ON{% else %}OFF{% endif %}
+            </span>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  {% comment %} Where another extension gets to say something on this screen. {% endcomment %}
+  {% if notices.size > 0 %}
+    <div class="notice-strip">
+      {% for notice in notices %}
+        <span class="notice{% if notice.loud %} notice--loud{% endif %}">
+          <span class="i i-{{ notice.icon }}"></span>{{ notice.text }}
+        </span>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

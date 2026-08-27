@@ -1,0 +1,75 @@
+{% comment %}
+  Full: 800x480. The price, what it has done, and the shape of the session.
+
+  The session bars are normalised between the low and the high rather than
+  drawn from zero: a share that moves 1% would otherwise be twelve identical
+  bars, which tells you nothing.
+{% endcomment %}
+
+{% assign q = market %}
+{% assign span = q.high | minus: q.low %}
+{% if span <= 0 %}{% assign span = 1 %}{% endif %}
+{% assign sym = extension.values.currency_symbol | default: "$" %}
+
+<div class="screen">
+  <div class="title-bar">
+    <div class="title">{{ q.name }}</div>
+    <div class="chip self-start"><span class="i i-chart"></span>{{ q.symbol }}</div>
+  </div>
+
+  <div class="content">
+    <div class="split-detail">
+      <div class="stack fit" style="justify-content: center; gap: 8px">
+        <p class="caption">Last</p>
+        <p class="t-bold" style="font-size: 72px; line-height: 1; letter-spacing: -0.03em">
+          {{ sym }}{{ q.price }}
+        </p>
+        <p class="with-icon t-lg t-bold">
+          <span class="i i-trending-{% if q.rising %}up{% else %}down{% endif %} i-sm"></span>
+          {% if q.rising %}+{% endif %}{{ q.change }} ({{ q.change_percent }}%)
+        </p>
+      </div>
+
+      <div class="stack fit" style="justify-content: center">
+        <div class="facts">
+          <div class="row">
+            <span class="name"><span class="i i-arrow-up i-xs"></span>High</span>
+            <span class="figure">{{ sym }}{{ q.high }}</span>
+          </div>
+          <div class="row">
+            <span class="name"><span class="i i-arrow-down i-xs"></span>Low</span>
+            <span class="figure">{{ sym }}{{ q.low }}</span>
+          </div>
+          <div class="row">
+            <span class="name"><span class="i i-dot i-xs"></span>Open</span>
+            <span class="figure">{{ sym }}{{ q.open }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if extension.values.show_session and q.history %}
+    <div style="border-top: var(--rule) solid var(--ink); height: 128px; padding: 12px var(--pad)">
+      <div class="bars" style="gap: 6px">
+        {% for point in q.history %}
+          {% assign height = point | minus: q.low | times: 82 | divided_by: span | plus: 12 %}
+          <div class="bar">
+            <span class="fill" style="height: {{ height }}%"></span>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  {% comment %} Where another extension gets to say something on this screen. {% endcomment %}
+  {% if notices.size > 0 %}
+    <div class="notice-strip">
+      {% for notice in notices %}
+        <span class="notice{% if notice.loud %} notice--loud{% endif %}">
+          <span class="i i-{{ notice.icon }}"></span>{{ notice.text }}
+        </span>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

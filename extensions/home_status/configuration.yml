@@ -1,0 +1,107 @@
+# Dither bundled extension: Home status.
+#
+# One source is one thing in the house. Add a source for the laptop and another
+# for the desk lamp, and each carries its own trigger - which is what makes
+# "if the laptop is on, show this; if not, show that" a rule you can build.
+
+version: "1.0.0"
+name: home_status
+label: Home status
+description: >
+  Whether things around the house are on: a laptop, a lamp, a door. One source
+  per thing, so each can be branched on.
+
+kind: connection
+connection: home
+mode: text
+tags:
+  - home
+
+interval: 5
+unit: minute
+days: []
+last_day_of_month: false
+start_at: "2026-01-01T00:00:00Z"
+
+static_body: {}
+data: {}
+
+fields:
+  - keyname: entity
+    name: Thing
+    field_type: select
+    default: laptop
+    options:
+      - value: laptop
+        label: Laptop
+      - value: desk_lamp
+        label: Desk lamp
+      - value: front_door
+        label: Front door
+      - value: living_room
+        label: Living room
+      - value: printer
+        label: Printer
+    help_text: Which one this source reports on, and what its triggers are about.
+    optional: false
+
+  - keyname: heading
+    name: Heading
+    field_type: string
+    default: "Home"
+    optional: true
+
+  - keyname: style
+    name: Style
+    field_type: select
+    default: house
+    options:
+      - value: house
+        label: The house — everything at once
+      - value: one
+        label: Just this thing, large
+    optional: false
+
+accepts_notices: true
+
+notices:
+  - key: left_on
+    label: Still on
+    icon: bolt
+    text: "{{ home.entity.label }} is still on"
+    when:
+      fact: is_on
+      operator: is_true
+
+facts:
+  - key: is_on
+    label: Is on
+    type: boolean
+    path: home.entity.on
+    unit: ""
+
+  - key: minutes_since_change
+    label: Changed
+    type: duration
+    path: home.entity.minutes_since_change
+    unit: min ago
+
+  - key: things_on
+    label: Things on in the house
+    type: number
+    path: home.on_count
+    unit: ""
+
+sample:
+  home:
+    anyone_home: true
+    on_count: 3
+    entity: { key: laptop, label: Laptop, icon: laptop, on: true, detail: "Docked, 82%", minutes_since_change: 42 }
+    entities:
+      - { key: laptop, label: Laptop, icon: laptop, on: true, detail: "Docked, 82%", minutes_since_change: 42 }
+      - { key: desk_lamp, label: Desk lamp, icon: bolt, on: true, detail: "Warm, 40%", minutes_since_change: 18 }
+      - { key: front_door, label: Front door, icon: home, on: false, detail: "Locked", minutes_since_change: 240 }
+      - { key: living_room, label: Living room, icon: home, on: true, detail: "21.4 degrees", minutes_since_change: 6 }
+      - { key: printer, label: Printer, icon: laptop, on: false, detail: "Idle", minutes_since_change: 900 }
+
+exchanges: []

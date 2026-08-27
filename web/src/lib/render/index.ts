@@ -4,6 +4,7 @@ import sharp from "sharp";
 import { shoot } from "./browser";
 import {
   compose,
+  composeEmpty,
   composeSolo,
   frameworkDigest,
   type Notice,
@@ -114,6 +115,33 @@ export async function renderScreen(
     height: info.height,
     fingerprint: await fingerprint(widgets, panel, notices),
     problems,
+  };
+}
+
+/** The panel a device shows before anyone has set it up. */
+export async function renderEmpty(
+  panel: Panel,
+  heading: string,
+  detail: string,
+): Promise<Rendered> {
+  const { html } = await composeEmpty(panel.width, panel.height, heading, detail);
+  const screenshot = await shoot(html, panel.width, panel.height);
+
+  const { data, info } = await sharp(screenshot).raw().toBuffer({ resolveWithObject: true });
+  const bytes = await sharp(
+    floydSteinberg(data, info.width, info.height, info.channels, paletteFor(panel)),
+    { raw: { width: info.width, height: info.height, channels: 3 } },
+  )
+    .png({ palette: true, colors: Math.max(2, panel.colors), compressionLevel: 9 })
+    .toBuffer();
+
+  return {
+    bytes,
+    mimeType: "image/png",
+    width: info.width,
+    height: info.height,
+    fingerprint: await fingerprint([], panel),
+    problems: [],
   };
 }
 

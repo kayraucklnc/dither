@@ -68,6 +68,59 @@ export function pixelsFor(shape: Shape, panelWidth: number, panelHeight: number)
   ];
 }
 
+/**
+ * Shapes that share an aspect class.
+ *
+ * A design authored for one wide band works in a taller wide band: it is the
+ * same markup reflowing in a box of a similar proportion, which the layout
+ * primitives already handle. That is not the same as scaling a full-page
+ * design into a corner, which is what the refusal rule exists to prevent - so
+ * an extension covers its family, and only its family, for free.
+ *
+ * An author who wants a different design at a different height still writes
+ * one; an exact template always wins over a family match.
+ */
+export const FAMILIES: Record<string, ShapeId[]> = {
+  full: ["full"],
+  band: ["third_height", "half_height", "two_thirds_height"],
+  column: ["third_width", "half_width", "two_thirds_width"],
+  block: ["quarter"],
+};
+
+const FAMILY_OF = new Map<ShapeId, string>(
+  Object.entries(FAMILIES).flatMap(([family, members]) =>
+    members.map((member) => [member, family] as [ShapeId, string]),
+  ),
+);
+
+export function familyOf(id: ShapeId): string | undefined {
+  return FAMILY_OF.get(id);
+}
+
+/**
+ * Which authored shape should draw `wanted`: itself if it exists, otherwise
+ * the nearest one in its family by area.
+ */
+export function standIn(wanted: ShapeId, authored: ShapeId[]): ShapeId | undefined {
+  if (authored.includes(wanted)) return wanted;
+
+  const family = FAMILY_OF.get(wanted);
+  const target = shape(wanted);
+  if (!family || !target) return undefined;
+
+  const area = target.columns * target.rows;
+
+  return authored
+    .filter((candidate) => FAMILY_OF.get(candidate) === family)
+    .map((candidate) => ({ candidate, shape: shape(candidate)! }))
+    .sort(
+      (a, b) =>
+        Math.abs(a.shape.columns * a.shape.rows - area) -
+        Math.abs(b.shape.columns * b.shape.rows - area),
+    )
+    .map(({ candidate }) => candidate)[0];
+}
+
 export interface Rect {
   column: number;
   row: number;

@@ -1,0 +1,99 @@
+{% comment %} Full: 800x480. Today's number, the week behind it, the breakdown. {% endcomment %}
+
+{% assign money = revenue %}
+{% assign rich = true %}
+{% if extension.values.style == "compact" %}{% assign rich = false %}{% endif %}
+
+<div class="screen">
+  <div class="title-bar">
+    <div class="title">{{ extension.values.heading | default: "Revenue" }}</div>
+    <div class="chip self-start">
+      <span class="i i-card"></span>{{ money.currency }}
+    </div>
+  </div>
+
+  {% if money == nil %}
+    <div class="content layout layout--col layout--center" style="gap: 8px">
+      <span class="i i-card i-xl"></span>
+      <p class="t-lg t-bold">Not connected</p>
+      <p class="t-sm">Link Stripe under Connections.</p>
+    </div>
+  {% else %}
+    <div class="content">
+      <div class="split-detail">
+        <div class="stack fit" style="justify-content: center; gap: 8px">
+          <p class="caption">Taken today</p>
+          <p class="t-bold" style="font-size: 76px; line-height: 1; letter-spacing: -0.03em">
+            {{ money.symbol }}{{ money.today }}
+          </p>
+          <p class="with-icon t-md t-bold">
+            <span class="i i-trending-{% if money.change_percent >= 0 %}up{% else %}down{% endif %} i-sm"></span>
+            {{ money.change_percent }}% on yesterday
+          </p>
+          <p class="t-sm">{{ money.payments_today }} payments</p>
+        </div>
+
+        <div class="stack fit" style="justify-content: center">
+          <div class="facts">
+            <div class="row">
+              <span class="name"><span class="i i-chart i-xs"></span>Month to date</span>
+              <span class="figure">{{ money.symbol }}{{ money.month_to_date }}</span>
+            </div>
+            <div class="row">
+              <span class="name"><span class="i i-users i-xs"></span>New customers</span>
+              <span class="figure">{{ money.new_customers }}</span>
+            </div>
+            <div class="row">
+              <span class="name"><span class="i i-close i-xs"></span>Failed</span>
+              <span class="figure">{{ money.failed_today }}</span>
+            </div>
+            <div class="row">
+              <span class="name"><span class="i i-receipt i-xs"></span>Yesterday</span>
+              <span class="figure">{{ money.symbol }}{{ money.yesterday }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% if rich and extension.values.show_week and money.week %}
+      {% comment %}
+        Scaled between the quietest and the busiest day, not from zero. A week
+        that runs 2980 to 4260 drawn from zero is seven bars of the same
+        height, which says nothing about the week.
+      {% endcomment %}
+      {% assign peak = 0 %}
+      {% assign trough = 99999999 %}
+      {% for day in money.week %}
+        {% if day.amount > peak %}{% assign peak = day.amount %}{% endif %}
+        {% if day.amount < trough %}{% assign trough = day.amount %}{% endif %}
+      {% endfor %}
+      {% assign span = peak | minus: trough %}
+      {% if span <= 0 %}{% assign span = 1 %}{% endif %}
+
+      <div style="border-top: var(--rule) solid var(--ink); height: 116px; padding: 10px var(--pad) 8px">
+        <div class="bars">
+          {% for day in money.week %}
+            <div class="bar">
+              <span class="tick t-bold">{{ day.amount }}</span>
+              <span class="fill{% if forloop.last %}{% else %} fill--hatch{% endif %}"
+                    style="height: {{ day.amount | minus: trough | times: 76 | divided_by: span | plus: 18 }}%"></span>
+              <span class="tick">{{ day.day }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  {% endif %}
+
+  {% comment %} Where another extension gets to say something on this screen. {% endcomment %}
+  {% if notices.size > 0 %}
+    <div class="notice-strip">
+      {% for notice in notices %}
+        <span class="notice{% if notice.loud %} notice--loud{% endif %}">
+          <span class="i i-{{ notice.icon }}"></span>{{ notice.text }}
+        </span>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

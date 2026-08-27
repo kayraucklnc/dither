@@ -1,6 +1,6 @@
 import { Liquid } from "liquidjs";
 
-import type { Extension } from "@/lib/extensions/registry";
+import { templateFor, type Extension } from "@/lib/extensions/registry";
 
 /**
  * Extension templates are Liquid, the same dialect TRMNL uses, so designs
@@ -150,7 +150,7 @@ export async function renderWidget(
   data: Record<string, unknown>,
   notices: { icon: string; text: string; loud: boolean }[] = [],
 ): Promise<{ html: string } | { problem: string }> {
-  const template = extension.templates[shape];
+  const template = templateFor(extension, shape);
 
   if (!template) {
     // Refusing is the point. Scaling a full-screen design into a corner is

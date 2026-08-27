@@ -19,6 +19,7 @@ export function ScreenPreview({
   alt,
   className,
   fit = "contain",
+  crisp = false,
 }: {
   src: string;
   width: number;
@@ -26,6 +27,13 @@ export function ScreenPreview({
   alt: string;
   className?: string;
   fit?: "contain" | "cover";
+  /**
+   * Show the dither as literal pixels. Right at roughly life size in the
+   * editor; wrong on a thumbnail, where downscaling a 1-bit image with nearest
+   * neighbour turns a careful dither into aliased noise. Smoothed, the same
+   * image reads as the greys the panel actually produces.
+   */
+  crisp?: boolean;
 }) {
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
   const [reason, setReason] = useState<string>();
@@ -81,7 +89,7 @@ export function ScreenPreview({
           src={src}
           alt={alt}
           className={cn("h-full w-full", fit === "cover" ? "object-cover" : "object-contain")}
-          style={{ imageRendering: "pixelated" }}
+          style={{ imageRendering: crisp ? "pixelated" : "auto" }}
         />
       )}
     </div>

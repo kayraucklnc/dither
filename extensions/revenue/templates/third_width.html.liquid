@@ -1,0 +1,47 @@
+{% comment %} Third width: 267x480. A narrow column of figures. {% endcomment %}
+
+{% assign money = revenue %}
+
+<div class="screen dense">
+  <div class="content content--tight layout layout--col" style="gap: 14px">
+    <p class="t-xs t-upper t-center">{{ extension.values.heading | default: "Revenue" }}</p>
+
+    <div class="hero" style="gap: 2px">
+      <p class="t-bold" style="font-size: 40px; line-height: 1">{{ money.symbol }}{{ money.today }}</p>
+      <p class="with-icon t-xs t-bold">
+        <span class="i i-trending-{% if money.change_percent >= 0 %}up{% else %}down{% endif %} i-xs"></span>
+        {{ money.change_percent }}%
+      </p>
+    </div>
+
+    <div class="facts">
+      <div class="row">
+        <span class="name">MTD</span>
+        <span class="figure">{{ money.symbol }}{{ money.month_to_date }}</span>
+      </div>
+      <div class="row">
+        <span class="name">Payments</span>
+        <span class="figure">{{ money.payments_today }}</span>
+      </div>
+      <div class="row">
+        <span class="name">New</span>
+        <span class="figure">{{ money.new_customers }}</span>
+      </div>
+      <div class="row">
+        <span class="name">Failed</span>
+        <span class="figure">{{ money.failed_today }}</span>
+      </div>
+    </div>
+  </div>
+
+  {% comment %} Where another extension gets to say something on this screen. {% endcomment %}
+  {% if notices.size > 0 %}
+    <div class="notice-strip">
+      {% for notice in notices %}
+        <span class="notice{% if notice.loud %} notice--loud{% endif %}">
+          <span class="i i-{{ notice.icon }}"></span>{{ notice.text }}
+        </span>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

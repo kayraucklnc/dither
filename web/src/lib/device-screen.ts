@@ -17,7 +17,7 @@ import { contextFor } from "@/lib/flow/context";
 import { activeNotices } from "@/lib/flow/notices";
 import { walk, type Node, type Walk } from "@/lib/flow/tree";
 import { panelFor } from "@/lib/panel";
-import { fingerprint, renderScreen } from "@/lib/render";
+import { fingerprint, renderEmpty, renderScreen } from "@/lib/render";
 import { store } from "@/lib/storage";
 import { refreshScreen } from "@/lib/extensions/fetcher";
 import { dataFor } from "@/lib/widget-data";
@@ -105,10 +105,20 @@ export async function serve(device: Device, now = new Date()): Promise<Served> {
   }));
 
   const spec = panelFor(panel);
-  const key = `${await fingerprint(placed, spec, said)}.png`;
+  // A leaf with no screen, or no tree at all, still has to put something on
+  // the panel - and "blank" is indistinguishable from "broken".
+  const nothing = placed.length === 0;
+
+  const key = nothing
+    ? `empty-${await fingerprint([], spec, said)}.png`
+    : `${await fingerprint(placed, spec, said)}.png`;
 
   if (!(await store().has(key))) {
-    const rendered = await renderScreen(placed, spec, said);
+    const rendered = nothing
+      ? await renderEmpty(spec, device.name, result.leaf
+          ? `"${result.leaf.label}" has no screen chosen yet. Pick one on this device's page.`
+          : "No decision tree yet. Open this device in Dither to set one up.")
+      : await renderScreen(placed, spec, said);
     await store().put(key, rendered.bytes, "image/png");
 
     await db.insert(renders).values({
