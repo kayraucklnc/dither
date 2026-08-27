@@ -1,5 +1,6 @@
-import { MINUTE, dayLabel, startOfDay, startOfDaysAgo } from "@/lib/clock";
+import { DAY, HOUR, MINUTE, dateLabel, dayKey, dayLabel, endOfDay, startOfDay } from "@/lib/clock";
 import type { GoogleEvent } from "./api";
+import type { RangeKey, Window } from "./range";
 
 /**
  * Turning what Google returns into what a template draws.
@@ -34,15 +35,42 @@ export interface Meeting {
   minutes_left: number;
   in_progress: boolean;
   accepted: boolean;
-  /** "Thu", for a horizon long enough to leave today. */
+  /** "Thu", for a window long enough to leave today. */
   day: string;
   today: boolean;
+  /** "2026-08-27", the day group this belongs to. */
+  date: string;
+  /**
+   * When it starts, as an instant. Sorting on `minutes_until` alone puts every
+   * meeting already running at zero and then orders them by a clock string, so
+   * two overlapping meetings could swap places between renders.
+   */
+  at: number;
 }
 
 export interface AllDay {
   title: string;
   today: boolean;
   accepted: boolean;
+  /** "2026-08-27", so a day-grouped design can find it. */
+  date: string;
+  day: string;
+}
+
+/** One local day of the window, for a design that lists more than today. */
+export interface DayGroup {
+  /** "2026-08-27". */
+  date: string;
+  /** "Thu". */
+  day: string;
+  /** "27 Aug". */
+  label: string;
+  today: boolean;
+  tomorrow: boolean;
+  events: Meeting[];
+  all_day: AllDay[];
+  /** Nothing timed and nothing all-day. */
+  empty: boolean;
 }
 
 export interface Agenda {
@@ -59,6 +87,18 @@ export interface Agenda {
   all_day: AllDay[];
   all_day_today: number;
   in_meeting: boolean;
+  /**
+   * The window, a local day at a time, oldest first.
+   *
+   * Only worth building when the window can hold more than one day - a design
+   * showing the rest of today would draw one group containing everything, and
+   * a heading saying "Thu" above a list of today's meetings is noise.
+   */
+  days: DayGroup[];
+  /** Which range was asked for, and what to call it. */
+  range: RangeKey;
+  range_label: string;
+  spans_days: boolean;
   /** True when the window held more than one page of events. */
   truncated: boolean;
 }
@@ -165,22 +205,39 @@ export function clockAt(at: Date, timezone: string, locale: string): string {
   return formatter.format(at);
 }
 
-/** Midnight at the end of the local day containing `at`. */
-const endOfLocalDay = (at: Date, timezone: string): Date => startOfDaysAgo(at, timezone, -1);
-
 export interface AgendaOptions {
   now: Date;
   timezone: string;
   locale: string;
-  /** How far ahead the widget asked to look. */
-  horizonMinutes: number;
+  /** The stretch of time the widget asked about. */
+  window: Window;
   hideDeclined: boolean;
   truncated?: boolean;
 }
 
+/**
+ * The local days a window covers, oldest first.
+ *
+ * Walked a day at a time from noon rather than by adding days of
+ * milliseconds, so the morning the clocks change does not produce the same
+ * date twice or skip one.
+ */
+function localDays(from: Date, to: Date, timezone: string): Date[] {
+  const days: Date[] = [];
+  let cursor = startOfDay(from, timezone);
+
+  // A month is 31 of these; the guard is for a window that somehow has no end.
+  while (cursor < to && days.length < 40) {
+    days.push(cursor);
+    cursor = endOfDay(new Date(cursor.getTime() + 12 * HOUR), timezone);
+  }
+
+  return days;
+}
+
 export function agenda(source: GoogleEvent[], options: AgendaOptions): Agenda {
-  const { now, timezone, locale, horizonMinutes, hideDeclined } = options;
-  const dayEnds = endOfLocalDay(now, timezone).getTime();
+  const { now, timezone, locale, window, hideDeclined } = options;
+  const dayEnds = endOfDay(now, timezone).getTime();
   const today = startOfDay(now, timezone).getTime();
 
   const kept = source.filter((event) => {
@@ -190,19 +247,28 @@ export function agenda(source: GoogleEvent[], options: AgendaOptions): Agenda {
 
   const allDay: AllDay[] = [];
   const meetings: Meeting[] = [];
+  /** Which local days each all-day entry covers, so a week can place it. */
+  const spans: { entry: AllDay; from: number; to: number }[] = [];
 
   for (const event of kept) {
     const title = (event.summary ?? "").trim() || "Busy";
 
     if (isAllDay(event)) {
       const from = instant(event.start)?.getTime() ?? 0;
-      allDay.push({
+      // An all-day entry's own dates are midnight UTC, so "does it cover this
+      // day" is a comparison of ranges rather than of a single instant.
+      const until = instant(event.end)?.getTime() ?? from + DAY;
+
+      const entry: AllDay = {
         title,
-        // An all-day entry's own dates are midnight UTC, so "does it cover
-        // today" is a comparison of ranges rather than of a single instant.
-        today: from < dayEnds && (instant(event.end)?.getTime() ?? from) > today,
+        today: from < dayEnds && until > today,
         accepted: !isDeclined(event),
-      });
+        date: dayKey(new Date(from), timezone),
+        day: dayLabel(new Date(from), timezone, locale),
+      };
+
+      allDay.push(entry);
+      spans.push({ entry, from, to: until });
       continue;
     }
 
@@ -225,15 +291,45 @@ export function agenda(source: GoogleEvent[], options: AgendaOptions): Agenda {
       accepted: !isDeclined(event),
       day: dayLabel(start, timezone, locale),
       today: start.getTime() < dayEnds,
+      date: dayKey(start, timezone),
+      at: start.getTime(),
     });
   }
 
   // Google orders by start time already, but only within one request, and only
   // when it was asked to. Sorting here costs nothing and means the timeline is
   // in order whatever the caller did.
-  meetings.sort((a, b) => a.minutes_until - b.minutes_until || a.start.localeCompare(b.start));
+  meetings.sort((a, b) => a.at - b.at);
 
   const next = meetings[0] ?? null;
+
+  /* -- the window, a day at a time ---------------------------------------- */
+
+  const days: DayGroup[] = window.spansDays
+    ? localDays(now, window.to, timezone).map((midnight) => {
+        const date = dayKey(midnight, timezone);
+        const ends = endOfDay(new Date(midnight.getTime() + 12 * HOUR), timezone).getTime();
+
+        const onThisDay = meetings.filter((meeting) => meeting.date === date);
+        // An entry covering Monday to Friday belongs on all five, which is
+        // what a calendar shows and what makes "am I off on Thursday"
+        // answerable from the group rather than from the flat list.
+        const covering = spans
+          .filter((span) => span.from < ends && span.to > midnight.getTime())
+          .map((span) => span.entry);
+
+        return {
+          date,
+          day: dayLabel(midnight, timezone, locale),
+          label: dateLabel(midnight, timezone, locale),
+          today: date === dayKey(now, timezone),
+          tomorrow: midnight.getTime() === dayEnds,
+          events: onThisDay,
+          all_day: covering,
+          empty: onThisDay.length === 0 && covering.length === 0,
+        };
+      })
+    : [];
 
   return {
     empty: meetings.length === 0,
@@ -241,12 +337,18 @@ export function agenda(source: GoogleEvent[], options: AgendaOptions): Agenda {
     // What is left of the quiet, which is zero when you are already in
     // something. A widget captioned "free for" reading 24 minutes while a
     // meeting is running would be lying by a whole meeting.
-    free_minutes: next ? next.minutes_until : horizonMinutes,
+    free_minutes: next
+      ? next.minutes_until
+      : Math.max(0, Math.round((window.to.getTime() - now.getTime()) / MINUTE)),
     next,
     events: meetings,
     all_day: allDay,
     all_day_today: allDay.filter((entry) => entry.today).length,
     in_meeting: Boolean(next?.in_progress),
+    days,
+    range: window.key,
+    range_label: window.label,
+    spans_days: window.spansDays,
     truncated: Boolean(options.truncated),
   };
 }

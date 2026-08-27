@@ -35,6 +35,69 @@ start_at: "2026-01-01T00:00:00Z"
 static_body: {}
 data: {}
 
+# Eight looks, at overlapping sizes, because a calendar is the widget people
+# stare at most and one opinion about it is not enough. Where two ranges cover
+# the size you drew, the widget picks - that is the "style" in the inspector.
+#
+# Declaring any means declaring all: the preset ranges only apply to a manifest
+# that names none.
+designs:
+  - template: full
+    label: Full screen
+    hint: What is next, large, with the rest of the day as a timeline beside it.
+    columns: [9, 12]
+    rows: [9, 12]
+    nominal: [12, 12]
+
+  - template: next_up
+    label: Next up
+    hint: The one thing, as large as the box allows, and nothing else.
+    columns: [4, 12]
+    rows: [3, 12]
+    nominal: [6, 6]
+
+  - template: agenda
+    label: Agenda
+    hint: What is on, grouped by day. Wants a range that reaches past today.
+    columns: [4, 12]
+    rows: [6, 12]
+    nominal: [6, 12]
+
+  - template: week
+    label: Week
+    hint: A column per day, gaps included, for reading the shape of a week.
+    columns: [8, 12]
+    rows: [5, 12]
+    nominal: [12, 8]
+
+  - template: half_width
+    label: Half width
+    hint: Full height, half the width - the day as a single timeline.
+    columns: [4, 8]
+    rows: [8, 12]
+    nominal: [6, 12]
+
+  - template: third_width
+    label: Narrow column
+    hint: Full height, narrow. A dense agenda and nothing else.
+    columns: [2, 5]
+    rows: [8, 12]
+    nominal: [3, 12]
+
+  - template: third_height
+    label: Wide band
+    hint: Full width, shallow. One line, read from across the room.
+    columns: [8, 12]
+    rows: [2, 5]
+    nominal: [12, 4]
+
+  - template: quarter
+    label: Corner
+    hint: A box in the middle of the range, neither band nor column.
+    columns: [4, 8]
+    rows: [3, 8]
+    nominal: [6, 6]
+
 fields:
   - keyname: calendar
     name: Calendar
@@ -46,6 +109,27 @@ fields:
     help_text: Which calendar from the linked account.
     optional: false
 
+  # A boundary in a place, not a duration. At 22:00 "the rest of today" is two
+  # hours and "the next twelve" is most of tomorrow morning, and only one of
+  # those is what somebody meant.
+  - keyname: range
+    name: Show
+    field_type: select
+    default: today
+    options:
+      - value: today
+        label: The rest of today
+      - value: tomorrow
+        label: Today and tomorrow
+      - value: week
+        label: The rest of this week
+      - value: month
+        label: The rest of this month
+      - value: hours
+        label: The next few hours
+    help_text: How far ahead the list reaches. Weeks end where this locale says they do.
+    optional: false
+
   - keyname: horizon_hours
     name: Look ahead
     field_type: number
@@ -54,12 +138,18 @@ fields:
     max: 72
     help_text: Hours ahead to consider. Meetings past this are ignored.
     optional: false
+    visible_when:
+      field: range
+      any_of:
+        - hours
 
   - keyname: heading
     name: Heading
     field_type: string
-    default: "Today"
-    help_text: Label above the list. Leave blank to hide it.
+    default: ""
+    help_text: >
+      Label above the list. Left blank it names the range - "Today", "This
+      week" - which is usually what you would have typed.
     optional: true
 
   - keyname: hide_declined
@@ -153,7 +243,15 @@ sample:
     empty: false
     in_meeting: false
     all_day_today: 0
-    all_day: []
+    all_day:
+      - title: "Ana on leave"
+        today: false
+        accepted: true
+        date: "2026-08-29"
+        day: "Sat"
+    range: week
+    range_label: "This week"
+    spans_days: true
     next:
       title: "Design review"
       minutes_until: 24
@@ -166,6 +264,7 @@ sample:
       accepted: true
       day: "Thu"
       today: true
+      date: "2026-08-27"
     events:
       - title: "Design review"
         start: "10:30"
@@ -173,15 +272,108 @@ sample:
         location: "Milano Centrale, Sala 4"
         remote: false
         minutes_until: 24
+        day: "Thu"
+        today: true
+        date: "2026-08-27"
       - title: "Standup"
         start: "11:30"
         end: "11:45"
         location: "Meet"
         remote: true
         minutes_until: 84
+        day: "Thu"
+        today: true
+        date: "2026-08-27"
       - title: "1:1 with Ana"
         start: "15:00"
         end: "15:30"
         location: "Sala 2"
         remote: false
         minutes_until: 294
+        day: "Thu"
+        today: true
+        date: "2026-08-27"
+      - title: "Sprint planning"
+        start: "09:30"
+        end: "10:30"
+        location: "Zoom"
+        remote: true
+        minutes_until: 1394
+        day: "Fri"
+        today: false
+        date: "2026-08-28"
+      - title: "Retro"
+        start: "16:00"
+        end: "17:00"
+        location: "Sala 4"
+        remote: false
+        minutes_until: 1784
+        day: "Fri"
+        today: false
+        date: "2026-08-28"
+    days:
+      - date: "2026-08-27"
+        day: "Thu"
+        label: "27 Aug"
+        today: true
+        tomorrow: false
+        empty: false
+        all_day: []
+        events:
+          - title: "Design review"
+            start: "10:30"
+            end: "11:15"
+            location: "Milano Centrale, Sala 4"
+            remote: false
+            minutes_until: 24
+          - title: "Standup"
+            start: "11:30"
+            end: "11:45"
+            location: "Meet"
+            remote: true
+            minutes_until: 84
+          - title: "1:1 with Ana"
+            start: "15:00"
+            end: "15:30"
+            location: "Sala 2"
+            remote: false
+            minutes_until: 294
+      - date: "2026-08-28"
+        day: "Fri"
+        label: "28 Aug"
+        today: false
+        tomorrow: true
+        empty: false
+        all_day: []
+        events:
+          - title: "Sprint planning"
+            start: "09:30"
+            end: "10:30"
+            location: "Zoom"
+            remote: true
+            minutes_until: 1394
+          - title: "Retro"
+            start: "16:00"
+            end: "17:00"
+            location: "Sala 4"
+            remote: false
+            minutes_until: 1784
+      - date: "2026-08-29"
+        day: "Sat"
+        label: "29 Aug"
+        today: false
+        tomorrow: false
+        empty: false
+        events: []
+        all_day:
+          - title: "Ana on leave"
+            today: false
+            accepted: true
+      - date: "2026-08-30"
+        day: "Sun"
+        label: "30 Aug"
+        today: false
+        tomorrow: false
+        empty: true
+        events: []
+        all_day: []
