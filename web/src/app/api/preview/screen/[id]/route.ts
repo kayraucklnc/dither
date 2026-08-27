@@ -8,6 +8,34 @@ import { fingerprint, renderScreen } from "@/lib/render";
 import { store } from "@/lib/storage";
 import { contextFor, sourceExtensions } from "@/lib/flow/context";
 import { activeNotices } from "@/lib/flow/notices";
+
+interface Simulation {
+  at: Date;
+  overrides: Record<string, Record<string, unknown>>;
+  notices: Record<number, "on" | "off">;
+}
+
+/** Base64 JSON, because a `<img src>` cannot carry a body. */
+function readSimulation(raw: string | null): Simulation {
+  const empty: Simulation = { at: new Date(), overrides: {}, notices: {} };
+  if (!raw) return empty;
+
+  try {
+    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8"));
+    const at = parsed.at ? new Date(parsed.at) : new Date();
+
+    return {
+      at: Number.isNaN(at.getTime()) ? new Date() : at,
+      overrides: parsed.overrides ?? {},
+      notices: Object.fromEntries(
+        Object.entries(parsed.notices ?? {}).map(([id, state]) => [Number(id), state]),
+      ) as Record<number, "on" | "off">,
+    };
+  } catch {
+    // A malformed parameter should show the truth, not an error page.
+    return empty;
+  }
+}
 import { dataFor } from "@/lib/widget-data";
 
 /** A saved screen, rendered for a panel. Used by every list and thumbnail. */
@@ -47,14 +75,27 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     ? await db.select().from(devices).where(eq(devices.id, deviceId))
     : [undefined];
 
+  /**
+   * A thumbnail has to agree with the trace beside it.
+   *
+   * The Test tab can pretend it is a different hour, that a value is other
+   * than it is, or that an alert is firing. A preview that ignores all that
+   * shows the truth while the trace shows the pretence, and the two disagree
+   * on screen. It rides in the URL because these are `<img src>`, which cannot
+   * post a body.
+   */
+  const simulation = readSimulation(new URL(request.url).searchParams.get("sim"));
+
   const said = device
     ? await activeNotices(
         await db.select().from(notices).where(eq(notices.deviceId, device.id)),
-        await contextFor(device),
+        await contextFor(device, simulation.at, simulation.overrides),
+        await sourceExtensions(device.id),
+        simulation.notices,
       )
     : [];
 
-  const key = await fingerprint(placed, panel, said);
+  const key = await fingerprint(placed, panel, said, { at: simulation.at.getTime() });
 
   if (request.headers.get("if-none-match") === `"${key}"`) {
     return new NextResponse(null, { status: 304 });

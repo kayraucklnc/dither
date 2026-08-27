@@ -152,7 +152,7 @@ export const manifestSchema = z.object({
    * crowded. Overflow is summarised rather than squeezed, because six alerts
    * in a band is six unreadable alerts.
    */
-  notice_capacity: z.number().int().min(1).max(6).default(2),
+  notice_capacity: z.number().int().min(1).max(8).default(4),
   exchanges: z.array(exchangeSchema).default([]),
 
   /**

@@ -22,14 +22,26 @@
     <p class="t-sm t-center">{{ stamp | date: "%a" }}<br>{{ stamp | date: "%-d %b" }}</p>
   </div>
 
-  {% comment %} Where another extension gets to say something on this screen. {% endcomment %}
+  {% comment %}
+    Where another extension gets to say something on this screen. Glyphs like
+    dashboard warning lights, with the loudest one's words beside them when the
+    shape is wide enough to carry them.
+  {% endcomment %}
   {% if notices.size > 0 %}
     <div class="notice-strip">
       {% for notice in notices %}
-        <span class="notice notice--{{ notice.level }}">
-          <span class="i i-{{ notice.icon }}"></span>{{ notice.text }}
-        </span>
+        {% if notice.overflow %}
+          <span class="notice notice--more">+{{ notice.overflow }}</span>
+        {% else %}
+          <span class="notice notice--{{ notice.level }}" title="{{ notice.text }}">
+            <span class="i i-{{ notice.icon }}"></span>
+          </span>
+        {% endif %}
       {% endfor %}
+
+      {% if shape.columns >= 6 and notices[0].text != blank %}
+        <span class="notice-said">{{ notices[0].text }}</span>
+      {% endif %}
     </div>
   {% endif %}
 </div>
