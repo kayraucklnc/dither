@@ -94,6 +94,17 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
 - **The cache key is also the image filename**, and `/api/image/[key]` only
   accepts a plain hash. Anything distinguishing a render belongs *inside* the
   hash, never as a key prefix.
+- **A preview's URL does not move when the screen does, so freshness is the
+  browser's decision.** A node's thumbnail is `/api/preview/screen/<id>`, the
+  same address before an edit and after it. Given a `max-age` the browser
+  draws its copy without asking, and `stale-while-revalidate` puts the fresh
+  one in the cache rather than on the screen - so the tree shows the screen as
+  it was, one visit behind, for as long as the window lasts. Previews say
+  `no-cache` and let the ETag answer, which is free only because the key is
+  stable: fold a raw `Date.now()` into it, as the screen preview did, and every
+  request is a key nothing has ever used - the stored render is never reused,
+  every thumbnail is drawn again, and no browser is ever told its copy is good.
+  The moment goes in as `now`, where each design's tick quantises it.
 - **The framework must reset `<p>` margins.** At 76px that is 152px of phantom
   space, enough to push a hero clean off the panel.
 - **`.bars` must `align-items: stretch`.** With `flex-end` every bar sizes to
@@ -238,6 +249,7 @@ make verify                                   # the firmware wire contract, live
 cd web                                        # the rest are still run by hand
 npx tsx --env-file=.env.local scripts/sweep.mts   # every design, at the edges of its range
 npx tsx --env-file=.env.local scripts/qa.mts      # every page, in a browser
+npx tsx --env-file=.env.local scripts/preview-freshness-qa.mts  # a node keeps up with its screen
 npx tsx scripts/shot.mts <url> <out.png> [h]  # screenshot a page, report console errors
 npx tsx scripts/measure.mts                   # element boxes, for layout bugs
 ```
