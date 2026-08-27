@@ -98,6 +98,7 @@ fields:
     optional: true
 
   - keyname: show_platform
+    presentation: true
     name: Show the platform
     field_type: boolean
     needs_capability: platforms
@@ -111,7 +112,12 @@ fields:
     help_text: Off is usually better - a cancelled train is worth knowing about.
     optional: true
 
+  # Presentational, both of them: the board is fetched from the route, the
+  # limit and the lead time, and neither of these is read on the way out. Left
+  # off, two boards of one route with different headings would be two questions
+  # and so two trips to the operator.
   - keyname: heading
+    presentation: true
     name: Heading
     field_type: string
     default: ""
