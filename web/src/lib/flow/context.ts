@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { triggers, type Device } from "@/lib/db/schema";
-import { answersFor, observationKey } from "@/lib/extensions/observations";
+import { answersFor, observationKey, reading } from "@/lib/extensions/observations";
 import { find as findExtension } from "@/lib/extensions/registry";
 import type { Context } from "@/lib/flow/conditions";
 import { setAt } from "@/lib/facts";
@@ -31,7 +31,9 @@ export async function sourcesFor(device: Device, now = new Date()): Promise<Sour
       triggerSource(
         trigger,
         extension?.manifest.facts ?? [],
-        answer ?? { payload: {}, fetchedAt: null },
+        // `reading`, not the answer itself: a stand-in is the extension's
+        // sample, and a check cannot tell one from a reading. See observations.
+        reading(answer),
         now,
       ),
     );

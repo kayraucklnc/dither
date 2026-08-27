@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { observationKey } from "./observations";
+import { observationKey, reading } from "./observations";
 
 describe("what counts as the same question", () => {
   it("is the extension and the settings, not who asked", () => {
@@ -30,5 +30,54 @@ describe("what counts as the same question", () => {
   it("treats no settings as a question in its own right", () => {
     expect(observationKey("clock", {})).toBe(observationKey("clock", {}));
     expect(observationKey("clock", {})).not.toBe(observationKey("clock", { heading: "Milan" }));
+  });
+});
+
+describe("what a decision is allowed to read", () => {
+  const fetchedAt = new Date("2026-08-27T08:00:00Z");
+
+  it("hands on a real answer unchanged", () => {
+    const answer = {
+      payload: { transit: { alert: "Reduced service" } },
+      fetchedAt,
+      attemptedAt: fetchedAt,
+      standIn: false,
+    };
+
+    expect(reading(answer)).toEqual({
+      payload: { transit: { alert: "Reduced service" } },
+      fetchedAt,
+      error: undefined,
+    });
+  });
+
+  it("reads a stand-in as nothing, sample or no sample", () => {
+    // The sample is preview material. A rule cannot tell it from a reading, so
+    // it never gets to see one - otherwise a source that has never answered
+    // decides with the extension author's imagination.
+    const answer = {
+      payload: { transit: { alerts: [{ title: "Reduced service" }] } },
+      fetchedAt: null,
+      attemptedAt: fetchedAt,
+      standIn: true,
+    };
+
+    expect(reading(answer)).toEqual({ payload: {}, fetchedAt: null, error: undefined });
+  });
+
+  it("keeps the error, so a silent source can say why it is silent", () => {
+    const answer = {
+      payload: {},
+      fetchedAt: null,
+      attemptedAt: fetchedAt,
+      error: "Trenord answered 503 for its journey planner.",
+      standIn: true,
+    };
+
+    expect(reading(answer).error).toBe("Trenord answered 503 for its journey planner.");
+  });
+
+  it("treats a question nobody has asked the same way", () => {
+    expect(reading(undefined)).toEqual({ payload: {}, fetchedAt: null, error: undefined });
   });
 });

@@ -21,7 +21,7 @@ import { inQuietHours, secondsUntilAwake } from "@/lib/quiet-hours";
 import { environment } from "@/lib/settings";
 import { fingerprint, renderEmpty, renderScreen } from "@/lib/render";
 import { store } from "@/lib/storage";
-import { refreshScreen } from "@/lib/extensions/fetcher";
+import { refreshScreen, refreshTriggers } from "@/lib/extensions/fetcher";
 import { dataFor } from "@/lib/widget-data";
 
 /**
@@ -57,6 +57,11 @@ export function toNodes(rows: (typeof decisionNodes.$inferSelect)[]): Node[] {
 
 export async function serve(device: Device, now = new Date()): Promise<Served> {
   const [panel] = await db.select().from(models).where(eq(models.id, device.modelId));
+
+  // Before the walk, not after: the tree is about to decide on these, and a
+  // source nothing ever refreshes decides on the day it was created for ever.
+  // Only the ones that have aged out, so a wake is one round of fetches at most.
+  await refreshTriggers(now);
 
   const rows = await db.select().from(decisionNodes).where(eq(decisionNodes.deviceId, device.id));
   const context = await contextFor(device, now);
