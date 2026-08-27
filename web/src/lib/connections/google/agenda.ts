@@ -41,6 +41,11 @@ export interface Meeting {
   /** "2026-08-27", the day group this belongs to. */
   date: string;
   /**
+   * Which feed it came from, when the widget is showing more than one. Empty
+   * for a single calendar, where naming it on every line is noise.
+   */
+  calendar: string;
+  /**
    * When it starts, as an instant. Sorting on `minutes_until` alone puts every
    * meeting already running at zero and then orders them by a clock string, so
    * two overlapping meetings could swap places between renders.
@@ -55,6 +60,8 @@ export interface AllDay {
   /** "2026-08-27", so a day-grouped design can find it. */
   date: string;
   day: string;
+  /** Which feed it came from, when the widget is showing more than one. */
+  calendar: string;
 }
 
 /** One local day of the window, for a design that lists more than today. */
@@ -265,6 +272,7 @@ export function agenda(source: GoogleEvent[], options: AgendaOptions): Agenda {
         accepted: !isDeclined(event),
         date: dayKey(new Date(from), timezone),
         day: dayLabel(new Date(from), timezone, locale),
+        calendar: event.calendarName ?? "",
       };
 
       allDay.push(entry);
@@ -292,6 +300,7 @@ export function agenda(source: GoogleEvent[], options: AgendaOptions): Agenda {
       day: dayLabel(start, timezone, locale),
       today: start.getTime() < dayEnds,
       date: dayKey(start, timezone),
+      calendar: event.calendarName ?? "",
       at: start.getTime(),
     });
   }

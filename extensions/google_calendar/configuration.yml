@@ -99,14 +99,19 @@ designs:
     nominal: [6, 6]
 
 fields:
+  # Several at once, because work and family on one panel is the ordinary case
+  # and two overlapping widgets is not how anybody would ask for it. Listed from
+  # the linked account rather than written down here: a calendar's id is an
+  # address, and typing one from memory is a quiz, not a form.
   - keyname: calendar
-    name: Calendar
-    field_type: select
-    default: primary
-    # Listed from the linked account rather than written down here: a calendar's
-    # id is an address, and typing one from memory is a quiz, not a form.
+    name: Calendars
+    field_type: multiselect
+    default:
+      - primary
     options_from: google.calendars
-    help_text: Which calendar from the linked account.
+    help_text: >
+      Which calendars from the linked account. Tick more than one and they are
+      merged into a single list, each entry marked with where it came from.
     optional: false
 
   # A boundary in a place, not a duration. At 22:00 "the rest of today" is two
@@ -234,6 +239,14 @@ facts:
     path: calendar.all_day_today
     unit: ""
 
+  # One of several feeds failing should not blank the four that still work, but
+  # it should be something a rule can notice.
+  - key: calendars_unread
+    label: Calendars that did not answer
+    type: number
+    path: calendar.unread
+    unit: ""
+
 # Used for previews until the connection has answered once. Never sent to a
 # device.
 sample:
@@ -252,6 +265,12 @@ sample:
     range: week
     range_label: "This week"
     spans_days: true
+    many: true
+    names:
+      - "Work"
+      - "Family"
+    incomplete: false
+    unread: 0
     next:
       title: "Design review"
       minutes_until: 24
@@ -265,6 +284,7 @@ sample:
       day: "Thu"
       today: true
       date: "2026-08-27"
+      calendar: "Work"
     events:
       - title: "Design review"
         start: "10:30"
@@ -275,6 +295,7 @@ sample:
         day: "Thu"
         today: true
         date: "2026-08-27"
+        calendar: "Work"
       - title: "Standup"
         start: "11:30"
         end: "11:45"
@@ -284,6 +305,7 @@ sample:
         day: "Thu"
         today: true
         date: "2026-08-27"
+        calendar: "Work"
       - title: "1:1 with Ana"
         start: "15:00"
         end: "15:30"
@@ -293,6 +315,7 @@ sample:
         day: "Thu"
         today: true
         date: "2026-08-27"
+        calendar: "Family"
       - title: "Sprint planning"
         start: "09:30"
         end: "10:30"
@@ -302,6 +325,7 @@ sample:
         day: "Fri"
         today: false
         date: "2026-08-28"
+        calendar: "Work"
       - title: "Retro"
         start: "16:00"
         end: "17:00"
@@ -311,6 +335,7 @@ sample:
         day: "Fri"
         today: false
         date: "2026-08-28"
+        calendar: "Family"
     days:
       - date: "2026-08-27"
         day: "Thu"
@@ -326,18 +351,21 @@ sample:
             location: "Milano Centrale, Sala 4"
             remote: false
             minutes_until: 24
+            calendar: "Work"
           - title: "Standup"
             start: "11:30"
             end: "11:45"
             location: "Meet"
             remote: true
             minutes_until: 84
+            calendar: "Work"
           - title: "1:1 with Ana"
             start: "15:00"
             end: "15:30"
             location: "Sala 2"
             remote: false
             minutes_until: 294
+            calendar: "Family"
       - date: "2026-08-28"
         day: "Fri"
         label: "28 Aug"
@@ -352,12 +380,14 @@ sample:
             location: "Zoom"
             remote: true
             minutes_until: 1394
+            calendar: "Work"
           - title: "Retro"
             start: "16:00"
             end: "17:00"
             location: "Sala 4"
             remote: false
             minutes_until: 1784
+            calendar: "Family"
       - date: "2026-08-29"
         day: "Sat"
         label: "29 Aug"

@@ -153,6 +153,29 @@ Six ideas. Getting any of them wrong is what the first version got wrong.
 - **An all-day calendar entry has no start time**, so it cannot go on a
   timeline. Placed there as 00:00 it takes the hero slot and fires the
   about-to-start notice at midnight. They are counted separately.
+- **A fetch that failed has to reach the renderer, or the panel lies.** An
+  extension that has never answered draws a *fault* rather than its sample -
+  four invented meetings look exactly like four real ones. One that answered
+  before keeps its last picture with a note over it, in the outer document
+  rather than the iframe, so no template knows about it. The fault is in the
+  cache key too, or a screen that starts failing serves the healthy picture
+  forever. See `web/src/lib/render/compose.ts`.
+- **`.row` and `.entry` are scoped to `.facts` and `.timeline`.** Used outside
+  them they are class names with no rules behind them, and a column layout
+  silently stacks. Check the stylesheet before reaching for a class.
+- **A calendar range is a boundary in a place, not a duration.** "The rest of
+  today" at 22:00 is two hours; "the next twelve" is most of tomorrow. Every
+  boundary is walked a day at a time, because a week containing a clocks change
+  is 167 or 169 hours long. See `web/src/lib/connections/google/range.ts`.
+- **A multiselect's value is sorted before it is stored.** The settings are
+  hashed into the key an answer is cached under, so "work then family" must not
+  be a different question from "family then work".
+- **Migrate stored settings rather than compensating at read time.** Tolerating
+  a missing field is not the same as being able to *show* it: a widget with no
+  `range` was read correctly and drew an empty selector. One script
+  (`web/scripts/calendar-settings.mts`) beat teaching one more component about
+  the invisible state - and it had to cover *triggers* as well as widgets, or a
+  widget and the source beside it stop sharing one answer.
 
 ## Checking the work
 

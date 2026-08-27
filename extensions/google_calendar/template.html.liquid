@@ -67,6 +67,12 @@
                 </span>
                 <span class="body">
                   <span class="what truncate" style="display: block">{{ event.title }}</span>
+                  {% if calendar.many and event.calendar != blank %}
+                    <span class="where">
+                      <span class="i i-calendar i-xs"></span>
+                      <span class="truncate">{{ event.calendar }}</span>
+                    </span>
+                  {% endif %}
                   {% if extension.values.show_location and event.location != blank %}
                     <span class="where">
                       <span class="i i-{% if event.remote %}video{% else %}pin{% endif %} i-xs"></span>
