@@ -86,6 +86,22 @@ describe("where a window ends", () => {
     expect(window.to.toISOString()).toBe("2026-08-30T09:00:00.000Z");
   });
 
+  it("says what it looked at when it found nothing", () => {
+    // "Nothing scheduled" is the same sentence whether you asked about the
+    // next two hours or the rest of the month, and those are very different
+    // pieces of news. An empty panel has to say which question it answered.
+    const now = new Date("2026-08-27T09:00:00Z");
+    const said = (settings: Record<string, unknown>) =>
+      windowFor(settings, now, "UTC", "en-GB").emptyLabel;
+
+    expect(said({ range: "today" })).toBe("Nothing left today");
+    expect(said({ range: "tomorrow" })).toBe("Nothing today or tomorrow");
+    expect(said({ range: "week" })).toBe("Nothing this week");
+    expect(said({ range: "month" })).toBe("Nothing this month");
+    expect(said({ range: "hours", horizon_hours: 6 })).toBe("Nothing in the next 6 hours");
+    expect(said({ range: "hours", horizon_hours: 1 })).toBe("Nothing in the next 1 hour");
+  });
+
   it("falls back to today when the setting is missing or nonsense", () => {
     const now = new Date("2026-08-27T09:00:00Z");
 

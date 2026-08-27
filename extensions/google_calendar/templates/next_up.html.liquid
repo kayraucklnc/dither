@@ -21,8 +21,8 @@
         <p class="t-sm">All day</p>
       {% else %}
         <span class="i i-calendar-check i-xl"></span>
-        <p class="t-xl t-bold">Nothing next</p>
-        <p class="t-sm">{{ calendar.range_label }} is clear.</p>
+        <p class="t-xl t-bold t-center clamp-2">{{ calendar.empty_label | default: "Nothing next" }}</p>
+        <p class="t-sm">Nothing on the calendars you picked.</p>
       {% endif %}
     </div>
   {% else %}

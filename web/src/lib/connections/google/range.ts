@@ -45,6 +45,15 @@ export interface Window {
   key: RangeKey;
   /** What the widget is showing, for a heading that was left blank. */
   label: string;
+  /**
+   * What to say when there is nothing in it.
+   *
+   * "Nothing scheduled" is the same sentence whether you asked about the next
+   * two hours or the rest of the month, and those are very different pieces of
+   * news. An empty panel should say what it looked at, or you cannot tell an
+   * empty calendar from a window that was too narrow.
+   */
+  emptyLabel: string;
   /** True when the window can hold more than one day, so days want labelling. */
   spansDays: boolean;
 }
@@ -80,6 +89,7 @@ export function windowFor(
       to: new Date(now.getTime() + hours * HOUR),
       key,
       label: `Next ${hours} hours`,
+      emptyLabel: `Nothing in the next ${hours} hour${hours === 1 ? "" : "s"}`,
       spansDays: hours > 12,
     };
   }
@@ -96,5 +106,14 @@ export function windowFor(
   const label =
     key === "today" ? "Today" : key === "tomorrow" ? "Tomorrow" : key === "week" ? "This week" : "This month";
 
-  return { from: now, to, key, label, spansDays: key !== "today" };
+  const emptyLabel =
+    key === "today"
+      ? "Nothing left today"
+      : key === "tomorrow"
+        ? "Nothing today or tomorrow"
+        : key === "week"
+          ? "Nothing this week"
+          : "Nothing this month";
+
+  return { from: now, to, key, label, emptyLabel, spansDays: key !== "today" };
 }

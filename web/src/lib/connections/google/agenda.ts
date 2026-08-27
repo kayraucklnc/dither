@@ -105,6 +105,8 @@ export interface Agenda {
   /** Which range was asked for, and what to call it. */
   range: RangeKey;
   range_label: string;
+  /** What to say when there is nothing in it - "Nothing this week". */
+  empty_label: string;
   spans_days: boolean;
   /** True when the window held more than one page of events. */
   truncated: boolean;
@@ -376,6 +378,7 @@ export function agenda(source: GoogleEvent[], options: AgendaOptions): Agenda {
     days,
     range: window.key,
     range_label: window.label,
+    empty_label: window.emptyLabel,
     spans_days: window.spansDays,
     truncated: Boolean(options.truncated),
   };
