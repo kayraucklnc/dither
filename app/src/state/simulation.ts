@@ -154,7 +154,7 @@ export function useSimulation(compiled: Compiled | null, overrides: Overrides = 
     for (const s of compiled?.sources ?? []) {
       const f = results.get(keyOf(s.source));
       if (f?.ok) {
-        for (const [k, v] of extract(s.source, f.body)) values.set(k, v);
+        for (const [k, v] of extract(s.source, f.body, formatContext(compiled!.runtime, now))) values.set(k, v);
         for (const [k, v] of freshness(s.source.id, true, Math.floor(f.at / 1000), now)) values.set(k, v);
         status.set(s.source.id, { state: "live", at: f.at });
       } else {

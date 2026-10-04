@@ -115,7 +115,7 @@ TEST(source_spec_parsing) {
   JsonFilter filter = buildFilter(sources[0]);
   CHECK(response.parse(R"({"current":{"t":4},"hourly":{"t":[1,2,3]},"other":1})", &filter).ok);
   ValueStore store;
-  applyResponse(sources[0], response, store);
+  applyResponse(sources[0], response, store, std::nullopt, TimeZone());
   CHECK(store.get("w1.temp") == Value::number(4));
   CHECK(store.get("w1.h") == Value::series({1, 2, 3}));
 }
@@ -247,7 +247,7 @@ TEST(aggregates_while_streaming) {
   JsonDoc doc;
   CHECK(doc.parse(kStripe, &filter, JsonLimits::response()).ok);
   ValueStore store;
-  applyResponse(sources[0], doc, store);
+  applyResponse(sources[0], doc, store, std::nullopt, TimeZone());
   CHECK(store.get("s.gross") == Value::number(1200 - 300 + 99.75));  // "pending" and the missing one skipped
   CHECK(store.get("s.n") == Value::number(6));                        // the bare 7 counts too
   CHECK(store.get("s.net") == Value::number(1200 + 450.25 + 0));      // nested field
@@ -279,20 +279,20 @@ TEST(aggregates_edge_cases) {
   JsonDoc doc;
   ValueStore store;
   CHECK(doc.parse(R"({"data":[]})", &filter, JsonLimits::response()).ok);
-  applyResponse(sources[0], doc, store);
+  applyResponse(sources[0], doc, store, std::nullopt, TimeZone());
   CHECK(store.get("s.gross") == Value::number(0));
   CHECK(store.get("s.n") == Value::number(0));
   CHECK(store.get("s.first").isNull());
   CHECK(doc.parse(R"({"data":{"amount":5}})", &filter, JsonLimits::response()).ok);
-  applyResponse(sources[0], doc, store);
+  applyResponse(sources[0], doc, store, std::nullopt, TimeZone());
   CHECK(store.get("s.gross").isNull());
   CHECK(store.get("s.n").isNull());
   // Duplicate keys: the last one decides, as with JSON.parse.
   CHECK(doc.parse(R"({"data":[{"amount":1}],"data":[{"amount":2},{"amount":3}]})", &filter, JsonLimits::response()).ok);
-  applyResponse(sources[0], doc, store);
+  applyResponse(sources[0], doc, store, std::nullopt, TimeZone());
   CHECK(store.get("s.gross") == Value::number(5));
   CHECK(doc.parse(R"({"data":[{"amount":1}],"data":null})", &filter, JsonLimits::response()).ok);
-  applyResponse(sources[0], doc, store);
+  applyResponse(sources[0], doc, store, std::nullopt, TimeZone());
   CHECK(store.get("s.gross").isNull());
 }
 
@@ -313,10 +313,105 @@ TEST(aggregates_do_not_materialise_big_lists) {
   JsonDoc doc;
   CHECK(doc.parse(body, &filter, JsonLimits::response()).ok);
   ValueStore store;
-  applyResponse(sources[0], doc, store);
+  applyResponse(sources[0], doc, store, std::nullopt, TimeZone());
   CHECK(store.get("s.gross") == Value::number(4950));
   CHECK(store.get("s.n") == Value::number(100));
   CHECK(store.get("s.net") == Value::number(100));
   CHECK(store.get("s.first") == Value::number(0));
   CHECK(doc.nodeCount() < 20);
+}
+
+namespace {
+
+std::vector<SourceSpec> bucketSources() {
+  JsonDoc spec;
+  spec.parse(R"([{"id":"s","url":"https://api.stripe.com/v1/charges","values":[
+    {"key":"daily","path":"data","agg":"buckets","field":"amount","time":"created","by":"day","count":3},
+    {"key":"hourly","path":"data","agg":"buckets","field":"amount","time":"created","by":"hour","count":24},
+    {"key":"nested","path":"data","agg":"buckets","field":"source.amount","time":"meta.when","count":2},
+    {"key":"gross","path":"data","agg":"sum","field":"amount"},
+    {"key":"first","path":"data.0.id"},
+    {"key":"none","path":"missing","agg":"buckets","field":"amount","time":"created","count":3}]}])");
+  return parseSources(spec.root());
+}
+
+}  // namespace
+
+TEST(aggregate_buckets) {
+  TimeZone cet;
+  cet.parse("CET-1CEST,M3.5.0,M10.5.0/3");
+  const int64_t now = 1782907200;  // 2026-07-01 14:00 CEST
+  auto sources = bucketSources();
+  JsonFilter filter = buildFilter(sources[0]);
+  JsonDoc doc;
+  CHECK(doc.parse(R"({"data":[
+      {"id":"a","amount":100,"created":1782907200,"description":"today 14:00","x":[1,2,3]},
+      {"id":"b","amount":50,"created":1782856800,"source":{"amount":7},"meta":{"when":"2026-07-01"}},
+      {"id":"c","amount":25,"created":1782856799,"meta":{"when":"2026-06-30T23:59"}},
+      {"id":"d","amount":"n/a","created":1782907200},
+      {"id":"e","amount":5},
+      {"id":"f","amount":1,"created":"2026-06-29T12:00:00Z","source":{"amount":3},"meta":{"when":"2026-06-29"}},
+      {"id":"g","amount":2,"created":"2026-06-28"},
+      {"id":"h","amount":4,"created":"2026-07-02T00:30"},
+      9]})", &filter, JsonLimits::response()).ok);
+  ValueStore store;
+  applyResponse(sources[0], doc, store, now, cet);
+  // b at local midnight is today; c one second earlier is yesterday; f two
+  // days ago; g (three days ago) and h (tomorrow) are out of range.
+  CHECK(store.get("s.daily") == Value::series({1, 25, 150}));
+  std::vector<double> hourly(24, 0);
+  hourly[14] = 100;
+  hourly[0] = 50;
+  CHECK(store.get("s.hourly") == Value::series(hourly));
+  CHECK(store.get("s.nested") == Value::series({0, 7}));  // f's date is out of 2; c has no source.amount
+  CHECK(store.get("s.gross") == Value::number(100 + 50 + 25 + 5 + 1 + 2 + 4));
+  CHECK(store.get("s.first") == Value::string("a"));
+  CHECK(store.get("s.none").isNull());
+  // Only the needed fields of each element are kept.
+  CHECK(!doc.root()["data"][size_t{0}]["description"].exists());
+  CHECK(!doc.root()["data"][size_t{0}]["x"].exists());
+
+  ValueStore noClock;
+  applyResponse(sources[0], doc, noClock, std::nullopt, cet);
+  CHECK(noClock.get("s.daily").isNull());
+  CHECK(noClock.get("s.gross") == Value::number(187));  // sums need no clock
+
+  CHECK(doc.parse(R"({"data":[]})", &filter, JsonLimits::response()).ok);
+  applyResponse(sources[0], doc, store, now, cet);
+  CHECK(store.get("s.daily") == Value::series({0, 0, 0}));
+  CHECK(doc.parse(R"({"data":{"amount":1}})", &filter, JsonLimits::response()).ok);
+  applyResponse(sources[0], doc, store, now, cet);
+  CHECK(store.get("s.daily").isNull());
+}
+
+TEST(aggregate_buckets_on_a_dst_day_and_a_big_list) {
+  TimeZone cet;
+  cet.parse("CET-1CEST,M3.5.0,M10.5.0/3");
+  const int64_t now = 1792926000;  // 2026-10-25 12:00 CET, the 25-hour day
+  auto sources = bucketSources();
+  JsonFilter filter = buildFilter(sources[0]);
+  std::string body = R"({"data":[)";
+  // One charge every 30 minutes from 2026-10-24 22:00Z (= 00:00 CEST) to now:
+  // 27 of them, across the repeated 02:00 hour.
+  for (int i = 0; i < 27; ++i) {
+    if (i) body += ",";
+    body += R"({"id":"ch_)" + std::to_string(i) + R"(","amount":1,"created":)" + std::to_string(1792879200 + i * 1800) +
+            R"(,"description":")" + std::string(600, 'd') + R"("})";
+  }
+  body += "]}";
+  JsonDoc doc;
+  CHECK(doc.parse(body, &filter, JsonLimits::response()).ok);
+  ValueStore store;
+  applyResponse(sources[0], doc, store, now, cet);
+  CHECK(store.get("s.daily") == Value::series({0, 0, 27}));
+  std::vector<double> hourly(24, 0);
+  for (int h = 0; h <= 11; ++h) hourly[static_cast<size_t>(h)] = 2;
+  hourly[2] = 4;   // 02:00-02:59 happens twice
+  hourly[12] = 1;  // 12:00 itself
+  hourly[11] = 2;
+  double total = 0;
+  for (double x : hourly) total += x;
+  CHECK_EQ(total, 27.0);
+  CHECK(store.get("s.hourly") == Value::series(hourly));
+  CHECK(doc.nodeCount() < 27 * 4 + 10);  // per element: the object, amount, created, id of the first
 }

@@ -8,6 +8,7 @@
 #pragma once
 
 #include <cstdint>
+#include <initializer_list>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -97,6 +98,10 @@ class JsonFilter {
   // `field`. Only those fields are ever kept, and only per element.
   enum class AggKind { Count, Sum };
   void addAggregate(std::string_view dottedPath, AggKind kind, std::string_view field, int id);
+  // Keeps every element of the array at `dottedPath`, but only these fields
+  // of it - for results worked out afterwards from the kept elements.
+  void keepElementFields(std::string_view dottedPath, std::initializer_list<std::string_view> fields);
+  bool keepsElements() const { return keepElements_; }
   // Call once all paths are in: elements that are also wanted by index
   // learn to keep the aggregate fields too.
   void finalize();
@@ -129,6 +134,7 @@ class JsonFilter {
   size_t longestKey_ = 0;  // on the root: the longest segment of any path
   std::vector<Aggregate> aggregates_;
   std::vector<JsonFilter> each_;  // zero or one
+  bool keepElements_ = false;
   int aggregateCount_ = 0;        // on the root
 };
 

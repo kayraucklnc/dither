@@ -61,7 +61,11 @@ export interface SourceSpec {
    * Value key → JSON path; `{ path, count }` for a series of numbers;
    * `{ path, agg: "sum", field }` or `{ path, agg: "count" }` for a total over a list.
    */
-  values: Record<string, string | { path: string; count: number } | { path: string; agg: "sum" | "count"; field?: string }>;
+  values: Record<string,
+    | string
+    | { path: string; count: number }
+    | { path: string; agg: "sum" | "count"; field?: string }
+    | { path: string; agg: "buckets"; field: string; time: string; by: "day" | "hour"; count: number }>;
 }
 
 export interface MergeSpec {
@@ -147,7 +151,7 @@ export interface Draw {
   line(x1: number, y1: number, x2: number, y2: number, options?: { width?: number; white?: boolean }): void;
   hand(x: number, y: number, length: number, ref: string, max: number, options?: { width?: number }): void;
   bar(box: Box, ref: string, min: number, max: number, options?: { vertical?: boolean }): void;
-  chart(box: Box, ref: string, options?: { kind?: "bars" | "line"; min?: number; max?: number; gap?: number; width?: number }): void;
+  chart(box: Box, ref: string, options?: { kind?: "bars" | "line" | "steps" | "area"; min?: number; max?: number; gap?: number; width?: number }): void;
   image(imageId: string, box: Box, options?: PictureOptions): void;
   /**
    * Everything drawn inside `fn` only shows when `condition` holds on the panel.

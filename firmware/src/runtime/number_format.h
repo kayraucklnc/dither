@@ -17,4 +17,9 @@ constexpr int kMaxDecimals = 15;
 // 64 bits; callers turn that into the fallback.
 std::optional<std::string> formatNumber(double v, int decimals, std::string_view sep = {});
 
+// `num.compact` for |v| >= 1000: v / 1e9, 1e6 or 1e3 - the largest not above
+// |v|, chosen before rounding - with 1 decimal, a trailing ".0" dropped, and
+// B, M or k: 74120 -> "74.1k", 999950 -> "1000k". No thousands separator.
+std::optional<std::string> formatCompact(double v);
+
 }  // namespace dither

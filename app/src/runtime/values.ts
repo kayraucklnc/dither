@@ -2,7 +2,9 @@
 // from a fetched JSON body, the same way the firmware picks them out.
 
 import { parseZone, toLocal } from "./tz";
-import type { Source, Value } from "./types";
+import { readTime, type FormatContext } from "./format";
+import { daysFromCivil } from "./tz";
+import type { Source, SourceValue, Value } from "./types";
 
 export interface DeviceState {
   battery: number | null;
@@ -56,7 +58,24 @@ export function at(body: unknown, path: string): unknown {
   return node;
 }
 
-export function extract(source: Source, body: unknown): Map<string, Value> {
+/** Each element's `field` added into per-day or per-hour totals, newest last. */
+function buckets(items: unknown[], v: SourceValue, ctx: FormatContext): number[] {
+  const n = Math.max(0, Math.min(64, v.count ?? 0));
+  const out: number[] = new Array(n).fill(0);
+  const today = toLocal(ctx.zone, ctx.now);
+  const todayDays = daysFromCivil(today.year, today.month, today.day);
+  for (const item of items) {
+    const amount = v.field ? at(item, v.field) : null;
+    const when = v.time ? readTime(at(item, v.time) as Value, ctx.zone, ctx.now) : null;
+    if (typeof amount !== "number" || !Number.isFinite(amount) || !when) continue;
+    const ago = todayDays - daysFromCivil(when.local.year, when.local.month, when.local.day);
+    const i = v.by === "hour" ? (ago === 0 ? when.local.hour : -1) : n - 1 - ago;
+    if (i >= 0 && i < n) out[i] += amount;
+  }
+  return out;
+}
+
+export function extract(source: Source, body: unknown, ctx?: FormatContext): Map<string, Value> {
   const out = new Map<string, Value>();
   for (const v of source.values) {
     const ref = `${source.id}.${v.key}`;
@@ -64,6 +83,7 @@ export function extract(source: Source, body: unknown): Map<string, Value> {
     if (v.agg) {
       if (!Array.isArray(target)) out.set(ref, null);
       else if (v.agg === "count") out.set(ref, target.length);
+      else if (v.agg === "buckets") out.set(ref, ctx ? buckets(target, v, ctx) : null);
       else if (v.agg !== "sum" || !v.field) out.set(ref, null);
       else {
         let sum = 0;

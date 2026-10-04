@@ -93,16 +93,20 @@ describe("transit, calendar and alerts", () => {
     expect(at("2026-10-05T08:30:00+02:00", "2026-10-05T09:00:00+02:00")).toBe(false);
   });
 
-  it("asks Stripe for the period's list and totals it on the panel", async () => {
+  it("asks Stripe for the period, the one before and the graph, and totals them on the panel", async () => {
     const p = createProject({ starter: "blank", timezone: "Europe/Rome", language: "en", units: "metric", place: null });
     p.accounts = { google: [], stripe: { key: "rk_live_abc", name: "" } };
-    p.screens[0].widgets = [{ id: "rev", type: "stripe", x: 0, y: 0, w: 8, h: 6, frame: "none", settings: { period: "week" } }];
+    p.screens[0].widgets = [{ id: "rev", type: "stripe", x: 0, y: 0, w: 10, h: 8, frame: "none", settings: { period: "week" } }];
     const out = await compile(p, deps);
-    const src = out.runtime.sources[0];
-    expect(src.url).toContain("created%5Bgte%5D={{today-518400}}");
-    expect(src.headers).toEqual([["Authorization", "Bearer rk_live_abc"]]);
-    expect(src.values).toContainEqual({ key: "gross", path: "data", agg: "sum", field: "amount" });
-    expect(src.values).toContainEqual({ key: "count", path: "data", agg: "count" });
+    const named = out.widgetSources.get("rev")!;
+    const now = out.runtime.sources.find((x) => x.id === named.now)!;
+    expect(now.url).toContain("/v1/charges/search?");
+    expect(now.url).toContain("created%3E%3D{{today-518400}}");
+    expect(now.headers).toEqual([["Authorization", "Bearer rk_live_abc"]]);
+    expect(now.values).toContainEqual({ key: "total", path: "data", agg: "sum", field: "amount" });
+    const chart = out.runtime.sources.find((x) => x.id === named.chart)!;
+    expect(chart.values).toContainEqual({ key: "series", path: "data", agg: "buckets", field: "amount", time: "created", by: "day", count: 7 });
+    expect(out.runtime.sources.find((x) => x.id === named.before)!.url).toContain("created%3C{{today-518400}}");
   });
 
   it("reads every linked account into one agenda, or the ones a widget picks", async () => {

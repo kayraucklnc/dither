@@ -171,7 +171,7 @@ export class ElementDraw implements Draw {
     this.push({ t: "bar", ...this.at(box), v: this.ref(ref), min, max, ...(o?.vertical ? { dir: "u" } : {}), ...this.color() });
   }
 
-  chart(box: Box, ref: string, o?: { kind?: "bars" | "line"; min?: number; max?: number; gap?: number; width?: number }): void {
+  chart(box: Box, ref: string, o?: { kind?: "bars" | "line" | "steps" | "area"; min?: number; max?: number; gap?: number; width?: number }): void {
     this.push({
       t: "chart", ...this.at(box), v: this.ref(ref), kind: o?.kind ?? "line",
       ...(o?.min !== undefined ? { min: o.min } : {}),
