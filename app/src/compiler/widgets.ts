@@ -5,7 +5,7 @@ import { EXTENSIONS } from "@/extensions";
 import type { Project, Widget } from "@/project/schema";
 
 export function envOf(project: Project): Env {
-  return { units: project.units, place: project.place, language: project.language, accounts: project.accounts };
+  return { units: project.units, place: project.place, language: project.language, timezone: project.timezone, accounts: project.accounts };
 }
 
 export function extensionFor(type: string): Extension | undefined {
