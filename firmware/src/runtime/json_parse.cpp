@@ -53,6 +53,16 @@ void JsonFilter::addAggregate(std::string_view path, AggKind kind, std::string_v
   aggregateCount_ = std::max(aggregateCount_, id + 1);
 }
 
+void JsonFilter::keepElementFields(std::string_view path, std::initializer_list<std::string_view> fields) {
+  JsonFilter* target = node(path);
+  target->keepElements_ = true;
+  if (target->each_.empty()) target->each_.emplace_back();
+  for (std::string_view f : fields) {
+    target->each_[0].addPath(f);
+    longestKey_ = std::max(longestKey_, target->each_[0].longestKey_);
+  }
+}
+
 void JsonFilter::merge(const JsonFilter& other) {
   scalar_ = scalar_ || other.scalar_;
   series_ = std::max(series_, other.series_);
@@ -237,7 +247,8 @@ class JsonParser {
       if (want.kind == Want::Item) return skip() && keepNull(out);
       if (want.kind == Want::Path) {
         const JsonFilter& f = *want.filter;
-        bool wanted = f.hasChildren() || (c == '[' && (f.seriesItems() >= 0 || !f.aggregates().empty()));
+        bool wanted = f.hasChildren() ||
+                      (c == '[' && (f.seriesItems() >= 0 || !f.aggregates().empty() || f.keepsElements()));
         if (!wanted) return skip();
       }
       if (depth >= limits_.maxDepth) return fail("nested too deeply");
@@ -328,7 +339,8 @@ class JsonParser {
     if ((out = addContainer(JsonType::Array)) == JsonDoc::kNone) return false;
     uint32_t last = JsonDoc::kNone;
     const long highest = want.kind == Want::Path ? want.filter->highestIndex() : -1;
-    const bool aggregating = want.kind == Want::Path && !want.filter->aggregates().empty();
+    const bool aggregating =
+        want.kind == Want::Path && (!want.filter->aggregates().empty() || want.filter->keepsElements());
     if (aggregating) startAggregates(*want.filter);
     skipSpace();
     if (src_.peek() == ']') {
@@ -392,6 +404,10 @@ class JsonParser {
     uint32_t transient = JsonDoc::kNone;
     if (!value(Want{Want::Path, fields}, depth, transient)) return false;
     addFields(f, transient);
+    if (f.keepsElements() && transient != JsonDoc::kNone) {
+      out = transient;  // kept, with only the element fields
+      return true;
+    }
     doc_.nodes_.resize(nodes);
     doc_.strings_.resize(bytes);
     if (child.kind == Want::Item || child.kind == Want::Hole) return keepNull(out);

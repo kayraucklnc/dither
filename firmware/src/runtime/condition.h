@@ -15,5 +15,6 @@ bool evalCondition(JsonView cond, const ValueStore& values, const FormatContext&
 // `eq` between a value and a JSON constant: number/number, string/string or
 // bool/bool; every other pairing (null included) is a mismatch.
 bool valuesEqual(const Value& v, JsonView x);
+bool valuesEqual(const Value& a, const Value& b);
 
 }  // namespace dither

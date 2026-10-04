@@ -191,3 +191,25 @@ TEST(format_days) {
   doc.parse(R"({"days":true})");
   CHECK_EQ(formatValue(str("2026-07-01"), doc.root(), unknown), kDash);
 }
+
+TEST(format_num_compact) {
+  const char* f = R"({"num":{"d":0,"compact":true}})";
+  CHECK_EQ(run(num(74120), f), "74.1k");
+  CHECK_EQ(run(num(2000000), f), "2M");
+  CHECK_EQ(run(num(999950), f), "1000k");   // the scale is chosen before rounding
+  CHECK_EQ(run(num(-999950), f), "-1000k");
+  CHECK_EQ(run(num(-1234), f), "-1.2k");
+  CHECK_EQ(run(num(1e9), f), "1B");
+  CHECK_EQ(run(num(1.25e9), f), "1.3B");      // 12.5 rounds away from zero
+  CHECK_EQ(run(num(1050), f), "1.1k");
+  CHECK_EQ(run(num(1049), f), "1k");
+  CHECK_EQ(run(num(1000), f), "1k");
+  CHECK_EQ(run(num(99999), f), "100k");
+  CHECK_EQ(run(num(123456789), f), "123.5M");
+  CHECK_EQ(run(num(1e15), R"({"num":{"compact":true,"sep":","}})"), "1000000B");  // no separator
+  // Below 1000: as without compact.
+  CHECK_EQ(run(num(999.99), f), "1000");
+  CHECK_EQ(run(num(999.4), R"({"num":{"d":2,"compact":true}})"), "999.40");
+  CHECK_EQ(run(num(-12.345), R"({"num":{"compact":true}})"), "-12.35");
+  CHECK_EQ(run(str("1234"), f), kDash);
+}

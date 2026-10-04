@@ -53,6 +53,23 @@ function textOf(parts: readonly Part[], ctx: Ctx): string {
     .join("");
 }
 
+const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+
+/** A dithered ramp beneath a line: dense near it, fading to the floor. */
+function shadeUnder(fb: Framebuffer, pts: number[][], x: number, w: number, floor: number, ink: boolean): void {
+  let seg = 0;
+  for (let px = x; px < x + w; px++) {
+    while (seg < pts.length - 2 && px > pts[seg + 1][0]) seg++;
+    const [x0, y0] = pts[seg];
+    const [x1, y1] = pts[seg + 1];
+    const ly = x1 === x0 ? y0 : y0 + Math.floor(((y1 - y0) * (px - x0)) / (x1 - x0));
+    for (let py = ly + 1; py < floor; py++) {
+      const level = 2 + Math.floor((8 * (floor - py)) / Math.max(1, floor - ly));
+      if (BAYER[py & 3][px & 3] < level) fb.set(px, py, ink);
+    }
+  }
+}
+
 function drawChart(el: ElementOf<"chart">, ctx: Ctx, ink: boolean): void {
   const series = ctx.values.get(el.v);
   if (!Array.isArray(series) || series.length === 0) return;
@@ -61,7 +78,7 @@ function drawChart(el: ElementOf<"chart">, ctx: Ctx, ink: boolean): void {
   let hi = el.max ?? Math.max(...series);
   if (hi <= lo) hi = lo + 1;
   const f = (s: number) => clamp01((s - lo) / (hi - lo));
-  if (el.kind !== "line") {
+  if (el.kind !== "line" && el.kind !== "steps" && el.kind !== "area") {
     const gap = el.gap ?? 1;
     series.forEach((s, i) => {
       const x0 = el.x + Math.floor((i * el.w) / n);
@@ -76,6 +93,15 @@ function drawChart(el: ElementOf<"chart">, ctx: Ctx, ink: boolean): void {
     el.y + (el.h - 1) - Math.floor(f(s) * (el.h - 1)),
   ]);
   const lw = el.lw ?? 2;
+  if (el.kind === "steps") {
+    pts.forEach(([px, py], i) => {
+      const nx = i + 1 < pts.length ? pts[i + 1][0] : el.x + el.w - 1;
+      line(ctx.fb, px, py, nx, py, lw, ink);
+      if (i + 1 < pts.length) line(ctx.fb, nx, py, nx, pts[i + 1][1], lw, ink);
+    });
+    return;
+  }
+  if (el.kind === "area" && pts.length > 1) shadeUnder(ctx.fb, pts, el.x, el.w, el.y + el.h, ink);
   for (let i = 1; i < pts.length; i++) line(ctx.fb, pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], lw, ink);
 }
 

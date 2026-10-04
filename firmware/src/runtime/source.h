@@ -9,18 +9,23 @@
 #include <vector>
 
 #include "json.h"
+#include "timezone.h"
 #include "value.h"
 
 namespace dither {
 
 struct SourceValueSpec {
-  enum class Agg { None, Count, Sum, Invalid };  // Invalid: unknown, or a sum without a field
+  enum class Agg { None, Count, Sum, Buckets, Invalid };  // Invalid: unknown, or a sum without a field
   std::string key;
   std::string path;
   int count = -1;  // -1: a single value; otherwise a series of at most 64
   Agg agg = Agg::None;
   std::string field;  // for Sum: the path inside each element
   int aggId = -1;     // its slot in the filter's aggregates
+  // Buckets: the element's time field, by "day" or by "hour", how many totals.
+  std::string time;
+  bool byHour = false;
+  int buckets = 0;
 };
 
 using NameValues = std::vector<std::pair<std::string, std::string>>;
@@ -65,7 +70,12 @@ Value extractPath(JsonView root, std::string_view path, int count);
 // Replaces every `<id>.<key>` of the source from a successful response.
 // `doc` must have been parsed with buildFilter(source), which works the
 // aggregates out while streaming.
-void applyResponse(const SourceSpec& source, const JsonDoc& doc, ValueStore& store);
+// Buckets need the clock (`now` unknown: null) and the zone.
+void applyResponse(const SourceSpec& source, const JsonDoc& doc, ValueStore& store, std::optional<int64_t> now,
+                   const TimeZone& tz);
+
+// The `buckets` series from the (kept) elements of `target`.
+Value bucketsFrom(JsonView target, const SourceValueSpec& spec, std::optional<int64_t> now, const TimeZone& tz);
 
 // An aggregate worked out from a whole, unfiltered document - the same answer
 // the streaming filter gives, for tests and in-memory documents.

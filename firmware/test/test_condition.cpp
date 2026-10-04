@@ -147,3 +147,34 @@ TEST(condition_leaf_days) {
   CHECK(check(R"({"v":"c.start","f":{"days":true,"until":true},"op":"eq","x":0})"));
   CHECK(check(R"({"v":"c.start","f":{"until":true},"op":"eq","x":30})"));
 }
+
+TEST(condition_vs_another_value) {
+  ValueStore s;
+  s.set("a.today", Value::number(120));
+  s.set("a.yesterday", Value::number(100));
+  s.set("a.name", Value::string("x"));
+  s.set("a.other", Value::string("x"));
+  s.set("a.start", Value::number(1782907200 + 600));  // in 10 minutes
+  s.set("a.end", Value::number(1782907200 + 3000));   // in 50 minutes
+  auto check = [&](const char* json) {
+    JsonDoc doc;
+    return doc.parse(json).ok && evalCondition(doc.root(), s, context());
+  };
+  CHECK(check(R"({"v":"a.today","op":"gt","vs":"a.yesterday"})"));
+  CHECK(!check(R"({"v":"a.today","op":"lt","vs":"a.yesterday"})"));
+  CHECK(check(R"({"v":"a.today","op":"ge","vs":"a.today"})"));
+  CHECK(check(R"({"v":"a.name","op":"eq","vs":"a.other"})"));
+  CHECK(check(R"({"v":"a.name","op":"ne","vs":"a.today"})"));
+  CHECK(!check(R"({"v":"a.missing","op":"eq","vs":"a.gone"})"));  // null never equals null
+  CHECK(check(R"({"v":"a.missing","op":"ne","vs":"a.gone"})"));
+  CHECK(!check(R"({"v":"a.today","op":"gt","vs":"a.missing"})"));
+  // vs takes the place of x, and goes through f as well.
+  CHECK(check(R"({"v":"a.today","op":"gt","vs":"a.yesterday","x":1000})"));
+  CHECK(check(R"({"v":"a.start","f":{"until":true},"op":"lt","vs":"a.end"})"));
+  CHECK(check(R"({"v":"a.end","f":{"until":true,"scale":2},"op":"eq","vs":"a.end"})"));      // 100 == 100
+  CHECK(check(R"({"v":"a.start","f":{"until":true,"scale":5},"op":"lt","vs":"a.end"})"));    // 50 < 250
+  CHECK(!check(R"({"v":"a.start","f":{"until":true,"scale":5},"op":"eq","vs":"a.end"})"));
+  // Only the comparison ops take vs.
+  CHECK(!check(R"({"v":"a.name","op":"contains","vs":"a.other"})"));
+  CHECK(!check(R"({"v":"a.today","op":"present","vs":"a.other"})"));
+}

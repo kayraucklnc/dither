@@ -101,6 +101,15 @@ each element's `field` (a path inside the element), skipping elements where it
 is not a number — `{ "key": "gross", "path": "data", "agg": "sum", "field":
 "amount" }`. An empty array sums to 0; a target that is not an array is `null`.
 
+`"agg": "buckets"` adds each element's `field` into a series of `count`
+totals (at most 64) by when the element happened — its `time` field, a time
+value (§ times). With `"by": "day"` the last total is today and the one before
+it yesterday, counted in local calendar days; with `"by": "hour"` total `h` is
+local hour `h` of today. Elements outside the range, or without a numeric
+`field` or a time, are skipped; a total with nothing in it is 0:
+`{ "key": "daily", "path": "data", "agg": "buckets", "field": "amount",
+"time": "created", "by": "day", "count": 30 }`.
+
 With `count`, the target must be an array and its first `count`
 (at most 64) elements are kept as a **series**; the series ends early at the
 first element that is not a number.
@@ -217,6 +226,11 @@ A source that fails keeps the values of its last success.
 { "v": "c1.start", "f": { "until": true }, "op": "lt", "x": 15 }
 ```
 
+A leaf may compare against another value instead of a constant: `"vs": ref`
+in place of `x` (with `lt`, `le`, `gt`, `ge`, `eq`, `ne`); the other value goes
+through the leaf's `f` as well. `{ "v": "s1.today", "op": "gt", "vs":
+"s2.yesterday" }`.
+
 A leaf may carry a format `f`: the value goes through its `shift`, `days`, `until`,
 `scale`, `add`, `steps` and `map` steps (the rest are ignored) before it is compared,
 and a step that gives `null` makes the value `null`.
@@ -272,8 +286,12 @@ A **format** turns a value into text. All fields optional; applied in this order
    entry than `t`.
 5. `map: { "k": [k0, …], "o": [o0, …], "d": default }` — exact match (number to
    number, string to string); unmatched becomes `d` (or `null` if no `d`).
-6. `num: { "d": decimals, "sep": "," }` — fixed decimals (§ numbers);
-   `sep` inserts a thousands separator into the integer part.
+6. `num: { "d": decimals, "sep": ",", "compact": true }` — fixed decimals
+   (§ numbers); `sep` inserts a thousands separator into the integer part.
+   With `compact`, a value whose magnitude is at least 1,000 is divided by the
+   largest of 10⁹, 10⁶, 10³ not above it, printed with 1 decimal (a trailing
+   `.0` dropped) and suffixed `B`, `M` or `k`: 74,120 → `74.1k`, 2,000,000 →
+   `2M`; smaller values print as without `compact`.
 7. `time: "HH:mm"` — value is a time; rendered with the tokens below.
 8. `upper: true` — the value becomes text, then: `a–z` → `A–Z`; U+00E0–U+00FE
    except U+00F7 → minus 0x20; `ğ→Ğ`, `ş→Ş`, `ı→I`. With `"tr": true` also set,
@@ -341,7 +359,7 @@ logical pixels.
 | `icon` | `x y w h`, `v` (reference), `f` (format, optional), `set` (`{ "name": assetIndex }`) — the value, formatted, picks a bitmap drawn centred in the box |
 | `bar` | `x y w h`, `v`, `min max`, `dir` (`r` grows rightwards, `u` upwards; default `r`) |
 | `group` | `els` — elements drawn in order, and only when the group's `when` holds. Groups nest up to 8 deep; a group's `c` is ignored |
-| `chart` | `x y w h`, `v` (a series), `kind` (`bars`/`line`), `min max` (optional, else from the data), `gap` (bars, default 1), `lw` (line thickness, default 2) |
+| `chart` | `x y w h`, `v` (a series), `kind` (`bars`/`line`/`steps`/`area`), `min max` (optional, else from the data), `gap` (bars, default 1), `lw` (line thickness, default 2) |
 
 `parts` is an array; each part is a literal string, `{ "v": ref, "f": format }`,
 or `{ "k": constant, "f": format }` — a fixed value (number, string, boolean or
@@ -462,6 +480,17 @@ never written.
   - `line`: point `i` is `(x + floor(i · (w - 1) / max(1, n - 1)),
     y + (h - 1) - floor(f · (h - 1)))`; consecutive points joined by `line` of
     thickness `lw` (default 2).
+  - `steps`: the same points, joined by a horizontal `line` from point `i` to
+    `(x of point i+1, y of point i)` and a vertical one from there to point
+    `i+1`; the last point is extended horizontally to `x + w - 1`.
+  - `area`: the `line`, with the region beneath it shaded. For each column
+    `px` from `x` to `x + w - 1`, the line's height there is linear between
+    the two points around it: `ly = y0 + floor((y1 - y0) · (px - x0) / (x1 -
+    x0))` (the point's own y where `x1 = x0`). Every pixel `(px, py)` with
+    `ly < py < y + h` is inked when `B[py mod 4][px mod 4] < L`, where `B` is
+    the 4×4 Bayer matrix `[[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]]`
+    and `L = 2 + floor(8 · (y + h - py) / max(1, y + h - ly))` — denser near
+    the line, fading towards the bottom. The line is drawn after the shading.
 - **bitmap.** Top-left at `(x, y)`.
 - **icon.** Value through `f`, then to text (§ formats); if `set` has that
   name, the bitmap is drawn at `(x + floor((w - bw) / 2), y + floor((h - bh) / 2))`

@@ -37,6 +37,13 @@ export function fixed(v: number, d: number, sep?: string): string {
   return `${negative ? "-" : ""}${grouped}${frac !== undefined ? `.${frac}` : ""}`;
 }
 
+/** 74,120 → "74.1k": the scale is chosen before rounding, so 999,950 → "1000k". */
+export function compact(v: number): string {
+  const a = Math.abs(v);
+  const [div, suffix] = a >= 1e9 ? [1e9, "B"] : a >= 1e6 ? [1e6, "M"] : [1e3, "k"];
+  return `${fixed(v / div, 1).replace(/\.0$/, "")}${suffix}`;
+}
+
 export function automatic(v: number): string {
   const text = withPoint(scaled(v, 2), 2);
   return text.replace(/\.?0+$/, "");
@@ -223,7 +230,8 @@ function applyFormat(input: Value, f: Format, ctx: FormatContext): Value {
   if (v === null) return null;
   if (f.num) {
     if (typeof v !== "number" || !Number.isFinite(v)) return null;
-    if (f.num.d === undefined) v = automatic(v);
+    if (f.num.compact && Math.abs(v) >= 1000) v = compact(v);
+    else if (f.num.d === undefined) v = automatic(v);
     else {
       const d = Math.max(0, Math.min(15, Math.trunc(f.num.d)));
       if (Math.abs(v) * 10 ** d >= 2 ** 63) return null;

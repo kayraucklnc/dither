@@ -66,7 +66,10 @@ function buildSources(project: Project): { sources: CompiledSource[]; ids: Map<s
       const map: Record<string, string> = {};
       for (const [name, spec] of specs) {
         const values: SourceValue[] = Object.entries(spec.values).map(([key, p]) =>
-          typeof p === "string" ? { key, path: p } : "agg" in p ? { key, path: p.path, agg: p.agg, ...(p.field ? { field: p.field } : {}) } : { key, path: p.path, count: p.count });
+          typeof p === "string" ? { key, path: p }
+          : !("agg" in p) ? { key, path: p.path, count: p.count }
+          : p.agg === "buckets" ? { key, path: p.path, agg: p.agg, field: p.field, time: p.time, by: p.by, count: p.count }
+          : { key, path: p.path, agg: p.agg, ...(p.field ? { field: p.field } : {}) });
         const base = {
           url: spec.url,
           every: Math.max(MIN_FETCH_MINUTES, spec.every) * 60,
@@ -76,7 +79,7 @@ function buildSources(project: Project): { sources: CompiledSource[]; ids: Map<s
         };
         const key = sourceKey(base);
         let entry = byKey.get(key);
-        const clash = entry && values.some((v) => entry!.source.values.some((e) => e.key === v.key && (e.path !== v.path || e.count !== v.count || e.agg !== v.agg || e.field !== v.field)));
+        const clash = entry && values.some((v) => entry!.source.values.some((e) => e.key === v.key && (e.path !== v.path || e.count !== v.count || e.agg !== v.agg || e.field !== v.field || e.time !== v.time || e.by !== v.by)));
         if (!entry || clash) {
           const id = `s${next++}`;
           entry = { source: { id, ...base, values: [] }, widgetIds: [], sample: new Map() };

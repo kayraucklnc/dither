@@ -120,3 +120,9 @@ describe("days", () => {
     expect(formatValue("2026-10-06", { days: true, until: true }, late)).toBe("2");
   });
 });
+
+describe("compact numbers", () => {
+  it.each([[999, "999"], [1000, "1k"], [74120, "74.1k"], [-1550, "-1.6k"], [2000000, "2M"], [999950, "1000k"], [1234567890, "1.2B"]])("%d → %s", (v, out) => {
+    expect(formatValue(v, { num: { d: 0, compact: true } }, ctx)).toBe(out);
+  });
+});
