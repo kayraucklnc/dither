@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Signing in</title>
+    <style>
+      body { font: 15px/1.5 system-ui, sans-serif; display: grid; place-items: center; height: 100vh; margin: 0; background: #f5f7f8; color: #1a1e22; }
+    </style>
+  </head>
+  <body>
+    <p id="msg">Finishing sign-in…</p>
+    <script>
+      // Hands the code back to the Dither tab that opened this window, then closes.
+      const p = new URLSearchParams(location.search);
+      const channel = new BroadcastChannel("dither-oauth");
+      channel.postMessage({ state: p.get("state"), code: p.get("code"), error: p.get("error") });
+      channel.close();
+      document.getElementById("msg").textContent = p.get("code") ? "Signed in. You can close this window." : "Sign-in did not finish. You can close this window.";
+      setTimeout(() => window.close(), 400);
+    </script>
+  </body>
+</html>
