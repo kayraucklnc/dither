@@ -80,7 +80,8 @@ export async function linkGoogle(clientId: string, clientSecret: string, scopes:
     throw new Error(body.error_description ?? body.error ?? "Google did not hand back a refresh token.");
   }
   const email = emailFrom(body.id_token);
-  return { id: email || `google-${Date.now().toString(36)}`, clientId, clientSecret, refreshToken: body.refresh_token, email };
+  const name = email.split("@")[0] ?? "";
+  return { id: email || `google-${Date.now().toString(36)}`, clientId, clientSecret, refreshToken: body.refresh_token, email, label: name ? name[0].toUpperCase() + name.slice(1) : "Google" };
 }
 
 /** A short-lived access token, for the browser's own calls (calendar list, preview). */

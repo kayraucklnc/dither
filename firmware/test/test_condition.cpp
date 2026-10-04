@@ -134,3 +134,16 @@ TEST(condition_leaf_format) {
   CHECK(check(R"({"v":"t.dep","f":{"shift":{"v":"t.delay","scale":60},"until":true},"op":"eq","x":17})"));
   CHECK(check(R"({"v":"t.dep","f":{"until":true},"op":"eq","x":5})"));
 }
+
+TEST(condition_leaf_days) {
+  ValueStore s;
+  s.set("c.date", Value::string("2026-07-02"));  // context: 2026-07-01 12:00 UTC
+  s.set("c.start", Value::number(1782907200 + 30 * 60));
+  auto check = [&](const char* json) {
+    JsonDoc doc;
+    return doc.parse(json).ok && evalCondition(doc.root(), s, context());
+  };
+  CHECK(check(R"({"v":"c.date","f":{"days":true},"op":"eq","x":1})"));
+  CHECK(check(R"({"v":"c.start","f":{"days":true,"until":true},"op":"eq","x":0})"));
+  CHECK(check(R"({"v":"c.start","f":{"until":true},"op":"eq","x":30})"));
+}

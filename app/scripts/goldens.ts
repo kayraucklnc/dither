@@ -12,7 +12,8 @@ import { localeFor } from "../src/compiler/locale";
 import { createProject, STARTERS } from "../src/project/starters";
 import { encodeBlob } from "../src/runtime/blob";
 import { toPbm } from "../src/runtime/pbm";
-import { render } from "../src/runtime/render";
+import { applyMerges } from "../src/runtime/merge";
+import { formatContext, render } from "../src/runtime/render";
 import type { Element, Runtime, Value } from "../src/runtime/types";
 import { builtins } from "../src/runtime/values";
 
@@ -26,6 +27,7 @@ function write(name: string, blob: Uint8Array, runtime: Runtime, values: Record<
   const all = builtins(now, runtime.tz, { battery: null, usb: false, online: false, rssi: null });
   for (const k of ["device.battery", "device.usb", "device.online", "device.rssi"]) all.set(k, null);
   for (const [k, v] of Object.entries(values)) all.set(k, v);
+  applyMerges(runtime.merges, all, formatContext(runtime, now, all));
   const { fb, screen } = render(runtime, blob, all, now);
   writeFileSync(`${dir}blob.bin`, blob);
   writeFileSync(`${dir}values.json`, `${JSON.stringify({ now, values }, null, 2)}\n`);
@@ -36,7 +38,7 @@ function write(name: string, blob: Uint8Array, runtime: Runtime, values: Record<
 const fonts = await loadFonts();
 const deps = { library: nodeLibrary, fonts, picture: async () => null, boardPanel: () => ({ width: 800, height: 480 }) };
 
-for (const dir of ["revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "primitives", "text-and-formats"]) {
+for (const dir of ["calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "primitives", "text-and-formats"]) {
   rmSync(`${root}${dir}`, { recursive: true, force: true });
 }
 
@@ -57,7 +59,7 @@ for (const s of STARTERS.filter((x) => x.id !== "blank")) {
 // Trains, a calendar and an alert: shift, wall-clock times, flags and overlays.
 {
   const project = createProject({ starter: "blank", timezone: "Europe/Rome", language: "en", units: "metric", place });
-  const account = { id: "me", clientId: "id", clientSecret: "secret", refreshToken: "token", email: "" };
+  const account = { id: "me", clientId: "id", clientSecret: "secret", refreshToken: "token", email: "", label: "Personal" };
   project.screens[0].widgets = [
     { id: "train", type: "trenord", x: 0, y: 0, w: 12, h: 8, frame: "none", settings: {} },
     { id: "agenda", type: "google-calendar", x: 12, y: 0, w: 8, h: 6, frame: "outline", settings: { calendarName: "Work" } },
@@ -69,9 +71,9 @@ for (const s of STARTERS.filter((x) => x.id !== "blank")) {
     { id: "late", enabled: true, match: "any", checks: [{ fact: "train:trouble", op: "is", value: true }], icon: "train-front", text: "Trouble on your line", value: null, style: "banner" },
   ];
   const c = await compile(project, deps);
-  const ids = new Map(c.sources.flatMap((x) => x.widgetIds.map((w) => [w, x.source.id] as const)));
+  const ids = new Map([...c.widgetSources].map(([w, m]) => [w, m[""]] as const));
   const t = ids.get("train")!;
-  const cal = ids.get("agenda")!;
+  const cal = c.widgetSources.get("agenda")!.c0;
   const trains: [string, number, boolean, string, string][] = [
     ["15:01:00", 0, false, "R", "24011"], ["15:12:00", 0, true, "R", "24015"], ["15:20:00", 6, false, "RE", "1611"],
     ["15:41:00", 0, false, "S3", "24121"], ["16:02:00", 2, false, "R", "24023"], ["16:15:00", 0, false, "RE", "1615"],
@@ -90,6 +92,35 @@ for (const s of STARTERS.filter((x) => x.id !== "blank")) {
   write("transit-calendar-alerts", c.blob, c.runtime, values);
 }
 
+// Three accounts side by side: groups, days, ongoing, all-day and later days.
+{
+  const project = createProject({ starter: "blank", timezone: "Europe/Istanbul", language: "en", units: "metric", place });
+  const link = (id: string, label: string) => ({ id, clientId: "id", clientSecret: "secret", refreshToken: `token-${id}`, email: `${id}@example.com`, label });
+  project.accounts = { google: [link("me", "Personal"), link("work", "Work"), link("home", "Family")], stripe: null };
+  project.screens[0].widgets = [
+    { id: "cal", type: "google-calendar", x: 0, y: 0, w: 20, h: 12, frame: "none", settings: {} },
+  ];
+  const c = await compile(project, deps);
+  const lanes = c.widgetSources.get("cal")!;
+  // NOW is Sunday 16:07:30 in Istanbul.
+  const events: Record<string, Value>[] = [
+    { t0: "Standup", s0: "2026-10-04T16:00:00+03:00", e0: "2026-10-04T16:30:00+03:00", w0: "Meet",
+      t1: "Design review", s1: "2026-10-04T17:00:00+03:00", e1: "2026-10-04T18:00:00+03:00", w1: "Room 4.2",
+      t2: "Quarterly planning", s2: "2026-10-05T09:30:00+03:00", e2: "2026-10-05T11:00:00+03:00",
+      t3: "Offsite", a3: "2026-10-07" },
+    { t0: "Ayşe's birthday", a0: "2026-10-04", t1: "Gym", s1: "2026-10-04T19:00:00Z", e1: "2026-10-04T20:00:00Z", w1: "Fit Club",
+      t2: "Dinner", s2: "2026-10-04T21:00:00+03:00", e2: "2026-10-04T23:30:00+03:00", w2: "Kadıköy" },
+    {},
+  ];
+  const values: Record<string, Value> = { ...DEVICE };
+  events.forEach((ev, i) => {
+    const id = lanes[`c${i}`];
+    for (const [k, v] of Object.entries(ev)) values[`${id}.${k}`] = v;
+    Object.assign(values, { [`${id}._ok`]: true, [`${id}._age`]: 2 });
+  });
+  write("calendar-three-accounts", c.blob, c.runtime, values);
+}
+
 // Revenue: list totals, minor units, a page-limit floor.
 {
   const project = createProject({ starter: "blank", timezone: "Europe/Istanbul", language: "tr", units: "metric", place });
@@ -99,7 +130,7 @@ for (const s of STARTERS.filter((x) => x.id !== "blank")) {
   ];
   project.accounts = { google: [], stripe: { key: "rk_test_golden", name: "" } };
   const c = await compile(project, deps);
-  const ids = new Map(c.sources.flatMap((x) => x.widgetIds.map((w) => [w, x.source.id] as const)));
+  const ids = new Map([...c.widgetSources].map(([w, m]) => [w, m[""]] as const));
   const a = ids.get("today")!;
   const b = ids.get("month")!;
   const values: Record<string, Value> = {

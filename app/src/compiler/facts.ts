@@ -5,9 +5,10 @@ import type { Fact } from "@/extensions/api";
 import type { Check, Project } from "@/project/schema";
 import type { Condition } from "@/runtime/types";
 import { envOf, extensionFor, widgetTitle } from "./widgets";
+import { namedSpecs, resolveKey, type SourceMap } from "./sources";
 
 export type CatalogFact =
-  | (Fact & { id: string; group: string; ref: string; source: string; extension?: string })
+  | (Fact & { id: string; group: string; ref: string; sources: SourceMap; extension?: string })
   | { id: string; group: string; key: string; label: string; type: "time"; ref: string };
 
 export type FactType = CatalogFact["type"];
@@ -39,23 +40,23 @@ const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frida
 const BUILT_IN: CatalogFact[] = [
   { id: "time", group: "Time", key: "time", label: "Time of day", type: "time", ref: "clock.minutes" },
   {
-    id: "weekday", group: "Time", key: "weekday", label: "Day of the week", type: "choice", value: "weekday", ref: "clock.weekday", source: "clock",
+    id: "weekday", group: "Time", key: "weekday", label: "Day of the week", type: "choice", value: "weekday", ref: "clock.weekday", sources: {},
     choices: [
       ...WEEKDAYS.map((label, i) => ({ id: String(i), label, match: [i] })),
       { id: "weekdays", label: "a weekday", match: [1, 2, 3, 4, 5] },
       { id: "weekend", label: "the weekend", match: [0, 6] },
     ],
   },
-  { id: "battery", group: "Panel", key: "battery", label: "Battery", type: "number", value: "battery", unit: "%", ref: "device.battery", source: "device" },
-  { id: "online", group: "Panel", key: "online", label: "Connected to Wi-Fi", type: "boolean", value: "online", ref: "device.online", source: "device" },
-  { id: "usb", group: "Panel", key: "usb", label: "Plugged in", type: "boolean", value: "usb", ref: "device.usb", source: "device" },
+  { id: "battery", group: "Panel", key: "battery", label: "Battery", type: "number", value: "battery", unit: "%", ref: "device.battery", sources: {} },
+  { id: "online", group: "Panel", key: "online", label: "Connected to Wi-Fi", type: "boolean", value: "online", ref: "device.online", sources: {} },
+  { id: "usb", group: "Panel", key: "usb", label: "Plugged in", type: "boolean", value: "usb", ref: "device.usb", sources: {} },
 ];
 
 /**
  * The catalog for a project. `sourceIds` maps widget id → runtime source id;
  * pass it from a compile, or leave it out to list facts for the editor.
  */
-export function factCatalog(project: Project, sourceIds?: ReadonlyMap<string, string>): CatalogFact[] {
+export function factCatalog(project: Project, sourceIds?: ReadonlyMap<string, SourceMap>): CatalogFact[] {
   const env = envOf(project);
   const out = [...BUILT_IN];
   for (const screen of project.screens) {
@@ -63,11 +64,14 @@ export function factCatalog(project: Project, sourceIds?: ReadonlyMap<string, st
       const ext = extensionFor(w.type);
       if (!ext?.facts || !ext.source) continue;
       const settings = { ...ext.defaults(env), ...w.settings };
-      if (!ext.source(settings, env)) continue;
+      const names = Object.keys(namedSpecs(ext.source(settings, env)));
+      if (names.length === 0) continue;
       const group = widgetTitle(w, env);
-      const src = sourceIds?.get(w.id) ?? w.id;
+      // Before a compile there are no runtime ids; the widget's own id stands in.
+      const sources = sourceIds?.get(w.id) ?? Object.fromEntries(names.map((n) => [n, n ? `${w.id}~${n}` : w.id]));
       for (const f of ext.facts(settings, env)) {
-        out.push({ ...f, id: `${w.id}:${f.key}`, group, ref: f.type === "flag" ? "" : `${src}.${f.value}`, source: src, extension: w.type });
+        const ref = f.type === "flag" ? "" : (resolveKey(f.value, sources) ?? "");
+        out.push({ ...f, id: `${w.id}:${f.key}`, group, ref, sources, extension: w.type });
       }
     }
   }
@@ -83,13 +87,13 @@ export function minutesOf(hhmm: unknown): number | null {
   return h < 24 && min < 60 ? h * 60 + min : null;
 }
 
-/** A widget's own condition, its references pointed at that widget's source. */
-export function scoped(c: Condition, source: string): Condition {
-  if ("all" in c) return { all: c.all.map((x) => scoped(x, source)) };
-  if ("any" in c) return { any: c.any.map((x) => scoped(x, source)) };
-  if ("not" in c) return { not: scoped(c.not, source) };
-  const v = c.v.includes(".") ? c.v : `${source}.${c.v}`;
-  const f = c.f?.shift && !c.f.shift.v.includes(".") ? { ...c.f, shift: { ...c.f.shift, v: `${source}.${c.f.shift.v}` } } : c.f;
+/** A widget's own condition, its references pointed at that widget's sources. */
+export function scoped(c: Condition, sources: SourceMap): Condition {
+  if ("all" in c) return { all: c.all.map((x) => scoped(x, sources)) };
+  if ("any" in c) return { any: c.any.map((x) => scoped(x, sources)) };
+  if ("not" in c) return { not: scoped(c.not, sources) };
+  const v = resolveKey(c.v, sources) ?? c.v;
+  const f = c.f?.shift ? { ...c.f, shift: { ...c.f.shift, v: resolveKey(c.f.shift.v, sources) ?? c.f.shift.v } } : c.f;
   return f ? { ...c, v, f } : { ...c, v };
 }
 
@@ -111,16 +115,16 @@ export function checkToCondition(check: Check, catalog: readonly CatalogFact[]):
         const [a, b] = Array.isArray(x) ? x : [];
         if (typeof a !== "number" || typeof b !== "number") return null;
         const cond: Condition = { v, op: "between", x: [a, b], ...(fact.format ? { f: fact.format } : {}) };
-        return "source" in fact && fact.source ? scoped(cond, fact.source) : cond;
+        return "sources" in fact ? scoped(cond, fact.sources) : cond;
       }
       if (typeof x !== "number" || !["gt", "lt", "ge", "le", "eq"].includes(check.op)) return null;
       const cond: Condition = { v, op: check.op as "gt", x, ...(fact.format ? { f: fact.format } : {}) };
-      return "source" in fact && fact.source ? scoped(cond, fact.source) : cond;
+      return "sources" in fact ? scoped(cond, fact.sources) : cond;
     }
     case "boolean":
       return { v, op: x === false ? "false" : "true" };
     case "flag": {
-      const test = scoped(fact.test, fact.source);
+      const test = scoped(fact.test, fact.sources);
       return x === false ? { not: test } : test;
     }
     case "choice": {

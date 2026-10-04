@@ -1,5 +1,6 @@
 // Expected pictures are worked out by hand from format.md §4.
 #include "../src/runtime/elements.h"
+#include "../src/runtime/program.h"
 #include "../src/runtime/shapes.h"
 #include "../src/runtime/timezone.h"
 
@@ -261,4 +262,62 @@ TEST(rounded_corner_closed_form_matches_definition) {
     }
     CHECK_EQ(bad, 0);
   }
+}
+
+namespace {
+
+// A group nested `depth` deep around one 1x1 rect at (x, 0).
+std::string nestedGroups(int depth, int x) {
+  std::string json = R"({"t":"rect","x":)" + std::to_string(x) + R"(,"y":0,"w":1,"h":1})";
+  for (int i = 0; i < depth; ++i) json = R"({"t":"group","els":[)" + json + "]}";
+  return json;
+}
+
+}  // namespace
+
+TEST(group_draws_children_in_order) {
+  ValueStore v;
+  v.set("d.on", Value::boolean(true));
+  v.set("d.off", Value::boolean(false));
+  CHECK_EQ(all(drawn(4, 1, R"({"t":"group","c":0,"els":[{"t":"rect","x":0,"y":0,"w":3,"h":1},
+                                                        {"t":"rect","x":1,"y":0,"w":1,"h":1,"c":0}]})", v)),
+           (Rows{"#.#."}));  // the group's c is ignored; the children's own c applies
+  CHECK_EQ(all(drawn(4, 1, R"({"t":"group","when":{"v":"d.on","op":"true"},"els":[{"t":"rect","x":0,"y":0,"w":2,"h":1}]})", v)),
+           (Rows{"##.."}));
+  CHECK_EQ(testutil::countInk(drawn(4, 1, R"({"t":"group","when":{"v":"d.off","op":"true"},
+                                             "els":[{"t":"rect","x":0,"y":0,"w":2,"h":1}]})", v)), 0);
+  // A false group inside a true one hides everything below it.
+  CHECK_EQ(all(drawn(4, 1, R"({"t":"group","els":[
+      {"t":"rect","x":0,"y":0,"w":1,"h":1},
+      {"t":"group","when":{"v":"d.off","op":"true"},"els":[
+        {"t":"rect","x":1,"y":0,"w":1,"h":1},
+        {"t":"group","els":[{"t":"rect","x":2,"y":0,"w":1,"h":1}]}]},
+      {"t":"rect","x":3,"y":0,"w":1,"h":1,"when":{"v":"d.on","op":"true"}}]})", v)),
+           (Rows{"#..#"}));
+  // Empty, missing or malformed els draw nothing and do not fail.
+  for (const char* g : {R"({"t":"group","els":[]})", R"({"t":"group"})", R"({"t":"group","els":5})",
+                        R"({"t":"group","els":[{"t":"nope"},7,null]})"}) {
+    CHECK_EQ(testutil::countInk(drawn(4, 1, g, v)), 0);
+  }
+}
+
+TEST(group_depth_limit) {
+  CHECK(drawn(4, 1, nestedGroups(8, 2).c_str()).get(2, 0));    // 8 deep: drawn
+  CHECK(!drawn(4, 1, nestedGroups(9, 2).c_str()).get(2, 0));   // 9 deep: that group is empty
+  CHECK_EQ(testutil::countInk(drawn(4, 1, nestedGroups(40, 1).c_str())), 0);
+}
+
+TEST(deep_groups_still_load_as_a_blob) {
+  // Nine groups plus a nested condition must parse; only the ninth is empty.
+  std::string inner = R"({"t":"rect","x":0,"y":0,"w":1,"h":1,"when":{"all":[{"any":[{"not":{"v":"x.y","op":"absent"}}]}]}})";
+  std::string json = R"({"t":"rect","x":1,"y":0,"w":1,"h":1})";
+  for (int i = 0; i < 9; ++i) json = R"({"t":"group","els":[)" + json + (i == 0 ? "," + inner : "") + "]}";
+  auto blob = testutil::makeBlob(R"({"v":1,"width":4,"height":1,"screens":[{"elements":[)" + json + "]}]}");
+  std::string error;
+  auto p = Program::load({blob.data(), blob.size()}, error);
+  CHECK(p != nullptr);
+  if (!p) return;
+  Framebuffer fb;
+  p->render(0, ValueStore(), 0, fb);
+  CHECK_EQ(testutil::countInk(fb), 0);
 }

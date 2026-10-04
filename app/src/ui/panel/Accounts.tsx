@@ -98,7 +98,14 @@ function Google({ links, set }: { links: GoogleLink[]; set: (a: GoogleLink[]) =>
   return (
     <div className="space-y-2">
       {links.map((a) => (
-        <Linked key={a.id} who={`${a.email || a.id} — calendars, read only`} onUnlink={() => set(links.filter((x) => x.id !== a.id))} />
+        <div key={a.id} className="flex items-center gap-2">
+          <input aria-label="Name on the panel" value={a.label} maxLength={24} placeholder="Personal"
+            onChange={(e) => set(links.map((x) => (x.id === a.id ? { ...x, label: e.target.value } : x)))}
+            className="h-9 w-32 shrink-0 rounded-md border border-line bg-raised px-2.5 font-medium focus:border-accent focus:outline-none" />
+          <div className="min-w-0 flex-1">
+            <Linked who={`${a.email || a.id} — calendars, read only`} onUnlink={() => set(links.filter((x) => x.id !== a.id))} />
+          </div>
+        </div>
       ))}
       {links.length === 0 || adding ? (
         <GoogleSignIn known={links[0]} onLinked={link} first={links.length === 0} />

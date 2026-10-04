@@ -8,7 +8,7 @@ import type { Extension } from "@/extensions/api";
 import { createProject } from "@/project/starters";
 import type { Project } from "@/project/schema";
 import { renderScreen } from "@/runtime/render";
-import { builtins } from "@/runtime/values";
+import { sampleValues } from "@/compiler/sample";
 import { compileInBrowser } from "@/state/compile";
 import { Lock } from "lucide-react";
 import { envOf, missingAccounts } from "@/compiler/widgets";
@@ -18,7 +18,7 @@ import { storeFor } from "../Preview";
 import { ExtensionIcon } from "./Inspector";
 
 const PREVIEW_ACCOUNTS: Project["accounts"] = {
-  google: [{ id: "preview", clientId: "preview", clientSecret: "preview", refreshToken: "preview", email: "" }],
+  google: [{ id: "preview", clientId: "preview", clientSecret: "preview", refreshToken: "preview", email: "", label: "Personal" }],
   stripe: { key: "rk_test_preview", name: "" },
 };
 
@@ -41,8 +41,7 @@ function Thumb({ ext, project }: { ext: Extension; project: Project }) {
   }, [ext, project.timezone, project.language, project.units, project.place, project.images, w, h]);
   const fb = useMemo(() => {
     if (!compiled) return null;
-    const values = builtins(now, compiled.runtime.tz);
-    for (const s of compiled.sources) for (const [k, v] of s.sample) values.set(k, v);
+    const values = sampleValues(compiled, now);
     return renderScreen(compiled.runtime, storeFor(compiled), 0, values, now);
   }, [compiled, now]);
   const box = useMemo(() => cellsToBox(0, 0, w, h, { width: 800, height: 480 }), [w, h]);

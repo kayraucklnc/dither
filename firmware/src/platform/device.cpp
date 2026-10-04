@@ -100,6 +100,7 @@ uint32_t Device::run(const Program& program) {
   setDeviceValues(values, device);
   const std::vector<SourceState> states = statesOf(program, cache);
   for (size_t i = 0; i < states.size(); ++i) setSourceStatus(values, program.sources()[i].id, states[i], now);
+  program.applyMerges(values, now);  // recomputed each wake, from cached values too
 
   const int screen = program.chooseScreen(values, now);
   const uint32_t drawStart = millis();

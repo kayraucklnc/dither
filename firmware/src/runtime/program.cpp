@@ -30,7 +30,8 @@ std::unique_ptr<Program> Program::load(ByteSpan blob, std::string& error) {
 
 bool Program::configure(ByteSpan blob, std::string& error) {
   ByteSpan rt = blob.sub(header_.runtimeOffset, header_.runtimeLength);
-  JsonParseResult r = doc_.parse(std::string_view(reinterpret_cast<const char*>(rt.data), rt.size));
+  // In place: the runtime JSON stays in the (memory-mapped) blob.
+  JsonParseResult r = doc_.parseInPlace(std::string_view(reinterpret_cast<const char*>(rt.data), rt.size));
   if (!r.ok) {
     error = "runtime JSON: " + r.error + " at " + std::to_string(r.offset);
     return false;
@@ -68,6 +69,7 @@ bool Program::configure(ByteSpan blob, std::string& error) {
     if (w["ssid"].isString()) wifi_.push_back({std::string(w["ssid"].string()), std::string(w["pass"].string())});
   }
   sources_ = parseSources(root["sources"]);
+  merges_ = parseMerges(root["merges"]);
   refresh_ = seconds(root["refresh"], kDefaultRefresh);
   JsonView quiet = root["quiet"];
   if (quiet["from"].isNumber() && quiet["to"].isNumber()) {
@@ -76,6 +78,10 @@ bool Program::configure(ByteSpan blob, std::string& error) {
     quiet_.to = std::clamp(quiet["to"].integer(0), 0, 1439);
   }
   return true;
+}
+
+void Program::applyMerges(ValueStore& values, std::optional<int64_t> now) const {
+  dither::applyMerges(merges_, values, now, tz_);
 }
 
 FormatContext Program::formatContext(std::optional<int64_t> now) const {

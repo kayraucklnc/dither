@@ -132,3 +132,62 @@ TEST(format_shift) {
   CHECK_EQ(run(str("soon"), delayed), kDash);
   CHECK_EQ(run(num(1782907200), R"({"shift":{"v":"t.delay","scale":1e300}})"), kDash);
 }
+
+namespace {
+
+std::string daysAt(int64_t now, const Value& v, const char* f = R"({"days":true})") {
+  static Env env;
+  FormatContext ctx = env.ctx;
+  ctx.now = now;
+  JsonDoc doc;
+  doc.parse(f);
+  return formatValue(v, doc.root(), ctx);
+}
+
+}  // namespace
+
+TEST(format_days) {
+  const int64_t noon = 1782907200 - 7200;  // 2026-07-01 12:00 CEST
+  CHECK_EQ(daysAt(noon, str("2026-07-01")), "0");
+  CHECK_EQ(daysAt(noon, str("2026-07-02")), "1");
+  CHECK_EQ(daysAt(noon, str("2026-06-30")), "-1");
+  CHECK_EQ(daysAt(noon, str("2026-12-25")), "177");
+  CHECK_EQ(daysAt(noon, str("2027-07-01")), "365");
+  CHECK_EQ(daysAt(noon, str("2026-07-02T23:59")), "1");
+  CHECK_EQ(daysAt(noon, num(static_cast<double>(noon))), "0");
+  // Around midnight: 23:59:59 is still today, one second later is tomorrow.
+  const int64_t lastSecond = 1782943199;  // 2026-07-01 23:59:59 CEST
+  CHECK_EQ(daysAt(lastSecond, num(static_cast<double>(lastSecond + 1))), "1");
+  CHECK_EQ(daysAt(lastSecond + 1, num(static_cast<double>(lastSecond))), "-1");
+  CHECK_EQ(daysAt(lastSecond + 1, str("2026-07-02")), "0");
+  // Zoned: 22:30Z is already tomorrow in Rome (00:30 CEST), but today in UTC.
+  CHECK_EQ(daysAt(noon, str("2026-07-01T22:30:00Z")), "1");
+  CHECK_EQ(daysAt(noon, str("2026-07-01T23:30:00+01:00")), "1");
+  CHECK_EQ(daysAt(noon, str("2026-07-01T21:59:59Z")), "0");
+  // Wall-clock strings take the nearest day.
+  CHECK_EQ(daysAt(lastSecond - 600, str("00:10")), "1");     // 23:50 now: tomorrow
+  CHECK_EQ(daysAt(lastSecond + 601, str("23:50")), "-1");    // 00:10 now: yesterday
+  CHECK_EQ(daysAt(noon, str("15:00")), "0");
+  // DST days are still one calendar day: from noon on the spring change
+  // (23 h long) and the autumn change (25 h long).
+  CHECK_EQ(daysAt(1774778400, str("2026-03-30")), "1");
+  CHECK_EQ(daysAt(1774778400, num(1774778400.0 + 23 * 3600)), "1");  // 13:00 next day
+  CHECK_EQ(daysAt(1792926000, str("2026-10-24")), "-1");
+  CHECK_EQ(daysAt(1792926000, num(1792926000.0 + 12 * 3600)), "1");  // 23:00Z = 00:00 CET on the 26th
+  CHECK_EQ(daysAt(1792926000, num(1792926000.0 + 12 * 3600 - 1)), "0");
+  // days wins over until; the rest of the pipeline follows.
+  CHECK_EQ(daysAt(noon, str("2026-07-03"), R"({"days":true,"until":true})"), "2");
+  CHECK_EQ(daysAt(noon, str("2026-06-01"), R"({"days":true,"until":true})"), "-30");  // past is fine for days
+  CHECK_EQ(daysAt(noon, str("2026-07-02"), R"({"days":true,"map":{"k":[0,1],"o":["Today","Tomorrow"]}})"),
+           "Tomorrow");
+  CHECK_EQ(daysAt(noon, str("2026-07-01T10:00"), R"({"shift":{"v":"t.delay","scale":86400},"days":true})"), "7");
+  // Not a time, or no clock.
+  CHECK_EQ(daysAt(noon, str("someday")), kDash);
+  CHECK_EQ(daysAt(noon, Value::boolean(true)), kDash);
+  static Env env;
+  FormatContext unknown = env.ctx;
+  unknown.now.reset();
+  JsonDoc doc;
+  doc.parse(R"({"days":true})");
+  CHECK_EQ(formatValue(str("2026-07-01"), doc.root(), unknown), kDash);
+}

@@ -79,7 +79,9 @@ function drawChart(el: ElementOf<"chart">, ctx: Ctx, ink: boolean): void {
   for (let i = 1; i < pts.length; i++) line(ctx.fb, pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], lw, ink);
 }
 
-function drawElement(el: Element, ctx: Ctx): void {
+const MAX_GROUP_DEPTH = 8;
+
+function drawElement(el: Element, ctx: Ctx, depth = 0): void {
   if (el.when && !evaluate(el.when, ctx.values, ctx.fmt)) return;
   const ink = el.c !== 0;
   const fb = ctx.fb;
@@ -139,6 +141,10 @@ function drawElement(el: Element, ctx: Ctx): void {
     }
     case "chart":
       drawChart(el, ctx, ink);
+      return;
+    case "group":
+      if (depth >= MAX_GROUP_DEPTH) return;
+      for (const child of el.els) drawElement(child, ctx, depth + 1);
       return;
   }
 }
