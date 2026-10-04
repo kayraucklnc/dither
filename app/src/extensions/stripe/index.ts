@@ -38,6 +38,8 @@ interface Settings extends Record<string, unknown> {
   compare: boolean;
   compact: boolean;
   names: boolean;
+  peak: boolean;
+  range: boolean;
 }
 
 const currencyOf = (s: Settings) => CURRENCIES.find((c) => c.value === s.currency) ?? CURRENCIES[0];
@@ -122,19 +124,58 @@ function figure(d: Draw, s: Settings, x: number, y: number, w: number, h: number
   }
 }
 
-/** Money over time: a line over a dithered ramp, with where it starts and ends. */
+/** Where each bucket of the graph sits in time, as words: "14:00", "3 days ago". */
+function bucketLabels(s: Settings): Format {
+  const ch = chartOf(s);
+  const k = Array.from({ length: ch.count }, (_, i) => i);
+  const o = ch.by === "hour"
+    ? k.map((i) => `${String(i).padStart(2, "0")}:00`)
+    : k.map((i) => (i === ch.count - 1 ? "today" : i === ch.count - 2 ? "yesterday" : `${ch.count - 1 - i} days ago`));
+  return { map: { k, o } };
+}
+
+/** Money over time: a line over a dithered ramp, the peak marked, the range spelled out. */
 function graph(d: Draw, s: Settings, x: number, y: number, w: number, h: number) {
   const ch = chartOf(s);
+  const c = currencyOf(s);
   const small = Math.max(13, Math.min(16, Math.round(h * 0.08)));
-  const axisH = d.metrics(small).lineHeight + 4;
-  const plotH = h - axisH;
+  const sm = d.metrics(small);
+  const axisH = sm.lineHeight + 4;
+  const rangeH = s.range ? sm.lineHeight + 4 : 0;
+  const peakH = s.peak ? sm.lineHeight + 6 : 0;
+  const plotY = y + peakH;
+  const plotH = h - axisH - rangeH - peakH;
+  if (plotH < 24) return;
+
   // Curved still passes through every figure; only the shape between two of them is drawn in.
   const smooth = s.line === "curve" || s.line === "curve-line";
   const kind = s.line === "curve" ? "area" : s.line === "curve-line" ? "line" : s.line;
-  d.chart({ x, y, w, h: plotH }, "chart/series", { kind, min: 0, width: 2, smooth });
-  d.line(x, y + plotH, x + w, y + plotH, { width: 1 });
-  at(d, ch.from, x, y + h - 2, w / 2, small, 400);
-  at(d, ch.to, x + w / 2, y + h - 2, w / 2, small, 400, { align: "right" });
+  d.chart({ x, y: plotY, w, h: plotH }, "chart/series", { kind, min: 0, width: 2, smooth });
+  d.line(x, plotY + plotH, x + w, plotY + plotH, { width: 1 });
+
+  const amount = (pick: "max" | "min"): Part => d.value("chart/series", { pick, scale: scaleOf(s), num: { d: 0, sep: ",", compact: s.compact } });
+  if (s.peak) {
+    // A hairline at the top of the graph is the high; the dot says where it fell.
+    for (let px = x; px < x + w; px += 8) d.line(px, plotY, Math.min(px + 3, x + w - 1), plotY, { width: 1 });
+    for (let i = 0; i < ch.count; i++) {
+      const px = x + Math.floor((i * (w - 1)) / Math.max(1, ch.count - 1));
+      d.when({ v: "chart/series", f: { pick: "argmax" }, op: "eq", x: i }, () => {
+        d.circle(px, plotY, 4);
+        const lw = d.measure(`${c.sign}88,888`, small, 700) + 8;
+        const lx = Math.max(x, Math.min(x + w - lw, px - Math.round(lw / 2)));
+        d.text([c.sign, amount("max")], { x: lx, y: y, w: lw, h: sm.lineHeight, size: small, weight: 700, align: px - lw / 2 < x ? "left" : px + lw / 2 > x + w ? "right" : "center" });
+      });
+    }
+  }
+  at(d, ch.from, x, plotY + plotH + sm.ascent + 2, w / 2, small, 400);
+  at(d, ch.to, x + w / 2, plotY + plotH + sm.ascent + 2, w / 2, small, 400, { align: "right" });
+  if (s.range) {
+    const when = bucketLabels(s);
+    at(d, [
+      "High ", c.sign, amount("max"), " ", d.value("chart/series", { pick: "argmax", ...when }),
+      "  ·  Low ", c.sign, amount("min"), " ", d.value("chart/series", { pick: "argmin", ...when }),
+    ], x, y + h - sm.descent, w, small, 700);
+  }
 }
 
 /** The latest payments: when, who or what, how much. */
@@ -224,13 +265,15 @@ export default defineExtension<Settings>({
       ],
       visible: (s) => ["auto", "graph", "board"].includes(String(s.style)),
     },
+    { key: "peak", label: "Mark the high on the graph", kind: "toggle", visible: (s) => ["auto", "graph", "board"].includes(String(s.style)) },
+    { key: "range", label: "Spell out the high and low", kind: "toggle", help: "“High €1,640 14:00 · Low €0 03:00”.", visible: (s) => ["auto", "graph", "board"].includes(String(s.style)) },
     { key: "compare", label: "Compare with the period before", kind: "toggle", visible: (s) => s.style !== "ledger" && s.style !== "payments" },
     { key: "names", label: "Show customers' names", kind: "toggle", help: "Off, payments show what was bought.", visible: (s) => ["auto", "board", "payments"].includes(String(s.style)) },
     { key: "compact", label: "Shorten large numbers", kind: "toggle", help: "74,120 becomes 74.1k." },
     { key: "heading", label: "Heading", kind: "text", placeholder: "Left empty, the period names it" },
     { key: "currency", label: "Currency", kind: "select", options: CURRENCIES.map(({ value, label }) => ({ value, label })) },
   ],
-  defaults: () => ({ style: "auto", period: "today", chart: "auto", line: "curve", currency: "eur", heading: "", compare: true, compact: false, names: false }),
+  defaults: () => ({ style: "auto", period: "today", chart: "auto", line: "curve", currency: "eur", heading: "", compare: true, compact: false, names: false, peak: true, range: true }),
   title: (s) => `Revenue, ${periodOf(s).label.toLowerCase()}`,
   source(s, env) {
     const key = env.accounts.stripe?.key.trim() ?? "";

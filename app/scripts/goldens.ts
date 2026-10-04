@@ -38,7 +38,7 @@ function write(name: string, blob: Uint8Array, runtime: Runtime, values: Record<
 const fonts = await loadFonts();
 const deps = { library: nodeLibrary, fonts, picture: async () => null, boardPanel: () => ({ width: 800, height: 480 }) };
 
-for (const dir of ["calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "primitives", "text-and-formats"]) {
+for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "primitives", "text-and-formats"]) {
   rmSync(`${root}${dir}`, { recursive: true, force: true });
 }
 
@@ -90,6 +90,24 @@ for (const s of STARTERS.filter((x) => x.id !== "blank")) {
     [`${cal}._ok`]: true, [`${cal}._age`]: 4,
   });
   write("transit-calendar-alerts", c.blob, c.runtime, values);
+}
+
+// Every clock face at once.
+{
+  const project = createProject({ starter: "blank", timezone: "Europe/Rome", language: "en", units: "metric", place });
+  const clock = (id: string, x: number, y: number, w: number, h: number, settings: Record<string, unknown>) =>
+    ({ id, type: "clock", x, y, w, h, frame: "none" as const, settings });
+  project.screens[0].widgets = [
+    clock("tiles", 0, 0, 8, 4, { style: "tiles" }),
+    clock("thin", 8, 0, 6, 4, { style: "thin", hours: "12", date: "ddd D MMM" }),
+    clock("words", 14, 0, 6, 4, { style: "words" }),
+    clock("roman", 0, 4, 5, 8, { style: "dial", numerals: "roman", showDate: false }),
+    clock("arabic", 5, 4, 5, 8, { style: "dial", numerals: "arabic", hands: "bold", date: "dddd" }),
+    clock("dots", 10, 4, 5, 8, { style: "dial", numerals: "dots", hands: "thin", showDate: false }),
+    clock("stacked", 15, 4, 5, 8, { style: "stacked", date: "DD.MM.YYYY" }),
+  ];
+  const c = await compile(project, deps);
+  write("clocks", c.blob, c.runtime, { ...DEVICE });
 }
 
 // Three accounts side by side: groups, days, ongoing, all-day and later days.

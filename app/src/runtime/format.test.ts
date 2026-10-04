@@ -126,3 +126,14 @@ describe("compact numbers", () => {
     expect(formatValue(v, { num: { d: 0, compact: true } }, ctx)).toBe(out);
   });
 });
+
+describe("pick", () => {
+  it.each([["max", 9], ["min", -2], ["sum", 14], ["first", 3], ["last", 1], ["argmax", 2], ["argmin", 1], ["count", 5]] as const)("%s", (how, out) => {
+    expect(formatValue([3, -2, 9, 9, 1], { pick: how }, ctx)).toBe(String(out === 14 ? 20 : out));
+  });
+  it("is null for an empty or a missing series", () => {
+    expect(formatValue([], { pick: "max", fallback: "none" }, ctx)).toBe("none");
+    expect(formatValue([], { pick: "count" }, ctx)).toBe("0");
+    expect(formatValue(5, { pick: "max", fallback: "none" }, ctx)).toBe("none");
+  });
+});

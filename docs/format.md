@@ -231,7 +231,7 @@ in place of `x` (with `lt`, `le`, `gt`, `ge`, `eq`, `ne`); the other value goes
 through the leaf's `f` as well. `{ "v": "s1.today", "op": "gt", "vs":
 "s2.yesterday" }`.
 
-A leaf may carry a format `f`: the value goes through its `shift`, `days`, `until`,
+A leaf may carry a format `f`: the value goes through its `pick`, `shift`, `days`, `until`,
 `scale`, `add`, `steps` and `map` steps (the rest are ignored) before it is compared,
 and a step that gives `null` makes the value `null`.
 
@@ -269,31 +269,36 @@ showing.
 
 A **format** turns a value into text. All fields optional; applied in this order:
 
-0. `shift: { "v": ref, "scale": n }` — value is a time; it becomes the instant
+0. `pick: "max" | "min" | "sum" | "first" | "last" | "argmax" | "argmin" |
+   "count"` — value is a series; becomes its largest, smallest, total, first,
+   last element, the index of its largest or smallest (the earliest on a
+   tie), or its length. An empty series is `null` (its `count` is 0); a value
+   that is not a series, or a name not listed here, is `null`.
+1. `shift: { "v": ref, "scale": n }` — value is a time; it becomes the instant
    (Unix seconds) moved by the referenced value × `scale` seconds (`scale`
    defaults to 1). A reference that is not a number moves it by 0. A
    timetable's "08:15" plus its delay in minutes (`scale: 60`) is when the
    train actually leaves.
-1. `days: true` — value is a time; becomes the number of local calendar days
+2. `days: true` — value is a time; becomes the number of local calendar days
    from today to its local date: 0 today, 1 tomorrow, −1 yesterday. (A date
    alone, `2026-10-05`, is that date.) When a format sets both `days` and
    `until`, `days` is used and `until` ignored.
-2. `until: true` — value is a time (§ times below); becomes whole minutes from
+3. `until: true` — value is a time (§ times below); becomes whole minutes from
    now to it, `floor((t - now) / 60)`. A time in the past becomes `null`.
-3. `scale: n` — multiply. `add: n` — add (after `scale`).
-4. `steps: { "t": [t0, t1, …], "o": [o0, o1, …, oN] }` — numeric value becomes
+4. `scale: n` — multiply. `add: n` — add (after `scale`).
+5. `steps: { "t": [t0, t1, …], "o": [o0, o1, …, oN] }` — numeric value becomes
    `o[k]` where `k` is how many thresholds are `<= value`. `o` has one more
    entry than `t`.
-5. `map: { "k": [k0, …], "o": [o0, …], "d": default }` — exact match (number to
+6. `map: { "k": [k0, …], "o": [o0, …], "d": default }` — exact match (number to
    number, string to string); unmatched becomes `d` (or `null` if no `d`).
-6. `num: { "d": decimals, "sep": ",", "compact": true }` — fixed decimals
+7. `num: { "d": decimals, "sep": ",", "compact": true }` — fixed decimals
    (§ numbers); `sep` inserts a thousands separator into the integer part.
    With `compact`, a value whose magnitude is at least 1,000 is divided by the
    largest of 10⁹, 10⁶, 10³ not above it, printed with 1 decimal (a trailing
    `.0` dropped) and suffixed `B`, `M` or `k`: 74,120 → `74.1k`, 2,000,000 →
    `2M`; smaller values print as without `compact`.
-7. `time: "HH:mm"` — value is a time; rendered with the tokens below.
-8. `upper: true` — the value becomes text, then: `a–z` → `A–Z`; U+00E0–U+00FE
+8. `time: "HH:mm"` — value is a time; rendered with the tokens below.
+9. `upper: true` — the value becomes text, then: `a–z` → `A–Z`; U+00E0–U+00FE
    except U+00F7 → minus 0x20; `ğ→Ğ`, `ş→Ş`, `ı→I`. With `"tr": true` also set,
    `i→İ` instead of `i→I`. Nothing else changes.
 
