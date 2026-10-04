@@ -1,0 +1,13 @@
+{
+  "name": "dither-tools",
+  "private": true,
+  "type": "module",
+  "description": "Asset generators for Dither: bitmap fonts and icon packs.",
+  "scripts": {
+    "icons": "node icons/build.mjs"
+  },
+  "dependencies": {
+    "lucide-static": "1.52.0",
+    "sharp": "0.35.5"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "now": 1791119250,
+  "values": {
+    "device.battery": 64,
+    "device.usb": false,
+    "device.online": true,
+    "device.rssi": -61
+  }
+}

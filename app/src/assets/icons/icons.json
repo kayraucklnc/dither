@@ -1,0 +1,1763 @@
+{
+  "source": "lucide-static@1.52.0",
+  "sizes": [
+    16,
+    24,
+    32,
+    48,
+    64,
+    96,
+    128
+  ],
+  "names": [
+    "sun",
+    "moon",
+    "cloud",
+    "cloud-sun",
+    "cloud-moon",
+    "cloud-rain",
+    "cloud-drizzle",
+    "cloud-snow",
+    "cloud-lightning",
+    "cloud-fog",
+    "snowflake",
+    "wind",
+    "droplets",
+    "umbrella",
+    "thermometer",
+    "sunrise",
+    "sunset",
+    "calendar",
+    "clock",
+    "alarm-clock",
+    "train-front",
+    "bus",
+    "tram-front",
+    "bike",
+    "car",
+    "plane",
+    "house",
+    "briefcase",
+    "mail",
+    "bell",
+    "battery",
+    "battery-low",
+    "battery-medium",
+    "battery-full",
+    "battery-charging",
+    "wifi",
+    "wifi-off",
+    "trending-up",
+    "trending-down",
+    "arrow-up",
+    "arrow-down",
+    "bitcoin",
+    "dollar-sign",
+    "euro",
+    "chart-line",
+    "heart",
+    "star",
+    "check",
+    "x",
+    "circle-alert",
+    "info",
+    "music",
+    "coffee",
+    "book-open",
+    "quote",
+    "gift",
+    "cake",
+    "map-pin",
+    "sparkles"
+  ],
+  "aliases": {},
+  "packs": {
+    "16": {
+      "file": "icons-16.pack",
+      "icons": {
+        "sun": [
+          0,
+          44
+        ],
+        "moon": [
+          44,
+          44
+        ],
+        "cloud": [
+          88,
+          44
+        ],
+        "cloud-sun": [
+          132,
+          44
+        ],
+        "cloud-moon": [
+          176,
+          44
+        ],
+        "cloud-rain": [
+          220,
+          44
+        ],
+        "cloud-drizzle": [
+          264,
+          44
+        ],
+        "cloud-snow": [
+          308,
+          44
+        ],
+        "cloud-lightning": [
+          352,
+          44
+        ],
+        "cloud-fog": [
+          396,
+          44
+        ],
+        "snowflake": [
+          440,
+          44
+        ],
+        "wind": [
+          484,
+          44
+        ],
+        "droplets": [
+          528,
+          44
+        ],
+        "umbrella": [
+          572,
+          44
+        ],
+        "thermometer": [
+          616,
+          44
+        ],
+        "sunrise": [
+          660,
+          44
+        ],
+        "sunset": [
+          704,
+          44
+        ],
+        "calendar": [
+          748,
+          44
+        ],
+        "clock": [
+          792,
+          44
+        ],
+        "alarm-clock": [
+          836,
+          44
+        ],
+        "train-front": [
+          880,
+          44
+        ],
+        "bus": [
+          924,
+          44
+        ],
+        "tram-front": [
+          968,
+          44
+        ],
+        "bike": [
+          1012,
+          44
+        ],
+        "car": [
+          1056,
+          44
+        ],
+        "plane": [
+          1100,
+          44
+        ],
+        "house": [
+          1144,
+          44
+        ],
+        "briefcase": [
+          1188,
+          44
+        ],
+        "mail": [
+          1232,
+          44
+        ],
+        "bell": [
+          1276,
+          44
+        ],
+        "battery": [
+          1320,
+          44
+        ],
+        "battery-low": [
+          1364,
+          44
+        ],
+        "battery-medium": [
+          1408,
+          44
+        ],
+        "battery-full": [
+          1452,
+          44
+        ],
+        "battery-charging": [
+          1496,
+          44
+        ],
+        "wifi": [
+          1540,
+          44
+        ],
+        "wifi-off": [
+          1584,
+          44
+        ],
+        "trending-up": [
+          1628,
+          44
+        ],
+        "trending-down": [
+          1672,
+          44
+        ],
+        "arrow-up": [
+          1716,
+          44
+        ],
+        "arrow-down": [
+          1760,
+          44
+        ],
+        "bitcoin": [
+          1804,
+          44
+        ],
+        "dollar-sign": [
+          1848,
+          44
+        ],
+        "euro": [
+          1892,
+          44
+        ],
+        "chart-line": [
+          1936,
+          44
+        ],
+        "heart": [
+          1980,
+          44
+        ],
+        "star": [
+          2024,
+          44
+        ],
+        "check": [
+          2068,
+          44
+        ],
+        "x": [
+          2112,
+          44
+        ],
+        "circle-alert": [
+          2156,
+          44
+        ],
+        "info": [
+          2200,
+          44
+        ],
+        "music": [
+          2244,
+          44
+        ],
+        "coffee": [
+          2288,
+          44
+        ],
+        "book-open": [
+          2332,
+          44
+        ],
+        "quote": [
+          2376,
+          44
+        ],
+        "gift": [
+          2420,
+          44
+        ],
+        "cake": [
+          2464,
+          44
+        ],
+        "map-pin": [
+          2508,
+          44
+        ],
+        "sparkles": [
+          2552,
+          44
+        ]
+      }
+    },
+    "24": {
+      "file": "icons-24.pack",
+      "icons": {
+        "sun": [
+          0,
+          84
+        ],
+        "moon": [
+          84,
+          84
+        ],
+        "cloud": [
+          168,
+          84
+        ],
+        "cloud-sun": [
+          252,
+          84
+        ],
+        "cloud-moon": [
+          336,
+          84
+        ],
+        "cloud-rain": [
+          420,
+          84
+        ],
+        "cloud-drizzle": [
+          504,
+          84
+        ],
+        "cloud-snow": [
+          588,
+          84
+        ],
+        "cloud-lightning": [
+          672,
+          84
+        ],
+        "cloud-fog": [
+          756,
+          84
+        ],
+        "snowflake": [
+          840,
+          84
+        ],
+        "wind": [
+          924,
+          84
+        ],
+        "droplets": [
+          1008,
+          84
+        ],
+        "umbrella": [
+          1092,
+          84
+        ],
+        "thermometer": [
+          1176,
+          84
+        ],
+        "sunrise": [
+          1260,
+          84
+        ],
+        "sunset": [
+          1344,
+          84
+        ],
+        "calendar": [
+          1428,
+          84
+        ],
+        "clock": [
+          1512,
+          84
+        ],
+        "alarm-clock": [
+          1596,
+          84
+        ],
+        "train-front": [
+          1680,
+          84
+        ],
+        "bus": [
+          1764,
+          84
+        ],
+        "tram-front": [
+          1848,
+          84
+        ],
+        "bike": [
+          1932,
+          84
+        ],
+        "car": [
+          2016,
+          84
+        ],
+        "plane": [
+          2100,
+          84
+        ],
+        "house": [
+          2184,
+          84
+        ],
+        "briefcase": [
+          2268,
+          84
+        ],
+        "mail": [
+          2352,
+          84
+        ],
+        "bell": [
+          2436,
+          84
+        ],
+        "battery": [
+          2520,
+          84
+        ],
+        "battery-low": [
+          2604,
+          84
+        ],
+        "battery-medium": [
+          2688,
+          84
+        ],
+        "battery-full": [
+          2772,
+          84
+        ],
+        "battery-charging": [
+          2856,
+          84
+        ],
+        "wifi": [
+          2940,
+          84
+        ],
+        "wifi-off": [
+          3024,
+          84
+        ],
+        "trending-up": [
+          3108,
+          84
+        ],
+        "trending-down": [
+          3192,
+          84
+        ],
+        "arrow-up": [
+          3276,
+          84
+        ],
+        "arrow-down": [
+          3360,
+          84
+        ],
+        "bitcoin": [
+          3444,
+          84
+        ],
+        "dollar-sign": [
+          3528,
+          84
+        ],
+        "euro": [
+          3612,
+          84
+        ],
+        "chart-line": [
+          3696,
+          84
+        ],
+        "heart": [
+          3780,
+          84
+        ],
+        "star": [
+          3864,
+          84
+        ],
+        "check": [
+          3948,
+          84
+        ],
+        "x": [
+          4032,
+          84
+        ],
+        "circle-alert": [
+          4116,
+          84
+        ],
+        "info": [
+          4200,
+          84
+        ],
+        "music": [
+          4284,
+          84
+        ],
+        "coffee": [
+          4368,
+          84
+        ],
+        "book-open": [
+          4452,
+          84
+        ],
+        "quote": [
+          4536,
+          84
+        ],
+        "gift": [
+          4620,
+          84
+        ],
+        "cake": [
+          4704,
+          84
+        ],
+        "map-pin": [
+          4788,
+          84
+        ],
+        "sparkles": [
+          4872,
+          84
+        ]
+      }
+    },
+    "32": {
+      "file": "icons-32.pack",
+      "icons": {
+        "sun": [
+          0,
+          140
+        ],
+        "moon": [
+          140,
+          140
+        ],
+        "cloud": [
+          280,
+          140
+        ],
+        "cloud-sun": [
+          420,
+          140
+        ],
+        "cloud-moon": [
+          560,
+          140
+        ],
+        "cloud-rain": [
+          700,
+          140
+        ],
+        "cloud-drizzle": [
+          840,
+          140
+        ],
+        "cloud-snow": [
+          980,
+          140
+        ],
+        "cloud-lightning": [
+          1120,
+          140
+        ],
+        "cloud-fog": [
+          1260,
+          140
+        ],
+        "snowflake": [
+          1400,
+          140
+        ],
+        "wind": [
+          1540,
+          140
+        ],
+        "droplets": [
+          1680,
+          140
+        ],
+        "umbrella": [
+          1820,
+          140
+        ],
+        "thermometer": [
+          1960,
+          140
+        ],
+        "sunrise": [
+          2100,
+          140
+        ],
+        "sunset": [
+          2240,
+          140
+        ],
+        "calendar": [
+          2380,
+          140
+        ],
+        "clock": [
+          2520,
+          140
+        ],
+        "alarm-clock": [
+          2660,
+          140
+        ],
+        "train-front": [
+          2800,
+          140
+        ],
+        "bus": [
+          2940,
+          140
+        ],
+        "tram-front": [
+          3080,
+          140
+        ],
+        "bike": [
+          3220,
+          140
+        ],
+        "car": [
+          3360,
+          140
+        ],
+        "plane": [
+          3500,
+          140
+        ],
+        "house": [
+          3640,
+          140
+        ],
+        "briefcase": [
+          3780,
+          140
+        ],
+        "mail": [
+          3920,
+          140
+        ],
+        "bell": [
+          4060,
+          140
+        ],
+        "battery": [
+          4200,
+          140
+        ],
+        "battery-low": [
+          4340,
+          140
+        ],
+        "battery-medium": [
+          4480,
+          140
+        ],
+        "battery-full": [
+          4620,
+          140
+        ],
+        "battery-charging": [
+          4760,
+          140
+        ],
+        "wifi": [
+          4900,
+          140
+        ],
+        "wifi-off": [
+          5040,
+          140
+        ],
+        "trending-up": [
+          5180,
+          140
+        ],
+        "trending-down": [
+          5320,
+          140
+        ],
+        "arrow-up": [
+          5460,
+          140
+        ],
+        "arrow-down": [
+          5600,
+          140
+        ],
+        "bitcoin": [
+          5740,
+          140
+        ],
+        "dollar-sign": [
+          5880,
+          140
+        ],
+        "euro": [
+          6020,
+          140
+        ],
+        "chart-line": [
+          6160,
+          140
+        ],
+        "heart": [
+          6300,
+          140
+        ],
+        "star": [
+          6440,
+          140
+        ],
+        "check": [
+          6580,
+          140
+        ],
+        "x": [
+          6720,
+          140
+        ],
+        "circle-alert": [
+          6860,
+          140
+        ],
+        "info": [
+          7000,
+          140
+        ],
+        "music": [
+          7140,
+          140
+        ],
+        "coffee": [
+          7280,
+          140
+        ],
+        "book-open": [
+          7420,
+          140
+        ],
+        "quote": [
+          7560,
+          140
+        ],
+        "gift": [
+          7700,
+          140
+        ],
+        "cake": [
+          7840,
+          140
+        ],
+        "map-pin": [
+          7980,
+          140
+        ],
+        "sparkles": [
+          8120,
+          140
+        ]
+      }
+    },
+    "48": {
+      "file": "icons-48.pack",
+      "icons": {
+        "sun": [
+          0,
+          300
+        ],
+        "moon": [
+          300,
+          300
+        ],
+        "cloud": [
+          600,
+          300
+        ],
+        "cloud-sun": [
+          900,
+          300
+        ],
+        "cloud-moon": [
+          1200,
+          300
+        ],
+        "cloud-rain": [
+          1500,
+          300
+        ],
+        "cloud-drizzle": [
+          1800,
+          300
+        ],
+        "cloud-snow": [
+          2100,
+          300
+        ],
+        "cloud-lightning": [
+          2400,
+          300
+        ],
+        "cloud-fog": [
+          2700,
+          300
+        ],
+        "snowflake": [
+          3000,
+          300
+        ],
+        "wind": [
+          3300,
+          300
+        ],
+        "droplets": [
+          3600,
+          300
+        ],
+        "umbrella": [
+          3900,
+          300
+        ],
+        "thermometer": [
+          4200,
+          300
+        ],
+        "sunrise": [
+          4500,
+          300
+        ],
+        "sunset": [
+          4800,
+          300
+        ],
+        "calendar": [
+          5100,
+          300
+        ],
+        "clock": [
+          5400,
+          300
+        ],
+        "alarm-clock": [
+          5700,
+          300
+        ],
+        "train-front": [
+          6000,
+          300
+        ],
+        "bus": [
+          6300,
+          300
+        ],
+        "tram-front": [
+          6600,
+          300
+        ],
+        "bike": [
+          6900,
+          300
+        ],
+        "car": [
+          7200,
+          300
+        ],
+        "plane": [
+          7500,
+          300
+        ],
+        "house": [
+          7800,
+          300
+        ],
+        "briefcase": [
+          8100,
+          300
+        ],
+        "mail": [
+          8400,
+          300
+        ],
+        "bell": [
+          8700,
+          300
+        ],
+        "battery": [
+          9000,
+          300
+        ],
+        "battery-low": [
+          9300,
+          300
+        ],
+        "battery-medium": [
+          9600,
+          300
+        ],
+        "battery-full": [
+          9900,
+          300
+        ],
+        "battery-charging": [
+          10200,
+          300
+        ],
+        "wifi": [
+          10500,
+          300
+        ],
+        "wifi-off": [
+          10800,
+          300
+        ],
+        "trending-up": [
+          11100,
+          300
+        ],
+        "trending-down": [
+          11400,
+          300
+        ],
+        "arrow-up": [
+          11700,
+          300
+        ],
+        "arrow-down": [
+          12000,
+          300
+        ],
+        "bitcoin": [
+          12300,
+          300
+        ],
+        "dollar-sign": [
+          12600,
+          300
+        ],
+        "euro": [
+          12900,
+          300
+        ],
+        "chart-line": [
+          13200,
+          300
+        ],
+        "heart": [
+          13500,
+          300
+        ],
+        "star": [
+          13800,
+          300
+        ],
+        "check": [
+          14100,
+          300
+        ],
+        "x": [
+          14400,
+          300
+        ],
+        "circle-alert": [
+          14700,
+          300
+        ],
+        "info": [
+          15000,
+          300
+        ],
+        "music": [
+          15300,
+          300
+        ],
+        "coffee": [
+          15600,
+          300
+        ],
+        "book-open": [
+          15900,
+          300
+        ],
+        "quote": [
+          16200,
+          300
+        ],
+        "gift": [
+          16500,
+          300
+        ],
+        "cake": [
+          16800,
+          300
+        ],
+        "map-pin": [
+          17100,
+          300
+        ],
+        "sparkles": [
+          17400,
+          300
+        ]
+      }
+    },
+    "64": {
+      "file": "icons-64.pack",
+      "icons": {
+        "sun": [
+          0,
+          524
+        ],
+        "moon": [
+          524,
+          524
+        ],
+        "cloud": [
+          1048,
+          524
+        ],
+        "cloud-sun": [
+          1572,
+          524
+        ],
+        "cloud-moon": [
+          2096,
+          524
+        ],
+        "cloud-rain": [
+          2620,
+          524
+        ],
+        "cloud-drizzle": [
+          3144,
+          524
+        ],
+        "cloud-snow": [
+          3668,
+          524
+        ],
+        "cloud-lightning": [
+          4192,
+          524
+        ],
+        "cloud-fog": [
+          4716,
+          524
+        ],
+        "snowflake": [
+          5240,
+          524
+        ],
+        "wind": [
+          5764,
+          524
+        ],
+        "droplets": [
+          6288,
+          524
+        ],
+        "umbrella": [
+          6812,
+          524
+        ],
+        "thermometer": [
+          7336,
+          524
+        ],
+        "sunrise": [
+          7860,
+          524
+        ],
+        "sunset": [
+          8384,
+          524
+        ],
+        "calendar": [
+          8908,
+          524
+        ],
+        "clock": [
+          9432,
+          524
+        ],
+        "alarm-clock": [
+          9956,
+          524
+        ],
+        "train-front": [
+          10480,
+          524
+        ],
+        "bus": [
+          11004,
+          524
+        ],
+        "tram-front": [
+          11528,
+          524
+        ],
+        "bike": [
+          12052,
+          524
+        ],
+        "car": [
+          12576,
+          524
+        ],
+        "plane": [
+          13100,
+          524
+        ],
+        "house": [
+          13624,
+          524
+        ],
+        "briefcase": [
+          14148,
+          524
+        ],
+        "mail": [
+          14672,
+          524
+        ],
+        "bell": [
+          15196,
+          524
+        ],
+        "battery": [
+          15720,
+          524
+        ],
+        "battery-low": [
+          16244,
+          524
+        ],
+        "battery-medium": [
+          16768,
+          524
+        ],
+        "battery-full": [
+          17292,
+          524
+        ],
+        "battery-charging": [
+          17816,
+          524
+        ],
+        "wifi": [
+          18340,
+          524
+        ],
+        "wifi-off": [
+          18864,
+          524
+        ],
+        "trending-up": [
+          19388,
+          524
+        ],
+        "trending-down": [
+          19912,
+          524
+        ],
+        "arrow-up": [
+          20436,
+          524
+        ],
+        "arrow-down": [
+          20960,
+          524
+        ],
+        "bitcoin": [
+          21484,
+          524
+        ],
+        "dollar-sign": [
+          22008,
+          524
+        ],
+        "euro": [
+          22532,
+          524
+        ],
+        "chart-line": [
+          23056,
+          524
+        ],
+        "heart": [
+          23580,
+          524
+        ],
+        "star": [
+          24104,
+          524
+        ],
+        "check": [
+          24628,
+          524
+        ],
+        "x": [
+          25152,
+          524
+        ],
+        "circle-alert": [
+          25676,
+          524
+        ],
+        "info": [
+          26200,
+          524
+        ],
+        "music": [
+          26724,
+          524
+        ],
+        "coffee": [
+          27248,
+          524
+        ],
+        "book-open": [
+          27772,
+          524
+        ],
+        "quote": [
+          28296,
+          524
+        ],
+        "gift": [
+          28820,
+          524
+        ],
+        "cake": [
+          29344,
+          524
+        ],
+        "map-pin": [
+          29868,
+          524
+        ],
+        "sparkles": [
+          30392,
+          524
+        ]
+      }
+    },
+    "96": {
+      "file": "icons-96.pack",
+      "icons": {
+        "sun": [
+          0,
+          1164
+        ],
+        "moon": [
+          1164,
+          1164
+        ],
+        "cloud": [
+          2328,
+          1164
+        ],
+        "cloud-sun": [
+          3492,
+          1164
+        ],
+        "cloud-moon": [
+          4656,
+          1164
+        ],
+        "cloud-rain": [
+          5820,
+          1164
+        ],
+        "cloud-drizzle": [
+          6984,
+          1164
+        ],
+        "cloud-snow": [
+          8148,
+          1164
+        ],
+        "cloud-lightning": [
+          9312,
+          1164
+        ],
+        "cloud-fog": [
+          10476,
+          1164
+        ],
+        "snowflake": [
+          11640,
+          1164
+        ],
+        "wind": [
+          12804,
+          1164
+        ],
+        "droplets": [
+          13968,
+          1164
+        ],
+        "umbrella": [
+          15132,
+          1164
+        ],
+        "thermometer": [
+          16296,
+          1164
+        ],
+        "sunrise": [
+          17460,
+          1164
+        ],
+        "sunset": [
+          18624,
+          1164
+        ],
+        "calendar": [
+          19788,
+          1164
+        ],
+        "clock": [
+          20952,
+          1164
+        ],
+        "alarm-clock": [
+          22116,
+          1164
+        ],
+        "train-front": [
+          23280,
+          1164
+        ],
+        "bus": [
+          24444,
+          1164
+        ],
+        "tram-front": [
+          25608,
+          1164
+        ],
+        "bike": [
+          26772,
+          1164
+        ],
+        "car": [
+          27936,
+          1164
+        ],
+        "plane": [
+          29100,
+          1164
+        ],
+        "house": [
+          30264,
+          1164
+        ],
+        "briefcase": [
+          31428,
+          1164
+        ],
+        "mail": [
+          32592,
+          1164
+        ],
+        "bell": [
+          33756,
+          1164
+        ],
+        "battery": [
+          34920,
+          1164
+        ],
+        "battery-low": [
+          36084,
+          1164
+        ],
+        "battery-medium": [
+          37248,
+          1164
+        ],
+        "battery-full": [
+          38412,
+          1164
+        ],
+        "battery-charging": [
+          39576,
+          1164
+        ],
+        "wifi": [
+          40740,
+          1164
+        ],
+        "wifi-off": [
+          41904,
+          1164
+        ],
+        "trending-up": [
+          43068,
+          1164
+        ],
+        "trending-down": [
+          44232,
+          1164
+        ],
+        "arrow-up": [
+          45396,
+          1164
+        ],
+        "arrow-down": [
+          46560,
+          1164
+        ],
+        "bitcoin": [
+          47724,
+          1164
+        ],
+        "dollar-sign": [
+          48888,
+          1164
+        ],
+        "euro": [
+          50052,
+          1164
+        ],
+        "chart-line": [
+          51216,
+          1164
+        ],
+        "heart": [
+          52380,
+          1164
+        ],
+        "star": [
+          53544,
+          1164
+        ],
+        "check": [
+          54708,
+          1164
+        ],
+        "x": [
+          55872,
+          1164
+        ],
+        "circle-alert": [
+          57036,
+          1164
+        ],
+        "info": [
+          58200,
+          1164
+        ],
+        "music": [
+          59364,
+          1164
+        ],
+        "coffee": [
+          60528,
+          1164
+        ],
+        "book-open": [
+          61692,
+          1164
+        ],
+        "quote": [
+          62856,
+          1164
+        ],
+        "gift": [
+          64020,
+          1164
+        ],
+        "cake": [
+          65184,
+          1164
+        ],
+        "map-pin": [
+          66348,
+          1164
+        ],
+        "sparkles": [
+          67512,
+          1164
+        ]
+      }
+    },
+    "128": {
+      "file": "icons-128.pack",
+      "icons": {
+        "sun": [
+          0,
+          2060
+        ],
+        "moon": [
+          2060,
+          2060
+        ],
+        "cloud": [
+          4120,
+          2060
+        ],
+        "cloud-sun": [
+          6180,
+          2060
+        ],
+        "cloud-moon": [
+          8240,
+          2060
+        ],
+        "cloud-rain": [
+          10300,
+          2060
+        ],
+        "cloud-drizzle": [
+          12360,
+          2060
+        ],
+        "cloud-snow": [
+          14420,
+          2060
+        ],
+        "cloud-lightning": [
+          16480,
+          2060
+        ],
+        "cloud-fog": [
+          18540,
+          2060
+        ],
+        "snowflake": [
+          20600,
+          2060
+        ],
+        "wind": [
+          22660,
+          2060
+        ],
+        "droplets": [
+          24720,
+          2060
+        ],
+        "umbrella": [
+          26780,
+          2060
+        ],
+        "thermometer": [
+          28840,
+          2060
+        ],
+        "sunrise": [
+          30900,
+          2060
+        ],
+        "sunset": [
+          32960,
+          2060
+        ],
+        "calendar": [
+          35020,
+          2060
+        ],
+        "clock": [
+          37080,
+          2060
+        ],
+        "alarm-clock": [
+          39140,
+          2060
+        ],
+        "train-front": [
+          41200,
+          2060
+        ],
+        "bus": [
+          43260,
+          2060
+        ],
+        "tram-front": [
+          45320,
+          2060
+        ],
+        "bike": [
+          47380,
+          2060
+        ],
+        "car": [
+          49440,
+          2060
+        ],
+        "plane": [
+          51500,
+          2060
+        ],
+        "house": [
+          53560,
+          2060
+        ],
+        "briefcase": [
+          55620,
+          2060
+        ],
+        "mail": [
+          57680,
+          2060
+        ],
+        "bell": [
+          59740,
+          2060
+        ],
+        "battery": [
+          61800,
+          2060
+        ],
+        "battery-low": [
+          63860,
+          2060
+        ],
+        "battery-medium": [
+          65920,
+          2060
+        ],
+        "battery-full": [
+          67980,
+          2060
+        ],
+        "battery-charging": [
+          70040,
+          2060
+        ],
+        "wifi": [
+          72100,
+          2060
+        ],
+        "wifi-off": [
+          74160,
+          2060
+        ],
+        "trending-up": [
+          76220,
+          2060
+        ],
+        "trending-down": [
+          78280,
+          2060
+        ],
+        "arrow-up": [
+          80340,
+          2060
+        ],
+        "arrow-down": [
+          82400,
+          2060
+        ],
+        "bitcoin": [
+          84460,
+          2060
+        ],
+        "dollar-sign": [
+          86520,
+          2060
+        ],
+        "euro": [
+          88580,
+          2060
+        ],
+        "chart-line": [
+          90640,
+          2060
+        ],
+        "heart": [
+          92700,
+          2060
+        ],
+        "star": [
+          94760,
+          2060
+        ],
+        "check": [
+          96820,
+          2060
+        ],
+        "x": [
+          98880,
+          2060
+        ],
+        "circle-alert": [
+          100940,
+          2060
+        ],
+        "info": [
+          103000,
+          2060
+        ],
+        "music": [
+          105060,
+          2060
+        ],
+        "coffee": [
+          107120,
+          2060
+        ],
+        "book-open": [
+          109180,
+          2060
+        ],
+        "quote": [
+          111240,
+          2060
+        ],
+        "gift": [
+          113300,
+          2060
+        ],
+        "cake": [
+          115360,
+          2060
+        ],
+        "map-pin": [
+          117420,
+          2060
+        ],
+        "sparkles": [
+          119480,
+          2060
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "now": 1782907200,
+  "values": {
+    "demo.minute": 20,
+    "demo.hour": 4.5,
+    "demo.level": 62.5,
+    "demo.series": [
+      3,
+      7,
+      4,
+      9,
+      12,
+      8,
+      5,
+      2,
+      6,
+      10,
+      11,
+      7
+    ],
+    "device.online": false,
+    "device.usb": true
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "now": 1791119250,
+  "values": {
+    "device.battery": 64,
+    "device.usb": false,
+    "device.online": true,
+    "device.rssi": -61,
+    "s0.gross": 1284550,
+    "s0.net": 1240100,
+    "s0.count": 23,
+    "s0.more": false,
+    "s0.a0": 49900,
+    "s0.t0": 1791118650,
+    "s0.n0": "Pro plan",
+    "s0.a1": 129000,
+    "s0.t1": 1791116250,
+    "s0.n1": "Takım planı, yıllık",
+    "s0.a2": 1900,
+    "s0.t2": 1791111850,
+    "s0.n2": null,
+    "s1.gross": 9812345,
+    "s1.net": 9500000,
+    "s1.count": 100,
+    "s1.more": true
+  }
+}
