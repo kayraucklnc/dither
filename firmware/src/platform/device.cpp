@@ -130,7 +130,7 @@ void Device::fetchDue(const Program& program, bool online, std::optional<int64_t
       const uint32_t start = millis();
       state.ok = fetchSource(source, program, now, cache, doc, error);
       if (state.ok) {
-        applyResponse(source, doc, cache.values);
+        applyResponse(source, doc, cache.values, now, program.timeZone());
         state.everSucceeded = true;
         state.lastSuccess = now;  // unknown without a clock: _age reads null
         dlog("source %s: ok in %lu ms (%u values, %u bytes of text kept), heap %lu", source.id.c_str(),

@@ -13,7 +13,7 @@ export type Condition =
   | { all: Condition[] }
   | { any: Condition[] }
   | { not: Condition }
-  | { v: string; op: Op; x?: unknown; f?: Format };
+  | { v: string; op: Op; x?: unknown; vs?: string; f?: Format };
 
 export interface Format {
   shift?: { v: string; scale?: number };
@@ -24,7 +24,7 @@ export interface Format {
   add?: number;
   steps?: { t: number[]; o: string[] };
   map?: { k: (number | string)[]; o: string[]; d?: string };
-  num?: { d: number; sep?: string };
+  num?: { d: number; sep?: string; compact?: boolean };
   time?: string;
   upper?: boolean;
   tr?: boolean;
@@ -53,7 +53,7 @@ export type Element =
   | (Base & { t: "group"; els: Element[] })
   | (Base & {
       t: "chart"; x: number; y: number; w: number; h: number; v: string;
-      kind: "bars" | "line"; min?: number; max?: number; gap?: number; lw?: number;
+      kind: "bars" | "line" | "steps" | "area"; min?: number; max?: number; gap?: number; lw?: number;
     });
 
 export type ElementOf<T extends Element["t"]> = Extract<Element, { t: T }>;
@@ -62,9 +62,12 @@ export interface SourceValue {
   key: string;
   path: string;
   count?: number;
-  agg?: "sum" | "count";
-  /** For `agg: "sum"`: the path inside each element to add up. */
+  agg?: "sum" | "count" | "buckets";
+  /** For `sum` and `buckets`: the path inside each element to add up. */
   field?: string;
+  /** For `buckets`: the path inside each element to when it happened. */
+  time?: string;
+  by?: "day" | "hour";
 }
 
 export interface SourceAuth {

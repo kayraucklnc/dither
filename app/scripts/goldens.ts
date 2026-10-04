@@ -121,25 +121,30 @@ for (const s of STARTERS.filter((x) => x.id !== "blank")) {
   write("calendar-three-accounts", c.blob, c.runtime, values);
 }
 
-// Revenue: list totals, minor units, a page-limit floor.
+// Revenue: a board (totals, buckets, a comparison, names) and a compact figure.
 {
   const project = createProject({ starter: "blank", timezone: "Europe/Istanbul", language: "tr", units: "metric", place });
-  project.screens[0].widgets = [
-    { id: "today", type: "stripe", x: 0, y: 0, w: 12, h: 12, frame: "none", settings: { currency: "try" } },
-    { id: "month", type: "stripe", x: 12, y: 0, w: 8, h: 3, frame: "outline", settings: { period: "month", measure: "net", currency: "jpy" } },
-  ];
   project.accounts = { google: [], stripe: { key: "rk_test_golden", name: "" } };
+  project.screens[0].widgets = [
+    { id: "board", type: "stripe", x: 0, y: 0, w: 20, h: 8, frame: "none", settings: { currency: "try", names: true, period: "month" } },
+    { id: "fig", type: "stripe", x: 0, y: 8, w: 8, h: 4, frame: "outline", settings: { style: "figure", compact: true, currency: "jpy" } },
+    { id: "steps", type: "stripe", x: 8, y: 8, w: 12, h: 4, frame: "none", settings: { style: "graph", line: "steps", compare: false } },
+  ];
   const c = await compile(project, deps);
-  const ids = new Map([...c.widgetSources].map(([w, m]) => [w, m[""]] as const));
-  const a = ids.get("today")!;
-  const b = ids.get("month")!;
+  const b = c.widgetSources.get("board")!;
+  const f = c.widgetSources.get("fig")!;
+  const st = c.widgetSources.get("steps")!;
+  const month = [210, 260, 190, 320, 280, 150, 120, 300, 340, 310, 290, 360, 200, 180, 380, 410, 350, 330, 420, 260, 240, 450, 480, 400, 390, 470, 300, 280, 520, 560];
   const values: Record<string, Value> = {
     ...DEVICE,
-    [`${a}.gross`]: 1284550, [`${a}.net`]: 1240100, [`${a}.count`]: 23, [`${a}.more`]: false,
-    [`${a}.a0`]: 49900, [`${a}.t0`]: NOW - 600, [`${a}.n0`]: "Pro plan",
-    [`${a}.a1`]: 129000, [`${a}.t1`]: NOW - 3000, [`${a}.n1`]: "Takım planı, yıllık",
-    [`${a}.a2`]: 1900, [`${a}.t2`]: NOW - 7400, [`${a}.n2`]: null,
-    [`${b}.gross`]: 9812345, [`${b}.net`]: 9500000, [`${b}.count`]: 100, [`${b}.more`]: true,
+    [`${b.now}.total`]: 3402150, [`${b.now}.count`]: 588, [`${b.now}.more`]: true,
+    [`${b.before}.total`]: 2980000, [`${b.chart}.series`]: month.map((x) => x * 1000),
+    [`${b.now}.a0`]: 49900, [`${b.now}.t0`]: NOW - 600, [`${b.now}.n0`]: "Ayşe Kaya", [`${b.now}.d0`]: "Pro plan",
+    [`${b.now}.a1`]: 129000, [`${b.now}.t1`]: NOW - 3000, [`${b.now}.n1`]: null, [`${b.now}.d1`]: "Takım planı, yıllık",
+    [`${b.now}.a2`]: 1900, [`${b.now}.t2`]: NOW - 90000, [`${b.now}.n2`]: "Studio Nord", [`${b.now}.d2`]: null,
+    [`${f.now}.total`]: 74120, [`${f.now}.count`]: 12, [`${f.before}.total`]: 80000,
+    [`${st.chart}.series`]: [0, 0, 0, 0, 0, 0, 1, 2, 4, 9, 14, 11, 8, 12, 16, 13, 9, 7, 10, 6, 3, 2, 1, 0].map((x) => x * 4900),
+    [`${st.now}.total`]: 128450, [`${st.now}.count`]: 23,
   };
   write("revenue", c.blob, c.runtime, values);
 }

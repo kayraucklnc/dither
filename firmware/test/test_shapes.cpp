@@ -321,3 +321,60 @@ TEST(deep_groups_still_load_as_a_blob) {
   p->render(0, ValueStore(), 0, fb);
   CHECK_EQ(testutil::countInk(fb), 0);
 }
+
+TEST(chart_steps) {
+  ValueStore v;
+  v.set("s.h", Value::series({0, 2, 1}));
+  CHECK_EQ(all(drawn(5, 3, R"({"t":"chart","x":0,"y":0,"w":5,"h":3,"v":"s.h","kind":"steps","lw":1})", v)),
+           (Rows{"..###", "..#.#", "###.."}));
+  v.set("s.one", Value::series({5}));  // one point still extends to the right edge
+  CHECK_EQ(all(drawn(5, 3, R"({"t":"chart","x":0,"y":0,"w":5,"h":3,"v":"s.one","kind":"steps","lw":1})", v)),
+           (Rows{".....", ".....", "#####"}));
+}
+
+TEST(chart_area_shading) {
+  ValueStore v;
+  v.set("s.up", Value::series({0, 3}));
+  // Worked by hand from format.md: ly per column 3, 2, 1, 0; inked where the
+  // Bayer entry is below L = 2 + floor(8 (4 - py) / (4 - ly)).
+  CHECK_EQ(all(drawn(4, 4, R"({"t":"chart","x":0,"y":0,"w":4,"h":4,"v":"s.up","kind":"area","lw":1})", v)),
+           (Rows{"...#", "..##", ".##.", "#..."}));
+  // A flat line: L is 8, 6, 5, 3 on the four rows under it.
+  v.set("s.flat", Value::series({1, 1}));
+  CHECK_EQ(all(drawn(8, 9, R"({"t":"chart","x":0,"y":0,"w":8,"h":9,"v":"s.flat","kind":"area","min":0,"max":2,"lw":1})", v)),
+           (Rows{"........", "........", "........", "........", "########", ".#.#.#.#", "#.#.#.#.", "........",
+                 "#.#.#.#."}));
+  // One point: no shading and no line.
+  v.set("s.one", Value::series({1}));
+  CHECK_EQ(testutil::countInk(drawn(8, 9, R"({"t":"chart","x":0,"y":0,"w":8,"h":9,"v":"s.one","kind":"area"})", v)), 0);
+  // White on black: the shading takes the element's colour.
+  Framebuffer fb(4, 4);
+  Canvas(fb, true).fillRect(0, 0, 4, 4);
+  ValueStore values;
+  values.set("s.up", Value::series({0, 3}));
+  static TimeZone tz;
+  static Locale locale = Locale::fromJson(JsonView());
+  std::vector<ByteSpan> assets;
+  RenderContext ctx;
+  ctx.values = &values;
+  ctx.format.tz = &tz;
+  ctx.format.locale = &locale;
+  ctx.assets = &assets;
+  JsonDoc doc;
+  doc.parse(R"({"t":"chart","x":0,"y":0,"w":4,"h":4,"v":"s.up","kind":"area","lw":1,"c":0})");
+  drawElement(fb, doc.root(), ctx);
+  CHECK_EQ(all(fb), (Rows{"###.", "##..", "#..#", ".###"}));
+  // An unknown kind draws bars.
+  CHECK_EQ(all(drawn(4, 2, R"({"t":"chart","x":0,"y":0,"w":4,"h":2,"v":"s.flat","gap":0,"kind":"pie","min":0,"max":1})", v)),
+           (Rows{"####", "####"}));
+}
+
+TEST(chart_area_columns_between_crowded_points) {
+  // More points than columns: several share a column, and the shading takes
+  // the first segment that ends at or after the column.
+  ValueStore v;
+  v.set("s.zig", Value::series({0, 4, 0, 4, 0, 4, 0}));
+  Framebuffer fb = drawn(3, 5, R"({"t":"chart","x":0,"y":0,"w":3,"h":5,"v":"s.zig","kind":"area","lw":1})", v);
+  CHECK(fb.get(0, 4) && fb.get(2, 4));
+  CHECK(testutil::countInk(fb) > 0);
+}

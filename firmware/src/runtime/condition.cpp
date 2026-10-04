@@ -9,9 +9,9 @@ namespace {
 
 constexpr int kMaxDepth = 32;
 
-bool compareNumbers(const Value& v, JsonView x, std::string_view op) {
+bool compareNumbers(const Value& v, const Value& x, std::string_view op) {
   if (!v.isNumber() || !x.isNumber()) return false;
-  double a = v.asNumber(), b = x.number();
+  double a = v.asNumber(), b = x.asNumber();
   if (op == "lt") return a < b;
   if (op == "le") return a <= b;
   if (op == "gt") return a > b;
@@ -36,19 +36,33 @@ bool anyEqual(const Value& v, JsonView x) {
   return false;
 }
 
+// A leaf's value: the referenced one, through the leaf's `f` if it has one.
+Value leafValue(JsonView cond, std::string_view ref, const ValueStore& values, const FormatContext& ctx) {
+  const Value& raw = values.get(ref);
+  if (!cond["f"].isObject()) return raw;
+  auto stepped = applyValueSteps(raw, cond["f"], ctx);
+  return stepped ? *stepped : Value();
+}
+
+bool isOrdering(std::string_view op) {
+  return op == "lt" || op == "le" || op == "gt" || op == "ge";
+}
+
 DITHER_NOINLINE bool evalComparison(JsonView cond, const ValueStore& values, const FormatContext& ctx) {
-  const Value& raw = values.get(cond["v"].string());
-  Value transformed;
-  if (cond["f"].isObject()) {
-    auto stepped = applyValueSteps(raw, cond["f"], ctx);
-    transformed = stepped ? *stepped : Value();
-  }
-  const Value& v = cond["f"].isObject() ? transformed : raw;
+  const Value v = leafValue(cond, cond["v"].string(), values, ctx);
   std::string_view op = cond["op"].string();
+  if (cond["vs"].isString()) {
+    // Against another value, put through the same `f`; `x` is not read.
+    const Value other = leafValue(cond, cond["vs"].string(), values, ctx);
+    if (op == "eq") return valuesEqual(v, other);
+    if (op == "ne") return !valuesEqual(v, other);
+    if (isOrdering(op)) return compareNumbers(v, other, op);
+    return false;
+  }
   JsonView x = cond["x"];
   if (op == "eq") return valuesEqual(v, x);
   if (op == "ne") return !valuesEqual(v, x);
-  if (op == "lt" || op == "le" || op == "gt" || op == "ge") return compareNumbers(v, x, op);
+  if (isOrdering(op)) return compareNumbers(v, valueFromJsonScalar(x), op);
   if (op == "between") return between(v, x);
   if (op == "in") return anyEqual(v, x);
   if (op == "contains") return contains(v, x);
@@ -80,6 +94,13 @@ bool eval(JsonView cond, const ValueStore& values, const FormatContext& ctx, int
 }
 
 }  // namespace
+
+bool valuesEqual(const Value& a, const Value& b) {
+  if (a.isNumber() && b.isNumber()) return a.asNumber() == b.asNumber();
+  if (a.isString() && b.isString()) return a.asString() == b.asString();
+  if (a.isBool() && b.isBool()) return a.asBool() == b.asBool();
+  return false;
+}
 
 bool valuesEqual(const Value& v, JsonView x) {
   if (v.isNumber() && x.isNumber()) return v.asNumber() == x.number();

@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "placeholders.h"
+#include "time_format.h"
 
 namespace dither {
 namespace {
@@ -86,7 +87,11 @@ std::vector<SourceSpec> parseSources(JsonView sources) {
         vs.field = std::string(v["field"].string());
         vs.agg = agg == "count"                                         ? SourceValueSpec::Agg::Count
                  : agg == "sum" && v["field"].isString() && !vs.field.empty() ? SourceValueSpec::Agg::Sum
+                 : agg == "buckets"                                      ? SourceValueSpec::Agg::Buckets
                                                                          : SourceValueSpec::Agg::Invalid;
+        vs.time = std::string(v["time"].string());
+        vs.byHour = v["by"].string() == "hour";
+        vs.buckets = std::clamp(v["count"].integer(0), 0, static_cast<int>(kMaxSeries));
         vs.count = -1;
         if (vs.agg == SourceValueSpec::Agg::Count || vs.agg == SourceValueSpec::Agg::Sum) vs.aggId = aggregates++;
       }
@@ -103,6 +108,8 @@ JsonFilter buildFilter(const SourceSpec& source) {
     if (v.aggId >= 0) {
       const auto kind = v.agg == SourceValueSpec::Agg::Sum ? JsonFilter::AggKind::Sum : JsonFilter::AggKind::Count;
       filter.addAggregate(v.path, kind, v.field, v.aggId);
+    } else if (v.agg == SourceValueSpec::Agg::Buckets) {
+      filter.keepElementFields(v.path, {v.field, v.time});
     } else if (v.agg == SourceValueSpec::Agg::None) {
       filter.addPath(v.path, v.count);
     }
@@ -117,11 +124,34 @@ Value extractPath(JsonView root, std::string_view path, int count) {
   return valueFromJsonScalar(node);
 }
 
-void applyResponse(const SourceSpec& source, const JsonDoc& doc, ValueStore& store) {
+Value bucketsFrom(JsonView target, const SourceValueSpec& spec, std::optional<int64_t> now, const TimeZone& tz) {
+  if (!target.isArray() || !now) return Value();
+  const int n = spec.buckets;
+  std::vector<double> totals(static_cast<size_t>(n), 0.0);
+  const CivilTime today = tz.toLocal(*now);
+  const int64_t todayDays = daysFromCivil(today.year, today.month, today.day);
+  for (JsonView e = target.first(); e.exists(); e = e.next()) {
+    if (spec.field.empty() || spec.time.empty()) break;
+    JsonView amount = e.path(spec.field);
+    if (!amount.isNumber()) continue;
+    auto when = parseTimeValue(valueFromJsonScalar(e.path(spec.time)), now, tz);
+    if (!when) continue;
+    const CivilTime local = toFields(*when, tz);
+    const int64_t ago = todayDays - daysFromCivil(local.year, local.month, local.day);
+    const int64_t i = spec.byHour ? (ago == 0 ? local.hour : -1) : n - 1 - ago;
+    if (i >= 0 && i < n) totals[static_cast<size_t>(i)] += amount.number();
+  }
+  return Value::series(std::move(totals));
+}
+
+void applyResponse(const SourceSpec& source, const JsonDoc& doc, ValueStore& store, std::optional<int64_t> now,
+                   const TimeZone& tz) {
   for (const auto& v : source.values) {
     Value value;
     if (v.agg == SourceValueSpec::Agg::None) {
       value = extractPath(doc.root(), v.path, v.count);
+    } else if (v.agg == SourceValueSpec::Agg::Buckets) {
+      value = bucketsFrom(doc.root().path(v.path), v, now, tz);
     } else if (auto total = doc.aggregate(v.aggId)) {
       value = Value::number(*total);
     }

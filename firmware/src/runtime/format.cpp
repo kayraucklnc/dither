@@ -90,6 +90,11 @@ MaybeValue applyMap(const Value& v, JsonView map) {
 
 MaybeValue applyNum(const Value& v, JsonView num) {
   if (!v.isNumber()) return std::nullopt;
+  if (num["compact"].boolean(false) && std::fabs(v.asNumber()) >= 1000) {
+    auto text = formatCompact(v.asNumber());
+    if (!text) return std::nullopt;
+    return Value::string(*text);
+  }
   int decimals = num["d"].isNumber() ? std::max(0, num["d"].integer(0)) : kAutoDecimals;
   auto text = formatNumber(v.asNumber(), decimals, num["sep"].string());
   if (!text) return std::nullopt;

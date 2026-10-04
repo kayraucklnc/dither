@@ -33,6 +33,17 @@ export function evaluate(c: Condition, values: Values, ctx: FormatContext): bool
   if ("not" in c) return !evaluate(c.not, values, ctx);
   const raw = values.get(c.v) ?? null;
   const v = c.f ? applyValueSteps(raw, c.f, ctx) : raw;
+  if (c.vs !== undefined) {
+    // Against another value, put through the same format.
+    const other = values.get(c.vs) ?? null;
+    const x = c.f ? applyValueSteps(other, c.f, ctx) : other;
+    switch (c.op) {
+      case "eq": return equal(v, x);
+      case "ne": return !equal(v, x);
+      case "lt": case "le": case "gt": case "ge": return compare(c.op, v, x);
+      default: return false;
+    }
+  }
   switch (c.op) {
     case "eq": return equal(v, c.x);
     case "ne": return !equal(v, c.x);

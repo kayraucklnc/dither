@@ -94,7 +94,8 @@ export function scoped(c: Condition, sources: SourceMap): Condition {
   if ("not" in c) return { not: scoped(c.not, sources) };
   const v = resolveKey(c.v, sources) ?? c.v;
   const f = c.f?.shift ? { ...c.f, shift: { ...c.f.shift, v: resolveKey(c.f.shift.v, sources) ?? c.f.shift.v } } : c.f;
-  return f ? { ...c, v, f } : { ...c, v };
+  const vs = c.vs === undefined ? undefined : (resolveKey(c.vs, sources) ?? c.vs);
+  return { ...c, v, ...(f ? { f } : {}), ...(vs !== undefined ? { vs } : {}) };
 }
 
 /** One check as a condition, or null when it is not filled in yet. */

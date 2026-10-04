@@ -32,7 +32,7 @@ function formatChars(f: Format | undefined, locale: Locale): Charset {
     if (!f.num && f.time === undefined) return withUpper(out, f);
   }
   if (f.num) {
-    add(out, `${DIGITS}-.${f.num.sep ?? ""}`);
+    add(out, `${DIGITS}-.${f.num.sep ?? ""}${f.num.compact ? "kMB" : ""}`);
     return out;
   }
   if (f.time !== undefined) {

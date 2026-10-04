@@ -58,4 +58,14 @@ std::optional<std::string> formatNumber(double v, int decimals, std::string_view
   return out;
 }
 
+std::optional<std::string> formatCompact(double v) {
+  const double a = std::fabs(v);
+  const double div = a >= 1e9 ? 1e9 : a >= 1e6 ? 1e6 : 1e3;
+  const char* suffix = a >= 1e9 ? "B" : a >= 1e6 ? "M" : "k";
+  auto text = formatNumber(v / div, 1);
+  if (!text) return std::nullopt;
+  if (text->size() >= 2 && text->compare(text->size() - 2, 2, ".0") == 0) text->resize(text->size() - 2);
+  return *text + suffix;
+}
+
 }  // namespace dither
