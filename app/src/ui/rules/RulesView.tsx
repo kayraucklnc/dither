@@ -96,10 +96,7 @@ export function RulesView({ compiled, values, now, sim, onSim }: {
 }) {
   const { project, update } = useProject();
   // Facts point at the compiled sources, so the simulation's values line up.
-  const sourceIds = useMemo(
-    () => new Map(compiled?.sources.flatMap((s) => s.widgetIds.map((w) => [w, s.source.id] as const)) ?? []),
-    [compiled],
-  );
+  const sourceIds = compiled?.widgetSources;
   const catalog = useMemo(() => factCatalog(project, sourceIds), [project, sourceIds]);
   const alertNow = compiled ? activeAlert(project.alerts, catalog, values, formatContext(compiled.runtime, now, values)) : null;
   const [menu, setMenu] = useState(false);

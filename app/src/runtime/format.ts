@@ -189,7 +189,12 @@ export function applyValueSteps(input: Value, f: Format, ctx: FormatContext): Va
     const by = ctx.values?.get(f.shift.v);
     v = m.epoch + (typeof by === "number" && Number.isFinite(by) ? by * (f.shift.scale ?? 1) : 0);
   }
-  if (f.until) {
+  if (f.days) {
+    const m = readTime(v, ctx.zone, ctx.now);
+    if (!m) return null;
+    const today = toLocal(ctx.zone, ctx.now);
+    v = daysFromCivil(m.local.year, m.local.month, m.local.day) - daysFromCivil(today.year, today.month, today.day);
+  } else if (f.until) {
     const m = readTime(v, ctx.zone, ctx.now);
     if (!m || m.epoch < ctx.now) return null;
     v = Math.floor((m.epoch - ctx.now) / 60);

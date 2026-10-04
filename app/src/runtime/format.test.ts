@@ -106,3 +106,17 @@ describe("shift", () => {
     expect(formatValue("soon", { shift: { v: "t.delay" }, until: true }, c)).toBe("\u2013");
   });
 });
+
+describe("days", () => {
+  const late = { ...ctx, now: Date.UTC(2026, 9, 4, 21, 30) / 1000 }; // 23:30 Sunday in Berlin
+  it("counts local calendar days", () => {
+    expect(formatValue("2026-10-04T23:45:00+02:00", { days: true }, late)).toBe("0");
+    expect(formatValue("2026-10-04T22:30:00Z", { days: true }, late)).toBe("1"); // 00:30 Monday in Berlin
+    expect(formatValue("2026-10-06", { days: true }, late)).toBe("2");
+    expect(formatValue("2026-10-03T12:00", { days: true }, late)).toBe("-1");
+    expect(formatValue("00:15", { days: true }, late)).toBe("1");
+  });
+  it("wins over until", () => {
+    expect(formatValue("2026-10-06", { days: true, until: true }, late)).toBe("2");
+  });
+});

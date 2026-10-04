@@ -29,7 +29,7 @@ describe("withoutSecrets", () => {
   it("drops linked accounts whole", () => {
     const linked = {
       ...base,
-      accounts: { google: [{ id: "me@x", clientId: "id", clientSecret: "s", refreshToken: "r", email: "me@x" }], stripe: { key: "rk_live_k", name: "" } },
+      accounts: { google: [{ id: "me@x", clientId: "id", clientSecret: "s", refreshToken: "r", email: "me@x", label: "Me" }], stripe: { key: "rk_live_k", name: "" } },
     };
     expect(withoutSecrets(linked).accounts).toEqual({ google: [], stripe: null });
   });

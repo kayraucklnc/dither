@@ -25,7 +25,7 @@ extern const char* const kDefaultFallback;  // "–" (U+2013)
 // "true"/"false", series "", numbers with automatic decimals.
 std::string defaultText(const Value& v);
 
-// The value steps of a format - shift, until, scale/add, steps, map - as used by
+// The value steps of a format - shift, days or until, scale/add, steps, map - as used by
 // condition leaves. nullopt: the value became null.
 std::optional<Value> applyValueSteps(const Value& v, JsonView format, const FormatContext& ctx);
 

@@ -10,8 +10,10 @@ Board: `xiao-epaper-75` — Seeed XIAO 7.5" ePaper Panel (XIAO ESP32-C3, 4 MB,
 ## Layout
 
 ```
-src/runtime/    portable C++17, no Arduino: blob + CRC, JSON (own streaming,
-                filtered, budgeted reader - see json.h for why), values,
+src/runtime/    portable C++17, no Arduino: blob + CRC, JSON (own reader - see
+                json.h for why: responses stream through a filter into a
+                small budgeted tree; the runtime JSON is validated once and
+                read in place from mapped flash, so it costs no heap), values,
                 conditions, formats, time zones, URL placeholders, chunked and
                 AES-ECB body decoding, fonts/bitmaps, text layout, drawing,
                 wake decisions, the value cache
@@ -60,7 +62,8 @@ esptool --chip esp32c3 erase_region 0x300000 0x100000   # back to "Not set up"
 
 (`ESPTOOL=` and `PORT=` override the defaults.)
 
-Limits worth knowing: a source response keeps at most 2048 JSON values and
+`make test` also prints, per golden fixture, the heap the load and the render
+peak at. Limits worth knowing: a source response keeps at most 2048 JSON values and
 16 KB of text, strings are cut at 256 bytes, kept nesting is at most 20 deep
 (skipped parts of a response are not limited), and the value cache that
 survives sleep is capped at 6 KB - the largest values are dropped first, with

@@ -8,6 +8,7 @@ import { layout, shape, width } from "@/runtime/text";
 import type { Condition, Element, Format, Part, Value } from "@/runtime/types";
 import type { AssetTable } from "./asset-table";
 import { scoped } from "./facts";
+import { resolveKey, type SourceMap } from "./sources";
 
 export interface DrawDeps {
   library: AssetLibrary;
@@ -19,7 +20,7 @@ export interface DrawDeps {
 
 export interface WidgetFrame {
   box: Box;
-  sourceId: string | null;
+  sources: SourceMap;
   inverted: boolean;
 }
 
@@ -30,7 +31,8 @@ export class ElementDraw implements Draw {
   readonly elements: Element[] = [];
   readonly width: number;
   readonly height: number;
-  private conditions: Condition[] = [];
+  /** Where drawn elements go: the widget's list, or the innermost `when` group. */
+  private target: Element[] = this.elements;
 
   constructor(private deps: DrawDeps, private frame: WidgetFrame) {
     this.width = frame.box.w;
@@ -57,9 +59,7 @@ export class ElementDraw implements Draw {
   }
 
   private push(el: Element): void {
-    const when = this.conditions.length === 0 ? undefined
-      : this.conditions.length === 1 ? this.conditions[0] : { all: [...this.conditions] };
-    this.elements.push(when ? ({ ...el, when } as Element) : el);
+    this.target.push(el);
   }
 
   private at(b: Box): Box {
@@ -67,8 +67,9 @@ export class ElementDraw implements Draw {
   }
 
   private sourceRef(key: string): string {
-    if (!this.frame.sourceId) throw new Error("This widget has no data source");
-    return `${this.frame.sourceId}.${key}`;
+    const ref = resolveKey(key, this.frame.sources);
+    if (!ref) throw new Error(`This widget has no data source for “${key}”`);
+    return ref;
   }
 
   // ------------------------------------------------------------ bindings
@@ -79,11 +80,11 @@ export class ElementDraw implements Draw {
 
   /** A format's own references (`shift`) are this widget's values too. */
   private scopeFormat(f: Format): Format {
-    return f.shift && !f.shift.v.includes(".") && this.frame.sourceId ? { ...f, shift: { ...f.shift, v: this.sourceRef(f.shift.v) } } : f;
+    return f.shift && !f.shift.v.includes(".") ? { ...f, shift: { ...f.shift, v: this.sourceRef(f.shift.v) } } : f;
   }
 
   ref(key: string): string {
-    return key.includes(".") ? key : this.sourceRef(key);
+    return this.sourceRef(key);
   }
 
   time(pattern: string): Part {
@@ -192,13 +193,18 @@ export class ElementDraw implements Draw {
   }
 
   when(condition: Condition, fn: () => void): void {
-    // Bare keys are this widget's own values, as in facts.
-    this.conditions.push(this.frame.sourceId ? scoped(condition, this.frame.sourceId) : condition);
+    // One group carries the condition for everything drawn inside it, rather
+    // than every element repeating it — the panel has little memory to spare.
+    const parent = this.target;
+    const els: Element[] = [];
+    this.target = els;
     try {
       fn();
     } finally {
-      this.conditions.pop();
+      this.target = parent;
     }
+    // Bare keys are this widget's own values, as in facts.
+    if (els.length) parent.push({ t: "group", when: scoped(condition, this.frame.sources), els });
   }
 
   // ------------------------------------------------------------ measuring

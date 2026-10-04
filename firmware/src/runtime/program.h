@@ -12,6 +12,7 @@
 #include "bytes.h"
 #include "framebuffer.h"
 #include "json.h"
+#include "merge.h"
 #include "source.h"
 #include "time_format.h"
 #include "timezone.h"
@@ -52,6 +53,9 @@ class Program {
   size_t screenCount() const { return root()["screens"].size(); }
 
   // Rules in order; the first that holds picks its screen, else screen 0.
+  // Builds every merge's values from the sources' (format.md §2 "Merges").
+  void applyMerges(ValueStore& values, std::optional<int64_t> now) const;
+  const std::vector<MergeSpec>& merges() const { return merges_; }
   int chooseScreen(const ValueStore& values, std::optional<int64_t> now) const;
   uint32_t refreshFor(int screen) const;  // the screen's own, or the default
   void render(int screen, const ValueStore& values, std::optional<int64_t> now, Framebuffer& fb) const;
@@ -72,6 +76,7 @@ class Program {
   std::string ntp_;
   std::vector<WifiNetwork> wifi_;
   std::vector<SourceSpec> sources_;
+  std::vector<MergeSpec> merges_;
   uint32_t refresh_ = kDefaultRefresh;
   QuietHours quiet_;
 };

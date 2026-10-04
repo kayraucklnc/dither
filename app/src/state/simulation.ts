@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Compiled } from "@/compiler";
 import type { FormatContext } from "@/runtime/format";
 import { expand } from "@/runtime/placeholders";
+import { applyMerges } from "@/runtime/merge";
 import { formatContext } from "@/runtime/render";
 import type { Source, SourceAuth, Value } from "@/runtime/types";
 import { SIMULATED_DEVICE, builtins, extract, freshness, type DeviceState } from "@/runtime/values";
@@ -163,6 +164,7 @@ export function useSimulation(compiled: Compiled | null, overrides: Overrides = 
       }
     }
     for (const [k, v] of Object.entries(overrides.values ?? {})) values.set(k, v);
+    if (compiled) applyMerges(compiled.runtime.merges, values, formatContext(compiled.runtime, now, values));
     return { now, values, status };
   }, [compiled, results, clock, overrides.time, overrides.device, overrides.values]);
 }

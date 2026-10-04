@@ -4,6 +4,7 @@
 #include <string>
 
 #include "json.h"
+#include "json_text.h"
 #include "noinline.h"
 
 namespace dither {
@@ -570,48 +571,41 @@ class JsonParser {
   }
 };
 
-namespace {
-
-// Upper bounds on nodes and string bytes, so an in-memory document can be
-// parsed into vectors reserved once.
-void prescan(std::string_view text, size_t& nodes, size_t& bytes) {
-  nodes = 1;
-  bytes = 0;
-  bool inString = false;
-  for (size_t i = 0; i < text.size(); ++i) {
-    char c = text[i];
-    if (inString) {
-      if (c == '\\') {
-        ++i;
-        bytes += 4;
-      } else if (c == '"') {
-        inString = false;
-      } else {
-        ++bytes;
-      }
-    } else if (c == '"') {
-      inString = true;
-    } else if (c == ',' || c == '[' || c == '{') {
-      ++nodes;
-    }
-  }
-}
-
-}  // namespace
-
 JsonParseResult JsonDoc::parse(CharSource& source, const JsonFilter* filter, const JsonLimits& limits) {
+  textMode_ = false;
+  ownedText_.clear();
+  text_ = {};
+  decoded_.clear();
   return JsonParser(*this, source, filter, limits).run();
 }
 
 JsonParseResult JsonDoc::parse(std::string_view text, const JsonFilter* filter, const JsonLimits& limits) {
   if (filter == nullptr) {
-    size_t nodes = 0, bytes = 0;
-    prescan(text, nodes, bytes);
-    nodes_.reserve(std::min(nodes, limits.maxNodes));
-    strings_.reserve(std::min(bytes, limits.maxStringBytes));
+    std::string copy(text);
+    JsonParseResult r = parseInPlace(copy, limits);
+    if (r.ok) {
+      ownedText_ = std::move(copy);
+      text_ = ownedText_;
+    }
+    return r;
   }
   MemorySource src(text);
   return parse(src, filter, limits);
+}
+
+JsonParseResult JsonDoc::parseInPlace(std::string_view text, const JsonLimits& limits) {
+  nodes_.clear();
+  strings_.clear();
+  aggregates_.clear();
+  decoded_.clear();
+  ownedText_.clear();
+  textMode_ = false;
+  text_ = {};
+  JsonParseResult r;
+  if (!JsonText::validate(text, limits.maxDepth, r)) return r;
+  textMode_ = true;
+  text_ = text;
+  return r;
 }
 
 std::optional<double> JsonDoc::aggregate(int id) const {
@@ -620,6 +614,7 @@ std::optional<double> JsonDoc::aggregate(int id) const {
 }
 
 JsonView JsonDoc::root() const {
+  if (textMode_) return JsonView(this, JsonText::rootOffset(text_));
   return nodes_.empty() ? JsonView() : JsonView(this, 0);
 }
 

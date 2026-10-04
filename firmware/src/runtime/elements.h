@@ -21,7 +21,10 @@ struct RenderContext {
 // The text of a `text` element's parts, concatenated.
 std::string buildText(JsonView parts, const RenderContext& ctx);
 
-void drawElement(Framebuffer& fb, JsonView element, const RenderContext& ctx);
+constexpr int kMaxGroupDepth = 8;
+
+// `groupDepth`: how many groups enclose the element.
+void drawElement(Framebuffer& fb, JsonView element, const RenderContext& ctx, int groupDepth = 0);
 
 // Clears to white, then draws every element in order.
 void renderElements(Framebuffer& fb, JsonView elements, const RenderContext& ctx);

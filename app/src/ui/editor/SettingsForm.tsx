@@ -9,6 +9,8 @@ import { newId } from "@/project/ids";
 import type { Place, Project } from "@/project/schema";
 import { useProject } from "@/state/project-store";
 import { Field, NumberInput, Select, TextArea, TextInput, Toggle } from "../kit";
+import type { Lane } from "@/extensions/google-calendar";
+import { CalendarsField } from "../fields/CalendarsField";
 import { RemoteSelect } from "../fields/RemoteSelect";
 import { PlaceSearch } from "../fields/PlaceSearch";
 import { SearchField } from "../fields/SearchField";
@@ -91,6 +93,8 @@ export function SettingsForm({ fields, values, onChange }: Props) {
                 return <ImageField value={String(v ?? "")} onChange={(x, also) => onChange(f.key, x, also)} />;
               case "search":
                 return <SearchField id={id} value={String(v ?? "")} onChange={(x) => onChange(f.key, x)} options={f.options()} placeholder={f.placeholder} />;
+              case "calendars":
+                return <CalendarsField value={(Array.isArray(v) ? v : []) as Lane[]} onChange={(x) => onChange(f.key, x)} />;
               case "remote-select":
                 return <RemoteSelect id={id} field={f} value={String(v ?? "")} settings={values} onChange={(x, label) => {
                   onChange(f.key, x);
