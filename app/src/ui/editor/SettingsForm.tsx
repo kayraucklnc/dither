@@ -92,7 +92,7 @@ export function SettingsForm({ fields, values, onChange }: Props) {
               case "search":
                 return <SearchField id={id} value={String(v ?? "")} onChange={(x) => onChange(f.key, x)} options={f.options()} placeholder={f.placeholder} />;
               case "remote-select":
-                return <RemoteSelect id={id} field={f} value={String(v ?? "")} onChange={(x, label) => {
+                return <RemoteSelect id={id} field={f} value={String(v ?? "")} settings={values} onChange={(x, label) => {
                   onChange(f.key, x);
                   onChange(`${f.key}Name`, label);
                 }} />;

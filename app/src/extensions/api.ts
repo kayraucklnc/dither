@@ -38,7 +38,7 @@ export type Field =
    * A choice whose options come from somewhere else — an account's calendars, say.
    * The chosen option's label is kept too, as `<key>Name`.
    */
-  | (FieldBase & { kind: "remote-select"; load: (env: Env) => Promise<{ value: string; label: string }[]> });
+  | (FieldBase & { kind: "remote-select"; load: (env: Env, settings: Record<string, unknown>) => Promise<{ value: string; label: string }[]> });
 
 // ---------------------------------------------------------------- data
 

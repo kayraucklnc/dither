@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { loadFonts, nodeLibrary } from "@/assets/node";
 import { createProject } from "@/project/starters";
-import type { Project } from "@/project/schema";
+import { parseProject, type Project } from "@/project/schema";
 import { AssetStore, formatContext, render } from "@/runtime/render";
 import { evaluate } from "@/runtime/conditions";
 import { builtins } from "@/runtime/values";
@@ -14,7 +14,7 @@ beforeAll(async () => {
   deps = { library: nodeLibrary, fonts: await loadFonts(), picture: async () => null, boardPanel: () => ({ width: 800, height: 480 }) };
 });
 
-const account = { clientId: "id.apps.googleusercontent.com", clientSecret: "shh", refreshToken: "1//refresh", email: "me@example.com" };
+const account = { id: "me@example.com", clientId: "id.apps.googleusercontent.com", clientSecret: "shh", refreshToken: "1//refresh", email: "me@example.com" };
 const NOW = Date.UTC(2026, 9, 5, 6, 0) / 1000; // Monday 08:00 in Rome
 
 function project(): Project {
@@ -24,7 +24,7 @@ function project(): Project {
     { id: "cal", type: "google-calendar", x: 10, y: 0, w: 10, h: 6, frame: "none", settings: {} },
     { id: "sky", type: "weather", x: 0, y: 6, w: 10, h: 6, frame: "none", settings: {} },
   ];
-  p.accounts = { google: account, stripe: null };
+  p.accounts = { google: [account], stripe: null };
   p.alerts = [
     { id: "a1", enabled: true, match: "any", checks: [{ fact: "train:trouble", op: "is", value: true }], icon: "train-front", text: "Trouble on your line", value: "train:delay", style: "banner" },
     { id: "a2", enabled: true, match: "any", checks: [{ fact: "sky:rain", op: "ge", value: 60 }], icon: "umbrella", text: "Take an umbrella", value: "sky:rain", style: "banner" },
@@ -90,7 +90,7 @@ describe("transit, calendar and alerts", () => {
 
   it("asks Stripe for the period's list and totals it on the panel", async () => {
     const p = createProject({ starter: "blank", timezone: "Europe/Rome", language: "en", units: "metric", place: null });
-    p.accounts = { google: null, stripe: { key: "rk_live_abc", name: "" } };
+    p.accounts = { google: [], stripe: { key: "rk_live_abc", name: "" } };
     p.screens[0].widgets = [{ id: "rev", type: "stripe", x: 0, y: 0, w: 8, h: 6, frame: "none", settings: { period: "week" } }];
     const out = await compile(p, deps);
     const src = out.runtime.sources[0];
@@ -98,5 +98,23 @@ describe("transit, calendar and alerts", () => {
     expect(src.headers).toEqual([["Authorization", "Bearer rk_live_abc"]]);
     expect(src.values).toContainEqual({ key: "gross", path: "data", agg: "sum", field: "amount" });
     expect(src.values).toContainEqual({ key: "count", path: "data", agg: "count" });
+  });
+
+  it("reads each calendar from the account its widget names", async () => {
+    const p = createProject({ starter: "blank", timezone: "Europe/Rome", language: "en", units: "metric", place: null });
+    const work = { ...account, id: "work@example.com", email: "work@example.com", refreshToken: "1//work" };
+    p.accounts = { google: [account, work], stripe: null };
+    p.screens[0].widgets = [
+      { id: "home", type: "google-calendar", x: 0, y: 0, w: 8, h: 6, frame: "none", settings: {} },
+      { id: "job", type: "google-calendar", x: 8, y: 0, w: 8, h: 6, frame: "none", settings: { account: "work@example.com" } },
+    ];
+    const out = await compile(p, deps);
+    const tokens = out.runtime.sources.map((s) => s.auth?.form.find(([k]) => k === "refresh_token")?.[1]).sort();
+    expect(tokens).toEqual(["1//refresh", "1//work"]);
+  });
+
+  it("opens projects saved with a single Google account", () => {
+    const old = { ...createProject({ starter: "blank", timezone: "UTC", language: "en", units: "metric", place: null }), accounts: { google: { clientId: "c", clientSecret: "s", refreshToken: "r", email: "me@x" }, stripe: null } };
+    expect(parseProject(JSON.parse(JSON.stringify(old))).accounts.google).toEqual([{ id: "me@x", clientId: "c", clientSecret: "s", refreshToken: "r", email: "me@x" }]);
   });
 });

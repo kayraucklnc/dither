@@ -26,5 +26,8 @@ export function widgetTitle(w: Widget, env: Env): string {
 
 /** The accounts a widget type needs that this project has not linked. */
 export function missingAccounts(type: string, env: Env): string[] {
-  return (extensionFor(type)?.requires ?? []).filter((k) => !env.accounts[k]);
+  return (extensionFor(type)?.requires ?? []).filter((k) => {
+    const a = env.accounts[k];
+    return Array.isArray(a) ? a.length === 0 : !a;
+  });
 }

@@ -8,18 +8,20 @@ import { Select } from "../kit";
 
 type RemoteField = Extract<Field, { kind: "remote-select" }>;
 
-export function RemoteSelect({ id, field, value, onChange }: {
-  id?: string; field: RemoteField; value: string; onChange: (value: string, label: string) => void;
+export function RemoteSelect({ id, field, value, settings, onChange }: {
+  id?: string; field: RemoteField; value: string; settings: Record<string, unknown>; onChange: (value: string, label: string) => void;
 }) {
   const { project } = useProject();
   const [options, setOptions] = useState<{ value: string; label: string }[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const accounts = project.accounts;
+  // A calendar list depends on which account is chosen; reload when that changes.
+  const depends = JSON.stringify(settings.account ?? null);
 
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    field.load(envOf({ ...project, accounts })).then(
+    field.load(envOf({ ...project, accounts }), settings).then(
       (o) => !cancelled && setOptions(o),
       (e: unknown) => !cancelled && setError(e instanceof Error ? e.message : String(e)),
     );
@@ -27,7 +29,7 @@ export function RemoteSelect({ id, field, value, onChange }: {
       cancelled = true;
     };
     // Reload when the accounts change, not on every edit to the project.
-  }, [field, accounts]);
+  }, [field, accounts, depends]);
 
   if (error) return <p className="text-[12px] text-danger">{error}</p>;
   if (!options) return <p className="text-[12px] text-muted">Loading…</p>;

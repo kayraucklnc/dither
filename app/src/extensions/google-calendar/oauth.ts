@@ -79,7 +79,8 @@ export async function linkGoogle(clientId: string, clientSecret: string, scopes:
   if (!res.ok || !body.refresh_token) {
     throw new Error(body.error_description ?? body.error ?? "Google did not hand back a refresh token.");
   }
-  return { clientId, clientSecret, refreshToken: body.refresh_token, email: emailFrom(body.id_token) };
+  const email = emailFrom(body.id_token);
+  return { id: email || `google-${Date.now().toString(36)}`, clientId, clientSecret, refreshToken: body.refresh_token, email };
 }
 
 /** A short-lived access token, for the browser's own calls (calendar list, preview). */

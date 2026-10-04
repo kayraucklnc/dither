@@ -6,7 +6,7 @@ import { ChevronDown, ExternalLink, LogIn } from "lucide-react";
 import { CALENDAR_SCOPES } from "@/extensions/google-calendar";
 import { linkGoogle, redirectUri } from "@/extensions/google-calendar/oauth";
 import { isStripeKey } from "@/extensions/stripe";
-import type { Accounts as AccountsDef } from "@/project/schema";
+import type { Accounts as AccountsDef, GoogleLink } from "@/project/schema";
 import { useProject } from "@/state/project-store";
 import { Button, Field, Note, TextInput } from "../kit";
 
@@ -47,19 +47,18 @@ function GoogleSetupHelp() {
   );
 }
 
-function Google({ account, set }: { account: AccountsDef["google"]; set: (a: AccountsDef["google"]) => void }) {
-  const [clientId, setClientId] = useState(account?.clientId ?? "");
-  const [clientSecret, setClientSecret] = useState(account?.clientSecret ?? "");
+function GoogleSignIn({ known, onLinked, first }: { known: GoogleLink | undefined; onLinked: (a: GoogleLink) => void; first: boolean }) {
+  // A second account usually reuses the first one's OAuth client.
+  const [clientId, setClientId] = useState(known?.clientId ?? "");
+  const [clientSecret, setClientSecret] = useState(known?.clientSecret ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  if (account) return <Linked who={`Google${account.email ? `: ${account.email}` : ""} — calendars, read only`} onUnlink={() => set(null)} />;
 
   const signIn = async () => {
     setBusy(true);
     setError(null);
     try {
-      set(await linkGoogle(clientId.trim(), clientSecret.trim(), CALENDAR_SCOPES));
+      onLinked(await linkGoogle(clientId.trim(), clientSecret.trim(), CALENDAR_SCOPES));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -69,15 +68,43 @@ function Google({ account, set }: { account: AccountsDef["google"]; set: (a: Acc
 
   return (
     <div className="space-y-3">
-      <GoogleSetupHelp />
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Client ID">{(id) => <TextInput id={id} value={clientId} onChange={setClientId} placeholder="…apps.googleusercontent.com" />}</Field>
-        <Field label="Client secret">{(id) => <TextInput id={id} type="password" value={clientSecret} onChange={setClientSecret} />}</Field>
-      </div>
+      {first && <GoogleSetupHelp />}
+      {(first || !known) && (
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Client ID">{(id) => <TextInput id={id} value={clientId} onChange={setClientId} placeholder="…apps.googleusercontent.com" />}</Field>
+          <Field label="Client secret">{(id) => <TextInput id={id} type="password" value={clientSecret} onChange={setClientSecret} />}</Field>
+        </div>
+      )}
       <Button variant="primary" icon={<LogIn size={15} />} disabled={busy || !clientId.trim() || !clientSecret.trim()} onClick={signIn}>
-        {busy ? "Waiting for Google…" : "Sign in with Google"}
+        {busy ? "Waiting for Google…" : first ? "Sign in with Google" : "Sign in with another account"}
       </Button>
       {error && <Note tone="warn">{error}</Note>}
+      {first && (
+        <p className="text-[12px] text-muted">
+          While your Google app is in “Testing”, Google ends the panel's sign-in after 7 days. Publish it (Audience → Publish app) to keep it.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Google({ links, set }: { links: GoogleLink[]; set: (a: GoogleLink[]) => void }) {
+  const [adding, setAdding] = useState(false);
+  const link = (a: GoogleLink) => {
+    // Signing in again with the same account replaces its old token.
+    set([...links.filter((x) => x.id !== a.id), a]);
+    setAdding(false);
+  };
+  return (
+    <div className="space-y-2">
+      {links.map((a) => (
+        <Linked key={a.id} who={`${a.email || a.id} — calendars, read only`} onUnlink={() => set(links.filter((x) => x.id !== a.id))} />
+      ))}
+      {links.length === 0 || adding ? (
+        <GoogleSignIn known={links[0]} onLinked={link} first={links.length === 0} />
+      ) : (
+        <Button size="sm" variant="ghost" onClick={() => setAdding(true)}>Add another Google account</Button>
+      )}
     </div>
   );
 }
@@ -128,7 +155,7 @@ export function Accounts() {
       <div className="space-y-2">
         <h3 className="font-medium">Google</h3>
         <p className="text-[13px] text-muted">For the Google Calendar widget, and rules like “in a meeting”.</p>
-        <Google account={project.accounts.google} set={(a) => set("google", a)} />
+        <Google links={project.accounts.google} set={(a) => set("google", a)} />
       </div>
       <div className="space-y-2">
         <h3 className="font-medium">Stripe</h3>

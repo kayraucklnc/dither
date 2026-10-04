@@ -57,14 +57,14 @@ for (const s of STARTERS.filter((x) => x.id !== "blank")) {
 // Trains, a calendar and an alert: shift, wall-clock times, flags and overlays.
 {
   const project = createProject({ starter: "blank", timezone: "Europe/Rome", language: "en", units: "metric", place });
-  const account = { clientId: "id", clientSecret: "secret", refreshToken: "token", email: "" };
+  const account = { id: "me", clientId: "id", clientSecret: "secret", refreshToken: "token", email: "" };
   project.screens[0].widgets = [
     { id: "train", type: "trenord", x: 0, y: 0, w: 12, h: 8, frame: "none", settings: {} },
     { id: "agenda", type: "google-calendar", x: 12, y: 0, w: 8, h: 6, frame: "outline", settings: { calendarName: "Work" } },
     { id: "next", type: "google-calendar", x: 12, y: 6, w: 8, h: 5, frame: "none", settings: { show: "next" } },
     { id: "strip", type: "trenord", x: 0, y: 8, w: 12, h: 2, frame: "none", settings: {} },
   ];
-  project.accounts = { google: account, stripe: null };
+  project.accounts = { google: [account], stripe: null };
   project.alerts = [
     { id: "late", enabled: true, match: "any", checks: [{ fact: "train:trouble", op: "is", value: true }], icon: "train-front", text: "Trouble on your line", value: null, style: "banner" },
   ];
@@ -97,7 +97,7 @@ for (const s of STARTERS.filter((x) => x.id !== "blank")) {
     { id: "today", type: "stripe", x: 0, y: 0, w: 12, h: 12, frame: "none", settings: { currency: "try" } },
     { id: "month", type: "stripe", x: 12, y: 0, w: 8, h: 3, frame: "outline", settings: { period: "month", measure: "net", currency: "jpy" } },
   ];
-  project.accounts = { google: null, stripe: { key: "rk_test_golden", name: "" } };
+  project.accounts = { google: [], stripe: { key: "rk_test_golden", name: "" } };
   const c = await compile(project, deps);
   const ids = new Map(c.sources.flatMap((x) => x.widgetIds.map((w) => [w, x.source.id] as const)));
   const a = ids.get("today")!;
