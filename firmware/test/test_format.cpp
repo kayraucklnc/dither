@@ -213,3 +213,60 @@ TEST(format_num_compact) {
   CHECK_EQ(run(num(-12.345), R"({"num":{"compact":true}})"), "-12.35");
   CHECK_EQ(run(str("1234"), f), kDash);
 }
+
+TEST(format_pick) {
+  const Value s = Value::series({3, -7, 9, 9, -7, 2});
+  CHECK_EQ(run(s, R"({"pick":"max"})"), "9");
+  CHECK_EQ(run(s, R"({"pick":"min"})"), "-7");
+  CHECK_EQ(run(s, R"({"pick":"argmax"})"), "2");  // the earliest of the tie
+  CHECK_EQ(run(s, R"({"pick":"argmin"})"), "1");
+  CHECK_EQ(run(s, R"({"pick":"sum"})"), "9");
+  CHECK_EQ(run(s, R"({"pick":"first"})"), "3");
+  CHECK_EQ(run(s, R"({"pick":"last"})"), "2");
+  CHECK_EQ(run(s, R"({"pick":"count"})"), "6");
+  // The sum adds left to right: (0.1 + 0.2) + 0.3 is 0.6000000000000001,
+  // while 0.1 + (0.2 + 0.3) would be 0.6.
+  {
+    static Env env;
+    JsonDoc f;
+    f.parse(R"({"pick":"sum"})");
+    auto total = applyValueSteps(Value::series({0.1, 0.2, 0.3}), f.root(), env.ctx);
+    const volatile double a = 0.1, b = 0.2, c = 0.3;
+    CHECK(total && total->asNumber() == (a + b) + c && total->asNumber() != 0.6);
+  }
+  CHECK_EQ(run(Value::series({1e16, 1, -1e16}), R"({"pick":"sum"})"), "0");  // not 1: order matters
+  // Empty and non-series.
+  const Value empty = Value::series({});
+  for (const char* p : {"max", "min", "sum", "first", "last", "argmax", "argmin"}) {
+    const std::string f = std::string(R"({"pick":")") + p + "\"}";
+    CHECK_EQ(run(empty, f.c_str()), kDash);
+  }
+  CHECK_EQ(run(empty, R"({"pick":"count"})"), "0");
+  CHECK_EQ(run(num(5), R"({"pick":"max"})"), kDash);
+  CHECK_EQ(run(str("1,2"), R"({"pick":"count"})"), kDash);
+  CHECK_EQ(run(Value(), R"({"pick":"count"})"), kDash);
+  CHECK_EQ(run(s, R"({"pick":"median"})"), kDash);
+  // Followed by the other steps.
+  CHECK_EQ(run(Value::series({1234.5, 99}), R"({"pick":"max","scale":0.01,"num":{"d":1}})"), "12.3");
+  CHECK_EQ(run(Value::series({74120, 3}), R"({"pick":"first","num":{"compact":true}})"), "74.1k");
+  CHECK_EQ(run(s, R"({"pick":"argmax","map":{"k":[2],"o":["Wed"]}})"), "Wed");
+}
+
+TEST(format_pick_as_shift_amount) {
+  // The busiest hour of a 24-hour series, as a time: midnight + argmax hours.
+  static Env env;
+  ValueStore values;
+  std::vector<double> hourly(24, 0);
+  hourly[9] = 5;
+  hourly[15] = 5;
+  values.set("r.hourly", Value::series(hourly));
+  FormatContext ctx = env.ctx;
+  ctx.values = &values;
+  JsonDoc pickDoc, shiftDoc;
+  pickDoc.parse(R"({"pick":"argmax"})");
+  auto hour = applyValueSteps(values.get("r.hourly"), pickDoc.root(), ctx);
+  CHECK(hour && *hour == Value::number(9));
+  values.set("r.peak", *hour);
+  shiftDoc.parse(R"({"shift":{"v":"r.peak","scale":3600},"time":"HH:mm"})");
+  CHECK_EQ(formatValue(Value::string("2026-07-01"), shiftDoc.root(), ctx), "09:00");
+}

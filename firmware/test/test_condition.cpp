@@ -178,3 +178,17 @@ TEST(condition_vs_another_value) {
   CHECK(!check(R"({"v":"a.name","op":"contains","vs":"a.other"})"));
   CHECK(!check(R"({"v":"a.today","op":"present","vs":"a.other"})"));
 }
+
+TEST(condition_leaf_pick) {
+  ValueStore s;
+  s.set("r.week", Value::series({10, 40, 25}));
+  s.set("r.target", Value::number(30));
+  auto check = [&](const char* json) {
+    JsonDoc doc;
+    return doc.parse(json).ok && evalCondition(doc.root(), s, context());
+  };
+  CHECK(check(R"({"v":"r.week","f":{"pick":"max"},"op":"gt","x":30})"));
+  CHECK(check(R"({"v":"r.week","f":{"pick":"argmax"},"op":"eq","x":1})"));
+  CHECK(!check(R"({"v":"r.week","f":{"pick":"sum"},"op":"lt","x":75})"));
+  CHECK(check(R"({"v":"r.target","f":{"pick":"max"},"op":"absent"})"));  // not a series
+}

@@ -186,10 +186,39 @@ function sameKey(a: Value, k: number | string): boolean {
     (typeof a === "string" && typeof k === "string" && a === k);
 }
 
+/** One number out of a series: docs/format.md "Formats", step 0. */
+function pick(v: Value, how: NonNullable<Format["pick"]>): number | null {
+  if (!Array.isArray(v)) return null;
+  if (!["max", "min", "sum", "first", "last", "argmax", "argmin", "count"].includes(how)) return null;
+  if (how === "count") return v.length;
+  if (v.length === 0) return null;
+  switch (how) {
+    case "first": return v[0];
+    case "last": return v[v.length - 1];
+    case "sum": {
+      let total = 0;
+      for (const x of v) total += x; // left to right, as the panel adds
+      return total;
+    }
+    default: {
+      let best = 0;
+      for (let i = 1; i < v.length; i++) {
+        const better = how === "max" || how === "argmax" ? v[i] > v[best] : v[i] < v[best];
+        if (better) best = i;
+      }
+      return how === "argmax" || how === "argmin" ? best : v[best];
+    }
+  }
+}
+
 /** A format's value steps alone — until, scale, add, steps, map — as rules use them. */
 export function applyValueSteps(input: Value, f: Format, ctx: FormatContext): Value {
   let v: Value = input;
   if (v === null) return null;
+  if (f.pick) {
+    v = pick(v, f.pick);
+    if (v === null) return null;
+  }
   if (f.shift) {
     const m = readTime(v, ctx.zone, ctx.now);
     if (!m) return null;
