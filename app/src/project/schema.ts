@@ -54,13 +54,21 @@ export const alertSchema = z.object({
 });
 
 /** Accounts the panel signs in to, linked once in Panel settings and shared by every widget. */
+export const googleLinkSchema = z.object({
+  /** Stable id a widget refers to; the email when Google gives one. */
+  id: z.string(),
+  clientId: z.string(),
+  clientSecret: z.string(),
+  refreshToken: z.string(),
+  email: z.string().default(""),
+});
+
 export const accountsSchema = z.object({
-  google: z.object({
-    clientId: z.string(),
-    clientSecret: z.string(),
-    refreshToken: z.string(),
-    email: z.string().default(""),
-  }).nullable().default(null),
+  // Projects saved before several accounts were possible hold one link, or none.
+  google: z.preprocess(
+    (v) => (v === null || v === undefined ? [] : Array.isArray(v) ? v : [{ id: (v as { email?: string }).email || "google", ...(v as object) }]),
+    z.array(googleLinkSchema),
+  ).default([]),
   stripe: z.object({ key: z.string(), name: z.string().default("") }).nullable().default(null),
 });
 
@@ -85,7 +93,7 @@ export const projectSchema = z.object({
   units: z.enum(["metric", "imperial"]).default("metric"),
   place: placeSchema.nullable().default(null),
   wifi: z.array(wifiSchema).default([]),
-  accounts: accountsSchema.default({ google: null, stripe: null }),
+  accounts: accountsSchema.default({ google: [], stripe: null }),
   refreshMinutes: z.number().int().min(1).max(1440).default(15),
   quiet: z.object({ enabled: z.boolean(), from: z.string(), to: z.string() })
     .default({ enabled: false, from: "23:00", to: "07:00" }),
@@ -104,6 +112,7 @@ export type RuleDef = z.infer<typeof ruleSchema>;
 export type AlertDef = z.infer<typeof alertSchema>;
 export type Wifi = z.infer<typeof wifiSchema>;
 export type Accounts = z.infer<typeof accountsSchema>;
+export type GoogleLink = z.infer<typeof googleLinkSchema>;
 export type AccountKind = keyof Accounts;
 export type Place = z.infer<typeof placeSchema>;
 export type Project = z.infer<typeof projectSchema>;

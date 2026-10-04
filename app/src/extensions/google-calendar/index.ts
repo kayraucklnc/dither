@@ -5,14 +5,18 @@ export const CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar.readon
 export const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const EVENTS = 5;
 
-export interface GoogleLink {
-  clientId: string;
-  clientSecret: string;
-  refreshToken: string;
-  email: string;
+/** The account a widget reads: the one it names, else the first linked. */
+export function linkFor(env: Env, id: string): GoogleLink | undefined {
+  return env.accounts.google.find((a) => a.id === id) ?? env.accounts.google[0];
 }
 
+export type { GoogleLink } from "@/project/schema";
+import type { Env } from "../api";
+import type { GoogleLink } from "@/project/schema";
+
 interface Settings extends Record<string, unknown> {
+  /** Which linked account; the first when unset or gone. */
+  account: string;
   calendar: string;
   calendarName: string;
   show: "auto" | "next" | "agenda";
@@ -76,18 +80,30 @@ export default defineExtension<Settings>({
   requires: ["google"],
   fields: [
     {
+      key: "account", label: "Account", kind: "remote-select",
+      load: async (env) => env.accounts.google.map((a) => ({ value: a.id, label: a.email || a.id })),
+    },
+    {
       key: "calendar", label: "Calendar", kind: "remote-select",
-      load: async (env) => (env.accounts.google ? (await import("./oauth")).listCalendars(env.accounts.google).then((l) => l.map((c) => ({ value: c.id, label: c.name }))) : []),
+      load: async (env, s) => {
+        const a = linkFor(env, String(s.account ?? ""));
+        if (!a) return [];
+        const { listCalendars } = await import("./oauth");
+        return (await listCalendars(a)).map((c) => ({ value: c.id, label: c.name }));
+      },
     },
     {
       key: "show", label: "Show", kind: "select",
       options: [{ value: "auto", label: "As much as fits" }, { value: "next", label: "The next event" }, { value: "agenda", label: "The next few events" }],
     },
   ],
-  defaults: () => ({ calendar: "primary", calendarName: "", show: "auto" }),
-  title: (s) => (s.calendarName ? `Calendar: ${s.calendarName}` : "Google Calendar"),
+  defaults: () => ({ account: "", calendar: "primary", calendarName: "", show: "auto" }),
+  title: (s, env) => {
+    const who = linkFor(env, s.account)?.email;
+    return s.calendarName ? `Calendar: ${s.calendarName}` : who ? `Calendar: ${who}` : "Google Calendar";
+  },
   source(s, env) {
-    const a = env.accounts.google;
+    const a = linkFor(env, s.account);
     if (!a?.refreshToken || !a.clientId) return null;
     const q = "singleEvents=true&orderBy=startTime&maxResults=" + EVENTS + "&fields=items(summary,location,start,end)";
     return {
@@ -125,7 +141,7 @@ export default defineExtension<Settings>({
     { key: "any", label: "Anything coming up", type: "flag", test: { v: "t0", op: "present" } },
   ],
   draw(d, s, env) {
-    if (!env.accounts.google?.refreshToken) {
+    if (!linkFor(env, s.account)?.refreshToken) {
       // Nothing to bind to yet; say what is missing rather than drawing dashes.
       const iconH = Math.min(d.height * 0.45, 96);
       d.icon("calendar", { x: 0, y: d.height * 0.12, w: d.width, h: iconH });

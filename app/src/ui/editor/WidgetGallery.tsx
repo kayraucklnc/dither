@@ -18,7 +18,7 @@ import { storeFor } from "../Preview";
 import { ExtensionIcon } from "./Inspector";
 
 const PREVIEW_ACCOUNTS: Project["accounts"] = {
-  google: { clientId: "preview", clientSecret: "preview", refreshToken: "preview", email: "" },
+  google: [{ id: "preview", clientId: "preview", clientSecret: "preview", refreshToken: "preview", email: "" }],
   stripe: { key: "rk_test_preview", name: "" },
 };
 

@@ -92,7 +92,7 @@ export function createProject(o: NewProjectOptions): Project {
     units: o.units,
     place: o.place,
     wifi: [{ ssid: "", password: "" }],
-    accounts: { google: null, stripe: null },
+    accounts: { google: [], stripe: null },
     refreshMinutes: 15,
     quiet: { enabled: false, from: "23:00", to: "07:00" },
     screens: s.screens,
