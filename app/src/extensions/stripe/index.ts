@@ -32,7 +32,7 @@ interface Settings extends Record<string, unknown> {
   style: "auto" | "figure" | "graph" | "board" | "ledger" | "payments";
   period: string;
   chart: "auto" | "hours" | "week" | "month";
-  line: "area" | "line" | "steps";
+  line: "curve" | "curve-line" | "area" | "line" | "steps";
   currency: string;
   heading: string;
   compare: boolean;
@@ -128,7 +128,10 @@ function graph(d: Draw, s: Settings, x: number, y: number, w: number, h: number)
   const small = Math.max(13, Math.min(16, Math.round(h * 0.08)));
   const axisH = d.metrics(small).lineHeight + 4;
   const plotH = h - axisH;
-  d.chart({ x, y, w, h: plotH }, "chart/series", { kind: s.line, min: 0, width: 2 });
+  // Curved still passes through every figure; only the shape between two of them is drawn in.
+  const smooth = s.line === "curve" || s.line === "curve-line";
+  const kind = s.line === "curve" ? "area" : s.line === "curve-line" ? "line" : s.line;
+  d.chart({ x, y, w, h: plotH }, "chart/series", { kind, min: 0, width: 2, smooth });
   d.line(x, y + plotH, x + w, y + plotH, { width: 1 });
   at(d, ch.from, x, y + h - 2, w / 2, small, 400);
   at(d, ch.to, x + w / 2, y + h - 2, w / 2, small, 400, { align: "right" });
@@ -212,7 +215,13 @@ export default defineExtension<Settings>({
     },
     {
       key: "line", label: "Line", kind: "select",
-      options: [{ value: "area", label: "Shaded underneath" }, { value: "line", label: "A plain line" }, { value: "steps", label: "Steps, a block per day" }],
+      options: [
+        { value: "curve", label: "Curved and shaded" },
+        { value: "curve-line", label: "Curved line" },
+        { value: "area", label: "Straight and shaded" },
+        { value: "line", label: "Straight line" },
+        { value: "steps", label: "Steps, a block per day" },
+      ],
       visible: (s) => ["auto", "graph", "board"].includes(String(s.style)),
     },
     { key: "compare", label: "Compare with the period before", kind: "toggle", visible: (s) => s.style !== "ledger" && s.style !== "payments" },
@@ -221,7 +230,7 @@ export default defineExtension<Settings>({
     { key: "heading", label: "Heading", kind: "text", placeholder: "Left empty, the period names it" },
     { key: "currency", label: "Currency", kind: "select", options: CURRENCIES.map(({ value, label }) => ({ value, label })) },
   ],
-  defaults: () => ({ style: "auto", period: "today", chart: "auto", line: "area", currency: "eur", heading: "", compare: true, compact: false, names: false }),
+  defaults: () => ({ style: "auto", period: "today", chart: "auto", line: "curve", currency: "eur", heading: "", compare: true, compact: false, names: false }),
   title: (s) => `Revenue, ${periodOf(s).label.toLowerCase()}`,
   source(s, env) {
     const key = env.accounts.stripe?.key.trim() ?? "";

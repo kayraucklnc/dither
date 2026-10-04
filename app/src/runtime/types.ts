@@ -53,7 +53,7 @@ export type Element =
   | (Base & { t: "group"; els: Element[] })
   | (Base & {
       t: "chart"; x: number; y: number; w: number; h: number; v: string;
-      kind: "bars" | "line" | "steps" | "area"; min?: number; max?: number; gap?: number; lw?: number;
+      kind: "bars" | "line" | "steps" | "area"; min?: number; max?: number; gap?: number; lw?: number; smooth?: boolean;
     });
 
 export type ElementOf<T extends Element["t"]> = Extract<Element, { t: T }>;

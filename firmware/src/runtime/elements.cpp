@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "assets.h"
+#include "chart.h"
 #include "noinline.h"
 #include "condition.h"
 #include "shapes.h"
@@ -86,73 +87,25 @@ DITHER_NOINLINE void drawBar(const Canvas& c, JsonView el, const RenderContext& 
   }
 }
 
-struct ChartPoint {
-  int64_t x, y;
-};
-
-// The 4x4 Bayer matrix of format.md §4 "chart", area.
-constexpr int kBayer[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
-
-// Dithered shading under the line: denser near it, fading towards `bottom`.
-void shadeUnder(const Canvas& c, const std::vector<ChartPoint>& pts, int64_t x, int64_t w, int64_t bottom) {
-  const Box& clip = c.clip();
-  size_t seg = 0;
-  for (int64_t px = x; px < x + w; ++px) {
-    while (seg + 2 < pts.size() && px > pts[seg + 1].x) ++seg;  // the first segment ending at or after px
-    if (px < clip.x0 || px >= clip.x1) continue;
-    const ChartPoint a = pts[seg], b = pts[seg + 1];
-    const int64_t ly = b.x == a.x ? a.y : a.y + floorDiv((b.y - a.y) * (px - a.x), b.x - a.x);
-    const int64_t span = std::max<int64_t>(1, bottom - ly);
-    for (int64_t py = std::max(ly + 1, clip.y0); py < std::min(bottom, clip.y1); ++py) {
-      const int64_t level = 2 + floorDiv(8 * (bottom - py), span);
-      if (kBayer[py & 3][px & 3] < level) c.plot(px, py);
-    }
-  }
-}
-
 DITHER_NOINLINE void drawChart(const Canvas& c, JsonView el, const RenderContext& ctx) {
   const Value& v = reference(ctx, el);
   if (!v.isSeries() || v.asSeries().empty()) return;
-  const std::vector<double>& s = v.asSeries();
-  const int64_t n = static_cast<int64_t>(s.size());
-  double lo = el["min"].isNumber() ? el["min"].number() : *std::min_element(s.begin(), s.end());
-  double hi = el["max"].isNumber() ? el["max"].number() : *std::max_element(s.begin(), s.end());
-  if (hi <= lo) hi = lo + 1;
-  // Finite inputs can still overflow (hi - lo); such a fraction counts as 0.
-  auto frac = [&](double value) {
-    double f = std::clamp((value - lo) / (hi - lo), 0.0, 1.0);
-    return std::isfinite(f) ? f : 0.0;
-  };
-
-  int64_t x = field(el, "x", 0), y = field(el, "y", 0), w = field(el, "w", 0), h = field(el, "h", 0);
+  ChartSpec spec;
+  spec.x = field(el, "x", 0);
+  spec.y = field(el, "y", 0);
+  spec.w = field(el, "w", 0);
+  spec.h = field(el, "h", 0);
   std::string_view kind = el["kind"].string();
-  if (kind != "line" && kind != "steps" && kind != "area") {  // bars, also for anything unknown
-    int64_t gap = field(el, "gap", 1);
-    for (int64_t i = 0; i < n; ++i) {
-      int64_t x0 = x + floorDiv(i * w, n);
-      int64_t x1 = x + floorDiv((i + 1) * w, n) - gap;
-      int64_t bh = std::max<int64_t>(1, static_cast<int64_t>(std::floor(frac(s[static_cast<size_t>(i)]) * h)));
-      c.fillRect(x0, y + h - bh, x1 - x0, bh);
-    }
-    return;
-  }
-  std::vector<ChartPoint> pts;
-  for (int64_t i = 0; i < n; ++i) {
-    pts.push_back({x + floorDiv(i * (w - 1), std::max<int64_t>(1, n - 1)),
-                   y + (h - 1) - static_cast<int64_t>(std::floor(frac(s[static_cast<size_t>(i)]) * (h - 1)))});
-  }
-  const int64_t lw = field(el, "lw", 2);
-  if (kind == "steps") {
-    for (size_t i = 0; i < pts.size(); ++i) {
-      const bool last = i + 1 == pts.size();
-      const int64_t nx = last ? x + w - 1 : pts[i + 1].x;
-      drawLine(c, pts[i].x, pts[i].y, nx, pts[i].y, lw);
-      if (!last) drawLine(c, nx, pts[i].y, nx, pts[i + 1].y, lw);
-    }
-    return;
-  }
-  if (kind == "area" && pts.size() > 1) shadeUnder(c, pts, x, w, y + h);
-  for (size_t i = 1; i < pts.size(); ++i) drawLine(c, pts[i - 1].x, pts[i - 1].y, pts[i].x, pts[i].y, lw);
+  spec.kind = kind == "line"    ? ChartSpec::Kind::Line
+              : kind == "steps" ? ChartSpec::Kind::Steps
+              : kind == "area"  ? ChartSpec::Kind::Area
+                                : ChartSpec::Kind::Bars;  // also for anything unknown
+  if (el["min"].isNumber()) spec.min = el["min"].number();
+  if (el["max"].isNumber()) spec.max = el["max"].number();
+  spec.gap = field(el, "gap", 1);
+  spec.lw = field(el, "lw", 2);
+  spec.smooth = el["smooth"].boolean(false);
+  drawChartSeries(c, spec, v.asSeries());
 }
 
 DITHER_NOINLINE void drawBitmapElement(const Canvas& c, JsonView el, const RenderContext& ctx) {

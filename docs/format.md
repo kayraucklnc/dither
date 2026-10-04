@@ -359,7 +359,7 @@ logical pixels.
 | `icon` | `x y w h`, `v` (reference), `f` (format, optional), `set` (`{ "name": assetIndex }`) — the value, formatted, picks a bitmap drawn centred in the box |
 | `bar` | `x y w h`, `v`, `min max`, `dir` (`r` grows rightwards, `u` upwards; default `r`) |
 | `group` | `els` — elements drawn in order, and only when the group's `when` holds. Groups nest up to 8 deep; a group's `c` is ignored |
-| `chart` | `x y w h`, `v` (a series), `kind` (`bars`/`line`/`steps`/`area`), `min max` (optional, else from the data), `gap` (bars, default 1), `lw` (line thickness, default 2) |
+| `chart` | `x y w h`, `v` (a series), `kind` (`bars`/`line`/`steps`/`area`), `min max` (optional, else from the data), `gap` (bars, default 1), `lw` (line thickness, default 2), `smooth` (curve the `line`/`area`, default false) |
 
 `parts` is an array; each part is a literal string, `{ "v": ref, "f": format }`,
 or `{ "k": constant, "f": format }` — a fixed value (number, string, boolean or
@@ -491,6 +491,17 @@ never written.
     the 4×4 Bayer matrix `[[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]]`
     and `L = 2 + floor(8 · (y + h - py) / max(1, y + h - ly))` — denser near
     the line, fading towards the bottom. The line is drawn after the shading.
+  - `smooth` (for `line` and `area`): between points the line is a
+    Catmull-Rom curve through them, worked out per column. For column `px`
+    take the segment `i` as the area rule does; if `x1 = x0`, `cy = y0`.
+    Otherwise `t = (px - x0) / (x1 - x0)` and, with `P1 = Y_i`, `P2 =
+    Y_(i+1)`, `P0 = Y_(i-1)` (or `P1` when `i = 0`), `P3 = Y_(i+2)` (or `P2`
+    past the end): `a = 2·P1`, `b = P2 - P0`, `c = 2·P0 - 5·P1 + 4·P2 - P3`,
+    `d = 3·P1 - P0 - 3·P2 + P3`, `v = a + t·(b + t·(c + t·d))` — evaluated
+    in exactly that order in doubles, with no fused multiply-add — and `cy =
+    round_half_away(v / 2)` clamped to `[y, y + h - 1]`. The line joins
+    `(px - 1, cy(px - 1))` to `(px, cy(px))` for every column after the
+    first, with thickness `lw`; `area` shades beneath `cy` in place of `ly`.
 - **bitmap.** Top-left at `(x, y)`.
 - **icon.** Value through `f`, then to text (§ formats); if `set` has that
   name, the bitmap is drawn at `(x + floor((w - bw) / 2), y + floor((h - bh) / 2))`
