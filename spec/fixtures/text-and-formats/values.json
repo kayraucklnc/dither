@@ -1,0 +1,16 @@
+{
+  "now": 1791119250,
+  "values": {
+    "f.word": "istanbul ığdır",
+    "f.temp": -3.5,
+    "f.big": 1234567.891,
+    "f.half": 2.675,
+    "f.auto": 20.5,
+    "f.neg": -0.04,
+    "f.code": 2,
+    "f.level": 55,
+    "f.missing": null,
+    "f.soon": "2026-10-04T16:00",
+    "f.iso": "2026-10-25T02:30:00Z"
+  }
+}

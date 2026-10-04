@@ -1,32 +1,14 @@
-# Secrets. `.env` holds the database password and must never be committed.
-*.env*
-!*.env*.tt
-
 .DS_Store
 *.log
+.env*
 
-# Node and Next
+# Node
 node_modules
-.next
-next-env.d.ts
+app/dist
 
-# Rendered screens, which are a cache keyed by their own content
-.storage
-
-# Your own pictures for the gallery. The bundled ones live in
-# extensions/gallery/art and are tracked; anything you put here is yours.
-.gallery
-
-# Left behind by the Ruby app, which no longer lives here. Nothing generates
-# these any more, and public/assets/app.js alone is 76,000 lines of compiled
-# bundle - enough to swamp the diff of any branch that touches the tree.
-#
-# Anchored with a leading slash on purpose. `web/public/` is real, tracked,
-# and holds the brand mark the renderer inlines into the "nothing set up"
-# panel; an unanchored `public/` would ignore that too.
-/log/
-/public/
-/tmp/
-
-# Firmware images offered by the flasher on /devices/new. Binaries, not source.
-web/public/downloads/*.bin
+# Firmware builds. The image the app offers is built by `make firmware`
+# (or CI) and copied into app/public/firmware/; it is never committed.
+firmware/.pio
+firmware/build
+app/public/firmware/*.bin
+app/public/firmware/manifest.json
