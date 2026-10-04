@@ -2,6 +2,7 @@
 // panel, so the first flash already shows something worth hanging up.
 
 import { newId } from "./ids";
+import { withShowcase } from "./showcase";
 import { PROJECT_VERSION, type Place, type Project, type RuleDef, type ScreenDef, type Widget } from "./schema";
 
 export interface StarterInfo {
@@ -11,6 +12,7 @@ export interface StarterInfo {
 }
 
 export const STARTERS: StarterInfo[] = [
+  { id: "showcase", name: "A whole day", description: "Every widget, with rules that follow the clock and your trains, and alerts when something needs you." },
   { id: "clock-weather", name: "Clock & weather", description: "The time, today's weather and the next two days. Dims to a quiet clock at night." },
   { id: "dashboard", name: "Daily dashboard", description: "Date, time, weather, a countdown and a thought for the day." },
   { id: "photo", name: "Photo frame", description: "One picture, with the time along the bottom." },
@@ -26,7 +28,7 @@ function screens(starter: string): { screens: ScreenDef[]; rules: (screens: Scre
       const home: ScreenDef = {
         id: newId("s"), name: "Home",
         widgets: [
-          w("clock", 0, 0, 11, 7, { style: "digital", showDate: true }),
+          w("clock", 0, 0, 11, 7, { style: "digits", showDate: true }),
           w("weather", 11, 0, 9, 11, { detail: "forecast" }, "outline"),
           w("messages", 0, 7, 11, 4),
           w("status", 0, 11, 20, 1),
@@ -81,6 +83,10 @@ export interface NewProjectOptions {
 }
 
 export function createProject(o: NewProjectOptions): Project {
+  if (o.starter === "showcase") {
+    const base = createProject({ ...o, starter: "blank" });
+    return { ...withShowcase(base), name: "A whole day" };
+  }
   const s = screens(o.starter);
   return {
     version: PROJECT_VERSION,
