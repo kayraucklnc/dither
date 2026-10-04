@@ -166,6 +166,13 @@ function routeLine(d: Draw, s: Record<string, unknown>, h: number) {
   }
 }
 
+/** Nothing to catch: every listed train has gone or been cancelled. */
+function noTrains(d: Draw, box: { x: number; y: number; w: number; h: number }) {
+  const all = arrangements().map((a) => a.when);
+  d.when({ not: { any: all } }, () =>
+    d.text("No more trains for now", { ...box, size: Math.max(16, Math.min(28, Math.round(box.h * 0.12))), weight: 700, align: "center", valign: "middle" }));
+}
+
 function board(d: Draw, s: Record<string, unknown>) {
   const { width: w, height: h } = d;
   const headH = h >= 150 ? Math.max(22, Math.min(32, Math.round(h * 0.09))) : 0;
@@ -186,6 +193,7 @@ function board(d: Draw, s: Record<string, unknown>) {
     countW: d.measure("88", heroBig, 700) + d.measure("min", heroUnit(heroBig), 700) + Math.round(heroBig * 0.45),
     stateW: d.measure(stacked ? "+88 min" : "Cancelled", stateSize, 700) + 6,
   };
+  noTrains(d, { x: 0, y: top, w, h: avail });
   for (const a of arrangements()) {
     d.when(a.when, () => {
       row(d, a.hero, top, heroH, g, true);
@@ -218,6 +226,7 @@ function strip(d: Draw) {
     countW: d.measure("88", heroBig, 700) + d.measure("min", heroUnit(heroBig), 700) + Math.round(heroBig * 0.45),
     stateW: d.width >= 360 ? d.measure("Cancelled", stateSize, 700) + 6 : 0,
   };
+  noTrains(d, { x: 0, y: 0, w: d.width, h: d.height });
   for (const a of arrangements()) d.when(a.when, () => row(d, a.hero, 0, d.height, g, true));
 }
 
@@ -266,12 +275,10 @@ export default defineExtension({
       values,
     };
   },
-  sample: () => {
-    // Timetable times are wall-clock strings; make the example ones upcoming.
-    const soon = (min: number) => {
-      const t = new Date(Math.ceil(Date.now() / 60000) * 60000 + min * 60000);
-      return `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}:00`;
-    };
+  sample: (_s, env) => {
+    // Timetable times are wall-clock strings in the panel's zone; make the example ones upcoming there.
+    const clock = new Intl.DateTimeFormat("en-GB", { timeZone: env.timezone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+    const soon = (min: number) => `${clock.format(new Date(Math.ceil(Date.now() / 60000) * 60000 + min * 60000))}:00`;
     return {
       alert: null,
       t0: soon(6), d0: 0, c0: false, s0: "", k0: "R", n0: "24015",

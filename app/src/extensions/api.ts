@@ -176,6 +176,8 @@ export interface Env {
   units: "metric" | "imperial";
   place: Place | null;
   language: string;
+  /** IANA zone, e.g. "Europe/Rome" — for examples that must be in the panel's local time. */
+  timezone: string;
   /** Linked in Panel settings; shared by every widget. Never put credentials in a widget's settings. */
   accounts: Accounts;
 }

@@ -1,10 +1,11 @@
 // The editor: screens on the left, the panel in the middle, settings on the right.
 
 import { useMemo, useState } from "react";
-import { Copy, FolderOpen, LayoutGrid, Plus, Redo2, Save, Settings2, Trash2, Undo2, Usb, Workflow } from "lucide-react";
+import { Copy, FolderOpen, Sparkles, LayoutGrid, Plus, Redo2, Save, Settings2, Trash2, Undo2, Usb, Workflow } from "lucide-react";
 import { gridOf, rotated } from "@/compiler/grid";
 import type { Extension } from "@/extensions/api";
 import { newId } from "@/project/ids";
+import { withShowcase } from "@/project/showcase";
 import { chooseScreen } from "@/runtime/conditions";
 import { formatContext } from "@/runtime/render";
 import { parseZone, toLocal } from "@/runtime/tz";
@@ -54,6 +55,7 @@ export function Workspace({ onNew }: { onNew: () => void }) {
   const [sim, setSim] = useState<SimState>(NO_SIM);
   const [openError, setOpenError] = useState<string | null>(null);
   const [confirmNew, setConfirmNew] = useState(false);
+  const [confirmShowcase, setConfirmShowcase] = useState(false);
 
   const base = useSimulation(compiled);
   const overrides = useMemo(() => toOverrides(sim, base.now, compiled?.runtime.tz), [sim, base.now, compiled]);
@@ -176,7 +178,10 @@ export function Workspace({ onNew }: { onNew: () => void }) {
               {!project.wifi.some((n) => n.ssid.trim()) && <span className="ml-auto size-1.5 rounded-full bg-danger" title="Wi-Fi is not set" />}
             </button>
           </div>
-          <div className="mt-auto px-1">
+          <div className="mt-auto space-y-1.5 px-1">
+            <button type="button" onClick={() => setConfirmShowcase(true)} className="flex items-center gap-2 text-[13px] text-muted hover:text-ink">
+              <Sparkles size={14} /> Load the showcase
+            </button>
             <button type="button" onClick={() => setConfirmNew(true)} className="inline-flex items-center gap-2 text-[13px] text-muted hover:text-ink">
               <LayoutGrid size={14} /> Start a new project
             </button>
@@ -228,6 +233,20 @@ export function Workspace({ onNew }: { onNew: () => void }) {
           <div className="flex flex-wrap gap-2 justify-end">
             <Button onClick={() => { download(projectFile(project, true), fileName(project)); setSaving(false); }}>With Wi-Fi passwords and API keys</Button>
             <Button variant="primary" onClick={() => { download(projectFile(project, false), fileName(project)); setSaving(false); }}>Save without passwords and keys</Button>
+          </div>
+        </div>
+      </Dialog>
+      <Dialog open={confirmShowcase} onClose={() => setConfirmShowcase(false)} title="Load the showcase?">
+        <div className="space-y-4">
+          <p>Seven screens that use every widget, rules that follow the day and your trains, and four alerts. Your screens, rules and alerts are replaced; Wi-Fi, accounts and place stay. You can undo this.</p>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setConfirmShowcase(false)}>Keep mine</Button>
+            <Button variant="primary" icon={<Sparkles size={15} />} onClick={() => {
+              update(withShowcase);
+              setView({ kind: "screen", index: 0 });
+              setSelected(null);
+              setConfirmShowcase(false);
+            }}>Load the showcase</Button>
           </div>
         </div>
       </Dialog>
