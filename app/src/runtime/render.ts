@@ -55,14 +55,41 @@ function textOf(parts: readonly Part[], ctx: Ctx): string {
 
 const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
 
-/** A dithered ramp beneath a line: dense near it, fading to the floor. */
-function shadeUnder(fb: Framebuffer, pts: number[][], x: number, w: number, floor: number, ink: boolean): void {
+/** The line's height in each column: straight between points, or a Catmull-Rom curve. */
+function columnHeights(pts: number[][], x: number, w: number, top: number, bottom: number, smooth: boolean): number[] {
+  const out: number[] = [];
   let seg = 0;
   for (let px = x; px < x + w; px++) {
     while (seg < pts.length - 2 && px > pts[seg + 1][0]) seg++;
     const [x0, y0] = pts[seg];
     const [x1, y1] = pts[seg + 1];
-    const ly = x1 === x0 ? y0 : y0 + Math.floor(((y1 - y0) * (px - x0)) / (x1 - x0));
+    if (x1 === x0) {
+      out.push(y0);
+    } else if (!smooth) {
+      out.push(y0 + Math.floor(((y1 - y0) * (px - x0)) / (x1 - x0)));
+    } else {
+      const t = (px - x0) / (x1 - x0);
+      const p1 = y0;
+      const p2 = y1;
+      const p0 = seg > 0 ? pts[seg - 1][1] : p1;
+      const p3 = seg + 2 < pts.length ? pts[seg + 2][1] : p2;
+      const a = 2 * p1;
+      const b = p2 - p0;
+      const c = 2 * p0 - 5 * p1 + 4 * p2 - p3;
+      const d = 3 * p1 - p0 - 3 * p2 + p3;
+      // Exactly this order, as the firmware evaluates it.
+      const v = a + t * (b + t * (c + t * d));
+      out.push(Math.max(top, Math.min(bottom, roundAway(v / 2))));
+    }
+  }
+  return out;
+}
+
+/** A dithered ramp beneath a line: dense near it, fading to the floor. */
+function shadeUnder(fb: Framebuffer, heights: number[], x: number, floor: number, ink: boolean): void {
+  for (let i = 0; i < heights.length; i++) {
+    const px = x + i;
+    const ly = heights[i];
     for (let py = ly + 1; py < floor; py++) {
       const level = 2 + Math.floor((8 * (floor - py)) / Math.max(1, floor - ly));
       if (BAYER[py & 3][px & 3] < level) fb.set(px, py, ink);
@@ -101,7 +128,12 @@ function drawChart(el: ElementOf<"chart">, ctx: Ctx, ink: boolean): void {
     });
     return;
   }
-  if (el.kind === "area" && pts.length > 1) shadeUnder(ctx.fb, pts, el.x, el.w, el.y + el.h, ink);
+  const heights = pts.length > 1 ? columnHeights(pts, el.x, el.w, el.y, el.y + el.h - 1, el.smooth === true) : [];
+  if (el.kind === "area" && pts.length > 1) shadeUnder(ctx.fb, heights, el.x, el.y + el.h, ink);
+  if (el.smooth && pts.length > 1) {
+    for (let i = 1; i < heights.length; i++) line(ctx.fb, el.x + i - 1, heights[i - 1], el.x + i, heights[i], lw, ink);
+    return;
+  }
   for (let i = 1; i < pts.length; i++) line(ctx.fb, pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], lw, ink);
 }
 

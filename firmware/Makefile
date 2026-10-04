@@ -19,7 +19,9 @@ HOST_DIR  := build/host
 RUNTIME   := $(wildcard src/runtime/*.cpp)
 TESTS     := $(wildcard test/*.cpp)
 OBJS      := $(patsubst %.cpp,$(HOST_DIR)/%.o,$(RUNTIME) $(TESTS))
-CXXFLAGS  := -std=c++17 -O1 -g -Wall -Wextra -Wshadow -Werror -fsanitize=address,undefined -fno-omit-frame-pointer
+# -ffp-contract=off: no fused multiply-add, so every double operation rounds
+# as it does in JavaScript (the smoothed chart depends on it).
+CXXFLAGS  := -std=c++17 -O1 -g -Wall -Wextra -Wshadow -Werror -ffp-contract=off -fsanitize=address,undefined -fno-omit-frame-pointer
 LDFLAGS   := -fsanitize=address,undefined
 
 .PHONY: test build image flash test-blob flash-blob clean
