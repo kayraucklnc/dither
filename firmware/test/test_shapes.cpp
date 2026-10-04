@@ -1,5 +1,6 @@
 // Expected pictures are worked out by hand from format.md §4.
 #include "../src/runtime/elements.h"
+#include "../src/runtime/chart.h"
 #include "../src/runtime/program.h"
 #include "../src/runtime/shapes.h"
 #include "../src/runtime/timezone.h"
@@ -377,4 +378,74 @@ TEST(chart_area_columns_between_crowded_points) {
   Framebuffer fb = drawn(3, 5, R"({"t":"chart","x":0,"y":0,"w":3,"h":5,"v":"s.zig","kind":"area","lw":1})", v);
   CHECK(fb.get(0, 4) && fb.get(2, 4));
   CHECK(testutil::countInk(fb) > 0);
+}
+
+TEST(catmull_rom_rows) {
+  // Points (0, 10), (4, 0), (8, 10): the first segment, P0 duplicated.
+  // Worked by hand: t = 1/4 -> v = 15.46875, 1/2 -> 8.75, 3/4 -> 2.65625.
+  CHECK_EQ(catmullRomRow(0, 0, 4, 10, 10, 0, 10, 0, 10), int64_t{10});
+  CHECK_EQ(catmullRomRow(1, 0, 4, 10, 10, 0, 10, 0, 10), int64_t{8});   // 7.734375
+  CHECK_EQ(catmullRomRow(2, 0, 4, 10, 10, 0, 10, 0, 10), int64_t{4});   // 4.375
+  CHECK_EQ(catmullRomRow(3, 0, 4, 10, 10, 0, 10, 0, 10), int64_t{1});   // 1.328125
+  CHECK_EQ(catmullRomRow(4, 0, 4, 10, 10, 0, 10, 0, 10), int64_t{0});
+  // Halves round away from zero: v/2 = -0.5 and +0.5.
+  CHECK_EQ(catmullRomRow(2, 0, 4, 0, 0, 0, 8, -10, 10), int64_t{-1});
+  CHECK_EQ(catmullRomRow(2, 0, 4, 0, 0, 0, -8, -10, 10), int64_t{1});
+  // Overshoot is clamped to the chart: a step 0,0 -> 10 dips to -1 first.
+  CHECK_EQ(catmullRomRow(2, 0, 4, 0, 0, 0, 10, -10, 10), int64_t{-1});
+  CHECK_EQ(catmullRomRow(2, 0, 4, 0, 0, 0, 10, 0, 10), int64_t{0});
+  CHECK_EQ(catmullRomRow(2, 0, 4, 10, 10, 10, 0, 0, 10), int64_t{10});
+  // Equal x: the point's own row, clamped.
+  CHECK_EQ(catmullRomRow(5, 5, 5, 0, 7, 3, 0, 0, 10), int64_t{7});
+  CHECK_EQ(catmullRomRow(5, 5, 5, 0, 70, 3, 0, 0, 10), int64_t{10});
+}
+
+namespace {
+
+Framebuffer joined(int fw, int fh, const std::vector<int64_t>& rows, int64_t lw, bool shade, int64_t floor) {
+  Framebuffer fb(fw, fh);
+  Canvas c(fb, true);
+  static const int kBayer[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
+  if (shade) {
+    for (int64_t px = 0; px < static_cast<int64_t>(rows.size()); ++px) {
+      for (int64_t py = rows[static_cast<size_t>(px)] + 1; py < floor; ++py) {
+        int64_t level = 2 + (8 * (floor - py)) / std::max<int64_t>(1, floor - rows[static_cast<size_t>(px)]);
+        if (kBayer[py & 3][px & 3] < level) c.plot(px, py);
+      }
+    }
+  }
+  for (size_t i = 1; i < rows.size(); ++i) drawLine(c, static_cast<int64_t>(i) - 1, rows[i - 1], static_cast<int64_t>(i), rows[i], lw);
+  return fb;
+}
+
+}  // namespace
+
+TEST(chart_smooth_line_and_area) {
+  ValueStore v;
+  v.set("s.peak", Value::series({0, 10, 0}));  // rows 10, 0, 10 at x 0, 4, 8
+  const std::vector<int64_t> rows = {10, 8, 4, 1, 0, 1, 4, 8, 10};  // hand-computed, symmetric
+  CHECK_EQ(all(drawn(9, 11, R"({"t":"chart","x":0,"y":0,"w":9,"h":11,"v":"s.peak","kind":"line","smooth":true,"lw":1})", v)),
+           all(joined(9, 11, rows, 1, false, 11)));
+  CHECK_EQ(all(drawn(9, 11, R"({"t":"chart","x":0,"y":0,"w":9,"h":11,"v":"s.peak","kind":"line","smooth":true,"lw":2})", v)),
+           all(joined(9, 11, rows, 2, false, 11)));
+  CHECK_EQ(all(drawn(9, 11, R"({"t":"chart","x":0,"y":0,"w":9,"h":11,"v":"s.peak","kind":"area","smooth":true,"lw":1})", v)),
+           all(joined(9, 11, rows, 1, true, 11)));
+  // smooth is ignored for bars and steps, and one point draws nothing.
+  CHECK_EQ(all(drawn(9, 11, R"({"t":"chart","x":0,"y":0,"w":9,"h":11,"v":"s.peak","kind":"steps","smooth":true,"lw":1})", v)),
+           all(drawn(9, 11, R"({"t":"chart","x":0,"y":0,"w":9,"h":11,"v":"s.peak","kind":"steps","lw":1})", v)));
+  v.set("s.one", Value::series({3}));
+  CHECK_EQ(testutil::countInk(drawn(9, 11, R"({"t":"chart","x":0,"y":0,"w":9,"h":11,"v":"s.one","kind":"area","smooth":true})", v)), 0);
+  // Overshoot stays inside the chart: a step clamps at the top and bottom rows.
+  v.set("s.step", Value::series({0, 0, 10, 10}));
+  Framebuffer fb = drawn(10, 13, R"({"t":"chart","x":0,"y":1,"w":10,"h":11,"v":"s.step","kind":"line","smooth":true,"lw":1})", v);
+  for (int x = 0; x < 10; ++x) CHECK(!fb.get(x, 0) && !fb.get(x, 12));
+}
+
+TEST(chart_smooth_crowded_columns) {
+  // More points than columns: segments of zero width use the point's row.
+  ValueStore v;
+  v.set("s.zig", Value::series({0, 4, 0, 4, 0, 4, 0}));
+  Framebuffer fb = drawn(3, 5, R"({"t":"chart","x":0,"y":0,"w":3,"h":5,"v":"s.zig","kind":"line","smooth":true,"lw":1})", v);
+  CHECK(testutil::countInk(fb) > 0);
+  CHECK_EQ(catmullRomRow(1, 1, 1, 0, 4, 0, 4, 0, 4), int64_t{4});
 }
