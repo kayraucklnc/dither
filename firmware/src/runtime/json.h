@@ -56,9 +56,12 @@ class JsonView {
  private:
   friend class JsonDoc;
   friend class JsonParser;
-  JsonView(const JsonDoc* doc, uint32_t index) : doc_(doc), index_(index) {}
+  friend class JsonText;
+  static constexpr uint32_t kNoKey = 0xFFFFFFFFu;
+  JsonView(const JsonDoc* doc, uint32_t index, uint32_t key = kNoKey) : doc_(doc), index_(index), key_(key) {}
   const JsonDoc* doc_ = nullptr;
-  uint32_t index_ = 0;
+  uint32_t index_ = 0;          // a node, or in text mode the offset of the value
+  uint32_t key_ = kNoKey;       // text mode: the offset of the member's key
 };
 
 // Where the parser reads characters from: memory, or an HTTP body.
@@ -135,7 +138,7 @@ struct JsonLimits {
   int maxDepth;           // of kept nesting; skipped parts are not limited
   size_t maxStringLength; // longer kept strings are cut (at a UTF-8 boundary); 0: no limit
 
-  static JsonLimits runtime() { return {200000, 4u << 20, 32, 0}; }
+  static JsonLimits runtime() { return {200000, 4u << 20, 64, 0}; }
   static JsonLimits response() { return {2048, 16 * 1024, 20, 256}; }
 };
 
@@ -145,13 +148,26 @@ struct JsonParseResult {
   size_t offset = 0;  // characters consumed when the error was found
 };
 
+// Two ways to hold a document:
+// - nodes, built by the streaming parser (responses, filtered): memory per
+//   kept value;
+// - text, validated once and then read in place (the runtime JSON, which sits
+//   in memory-mapped flash): no memory per value at all. Lookups scan the
+//   text, which for elements of a few hundred bytes is cheap.
 class JsonDoc {
  public:
+  JsonDoc() = default;
+  JsonDoc(const JsonDoc&) = delete;  // views point into it
+  JsonDoc& operator=(const JsonDoc&) = delete;
+
   JsonParseResult parse(CharSource& source, const JsonFilter* filter, const JsonLimits& limits);
-  // Unfiltered documents in memory (the runtime JSON, test inputs). Reserves
-  // exactly once from a quick scan, so the vectors never double while parsing.
+  // With a filter: parsed into nodes. Without: validated and copied, then
+  // read in place.
   JsonParseResult parse(std::string_view text, const JsonFilter* filter = nullptr,
                         const JsonLimits& limits = JsonLimits::runtime());
+  // Validated and read in place without a copy: `text` must outlive the doc.
+  JsonParseResult parseInPlace(std::string_view text, const JsonLimits& limits = JsonLimits::runtime());
+  bool inPlace() const { return textMode_; }
   JsonView root() const;
   size_t nodeCount() const { return nodes_.size(); }
   size_t stringBytes() const { return strings_.size(); }
@@ -162,6 +178,7 @@ class JsonDoc {
  private:
   friend class JsonView;
   friend class JsonParser;
+  friend class JsonText;
   static constexpr uint32_t kNone = 0xFFFFFFFFu;
 
   struct Node {
@@ -184,6 +201,13 @@ class JsonDoc {
   std::vector<Node> nodes_;
   std::string strings_;
   std::vector<std::optional<double>> aggregates_;
+
+  bool textMode_ = false;
+  std::string ownedText_;
+  std::string_view text_;
+  // Strings with escapes, decoded on first use (rare: JSON.stringify only
+  // escapes quotes, backslashes and control characters).
+  mutable std::vector<std::pair<uint32_t, std::string>> decoded_;
 };
 
 }  // namespace dither

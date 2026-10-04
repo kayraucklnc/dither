@@ -38,6 +38,8 @@ export type Field =
    * A choice whose options come from somewhere else — an account's calendars, say.
    * The chosen option's label is kept too, as `<key>Name`.
    */
+  /** Which linked Google accounts to show, and which calendar of each. */
+  | (FieldBase & { kind: "calendars" })
   | (FieldBase & { kind: "remote-select"; load: (env: Env, settings: Record<string, unknown>) => Promise<{ value: string; label: string }[]> });
 
 // ---------------------------------------------------------------- data
@@ -60,6 +62,15 @@ export interface SourceSpec {
    * `{ path, agg: "sum", field }` or `{ path, agg: "count" }` for a total over a list.
    */
   values: Record<string, string | { path: string; count: number } | { path: string; agg: "sum" | "count"; field?: string }>;
+}
+
+export interface MergeSpec {
+  from: string[];
+  fields: string[];
+  count: number;
+  skip?: string[];
+  sort?: string[];
+  unique?: string[];
 }
 
 /** Something a rule can check, e.g. "Rain chance today". */
@@ -178,8 +189,18 @@ export interface Extension<S extends Record<string, unknown> = Record<string, un
   size: { min: [number, number]; default: [number, number] };
   fields: Field[];
   defaults: (env: Env) => S;
-  /** What to fetch. `null` when the settings are not complete enough to ask. */
-  source?: (settings: S, env: Env) => SourceSpec | null;
+  /**
+   * What to fetch. `null` when the settings are not complete enough to ask.
+   * Several sources are named — `{ work: …, home: … }` — and their values are
+   * then keyed `work/t0`, `home/t0` everywhere (draw, facts, sample).
+   */
+  source?: (settings: S, env: Env) => SourceSpec | Record<string, SourceSpec> | null;
+  /**
+   * Lists built on the panel from several of this widget's sources — every
+   * account's calendar as one agenda. Keyed by a name its values are read
+   * under (`all/t0`); `from` names this widget's sources. See docs/format.md "Merges".
+   */
+  merges?: (settings: S, env: Env) => Record<string, MergeSpec>;
   /** Plausible values for the preview before anything has been fetched. */
   sample?: (settings: S, env: Env) => Record<string, Value>;
   facts?: (settings: S, env: Env) => Fact[];

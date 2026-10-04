@@ -9,6 +9,7 @@ import { listBoards } from "@/device";
 import { createProject, STARTERS } from "@/project/starters";
 import type { Place, Project } from "@/project/schema";
 import { builtins } from "@/runtime/values";
+import { sampleValues } from "@/compiler/sample";
 import { readProjectFile } from "@/state/storage";
 import { Button, Field, Note, TextInput } from "../kit";
 import { PlaceSearch } from "../fields/PlaceSearch";
@@ -45,9 +46,7 @@ function StarterCard({ id, name, description, selected, onSelect, place }: {
     };
   }, [id, place]);
   const values = useMemo(() => {
-    const v = builtins(now, compiled?.runtime.tz ?? "STD0");
-    for (const s of compiled?.sources ?? []) for (const [k, x] of s.sample) v.set(k, x);
-    return v;
+    return compiled ? sampleValues(compiled, now) : builtins(now, "STD0");
   }, [compiled, now]);
   return (
     <button

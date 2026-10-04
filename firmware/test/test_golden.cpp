@@ -10,7 +10,11 @@
 
 #include "../src/runtime/program.h"
 #include "../src/runtime/wake.h"
+#include "alloc_stats.h"
 #include "check.h"
+
+#include <chrono>
+#include <cstdio>
 #include "pbm.h"
 
 namespace fs = std::filesystem;
@@ -43,8 +47,14 @@ Mismatch compare(const Framebuffer& a, const Framebuffer& b) {
 std::string runFixture(const fs::path& dir, const fs::path& outDir) {
   auto blob = readFile(dir / "blob.bin");
   std::string error;
+  const size_t before = allocstats::currentBytes();
+  allocstats::resetPeak();
   auto program = Program::load({blob.data(), blob.size()}, error);
   if (!program) return "blob does not load: " + error;
+  const size_t peak = allocstats::peakBytes() - before, kept = allocstats::currentBytes() - before;
+  std::printf("  %-30s runtime JSON %6u B: heap peak %6.1f KB while loading, %6.1f KB kept\n",
+              dir.filename().string().c_str(), static_cast<unsigned>(program->header().runtimeLength),
+              static_cast<double>(peak) / 1024, static_cast<double>(kept) / 1024);
 
   auto valuesText = readFile(dir / "values.json");
   JsonDoc doc;
@@ -59,12 +69,19 @@ std::string runFixture(const fs::path& dir, const fs::path& outDir) {
   for (JsonView v = doc.root()["values"].first(); v.exists(); v = v.next()) {
     values.set(v.key(), valueFromJson(v));
   }
+  program->applyMerges(values, nowSeconds);
 
   auto expected = testutil::readPbm((dir / "expected.pbm").string());
   if (!expected) return "expected.pbm missing or not P4";
 
-  Framebuffer actual;
+  Framebuffer actual(program->width(), program->height());
+  const size_t beforeRender = allocstats::currentBytes();
+  allocstats::resetPeak();
+  const auto start = std::chrono::steady_clock::now();
   program->render(program->chooseScreen(values, nowSeconds), values, nowSeconds, actual);
+  const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+  std::printf("  %-30s render: heap peak %6.1f KB above the framebuffer, %.1f ms on this host\n", "",
+              static_cast<double>(allocstats::peakBytes() - beforeRender) / 1024, ms);
   if (actual.width() != expected->width() || actual.height() != expected->height()) {
     return "size " + std::to_string(actual.width()) + "x" + std::to_string(actual.height()) + " != expected " +
            std::to_string(expected->width()) + "x" + std::to_string(expected->height());

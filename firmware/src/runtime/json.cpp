@@ -1,5 +1,7 @@
 #include "json.h"
 
+#include "json_text.h"
+
 #include <cmath>
 #include <cstdlib>
 #include <string>
@@ -7,51 +9,64 @@
 namespace dither {
 
 // ---- JsonView ---------------------------------------------------------------
+// Node mode reads doc_->nodes_; text mode hands off to JsonText.
 
 JsonType JsonView::type() const {
-  return doc_ ? doc_->nodes_[index_].type : JsonType::Null;
+  if (!doc_) return JsonType::Null;
+  return doc_->textMode_ ? JsonText::type(*this) : doc_->nodes_[index_].type;
 }
 
 double JsonView::number(double fallback) const {
-  return isNumber() ? doc_->nodes_[index_].number : fallback;
+  if (!isNumber()) return fallback;
+  return doc_->textMode_ ? JsonText::number(*this) : doc_->nodes_[index_].number;
 }
 
 bool JsonView::boolean(bool fallback) const {
-  return isBool() ? doc_->nodes_[index_].boolean : fallback;
+  if (!isBool()) return fallback;
+  return doc_->textMode_ ? JsonText::boolean(*this) : doc_->nodes_[index_].boolean;
 }
 
 int JsonView::integer(int fallback) const {
   if (!isNumber()) return fallback;
-  double v = doc_->nodes_[index_].number;
+  double v = number();
   if (!std::isfinite(v) || v > 2147483647.0 || v < -2147483648.0) return fallback;
   return static_cast<int>(v);
 }
 
 std::string_view JsonView::string() const {
   if (!isString()) return {};
+  if (doc_->textMode_) return JsonText::stringAt(*doc_, index_);
   const auto& n = doc_->nodes_[index_];
   return std::string_view(doc_->strings_).substr(n.str.offset, n.str.length);
 }
 
 size_t JsonView::size() const {
   if (!isArray() && !isObject()) return 0;
+  if (doc_->textMode_) {
+    size_t n = 0;
+    for (JsonView c = first(); c.exists(); c = c.next()) ++n;
+    return n;
+  }
   return doc_->nodes_[index_].kids.count;
 }
 
 JsonView JsonView::first() const {
   if (!isArray() && !isObject()) return {};
+  if (doc_->textMode_) return JsonText::first(*this);
   uint32_t f = doc_->nodes_[index_].kids.first;
   return f == JsonDoc::kNone ? JsonView() : JsonView(doc_, f);
 }
 
 JsonView JsonView::next() const {
   if (!doc_) return {};
+  if (doc_->textMode_) return JsonText::next(*this);
   uint32_t n = doc_->nodes_[index_].next;
   return n == JsonDoc::kNone ? JsonView() : JsonView(doc_, n);
 }
 
 std::string_view JsonView::key() const {
   if (!doc_) return {};
+  if (doc_->textMode_) return key_ == kNoKey ? std::string_view() : JsonText::stringAt(*doc_, key_);
   const auto& n = doc_->nodes_[index_];
   return std::string_view(doc_->strings_).substr(n.keyOffset, n.keyLength);
 }

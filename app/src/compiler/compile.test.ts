@@ -5,6 +5,7 @@ import type { Font } from "@/runtime/assets";
 import { decodeBlob } from "@/runtime/blob";
 import { renderScreen, AssetStore } from "@/runtime/render";
 import { builtins } from "@/runtime/values";
+import { sampleValues } from "./sample";
 import { compile, type CompileDeps } from "./index";
 
 let deps: CompileDeps;
@@ -23,7 +24,7 @@ describe("compile", () => {
     const blob = decodeBlob(out.blob);
     expect(blob.runtime.screens).toHaveLength(project.screens.length);
     const values = builtins(Date.UTC(2026, 9, 4, 13, 0) / 1000, out.runtime.tz);
-    for (const s of out.sources) for (const [k, v] of s.sample) values.set(k, v);
+    for (const [k, v] of sampleValues(out, Math.floor(Date.now() / 1000))) if (!k.startsWith("clock.") && !k.startsWith("device.")) values.set(k, v);
     const store = new AssetStore(blob.bytes, blob.runtime.assets);
     out.runtime.screens.forEach((_, i) => {
       const fb = renderScreen(out.runtime, store, i, values, Date.UTC(2026, 9, 4, 13, 0) / 1000);
@@ -58,7 +59,7 @@ describe("compile", () => {
     expect(trimmed.blob.length).toBeLessThanOrEqual(full.blob.length);
     for (const now of [Date.UTC(2026, 9, 4, 13, 0) / 1000, Date.UTC(2026, 1, 28, 21, 59) / 1000]) {
       const values = builtins(now, full.runtime.tz);
-      for (const s of full.sources) for (const [k, v] of s.sample) values.set(k, v);
+      for (const [k, v] of sampleValues(full, now)) if (!k.startsWith("clock.") && !k.startsWith("device.")) values.set(k, v);
       full.runtime.screens.forEach((_, i) => {
         const a = renderScreen(full.runtime, new AssetStore(full.blob, full.runtime.assets), i, values, now);
         const b = renderScreen(trimmed.runtime, new AssetStore(trimmed.blob, trimmed.runtime.assets), i, values, now);

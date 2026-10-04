@@ -61,6 +61,8 @@ export const googleLinkSchema = z.object({
   clientSecret: z.string(),
   refreshToken: z.string(),
   email: z.string().default(""),
+  /** What the panel calls this account, e.g. "Work". */
+  label: z.string().max(24).default(""),
 });
 
 export const accountsSchema = z.object({

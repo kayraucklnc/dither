@@ -40,7 +40,7 @@ function formatChars(f: Format | undefined, locale: Locale): Charset {
     for (const list of [locale.days, locale.daysShort, locale.months, locale.monthsShort]) for (const name of list) add(out, name);
     return withUpper(out, f);
   }
-  if (f.until || f.scale !== undefined || f.add !== undefined) {
+  if (f.until || f.days || f.scale !== undefined || f.add !== undefined) {
     // A number with no fixed decimals prints automatically.
     add(out, `${DIGITS}-.`);
     return out;
@@ -65,9 +65,13 @@ function partChars(p: Part, locale: Locale): Charset {
 }
 
 /** For each font asset index, the codepoints its texts can need. */
+function flatten(elements: readonly Element[]): Element[] {
+  return elements.flatMap((el) => (el.t === "group" ? flatten(el.els) : [el]));
+}
+
 export function fontCharsets(elements: readonly Element[], locale: Locale): Map<number, Charset> {
   const out = new Map<number, Charset>();
-  for (const el of elements) {
+  for (const el of flatten(elements)) {
     if (el.t !== "text") continue;
     let cur = out.get(el.font) ?? new Set<number>();
     for (const p of el.parts) {

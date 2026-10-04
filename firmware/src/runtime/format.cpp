@@ -34,6 +34,17 @@ MaybeValue applyShift(const Value& v, JsonView shift, const FormatContext& ctx) 
   return Value::number(instant);
 }
 
+// Local calendar days from today's date to the value's date.
+MaybeValue applyDays(const Value& v, const FormatContext& ctx) {
+  if (!ctx.now) return std::nullopt;
+  auto t = parseTimeValue(v, ctx.now, *ctx.tz);
+  if (!t) return std::nullopt;
+  const CivilTime day = toFields(*t, *ctx.tz);
+  const CivilTime today = ctx.tz->toLocal(*ctx.now);
+  return Value::number(static_cast<double>(daysFromCivil(day.year, day.month, day.day) -
+                                           daysFromCivil(today.year, today.month, today.day)));
+}
+
 MaybeValue applyUntil(const Value& v, const FormatContext& ctx) {
   if (!ctx.now) return std::nullopt;
   auto t = parseTimeValue(v, ctx.now, *ctx.tz);
@@ -104,7 +115,11 @@ MaybeValue runPipeline(const Value& input, JsonView f, const FormatContext& ctx)
 std::optional<Value> applyValueSteps(const Value& input, JsonView f, const FormatContext& ctx) {
   MaybeValue v = nonNull(input);
   if (v && f["shift"].isObject()) v = applyShift(*v, f["shift"], ctx);
-  if (v && f["until"].boolean(false)) v = applyUntil(*v, ctx);
+  if (v && f["days"].boolean(false)) {
+    v = applyDays(*v, ctx);  // and `until` is ignored
+  } else if (v && f["until"].boolean(false)) {
+    v = applyUntil(*v, ctx);
+  }
   if (v) v = applyArithmetic(*v, f);
   if (v && f["steps"].isObject()) v = applySteps(*v, f["steps"]);
   if (v && f["map"].isObject()) v = applyMap(*v, f["map"]);

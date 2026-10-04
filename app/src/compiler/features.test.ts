@@ -4,7 +4,9 @@ import { createProject } from "@/project/starters";
 import { parseProject, type Project } from "@/project/schema";
 import { AssetStore, formatContext, render } from "@/runtime/render";
 import { evaluate } from "@/runtime/conditions";
+import { applyMerges } from "@/runtime/merge";
 import { builtins } from "@/runtime/values";
+import { sampleValues } from "./sample";
 import { compile, type CompileDeps } from "./index";
 import { factCatalog, scoped } from "./facts";
 import { activeAlert } from "./alerts";
@@ -14,7 +16,7 @@ beforeAll(async () => {
   deps = { library: nodeLibrary, fonts: await loadFonts(), picture: async () => null, boardPanel: () => ({ width: 800, height: 480 }) };
 });
 
-const account = { id: "me@example.com", clientId: "id.apps.googleusercontent.com", clientSecret: "shh", refreshToken: "1//refresh", email: "me@example.com" };
+const account = { id: "me@example.com", clientId: "id.apps.googleusercontent.com", clientSecret: "shh", refreshToken: "1//refresh", email: "me@example.com", label: "Personal" };
 const NOW = Date.UTC(2026, 9, 5, 6, 0) / 1000; // Monday 08:00 in Rome
 
 function project(): Project {
@@ -47,10 +49,10 @@ describe("transit, calendar and alerts", () => {
   it("puts the first alert that holds on top of the screen", async () => {
     const p = project();
     const out = await compile(p, deps);
-    const ids = new Map(out.sources.flatMap((s) => s.widgetIds.map((w) => [w, s.source.id] as const)));
-    const catalog = factCatalog(p, ids);
+    const ids = new Map([...out.widgetSources].map(([w, m]) => [w, m[""]] as const));
+    const catalog = factCatalog(p, out.widgetSources);
     const values = builtins(NOW, out.runtime.tz);
-    for (const s of out.sources) for (const [k, v] of s.sample) values.set(k, v);
+    for (const [k, v] of sampleValues(out, Math.floor(Date.now() / 1000))) if (!k.startsWith("clock.") && !k.startsWith("device.")) values.set(k, v);
     const ctx = formatContext(out.runtime, NOW);
     // The sample has a cancelled train and a 7-minute delay: the train alert wins over rain.
     values.set(`${ids.get("sky")}.rain`, 80);
@@ -73,19 +75,22 @@ describe("transit, calendar and alerts", () => {
   it("knows whether you are in a meeting", async () => {
     const p = project();
     const out = await compile(p, deps);
-    const ids = new Map(out.sources.flatMap((s) => s.widgetIds.map((w) => [w, s.source.id] as const)));
-    const busy = factCatalog(p, ids).find((f) => f.id === "cal:busy")!;
-    const src = ids.get("cal")!;
+    const busy = factCatalog(p, out.widgetSources).find((f) => f.id === "cal:busy")!;
+    const lanes = out.widgetSources.get("cal")!;
+    const src = lanes.c0;
     const values = builtins(NOW, out.runtime.tz);
     const ctx = formatContext(out.runtime, NOW);
     if (busy.type !== "flag") throw new Error("busy is a flag");
-    const test = scoped(busy.test, src);
-    values.set(`${src}.s0`, "2026-10-05T07:30:00+02:00");
-    values.set(`${src}.e0`, "2026-10-05T08:30:00+02:00");
-    expect(evaluate(test, values, ctx)).toBe(true);
-    values.set(`${src}.s0`, "2026-10-05T08:30:00+02:00");
-    values.set(`${src}.e0`, "2026-10-05T09:00:00+02:00");
-    expect(evaluate(test, values, ctx)).toBe(false);
+    const test = scoped(busy.test, lanes);
+    const at = (start: string, end: string) => {
+      values.set(`${src}.t0`, "Standup");
+      values.set(`${src}.s0`, start);
+      values.set(`${src}.e0`, end);
+      applyMerges(out.runtime.merges, values, ctx);
+      return evaluate(test, values, ctx);
+    };
+    expect(at("2026-10-05T07:30:00+02:00", "2026-10-05T08:30:00+02:00")).toBe(true);
+    expect(at("2026-10-05T08:30:00+02:00", "2026-10-05T09:00:00+02:00")).toBe(false);
   });
 
   it("asks Stripe for the period's list and totals it on the panel", async () => {
@@ -100,21 +105,27 @@ describe("transit, calendar and alerts", () => {
     expect(src.values).toContainEqual({ key: "count", path: "data", agg: "count" });
   });
 
-  it("reads each calendar from the account its widget names", async () => {
+  it("reads every linked account into one agenda, or the ones a widget picks", async () => {
     const p = createProject({ starter: "blank", timezone: "Europe/Rome", language: "en", units: "metric", place: null });
-    const work = { ...account, id: "work@example.com", email: "work@example.com", refreshToken: "1//work" };
+    const work = { ...account, id: "work@example.com", email: "work@example.com", refreshToken: "1//work", label: "Work" };
     p.accounts = { google: [account, work], stripe: null };
     p.screens[0].widgets = [
-      { id: "home", type: "google-calendar", x: 0, y: 0, w: 8, h: 6, frame: "none", settings: {} },
-      { id: "job", type: "google-calendar", x: 8, y: 0, w: 8, h: 6, frame: "none", settings: { account: "work@example.com" } },
+      { id: "both", type: "google-calendar", x: 0, y: 0, w: 12, h: 8, frame: "none", settings: {} },
+      { id: "job", type: "google-calendar", x: 12, y: 0, w: 8, h: 8, frame: "none", settings: { lanes: [{ account: "work@example.com", calendar: "team@group", name: "Team" }] } },
     ];
     const out = await compile(p, deps);
-    const tokens = out.runtime.sources.map((s) => s.auth?.form.find(([k]) => k === "refresh_token")?.[1]).sort();
-    expect(tokens).toEqual(["1//refresh", "1//work"]);
+    expect(out.problems).toEqual([]);
+    expect(Object.keys(out.widgetSources.get("both")!)).toEqual(["c0", "c1", "agenda", "allday"]);
+    expect(out.runtime.merges?.find((m) => m.id === out.widgetSources.get("both")!.agenda)?.from).toHaveLength(2);
+    const token = (id: string) => out.runtime.sources.find((s) => s.id === id)?.auth?.form.find(([k]) => k === "refresh_token")?.[1];
+    const both = out.widgetSources.get("both")!;
+    expect([token(both.c0), token(both.c1)]).toEqual(["1//refresh", "1//work"]);
+    const team = out.runtime.sources.find((s) => s.id === out.widgetSources.get("job")!.c0)!;
+    expect(team.url).toContain("/calendars/team%40group/events");
   });
 
   it("opens projects saved with a single Google account", () => {
-    const old = { ...createProject({ starter: "blank", timezone: "UTC", language: "en", units: "metric", place: null }), accounts: { google: { clientId: "c", clientSecret: "s", refreshToken: "r", email: "me@x" }, stripe: null } };
-    expect(parseProject(JSON.parse(JSON.stringify(old))).accounts.google).toEqual([{ id: "me@x", clientId: "c", clientSecret: "s", refreshToken: "r", email: "me@x" }]);
+    const old = { ...createProject({ starter: "blank", timezone: "UTC", language: "en", units: "metric", place: null }), accounts: { google: { clientId: "c", clientSecret: "s", refreshToken: "r", email: "me@x" }, stripe: null } } as unknown as Project;
+    expect(parseProject(JSON.parse(JSON.stringify(old))).accounts.google).toEqual([{ id: "me@x", clientId: "c", clientSecret: "s", refreshToken: "r", email: "me@x", label: "" }]);
   });
 });

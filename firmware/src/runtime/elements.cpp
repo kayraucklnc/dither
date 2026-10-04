@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "assets.h"
+#include "noinline.h"
 #include "condition.h"
 #include "shapes.h"
 #include "text.h"
@@ -34,7 +35,7 @@ const Value& reference(const RenderContext& ctx, JsonView el) {
   return ctx.values->get(el["v"].string());
 }
 
-void drawRect(const Canvas& c, JsonView el) {
+DITHER_NOINLINE void drawRect(const Canvas& c, JsonView el) {
   int64_t x = field(el, "x", 0), y = field(el, "y", 0), w = field(el, "w", 0), h = field(el, "h", 0);
   int64_t r = field(el, "r", 0);
   if (el["fill"].boolean(true)) {
@@ -44,7 +45,7 @@ void drawRect(const Canvas& c, JsonView el) {
   }
 }
 
-void drawCircleElement(const Canvas& c, JsonView el) {
+DITHER_NOINLINE void drawCircleElement(const Canvas& c, JsonView el) {
   int64_t x = field(el, "x", 0), y = field(el, "y", 0), r = field(el, "r", 0);
   if (el["fill"].boolean(true)) {
     fillCircle(c, x, y, r);
@@ -53,11 +54,11 @@ void drawCircleElement(const Canvas& c, JsonView el) {
   }
 }
 
-void drawLineElement(const Canvas& c, JsonView el) {
+DITHER_NOINLINE void drawLineElement(const Canvas& c, JsonView el) {
   drawLine(c, field(el, "x1", 0), field(el, "y1", 0), field(el, "x2", 0), field(el, "y2", 0), field(el, "w", 1));
 }
 
-void drawHand(const Canvas& c, JsonView el, const RenderContext& ctx) {
+DITHER_NOINLINE void drawHand(const Canvas& c, JsonView el, const RenderContext& ctx) {
   const Value& v = reference(ctx, el);
   double max = el["max"].number(0);
   if (!v.isNumber() || !(max > 0)) return;
@@ -69,7 +70,7 @@ void drawHand(const Canvas& c, JsonView el, const RenderContext& ctx) {
   drawLine(c, x, y, x + static_cast<int64_t>(ex), y - static_cast<int64_t>(ey), field(el, "w", 1));
 }
 
-void drawBar(const Canvas& c, JsonView el, const RenderContext& ctx) {
+DITHER_NOINLINE void drawBar(const Canvas& c, JsonView el, const RenderContext& ctx) {
   const Value& v = reference(ctx, el);
   JsonView minV = el["min"], maxV = el["max"];
   if (!v.isNumber() || !minV.isNumber() || !maxV.isNumber() || maxV.number() <= minV.number()) return;
@@ -84,7 +85,7 @@ void drawBar(const Canvas& c, JsonView el, const RenderContext& ctx) {
   }
 }
 
-void drawChart(const Canvas& c, JsonView el, const RenderContext& ctx) {
+DITHER_NOINLINE void drawChart(const Canvas& c, JsonView el, const RenderContext& ctx) {
   const Value& v = reference(ctx, el);
   if (!v.isSeries() || v.asSeries().empty()) return;
   const std::vector<double>& s = v.asSeries();
@@ -121,13 +122,13 @@ void drawChart(const Canvas& c, JsonView el, const RenderContext& ctx) {
   }
 }
 
-void drawBitmapElement(const Canvas& c, JsonView el, const RenderContext& ctx) {
+DITHER_NOINLINE void drawBitmapElement(const Canvas& c, JsonView el, const RenderContext& ctx) {
   const ByteSpan* a = asset(ctx, el["a"]);
   if (!a) return;
   if (auto bmp = Bitmap::parse(*a)) drawBitmap(c, *bmp, field(el, "x", 0), field(el, "y", 0));
 }
 
-void drawIcon(const Canvas& c, JsonView el, const RenderContext& ctx) {
+DITHER_NOINLINE void drawIcon(const Canvas& c, JsonView el, const RenderContext& ctx) {
   std::string name = formatValue(reference(ctx, el), el["f"], ctx.format);
   const ByteSpan* a = asset(ctx, el["set"][name]);
   if (!a) return;
@@ -138,7 +139,7 @@ void drawIcon(const Canvas& c, JsonView el, const RenderContext& ctx) {
   drawBitmap(clipped, *bmp, x + floorDiv(w - bmp->width, 2), y + floorDiv(h - bmp->height, 2));
 }
 
-void drawText(const Canvas& c, JsonView el, const RenderContext& ctx) {
+DITHER_NOINLINE void drawText(const Canvas& c, JsonView el, const RenderContext& ctx) {
   const ByteSpan* a = asset(ctx, el["font"]);
   if (!a) return;
   auto font = Font::parse(*a);
@@ -173,11 +174,19 @@ std::string buildText(JsonView parts, const RenderContext& ctx) {
   return out;
 }
 
-void drawElement(Framebuffer& fb, JsonView el, const RenderContext& ctx) {
+void drawElement(Framebuffer& fb, JsonView el, const RenderContext& ctx, int groupDepth) {
   if (!evalCondition(el["when"], *ctx.values, ctx.format)) return;
+  std::string_view t = el["t"].string();
+  if (t == "group") {
+    // Groups nest at most kMaxGroupDepth deep; a deeper one is empty.
+    if (groupDepth >= kMaxGroupDepth) return;
+    for (JsonView child = el["els"].first(); child.exists(); child = child.next()) {
+      drawElement(fb, child, ctx, groupDepth + 1);
+    }
+    return;
+  }
   const bool black = !(el["c"].isNumber() && el["c"].number() == 0);
   const Canvas c(fb, black);
-  std::string_view t = el["t"].string();
   if (t == "rect") drawRect(c, el);
   else if (t == "circle") drawCircleElement(c, el);
   else if (t == "line") drawLineElement(c, el);

@@ -6,7 +6,8 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { decodeBlob } from "./blob";
 import { fromPbm } from "./pbm";
-import { render } from "./render";
+import { applyMerges } from "./merge";
+import { formatContext, render } from "./render";
 import type { Value } from "./types";
 import { builtins } from "./values";
 
@@ -20,6 +21,7 @@ describe.skipIf(names.length === 0)("golden fixtures", () => {
     const all = builtins(now, blob.runtime.tz);
     for (const k of ["device.battery", "device.usb", "device.online", "device.rssi"]) all.set(k, null);
     for (const [k, v] of Object.entries(values)) all.set(k, v);
+    applyMerges(blob.runtime.merges, all, formatContext(blob.runtime, now, all));
     const { fb } = render(blob.runtime, blob.bytes, all, now);
     const expected = fromPbm(new Uint8Array(readFileSync(`${root}${name}/expected.pbm`)));
     let diff = 0;
