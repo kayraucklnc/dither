@@ -19,6 +19,43 @@ export interface Lane {
 interface Settings extends Record<string, unknown> {
   /** Empty means every linked account's main calendar. */
   lanes: Lane[];
+  look: "agenda" | "list" | "next";
+  /** Days beyond today to show: 0 today only, 1 through tomorrow, 6 a week. */
+  ahead: string;
+  header: boolean;
+  places: boolean;
+  ends: boolean;
+  tags: boolean;
+  allday: boolean;
+  hours: "24" | "12";
+  density: "roomy" | "dense";
+}
+
+/** Everything drawing needs from the settings, worked out once. */
+interface Opt {
+  hm: Format;
+  hmSample: string;
+  /** Account names per merge position; empty when tags are off or there is one account. */
+  labels: string[];
+  places: boolean;
+  ends: boolean;
+  allday: boolean;
+  ahead: number;
+  rowMin: number;
+}
+
+function optOf(s: Settings, labels: string[]): Opt {
+  const twelve = s.hours === "12";
+  return {
+    hm: { time: twelve ? "h:mm A" : "HH:mm" },
+    hmSample: twelve ? "12:00 PM" : "88:88",
+    labels: s.tags && labels.length > 1 ? labels : [],
+    places: s.places,
+    ends: s.ends,
+    allday: s.allday,
+    ahead: Number(s.ahead) || 0,
+    rowMin: s.density === "dense" ? 34 : 46,
+  };
 }
 
 /** The account a lane reads: the one it names, else the first linked. */
@@ -45,12 +82,14 @@ const laneTitle = (lane: Lane, env: Env) => {
 // `allday/<field><n>` for all-day ones, duplicates dropped. Fields: title t,
 // start s, all-day date a, end e, place w; `from<n>` says which account.
 
-const HHMM: Format = { time: "HH:mm" };
 const AGENDA = 8;
 const ALLDAY = 3;
 const g = (list: string, field: string, n: number) => `${list}/${field}${n}`;
 
 const has = (n: number, list = "agenda"): Condition => ({ v: g(list, "t", n), op: "present" });
+/** Present, and within the days the widget looks ahead. */
+const within = (n: number, o: Opt, list = "agenda"): Condition =>
+  ({ all: [has(n, list), { v: g(list, list === "allday" ? "a" : "s", n), f: { days: true }, op: "le", x: o.ahead }] });
 const started = (n: number): Condition => ({ v: g("agenda", "s", n), f: { until: true }, op: "absent" });
 const ongoing = (n: number): Condition => ({ all: [has(n), started(n), { v: g("agenda", "e", n), f: { until: true }, op: "present" }] });
 const onDay = (n: number, day: number, list = "agenda", field = "s"): Condition => ({ v: g(list, field, n), f: { days: true }, op: "eq", x: day });
@@ -66,9 +105,13 @@ function at(d: Draw, content: string | Part | (string | Part)[], x: number, base
 }
 
 /** "Work · Room 4.2": which account (when there is more than one) and where. */
-function detail(d: Draw, n: number, labels: string[], x: number, baseline: number, w: number, size: number, white = false) {
-  const who: Format = { map: { k: labels.map((_, i) => i), o: labels } };
-  const account = labels.length > 1 ? d.value(g("agenda", "from", n), who) : null;
+function detail(d: Draw, n: number, o: Opt, x: number, baseline: number, w: number, size: number, white = false) {
+  const who: Format = { map: { k: o.labels.map((_, i) => i), o: o.labels } };
+  const account = o.labels.length ? d.value(g("agenda", "from", n), who) : null;
+  if (!o.places) {
+    if (account) at(d, [account], x, baseline, w, size, 400, { white });
+    return;
+  }
   const place = d.value(g("agenda", "w", n));
   d.when({ v: g("agenda", "w", n), op: "present" }, () => at(d, account ? [account, " · ", place] : [place], x, baseline, w, size, 400, { white }));
   if (account) d.when({ v: g("agenda", "w", n), op: "absent" }, () => at(d, [account], x, baseline, w, size, 400, { white }));
@@ -89,7 +132,7 @@ function dateHeader(d: Draw, x: number, y: number, w: number, h: number) {
 }
 
 /** The event that matters most — on now, or next — as a black card: when, what, where. */
-function hero(d: Draw, labels: string[], x: number, y: number, w: number, h: number) {
+function hero(d: Draw, o: Opt, x: number, y: number, w: number, h: number) {
   d.rect({ x, y, w, h }, { radius: 10 });
   const pad = Math.round(Math.min(h * 0.1, 20));
   const iw = w - pad * 2;
@@ -106,21 +149,23 @@ function hero(d: Draw, labels: string[], x: number, y: number, w: number, h: num
   const top = y + Math.max(pad, Math.round((h - block) / 2));
   const kb = top + km.ascent;
 
-  d.when(not(has(0)), () => at(d, "Nothing else on the calendar", x + pad, y + Math.round(h / 2 + kicker * 0.3), iw, kicker, 700, { white: true }));
-  d.when(ongoing(0), () => at(d, ["Now · until ", d.value(g("agenda", "e", 0), HHMM)], x + pad, kb, iw, kicker, 700, { white: true }));
+  d.when(not(within(0, o)), () => at(d, "Nothing else on the calendar", x + pad, y + Math.round(h / 2 + kicker * 0.3), iw, kicker, 700, { white: true }));
+  d.when(ongoing(0), () => at(d, ["Now · until ", d.value(g("agenda", "e", 0), o.hm)], x + pad, kb, iw, kicker, 700, { white: true }));
   d.when(and(has(0), not(started(0)), onDay(0, 0)), () => {
     d.when({ v: g("agenda", "s", 0), f: { until: true }, op: "lt", x: 60 }, () =>
       at(d, ["Next · in ", d.value(g("agenda", "s", 0), { until: true, num: { d: 0 } }), " min"], x + pad, kb, iw, kicker, 700, { white: true }));
     d.when({ v: g("agenda", "s", 0), f: { until: true }, op: "ge", x: 60 }, () =>
-      at(d, ["Next · ", d.value(g("agenda", "s", 0), HHMM)], x + pad, kb, iw, kicker, 700, { white: true }));
+      at(d, ["Next · ", d.value(g("agenda", "s", 0), o.hm)], x + pad, kb, iw, kicker, 700, { white: true }));
   });
-  d.when(and(has(0), onDay(0, 1)), () => at(d, ["Tomorrow · ", d.value(g("agenda", "s", 0), HHMM)], x + pad, kb, iw, kicker, 700, { white: true }));
-  d.when(and(has(0), not(onDay(0, 0)), not(onDay(0, 1))), () =>
-    at(d, [d.value(g("agenda", "s", 0), { time: "dddd D · HH:mm" })], x + pad, kb, iw, kicker, 700, { white: true }));
+  d.when(and(within(0, o), onDay(0, 1)), () => at(d, ["Tomorrow · ", d.value(g("agenda", "s", 0), o.hm)], x + pad, kb, iw, kicker, 700, { white: true }));
+  d.when(and(within(0, o), not(onDay(0, 0)), not(onDay(0, 1))), () =>
+    at(d, [d.value(g("agenda", "s", 0), { time: `dddd D · ${o.hm.time}` })], x + pad, kb, iw, kicker, 700, { white: true }));
 
   const titleY = top + km.lineHeight + 6;
-  d.text(d.value(g("agenda", "t", 0)), { x: x + pad, y: titleY, w: iw, h: tm.lineHeight * lines, size: title, weight: 700, wrap: lines > 1, lines, white: true });
-  detail(d, 0, labels, x + pad, titleY + tm.lineHeight * lines + 6 + sm.ascent, iw, small, true);
+  d.when(within(0, o), () => {
+    d.text(d.value(g("agenda", "t", 0)), { x: x + pad, y: titleY, w: iw, h: tm.lineHeight * lines, size: title, weight: 700, wrap: lines > 1, lines, white: true });
+    detail(d, 0, o, x + pad, titleY + tm.lineHeight * lines + 6 + sm.ascent, iw, small, true);
+  });
 }
 
 interface RowStyle {
@@ -131,38 +176,46 @@ interface RowStyle {
 }
 
 /** One later event on the timeline: when on the left, what and where on the right. */
-function row(d: Draw, n: number, labels: string[], x: number, y: number, w: number, h: number, st: RowStyle) {
+function row(d: Draw, n: number, o: Opt, x: number, y: number, w: number, h: number, st: RowStyle) {
   const textX = st.rule + 12;
   const textW = x + w - textX;
   const mid = y + Math.round(h / 2);
   const top = mid - Math.round(st.size * 0.1);
   const low = top + d.metrics(st.small).lineHeight;
-  d.when(has(n), () => {
+  d.when(within(n, o), () => {
     d.when(onDay(n, 0), () => {
-      at(d, d.value(g("agenda", "s", n), HHMM), x, top, st.timeW, st.size, 700);
-      at(d, d.value(g("agenda", "e", n), { ...HHMM, fallback: "" }), x, low, st.timeW, st.small, 400);
+      // On now: said so, with when it ends, and the dot ringed.
+      d.when(ongoing(n), () => {
+        at(d, "Now", x, top, st.timeW, st.size, 700);
+        at(d, ["until ", d.value(g("agenda", "e", n), o.hm)], x, low, st.timeW, st.small, 400);
+        d.circle(st.rule, mid, Math.max(5, Math.round(st.size * 0.34)), { fill: false, stroke: 2 });
+      });
+      d.when(not(ongoing(n)), () => {
+        at(d, d.value(g("agenda", "s", n), o.hm), x, top, st.timeW, st.size, 700);
+        if (o.ends) at(d, d.value(g("agenda", "e", n), { ...o.hm, fallback: "" }), x, low, st.timeW, st.small, 400);
+      });
       d.circle(st.rule, mid, Math.max(3, Math.round(st.size * 0.22)));
     });
     d.when(not(onDay(n, 0)), () => {
       d.when(onDay(n, 1), () => at(d, "Tomorrow", x, top, st.timeW, st.small, 700));
       d.when(not(onDay(n, 1)), () => at(d, d.value(g("agenda", "s", n), { time: "ddd D" }), x, top, st.timeW, st.small, 700));
-      at(d, d.value(g("agenda", "s", n), HHMM), x, low, st.timeW, st.small, 400);
+      at(d, d.value(g("agenda", "s", n), o.hm), x, low, st.timeW, st.small, 400);
       d.circle(st.rule, mid, Math.max(3, Math.round(st.size * 0.22)), { fill: false, stroke: 2 });
     });
     at(d, d.value(g("agenda", "t", n)), textX, top, textW, st.size, 700);
-    detail(d, n, labels, textX, low, textW, st.small);
+    detail(d, n, o, textX, low, textW, st.small);
   });
 }
 
 /** All-day events as a row of pills: what, and when it is not today. */
-function pills(d: Draw, x: number, y: number, w: number, h: number) {
+function pills(d: Draw, o: Opt, x: number, y: number, w: number, h: number) {
   const slots = w >= 520 ? 3 : 2;
   const gap = 8;
   const pw = Math.floor((w - gap * (slots - 1)) / slots);
   const size = Math.max(13, Math.min(18, Math.round(h * 0.42)));
   for (let n = 0; n < Math.min(ALLDAY, slots); n++) {
     const px = x + n * (pw + gap);
-    d.when(has(n, "allday"), () => {
+    d.when(within(n, o, "allday"), () => {
       d.rect({ x: px, y, w: pw, h }, { fill: false, stroke: 2, radius: h / 2 });
       const base = y + Math.round((h + size * 0.73) / 2);
       d.when(onDay(n, 0, "allday", "a"), () => at(d, [d.value(g("allday", "t", n))], px + 12, base, pw - 24, size, 700));
@@ -174,35 +227,36 @@ function pills(d: Draw, x: number, y: number, w: number, h: number) {
 }
 
 /** The timeline of everything after the hero, moved up when there are no all-day events. */
-function timeline(d: Draw, labels: string[], x: number, y: number, w: number, h: number) {
+function timeline(d: Draw, o: Opt, first: number, x: number, y: number, w: number, h: number) {
   const pillH = Math.max(30, Math.min(40, Math.round(h * 0.12)));
   const draw = (top: number) => {
     const avail = y + h - top;
-    const rows = Math.max(1, Math.min(AGENDA - 1, Math.floor(avail / 46)));
+    const rows = Math.max(1, Math.min(AGENDA - first, Math.floor(avail / o.rowMin)));
     const rowH = Math.floor(avail / rows);
-    const size = Math.max(14, Math.min(24, Math.round(rowH * 0.36), d.fit(["88:88 Quarterly planning"], w, rowH)));
+    const size = Math.max(14, Math.min(24, Math.round(rowH * (o.rowMin < 40 ? 0.42 : 0.36)), d.fit([`${o.hmSample} Quarterly planning`], w, rowH)));
     const small = Math.max(13, Math.round(size * 0.74));
-    const timeW = Math.max(d.measure("88:88", size, 700), d.measure("Tomorrow", small, 700)) + 10;
+    const timeW = Math.max(d.measure(o.hmSample, size, 700), d.measure("Tomorrow", small, 700)) + 10;
     const st: RowStyle = { size, small, timeW, rule: x + timeW + 4 };
-    for (let n = 2; n <= rows; n++) {
-      d.when(has(n), () => d.line(st.rule, top + (n - 2) * rowH + rowH / 2, st.rule, top + (n - 1) * rowH + rowH / 2, { width: 1 }));
+    for (let r = 1; r < rows; r++) {
+      d.when(within(first + r, o), () => d.line(st.rule, top + (r - 1) * rowH + rowH / 2, st.rule, top + r * rowH + rowH / 2, { width: 1 }));
     }
-    for (let r = 0; r < rows; r++) row(d, r + 1, labels, x, top + r * rowH, w, rowH, st);
+    for (let r = 0; r < rows; r++) row(d, first + r, o, x, top + r * rowH, w, rowH, st);
   };
-  d.when(has(0, "allday"), () => {
-    pills(d, x, y, w, pillH);
+  if (!o.allday) return draw(y);
+  d.when(within(0, o, "allday"), () => {
+    pills(d, o, x, y, w, pillH);
     draw(y + pillH + 10);
   });
-  d.when(not(has(0, "allday")), () => draw(y));
+  d.when(not(within(0, o, "allday")), () => draw(y));
 }
 
 /** Too little room: what is now or next, and the one after. */
-function compact(d: Draw, labels: string[]) {
+function compact(d: Draw, o: Opt) {
   const half = Math.floor(d.height / 2);
-  hero(d, labels, 0, 0, d.width, d.height >= 120 ? half + 20 : d.height);
+  hero(d, o, 0, 0, d.width, d.height >= 120 ? half + 20 : d.height);
   if (d.height >= 120) {
-    const st: RowStyle = { size: 16, small: 13, timeW: d.measure("Tomorrow", 13, 700) + 10, rule: d.measure("Tomorrow", 13, 700) + 14 };
-    row(d, 1, labels, 0, half + 26, d.width, d.height - half - 26, st);
+    const tw = Math.max(d.measure("Tomorrow", 13, 700), d.measure(o.hmSample, 16, 700)) + 10;
+    row(d, 1, o, 0, half + 26, d.width, d.height - half - 26, { size: 16, small: 13, timeW: tw, rule: tw + 4 });
   }
 }
 
@@ -248,8 +302,31 @@ export default defineExtension<Settings>({
   category: "time",
   requires: ["google"],
   size: { min: [4, 3], default: [12, 8] },
-  fields: [{ key: "lanes", label: "Calendars", kind: "calendars", help: "Leave all unticked to show every account's main calendar." }],
-  defaults: () => ({ lanes: [] }),
+  fields: [
+    { key: "lanes", label: "Calendars", kind: "calendars", help: "Leave all unticked to show every account's main calendar." },
+    {
+      key: "look", label: "Look", kind: "select",
+      options: [
+        { value: "agenda", label: "Agenda — now or next, then the rest" },
+        { value: "list", label: "List — everything on one timeline" },
+        { value: "next", label: "Next up — one event, large" },
+      ],
+    },
+    {
+      key: "ahead", label: "Show", kind: "select",
+      options: [{ value: "0", label: "Today only" }, { value: "1", label: "Today and tomorrow" }, { value: "6", label: "The next 7 days" }],
+    },
+    { key: "hours", label: "Times", kind: "select", options: [{ value: "24", label: "24-hour" }, { value: "12", label: "12-hour" }] },
+    { key: "density", label: "Rows", kind: "select", options: [{ value: "roomy", label: "Roomy" }, { value: "dense", label: "Dense — more events" }], visible: (s) => s.look !== "next" },
+    { key: "header", label: "Show the date", kind: "toggle" },
+    { key: "places", label: "Show where", kind: "toggle" },
+    { key: "ends", label: "Show when events end", kind: "toggle", visible: (s) => s.look !== "next" },
+    { key: "tags", label: "Say which account", kind: "toggle", help: "Only when more than one calendar is shown." },
+    { key: "allday", label: "Show all-day events", kind: "toggle", visible: (s) => s.look !== "next" },
+  ],
+  defaults: () => ({
+    lanes: [], look: "agenda", ahead: "6", header: true, places: true, ends: true, tags: true, allday: true, hours: "24", density: "roomy",
+  }),
   title: (s, env) => `Calendar: ${lanesOf(s, env).map((l) => laneTitle(l, env)).join(" + ") || "none"}`,
   source(s, env) {
     const out: Record<string, SourceSpec> = {};
@@ -292,22 +369,39 @@ export default defineExtension<Settings>({
   draw(d, s, env) {
     const lanes = lanesOf(s, env);
     if (lanes.length === 0 || !lanes.some((l) => linkFor(env, l.account)?.refreshToken)) return placeholder(d);
-    const labels = lanes.map((l) => laneTitle(l, env));
-    if (d.height < 200 || d.width < 260) return compact(d, labels);
-    if (d.width >= d.height * 1.35 && d.width >= 480) {
+    const o = optOf(s, lanes.map((l) => laneTitle(l, env)));
+    if (d.height < 200 || d.width < 260) return compact(d, o);
+    const wide = d.width >= d.height * 1.35 && d.width >= 480;
+
+    if (s.look === "next") {
+      const headH = s.header && d.height >= 260 ? Math.max(44, Math.min(110, Math.round(d.height * 0.22))) : 0;
+      if (headH) dateHeader(d, 0, 0, d.width, headH);
+      return hero(d, o, 0, headH ? headH + 12 : 0, d.width, d.height - (headH ? headH + 12 : 0));
+    }
+    if (s.look === "list") {
+      if (wide && s.header) {
+        const left = Math.round(d.width * 0.3);
+        dateHeader(d, 0, 0, left, Math.min(d.height, 130));
+        return timeline(d, o, 0, left + 24, 0, d.width - left - 24, d.height);
+      }
+      const headH = s.header && d.height >= 260 ? Math.max(44, Math.min(90, Math.round(d.height * 0.15))) : 0;
+      if (headH) dateHeader(d, 0, 0, d.width, headH);
+      return timeline(d, o, 0, 0, headH ? headH + 14 : 0, d.width, d.height - (headH ? headH + 14 : 0));
+    }
+    if (wide) {
       // Side by side: the day and what matters now on the left, the rest on the right.
       const left = Math.round(d.width * 0.4);
-      const headH = Math.max(56, Math.min(130, Math.round(d.height * 0.3)));
-      dateHeader(d, 0, 0, left, headH);
-      hero(d, labels, 0, headH + 14, left, d.height - headH - 14);
-      timeline(d, labels, left + 24, 0, d.width - left - 24, d.height);
+      const headH = s.header ? Math.max(56, Math.min(130, Math.round(d.height * 0.3))) : 0;
+      if (headH) dateHeader(d, 0, 0, left, headH);
+      hero(d, o, 0, headH ? headH + 14 : 0, left, d.height - (headH ? headH + 14 : 0));
+      timeline(d, o, 1, left + 24, 0, d.width - left - 24, d.height);
       return;
     }
-    const headH = d.height >= 300 ? Math.max(44, Math.min(90, Math.round(d.height * 0.15))) : 0;
+    const headH = s.header && d.height >= 300 ? Math.max(44, Math.min(90, Math.round(d.height * 0.15))) : 0;
     if (headH) dateHeader(d, 0, 0, d.width, headH);
     const heroY = headH ? headH + 10 : 0;
     const heroH = Math.max(96, Math.min(170, Math.round(d.height * 0.3)));
-    hero(d, labels, 0, heroY, d.width, heroH);
-    timeline(d, labels, 0, heroY + heroH + 14, d.width, d.height - heroY - heroH - 14);
+    hero(d, o, 0, heroY, d.width, heroH);
+    timeline(d, o, 1, 0, heroY + heroH + 14, d.width, d.height - heroY - heroH - 14);
   },
 });

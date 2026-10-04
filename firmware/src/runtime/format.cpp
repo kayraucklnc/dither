@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 #include <optional>
+#include <string_view>
+#include <vector>
 
 #include "number_format.h"
 #include "utf8.h"
@@ -20,7 +22,31 @@ MaybeValue nonNull(Value v) {
   return v;
 }
 
-// Step 0: a time moved by (value of `v`) x `scale` seconds, as an instant.
+// Step 0: one number out of a series. Ties go to the earliest index; the sum
+// adds in index order, as JavaScript's reduce does.
+MaybeValue applyPick(const Value& v, std::string_view pick) {
+  if (!v.isSeries()) return std::nullopt;
+  const std::vector<double>& s = v.asSeries();
+  if (pick == "count") return Value::number(static_cast<double>(s.size()));
+  if (s.empty()) return std::nullopt;
+  if (pick == "first") return Value::number(s.front());
+  if (pick == "last") return Value::number(s.back());
+  if (pick == "sum") {
+    double total = 0;
+    for (double x : s) total += x;
+    return Value::number(total);
+  }
+  size_t best = 0;
+  const bool wantMax = pick == "max" || pick == "argmax";
+  if (!wantMax && pick != "min" && pick != "argmin") return std::nullopt;  // unknown pick
+  for (size_t i = 1; i < s.size(); ++i) {
+    if (wantMax ? s[i] > s[best] : s[i] < s[best]) best = i;
+  }
+  if (pick == "argmax" || pick == "argmin") return Value::number(static_cast<double>(best));
+  return Value::number(s[best]);
+}
+
+// Step 1: a time moved by (value of `v`) x `scale` seconds, as an instant.
 MaybeValue applyShift(const Value& v, JsonView shift, const FormatContext& ctx) {
   auto t = parseTimeValue(v, ctx.now, *ctx.tz);
   if (!t) return std::nullopt;
@@ -119,6 +145,7 @@ MaybeValue runPipeline(const Value& input, JsonView f, const FormatContext& ctx)
 
 std::optional<Value> applyValueSteps(const Value& input, JsonView f, const FormatContext& ctx) {
   MaybeValue v = nonNull(input);
+  if (v && f["pick"].isString()) v = applyPick(*v, f["pick"].string());
   if (v && f["shift"].isObject()) v = applyShift(*v, f["shift"], ctx);
   if (v && f["days"].boolean(false)) {
     v = applyDays(*v, ctx);  // and `until` is ignored

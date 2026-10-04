@@ -16,6 +16,7 @@ export type Condition =
   | { v: string; op: Op; x?: unknown; vs?: string; f?: Format };
 
 export interface Format {
+  pick?: "max" | "min" | "sum" | "first" | "last" | "argmax" | "argmin" | "count";
   shift?: { v: string; scale?: number };
   /** Calendar days from today: 0 today, 1 tomorrow. Wins over `until`. */
   days?: boolean;

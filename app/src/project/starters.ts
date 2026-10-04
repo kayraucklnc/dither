@@ -34,7 +34,7 @@ function screens(starter: string): { screens: ScreenDef[]; rules: (screens: Scre
       };
       const night: ScreenDef = {
         id: newId("s"), name: "Night",
-        widgets: [w("clock", 0, 0, 20, 12, { style: "analog", every: "15" })],
+        widgets: [w("clock", 0, 0, 20, 12, { style: "dial", numerals: "roman", every: "15" })],
       };
       return {
         screens: [home, night],
