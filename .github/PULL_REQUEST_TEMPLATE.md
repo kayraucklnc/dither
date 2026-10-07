@@ -1,8 +1,8 @@
-## Overview
-<!-- Required. Describe, briefly, why this is necessary and what the overarching architecture is. -->
+## What and why
 
-## Screenshots/Screencasts
-<!-- Optional. Provide supporting screen shots/casts. -->
+<!-- What this changes and why it's worth it. Screenshots for anything visual. -->
 
-## Details
-<!-- Optional. As bullet points, list related issue(s); major highlights; team callouts; and/or other information that is helpful. -->
+## Checklist
+
+- [ ] `make test` passes
+- [ ] If drawing changed: `docs/format.md`, both renderers and `spec/fixtures/` are updated together

@@ -1,5 +1,5 @@
-blank_issues_enabled: false
+blank_issues_enabled: true
 contact_links:
-  - name: Community
-    url: https://discord.gg/CAgBZQqVWp
-    about: Please ask questions or discuss specifics here.
+  - name: How Dither works
+    url: https://github.com/kayraucklnc/dither/blob/main/docs/format.md
+    about: The format both the app and the firmware implement.
