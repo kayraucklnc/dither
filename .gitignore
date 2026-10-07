@@ -12,3 +12,6 @@ firmware/.pio
 firmware/build
 app/public/firmware/*.bin
 app/public/firmware/manifest.json
+
+# TypeScript incremental build state
+*.tsbuildinfo
