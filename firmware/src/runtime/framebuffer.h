@@ -41,6 +41,7 @@ class Canvas {
  public:
   Canvas(Framebuffer& fb, bool black);
   Canvas withClip(const Box& box) const;
+  Canvas withColor(bool black) const;
   bool black() const { return black_; }
   const Box& clip() const { return clip_; }
 

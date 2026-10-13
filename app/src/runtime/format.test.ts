@@ -127,6 +127,21 @@ describe("compact numbers", () => {
   });
 });
 
+describe("pick by index, and times", () => {
+  const values = new Map<string, import("./types").Value>([["t.delay", 7], ["t.none", null], ["t.text", "late"]]);
+  const vctx = { ...ctx, values };
+  it.each([[0, "3"], [2, "9"], [3, "–"], [-1, "–"], [1.5, "–"]] as const)("pick %s", (i, out) => {
+    expect(formatValue([3, -7, 9], { pick: i }, vctx)).toBe(out);
+  });
+  it("multiplies by another value", () => {
+    expect(formatValue(4, { pick: 0 }, vctx)).toBe("–");
+    expect(formatValue([3, -7, 9], { pick: 1, scale: 0.5, times: "t.delay", add: 1, num: { d: 1 } }, vctx)).toBe("-23.5");
+    expect(formatValue(3, { times: "t.delay" }, vctx)).toBe("21");
+    for (const ref of ["t.none", "t.text", "t.missing"]) expect(formatValue(3, { times: ref }, vctx)).toBe("–");
+    expect(formatValue("3", { times: "t.delay" }, vctx)).toBe("–");
+  });
+});
+
 describe("pick", () => {
   it.each([["max", 9], ["min", -2], ["sum", 14], ["first", 3], ["last", 1], ["argmax", 2], ["argmin", 1], ["count", 5]] as const)("%s", (how, out) => {
     expect(formatValue([3, -2, 9, 9, 1], { pick: how }, ctx)).toBe(String(out === 14 ? 20 : out));

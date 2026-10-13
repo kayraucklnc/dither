@@ -33,24 +33,35 @@ interface Settings extends Record<string, unknown> {
   period: string;
   chart: "auto" | "hours" | "week" | "month";
   line: "curve" | "curve-line" | "area" | "line" | "steps";
+  /** What Stripe counts in: the account's own currency. */
   currency: string;
+  /** What the panel shows: "same", or a currency the amounts are converted to. */
+  show: string;
   heading: string;
   compare: boolean;
   compact: boolean;
   names: boolean;
   peak: boolean;
   range: boolean;
+  /** Each day's (or hour's) amount, lined up with it above the graph. */
+  each: boolean;
 }
 
-const currencyOf = (s: Settings) => CURRENCIES.find((c) => c.value === s.currency) ?? CURRENCIES[0];
+const accountCurrency = (s: Settings) => CURRENCIES.find((c) => c.value === s.currency) ?? CURRENCIES[0];
+/** The currency on the panel: the account's, or the one it is converted to. */
+const currencyOf = (s: Settings) => CURRENCIES.find((c) => c.value === s.show) ?? accountCurrency(s);
+const converts = (s: Settings) => currencyOf(s).value !== accountCurrency(s).value;
 const periodOf = (s: Settings) => PERIODS.find((p) => p.value === s.period) ?? PERIODS[0];
 const chartOf = (s: Settings) => {
   const v = s.chart === "auto" ? (s.period === "today" ? "hours" : s.period === "week" ? "week" : "month") : s.chart;
   return CHARTS.find((c) => c.value === v) ?? CHARTS[0];
 };
-const scaleOf = (s: Settings) => (currencyOf(s).decimals ? 1 / 10 ** currencyOf(s).decimals : 1);
+// Minor units are the account's; the decimals printed are the shown currency's.
+const scaleOf = (s: Settings) => (accountCurrency(s).decimals ? 1 / 10 ** accountCurrency(s).decimals : 1);
+/** Minor units to the shown currency: divided out, then at today's rate when converting. */
+const convert = (s: Settings): Format => ({ scale: scaleOf(s), ...(converts(s) ? { times: "fx/rate" } : {}) });
 const money = (s: Settings, d?: number, compact = s.compact): Format =>
-  ({ scale: scaleOf(s), num: { d: d ?? currencyOf(s).decimals, sep: ",", compact } });
+  ({ ...convert(s), num: { d: d ?? currencyOf(s).decimals, sep: ",", compact } });
 
 /** Succeeded charges in a window, from Stripe's search — charges carry the customer's name. */
 function search(from: string, until?: string): string {
@@ -80,6 +91,12 @@ function sources(s: Settings, key: string): Record<string, SourceSpec> {
       values: { series: { path: "data", agg: "buckets", field: "amount", time: "created", by: c.by, count: c.count } },
     },
   };
+  if (converts(s)) {
+    // The ECB's daily reference rates; no key, and a reply of a few dozen bytes.
+    const from = accountCurrency(s).value.toUpperCase();
+    const to = currencyOf(s).value.toUpperCase();
+    out.fx = { url: `https://api.frankfurter.dev/v1/latest?base=${from}&symbols=${to}`, every: 360, values: { rate: `rates.${to}` } };
+  }
   if (s.compare) out.before = { url: search(p.before, p.since), headers: auth, every: 60, values: { total: { path: "data", agg: "sum", field: "amount" } } };
   if (s.style === "ledger") {
     for (const q of PERIODS) out[`p_${q.value}`] = { url: search(q.since), headers: auth, every: 30, values: { total: { path: "data", agg: "sum", field: "amount" }, count: { path: "data", agg: "count" } } };
@@ -136,6 +153,10 @@ function bucketLabels(s: Settings): Format {
 
 /** Money over time: a line over a dithered ramp, the peak marked, the range spelled out. */
 function graph(d: Draw, s: Settings, x: number, y: number, w: number, h: number) {
+  // Curved still passes through every figure; only the shape between two of them is drawn in.
+  const smooth = s.line === "curve" || s.line === "curve-line";
+  const kind = s.line === "curve" ? "area" : s.line === "curve-line" ? "line" : s.line;
+  if (s.each) return eachPoint(d, s, x, y, w, h, kind, smooth);
   const ch = chartOf(s);
   const c = currencyOf(s);
   const small = Math.max(13, Math.min(16, Math.round(h * 0.08)));
@@ -147,13 +168,10 @@ function graph(d: Draw, s: Settings, x: number, y: number, w: number, h: number)
   const plotH = h - axisH - rangeH - peakH;
   if (plotH < 24) return;
 
-  // Curved still passes through every figure; only the shape between two of them is drawn in.
-  const smooth = s.line === "curve" || s.line === "curve-line";
-  const kind = s.line === "curve" ? "area" : s.line === "curve-line" ? "line" : s.line;
   d.chart({ x, y: plotY, w, h: plotH }, "chart/series", { kind, min: 0, width: 2, smooth });
   d.line(x, plotY + plotH, x + w, plotY + plotH, { width: 1 });
 
-  const amount = (pick: "max" | "min"): Part => d.value("chart/series", { pick, scale: scaleOf(s), num: { d: 0, sep: ",", compact: s.compact } });
+  const amount = (pick: "max" | "min"): Part => d.value("chart/series", { pick, ...convert(s), num: { d: 0, sep: ",", compact: s.compact } });
   if (s.peak) {
     // A hairline at the top of the graph is the high; the dot says where it fell.
     for (let px = x; px < x + w; px += 8) d.line(px, plotY, Math.min(px + 3, x + w - 1), plotY, { width: 1 });
@@ -175,6 +193,55 @@ function graph(d: Draw, s: Settings, x: number, y: number, w: number, h: number)
       "High ", c.sign, amount("max"), " ", d.value("chart/series", { pick: "argmax", ...when }),
       "  ·  Low ", c.sign, amount("min"), " ", d.value("chart/series", { pick: "argmin", ...when }),
     ], x, y + h - sm.descent, w, small, 700);
+  }
+}
+
+/** Where point `i` of `n` sits across a graph `w` wide: a bar's middle, or a line's point. */
+const pointX = (x: number, w: number, i: number, n: number, bars: boolean) =>
+  bars ? x + Math.floor(((2 * i + 1) * w) / (2 * n)) : x + Math.floor((i * (w - 1)) / Math.max(1, n - 1));
+
+/** What a bucket is called under the axis: "Mon", "14", "09". */
+function bucketName(s: Settings, i: number): string | Part {
+  const ch = chartOf(s);
+  if (ch.by === "hour") return String(i).padStart(2, "0");
+  const ago = ch.count - 1 - i;
+  if (ago === 0) return "Today";
+  // The panel's own clock, a whole number of days back: the name stays right at midnight.
+  return { v: "clock.epoch", f: { add: -ago * 86400, time: ch.count <= 7 ? "ddd" : "D" } };
+}
+
+/**
+ * The graph with every bucket's amount riding on the line in a small white
+ * box, and its day beneath: what each day made, not just the best one. Where
+ * the buckets are too narrow for a figure each, every second (or third…) one
+ * is labelled, always including the latest.
+ */
+function eachPoint(d: Draw, s: Settings, x: number, y: number, w: number, h: number, kind: string, smooth: boolean) {
+  const ch = chartOf(s);
+  const c = currencyOf(s);
+  const n = ch.count;
+  const bars = kind === "bars";
+  const small = Math.max(12, Math.min(16, Math.round(h * 0.075)));
+  const sm = d.metrics(small, 700);
+  // Short figures ("€1.6k") so a week of them fits side by side.
+  const figureW = d.measure(`${c.sign}888.8k`, small, 700) + 12;
+  const every = Math.max(1, Math.ceil(figureW / Math.max(1, w / n)));
+  // Room above the highest point for its box, and a row beneath for the days.
+  const top = sm.lineHeight + 2 + 5 + 2;
+  const plotY = y + top;
+  const plotH = h - top - (sm.lineHeight + 4);
+  if (plotH < 24) return;
+  d.chart({ x, y: plotY, w, h: plotH }, "chart/series", {
+    kind: kind as "area", min: 0, width: 2, smooth,
+    labels: { size: small, weight: 700, every, before: c.sign, format: { ...convert(s), num: { d: 0, sep: ",", compact: true }, fallback: "" } },
+  });
+  d.line(x, plotY + plotH, x + w, plotY + plotH, { width: 1 });
+  const lw = Math.min(figureW, w);
+  for (let i = n - 1; i >= 0; i -= every) {
+    const px = pointX(x, w, i, n, bars);
+    const lx = Math.max(x, Math.min(x + w - lw, px - Math.round(lw / 2)));
+    const align = px - lw / 2 < x ? "left" : px + lw / 2 > x + w ? "right" : "center";
+    d.text(bucketName(s, i), { x: lx, y: plotY + plotH + 3, w: lw, h: sm.lineHeight, size: small, weight: i === n - 1 ? 700 : 400, align });
   }
 }
 
@@ -265,15 +332,25 @@ export default defineExtension<Settings>({
       ],
       visible: (s) => ["auto", "graph", "board"].includes(String(s.style)),
     },
-    { key: "peak", label: "Mark the high on the graph", kind: "toggle", visible: (s) => ["auto", "graph", "board"].includes(String(s.style)) },
-    { key: "range", label: "Spell out the high and low", kind: "toggle", help: "“High €1,640 14:00 · Low €0 03:00”.", visible: (s) => ["auto", "graph", "board"].includes(String(s.style)) },
+    { key: "peak", label: "Mark the high on the graph", kind: "toggle", visible: (s) => ["auto", "graph", "board"].includes(String(s.style)) && !s.each },
+    {
+      key: "each", label: "Show each day's amount", kind: "toggle",
+      help: "Every point of the graph gets its figure above it and its day below. On the 30-day graph, every few days.",
+      visible: (s) => ["auto", "graph", "board"].includes(String(s.style)),
+    },
+    { key: "range", label: "Spell out the high and low", kind: "toggle", help: "“High €1,640 14:00 · Low €0 03:00”.", visible: (s) => ["auto", "graph", "board"].includes(String(s.style)) && !s.each },
     { key: "compare", label: "Compare with the period before", kind: "toggle", visible: (s) => s.style !== "ledger" && s.style !== "payments" },
     { key: "names", label: "Show customers' names", kind: "toggle", help: "Off, payments show what was bought.", visible: (s) => ["auto", "board", "payments"].includes(String(s.style)) },
     { key: "compact", label: "Shorten large numbers", kind: "toggle", help: "74,120 becomes 74.1k." },
     { key: "heading", label: "Heading", kind: "text", placeholder: "Left empty, the period names it" },
-    { key: "currency", label: "Currency", kind: "select", options: CURRENCIES.map(({ value, label }) => ({ value, label })) },
+    { key: "currency", label: "Your Stripe currency", kind: "select", options: CURRENCIES.map(({ value, label }) => ({ value, label })), help: "The currency your Stripe account is paid out in." },
+    {
+      key: "show", label: "Show amounts in", kind: "select",
+      options: [{ value: "same", label: "The same currency" }, ...CURRENCIES.map(({ value, label }) => ({ value, label: `${label}, converted` }))],
+      help: "Converted at the day's European Central Bank rate, which the panel fetches itself.",
+    },
   ],
-  defaults: () => ({ style: "auto", period: "today", chart: "auto", line: "curve", currency: "eur", heading: "", compare: true, compact: false, names: false, peak: true, range: true }),
+  defaults: () => ({ style: "auto", period: "today", chart: "auto", line: "curve", currency: "eur", show: "same", heading: "", compare: true, compact: false, names: false, peak: true, range: true, each: true }),
   title: (s) => `Revenue, ${periodOf(s).label.toLowerCase()}`,
   source(s, env) {
     const key = env.accounts.stripe?.key.trim() ?? "";
@@ -281,26 +358,33 @@ export default defineExtension<Settings>({
   },
   sample: (s) => {
     const now = Math.floor(Date.now() / 1000);
-    const cents = currencyOf(s).decimals ? 100 : 1;
+    const cents = accountCurrency(s).decimals ? 100 : 1;
     const day = [0, 0, 0, 0, 0, 0, 1, 2, 4, 9, 14, 11, 8, 12, 16, 13, 9, 7, 10, 6, 3, 2, 1, 0];
     const month = [210, 260, 190, 320, 280, 150, 120, 300, 340, 310, 290, 360, 200, 180, 380, 410, 350, 330, 420, 260, 240, 450, 480, 400, 390, 470, 300, 280, 520, 560];
-    const series = chartOf(s).by === "hour" ? day.map((x) => x * 4900) : month.slice(-chartOf(s).count).map((x) => x * cents * 10);
+    const hourly = day.map((x) => x * 4900 * (cents === 1 ? 0.01 : 1));
+    const daily = month.map((x) => x * cents * 10);
+    const series = chartOf(s).by === "hour" ? hourly : daily.slice(-chartOf(s).count);
+    // Totals that agree with the graph: now that every day is labelled, a mismatch shows.
+    const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+    const totalFor = (p: string) => (p === "today" ? sum(hourly) : sum(daily.slice(p === "week" ? -7 : -30)));
+    const beforeFor = (p: string) => Math.round(totalFor(p) * 0.78);
     const recent: [number, number, string | null, string][] = [
       [4900, 600, "Ayşe Kaya", "Pro plan"], [12900, 3000, "Deniz Aydın", "Team plan, annual"], [1900, 7400, null, "Starter"],
       [4900, 9800, "Marco Rossi", "Pro plan"], [29900, 14400, "Studio Nord", "Agency plan"], [4900, 90000, "Lena Vogel", "Pro plan"],
     ];
     const out: Record<string, string | number | boolean | number[] | null> = {
-      "now/total": 128450 * (cents === 1 ? 0.01 : 1), "now/count": 23, "now/more": false,
-      "before/total": 98000 * (cents === 1 ? 0.01 : 1), "chart/series": series,
+      "now/total": totalFor(periodOf(s).value), "now/count": 23, "now/more": false,
+      "before/total": beforeFor(periodOf(s).value), "chart/series": series,
+      ...(converts(s) ? { "fx/rate": 1 } : {}),
     };
     recent.forEach(([a, ago, name, what], i) => Object.assign(out, { [`now/a${i}`]: a, [`now/t${i}`]: now - ago, [`now/n${i}`]: name, [`now/d${i}`]: what }));
-    for (const [p, total, count] of [["today", 128450, 23], ["week", 812300, 141], ["month", 3402100, 588]] as const) {
-      Object.assign(out, { [`p_${p}/total`]: total, [`p_${p}/count`]: count });
+    for (const [p, count] of [["today", 23], ["week", 141], ["month", 588]] as const) {
+      Object.assign(out, { [`p_${p}/total`]: totalFor(p), [`p_${p}/count`]: count });
     }
     return out;
   },
   facts: (s) => [
-    { key: "amount", label: `Revenue, ${periodOf(s).label.toLowerCase()}`, type: "number", value: "now/total", unit: ` ${s.currency.toUpperCase()}`, format: { scale: scaleOf(s) } },
+    { key: "amount", label: `Revenue, ${periodOf(s).label.toLowerCase()}`, type: "number", value: "now/total", unit: ` ${currencyOf(s).value.toUpperCase()}`, format: convert(s) },
     { key: "count", label: `Payments, ${periodOf(s).label.toLowerCase()}`, type: "number", value: "now/count" },
     ...(s.compare ? [{ key: "up", label: "Ahead of the period before", type: "flag" as const, test: up }] : []),
   ],

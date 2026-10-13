@@ -16,12 +16,15 @@ export type Condition =
   | { v: string; op: Op; x?: unknown; vs?: string; f?: Format };
 
 export interface Format {
-  pick?: "max" | "min" | "sum" | "first" | "last" | "argmax" | "argmin" | "count";
+  /** A summary of a series, or a number: the element at that index. */
+  pick?: "max" | "min" | "sum" | "first" | "last" | "argmax" | "argmin" | "count" | number;
   shift?: { v: string; scale?: number };
   /** Calendar days from today: 0 today, 1 tomorrow. Wins over `until`. */
   days?: boolean;
   until?: boolean;
   scale?: number;
+  /** Multiplied by this reference's value, e.g. an exchange rate. */
+  times?: string;
   add?: number;
   steps?: { t: number[]; o: string[] };
   map?: { k: (number | string)[]; o: string[]; d?: string };
@@ -55,6 +58,8 @@ export type Element =
   | (Base & {
       t: "chart"; x: number; y: number; w: number; h: number; v: string;
       kind: "bars" | "line" | "steps" | "area"; min?: number; max?: number; gap?: number; lw?: number; smooth?: boolean;
+      /** Each point's value in a box above it; `every` labels one point in so many, counting back from the last. */
+      labels?: { font: number; f?: Format; every?: number; pre?: string; post?: string };
     });
 
 export type ElementOf<T extends Element["t"]> = Extract<Element, { t: T }>;

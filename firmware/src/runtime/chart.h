@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <utility>
 #include <vector>
 
 #include "framebuffer.h"
@@ -20,6 +21,9 @@ struct ChartSpec {
 };
 
 void drawChartSeries(const Canvas& c, const ChartSpec& spec, const std::vector<double>& series);
+
+// Where each point's label hangs: a line's point, or the middle of a bar's top.
+std::vector<std::pair<int64_t, int64_t>> chartAnchors(const ChartSpec& spec, const std::vector<double>& series);
 
 // The smoothed height of column `px` between points (x0, p1) and (x1, p2),
 // with p0 and p3 the neighbours (duplicated at the ends), clamped to

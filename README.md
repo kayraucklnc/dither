@@ -129,9 +129,9 @@ back in, then let go.
 | 🕰️ | Clock | The time as digits, flip tiles, a dial or words | — |
 | 📅 | Date | Today, like a page torn off a calendar | — |
 | ⛅ | Weather | Now, today and the next days ([Open-Meteo](https://open-meteo.com/)) | — |
-| 🗓️ | Google Calendar | Every linked account as one agenda: now, next, and the rest of the day | A Google OAuth client (the app walks you through it) |
+| 🗓️ | Google Calendar | Every linked account as one agenda, grouped by day: what's on now, what's next, and the days ahead | A Google OAuth client (the app walks you through it) |
 | 🚆 | Trains (Trenord) | Your next train, how late it is, and the ones after it | — |
-| 💶 | Revenue (Stripe) | A figure, a smooth graph, a ledger or a full board with payments | A restricted Stripe key |
+| 💶 | Revenue (Stripe) | A figure, a smooth graph with each day's amount on it, a ledger or a full board with payments, converted to another currency if you like | A restricted Stripe key |
 | ₿ | Crypto price | A coin's price and today's change ([CoinGecko](https://www.coingecko.com/)) | — |
 | 🔢 | Number from the web | Any value from a JSON address: a sensor, a counter, a price | — |
 | 📄 | Web page | The text of any web page, fetched by the panel itself: a status page, a menu, a notice | — |
@@ -311,6 +311,7 @@ The full guide, with layout tips and the whole `Draw` API, is
 - ✅ The panel is only redrawn when what it would show has changed
 - ✅ How often each screen fetches its data, set per screen
 - ✅ Web pages read as text on the panel
+- ✅ Panel activity: what the panel really did on each wake, read over USB, and a button to wake it now
 - ⬜ Update the design over Wi-Fi, without a cable
 - ⬜ Set up Wi-Fi from a phone over Bluetooth
 - ⬜ Only refresh the parts of the screen that changed

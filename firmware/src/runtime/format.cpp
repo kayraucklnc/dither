@@ -24,9 +24,17 @@ MaybeValue nonNull(Value v) {
 
 // Step 0: one number out of a series. Ties go to the earliest index; the sum
 // adds in index order, as JavaScript's reduce does.
-MaybeValue applyPick(const Value& v, std::string_view pick) {
+MaybeValue applyPick(const Value& v, JsonView how) {
   if (!v.isSeries()) return std::nullopt;
   const std::vector<double>& s = v.asSeries();
+  if (how.isNumber()) {
+    // An index: the element there, or nothing for a fraction, a negative or past the end.
+    const double i = how.number();
+    if (!(i >= 0) || i != std::floor(i) || i >= static_cast<double>(s.size())) return std::nullopt;
+    return Value::number(s[static_cast<size_t>(i)]);
+  }
+  if (!how.isString()) return std::nullopt;
+  const std::string_view pick = how.string();
   if (pick == "count") return Value::number(static_cast<double>(s.size()));
   if (s.empty()) return std::nullopt;
   if (pick == "first") return Value::number(s.front());
@@ -81,12 +89,19 @@ MaybeValue applyUntil(const Value& v, const FormatContext& ctx) {
   return Value::number(std::floor((instant - now) / 60.0));
 }
 
-MaybeValue applyArithmetic(const Value& v, JsonView format) {
-  JsonView scale = format["scale"], add = format["add"];
-  if (!scale.exists() && !add.exists()) return v;
+MaybeValue applyArithmetic(const Value& v, JsonView format, const FormatContext& ctx) {
+  JsonView scale = format["scale"], times = format["times"], add = format["add"];
+  if (!scale.exists() && !times.exists() && !add.exists()) return v;
   if (!v.isNumber()) return std::nullopt;
   double n = v.asNumber();
   if (scale.isNumber()) n *= scale.number();
+  if (times.exists()) {
+    // By another value, e.g. an exchange rate; one that is not a number makes this null.
+    if (!ctx.values) return std::nullopt;
+    const Value& by = ctx.values->get(times.string());
+    if (!by.isNumber() || !std::isfinite(by.asNumber())) return std::nullopt;
+    n *= by.asNumber();
+  }
   if (add.isNumber()) n += add.number();
   return Value::number(n);
 }
@@ -145,14 +160,14 @@ MaybeValue runPipeline(const Value& input, JsonView f, const FormatContext& ctx)
 
 std::optional<Value> applyValueSteps(const Value& input, JsonView f, const FormatContext& ctx) {
   MaybeValue v = nonNull(input);
-  if (v && f["pick"].isString()) v = applyPick(*v, f["pick"].string());
+  if (v && f["pick"].exists()) v = applyPick(*v, f["pick"]);
   if (v && f["shift"].isObject()) v = applyShift(*v, f["shift"], ctx);
   if (v && f["days"].boolean(false)) {
     v = applyDays(*v, ctx);  // and `until` is ignored
   } else if (v && f["until"].boolean(false)) {
     v = applyUntil(*v, ctx);
   }
-  if (v) v = applyArithmetic(*v, f);
+  if (v) v = applyArithmetic(*v, f, ctx);
   if (v && f["steps"].isObject()) v = applySteps(*v, f["steps"]);
   if (v && f["map"].isObject()) v = applyMap(*v, f["map"]);
   return v;

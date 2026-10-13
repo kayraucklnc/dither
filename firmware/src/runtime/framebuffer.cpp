@@ -51,6 +51,12 @@ Canvas Canvas::withClip(const Box& box) const {
   return c;
 }
 
+Canvas Canvas::withColor(bool black) const {
+  Canvas c = *this;
+  c.black_ = black;
+  return c;
+}
+
 void Canvas::plotColor(int64_t x, int64_t y, bool black) const {
   if (x < clip_.x0 || x >= clip_.x1 || y < clip_.y0 || y >= clip_.y1) return;
   fb_->set(static_cast<int>(x), static_cast<int>(y), black);

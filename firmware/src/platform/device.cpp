@@ -44,6 +44,43 @@ std::vector<SourceState> statesOf(const Program& p, const ValueCache& cache) {
 
 uint32_t Device::wake() {
   const uint32_t number = countWake();
+  state_ = "ran";
+  screen_ = -1;
+  frameResult_ = Frame::None;
+  online_ = false;
+  clockSet_ = false;
+  outcomes_.clear();
+  const uint32_t seconds = openAndRun(number);
+  logSummary(number, seconds);
+  return seconds;
+}
+
+// One line per wake that the app's "Panel activity" view reads; the lines
+// above it are for people. Keys only ever get added, never renamed.
+void Device::logSummary(uint32_t number, uint32_t sleepSeconds) const {
+  static const char* const kFrames[] = {"none", "updated", "same", "failed"};
+  std::string sources;
+  for (const auto& o : outcomes_) {
+    if (!sources.empty()) sources += ',';
+    sources += o.first + ':' + o.second;
+  }
+  dlog("summary: wake=%lu state=%s screen=%d frame=%s online=%s clock=%s sources=%s sleep=%lu",
+       static_cast<unsigned long>(number), state_, screen_, kFrames[static_cast<int>(frameResult_)],
+       online_ ? "yes" : "no", clockSet_ ? "set" : "unknown", sources.empty() ? "-" : sources.c_str(),
+       static_cast<unsigned long>(sleepSeconds));
+}
+
+void Device::noteSource(const std::string& id, const char* outcome) {
+  for (auto& o : outcomes_) {
+    if (o.first == id) {
+      o.second = outcome;
+      return;
+    }
+  }
+  outcomes_.emplace_back(id, outcome);
+}
+
+uint32_t Device::openAndRun(uint32_t number) {
   dlog("wake #%lu: Dither %s on %s, reset reason %d, heap %lu", static_cast<unsigned long>(number), DITHER_VERSION,
        board::kId, static_cast<int>(esp_reset_reason()), static_cast<unsigned long>(ESP.getFreeHeap()));
   MappedBlob blob;
@@ -68,9 +105,12 @@ uint32_t Device::wake() {
 
 uint32_t Device::run(const Program& program) {
   std::optional<int64_t> now = clockNow();
+  clockSet_ = now.has_value();
+  for (const auto& s : program.sources()) outcomes_.emplace_back(s.id, "wait");
   if (now && program.quiet().enabled) {
     CivilTime local = program.timeZone().toLocal(*now);
     if (inQuietHours(program.quiet(), local.hour * 60 + local.minute)) {
+      state_ = "quiet";
       dlog("quiet hours until %02d:%02d", program.quiet().to / 60, program.quiet().to % 60);
       return quietSleepSeconds(local, program.quiet().to);
     }
@@ -94,6 +134,8 @@ uint32_t Device::run(const Program& program) {
     device.rssi = cache.lastRssi;
     dlog("nothing due: no network this wake");
   }
+  clockSet_ = now.has_value();
+  online_ = device.online;
   dlog("clock %s, online %s, usb %s", now ? "set" : "unknown", device.online ? "yes" : "no",
        device.usb ? "yes" : "no");
 
@@ -106,6 +148,7 @@ uint32_t Device::run(const Program& program) {
   program.applyMerges(values, now);  // recomputed each wake, from cached values too
 
   const int screen = program.chooseScreen(values, now);
+  screen_ = screen;
   const uint32_t drawStart = millis();
   Framebuffer logical;
   program.render(screen, values, now, logical);
@@ -120,6 +163,7 @@ void Device::fetchDue(const Program& program, bool online, std::optional<int64_t
     if (!sourceDue(state, source.every, now)) continue;
     if (!sourceFetchable(source, now)) {
       dlog("source %s: needs the clock, not fetched", source.id.c_str());
+      noteSource(source.id, "noclock");
       continue;
     }
     state.attempted = true;
@@ -127,6 +171,7 @@ void Device::fetchDue(const Program& program, bool online, std::optional<int64_t
     if (!online) {
       state.ok = false;
       dlog("source %s: due, but offline", source.id.c_str());
+      noteSource(source.id, "offline");
     } else {
       JsonDoc doc;
       HtmlText page;
@@ -144,8 +189,10 @@ void Device::fetchDue(const Program& program, bool online, std::optional<int64_t
         dlog("source %s: ok in %lu ms (%u values, %u bytes of text kept), heap %lu", source.id.c_str(),
              static_cast<unsigned long>(millis() - start), static_cast<unsigned>(doc.nodeCount()),
              static_cast<unsigned>(doc.stringBytes()), static_cast<unsigned long>(ESP.getFreeHeap()));
+        noteSource(source.id, "ok");
       } else {
         dlog("source %s: failed: %s", source.id.c_str(), error.c_str());
+        noteSource(source.id, "fail");
       }
     }
     cache.setState(source.id, state);
@@ -153,6 +200,7 @@ void Device::fetchDue(const Program& program, bool online, std::optional<int64_t
 }
 
 uint32_t Device::notSetUp(const std::string& reason, uint32_t sleepSeconds) {
+  state_ = "not-set-up";
   dlog("not set up: %s", reason.c_str());
   Framebuffer fb(board::kPanelWidth, board::kPanelHeight);
   drawNotSetUp(fb, std::string("Dither ") + DITHER_VERSION + " - " + reason);
@@ -165,14 +213,17 @@ void Device::present(Framebuffer frame) {
   const uint32_t hash = crc32(frame_.bytes().data(), frame_.bytes().size());
   if (panelShows(hash)) {
     dlog("panel already shows this frame (%08lx), left alone", static_cast<unsigned long>(hash));
+    frameResult_ = Frame::Same;
     return;
   }
   // Until the refresh completes the panel shows something unknown.
   forgetPanel();
   if (panel_.show(frame_)) {
     rememberPanel(hash);
+    frameResult_ = Frame::Updated;
     dlog("panel updated (%08lx)", static_cast<unsigned long>(hash));
   } else {
+    frameResult_ = Frame::Failed;
     dlog("panel update failed");
   }
 }

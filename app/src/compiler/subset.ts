@@ -40,7 +40,7 @@ function formatChars(f: Format | undefined, locale: Locale): Charset {
     for (const list of [locale.days, locale.daysShort, locale.months, locale.monthsShort]) for (const name of list) add(out, name);
     return withUpper(out, f);
   }
-  if (f.until || f.days || f.scale !== undefined || f.add !== undefined) {
+  if (f.until || f.days || f.pick !== undefined || f.scale !== undefined || f.times !== undefined || f.add !== undefined) {
     // A number with no fixed decimals prints automatically.
     add(out, `${DIGITS}-.`);
     return out;
@@ -72,6 +72,14 @@ function flatten(elements: readonly Element[]): Element[] {
 export function fontCharsets(elements: readonly Element[], locale: Locale): Map<number, Charset> {
   const out = new Map<number, Charset>();
   for (const el of flatten(elements)) {
+    if (el.t === "chart" && el.labels) {
+      // A label is the point's number through its format; nothing else.
+      const cur = out.get(el.labels.font) ?? new Set<number>();
+      const chars = formatChars(el.labels.f ?? { num: { d: 2 } }, locale);
+      if (chars !== "all") add(chars, `${el.labels.pre ?? ""}${el.labels.post ?? ""}`);
+      out.set(el.labels.font, cur === "all" || chars === "all" ? "all" : new Set([...cur, ...chars]));
+      continue;
+    }
     if (el.t !== "text") continue;
     let cur = out.get(el.font) ?? new Set<number>();
     for (const p of el.parts) {

@@ -26,5 +26,5 @@ export {
   type PanelInfo,
 } from "./connection";
 export { type FlashStage } from "./plan";
-export { DITHER_PREFIX, openMonitor, type Monitor, type MonitorOptions } from "./monitor";
+export { DITHER_PREFIX, isPanelPort, openMonitor, type Monitor, type MonitorOptions } from "./monitor";
 export type { DeviceSession, FlashFile, SessionOpener } from "./session";

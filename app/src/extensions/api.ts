@@ -153,7 +153,15 @@ export interface Draw {
   line(x1: number, y1: number, x2: number, y2: number, options?: { width?: number; white?: boolean }): void;
   hand(x: number, y: number, length: number, ref: string, max: number, options?: { width?: number }): void;
   bar(box: Box, ref: string, min: number, max: number, options?: { vertical?: boolean }): void;
-  chart(box: Box, ref: string, options?: { kind?: "bars" | "line" | "steps" | "area"; min?: number; max?: number; gap?: number; width?: number; smooth?: boolean }): void;
+  /**
+   * `labels` writes each point's value, through `format`, in a white box riding
+   * just above the point — leave about a line of room above the box. `every`
+   * labels one point in so many, always including the last.
+   */
+  chart(box: Box, ref: string, options?: {
+    kind?: "bars" | "line" | "steps" | "area"; min?: number; max?: number; gap?: number; width?: number; smooth?: boolean;
+    labels?: { size: number; weight?: Weight; format?: Format; every?: number; before?: string; after?: string };
+  }): void;
   image(imageId: string, box: Box, options?: PictureOptions): void;
   /**
    * Everything drawn inside `fn` only shows when `condition` holds on the panel.

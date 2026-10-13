@@ -87,6 +87,50 @@ DITHER_NOINLINE void drawBar(const Canvas& c, JsonView el, const RenderContext& 
   }
 }
 
+constexpr int64_t kLabelPad = 4;
+constexpr int64_t kLabelGap = 5;
+constexpr int64_t kLabelWide = 32767;
+
+// Each labelled point's value in a white box riding just above it
+// (format.md §4 "chart", labels).
+DITHER_NOINLINE void drawChartLabels(const Canvas& c, const ChartSpec& spec, const std::vector<double>& series,
+                                     JsonView labels, const RenderContext& ctx) {
+  const ByteSpan* a = asset(ctx, labels["font"]);
+  if (!a) return;
+  auto font = Font::parse(*a);
+  if (!font) return;
+  const double everyField = labels["every"].isNumber() ? std::floor(labels["every"].number()) : 1;
+  const int64_t every = everyField >= 1 && std::isfinite(everyField) ? static_cast<int64_t>(std::min(everyField, 64.0)) : 1;
+  const auto anchors = chartAnchors(spec, series);
+  const int64_t n = static_cast<int64_t>(series.size());
+  const Canvas paper = c.withColor(!c.black());
+  for (int64_t i = 0; i < n; ++i) {
+    if ((n - 1 - i) % every != 0) continue;
+    const std::string value = formatValue(Value::number(series[static_cast<size_t>(i)]), labels["f"], ctx.format);
+    if (value.empty()) continue;
+    const std::string text = std::string(labels["pre"].string()) + value + std::string(labels["post"].string());
+    TextBox measure;
+    measure.w = kLabelWide;
+    measure.h = font->lineHeight();
+    const auto lines = layoutText(*font, text, measure);
+    const int64_t tw = lines.empty() ? 0 : lines[0].width;
+    const auto [px, py] = anchors[static_cast<size_t>(i)];
+    const int64_t bw = tw + 2 * kLabelPad;
+    const int64_t bh = font->lineHeight() + 2;
+    const int64_t bx = std::max(spec.x, std::min(spec.x + spec.w - bw, px - floorDiv(bw, 2)));
+    const int64_t by = py - bh - kLabelGap;
+    fillCircle(c, px, py, 3);
+    fillRoundRect(paper, bx, by, bw, bh, 3);
+    strokeRoundRect(c, bx, by, bw, bh, 3, 1);
+    TextBox box;
+    box.x = bx + kLabelPad;
+    box.y = by + 1;
+    box.w = tw;
+    box.h = font->lineHeight();
+    drawTextLines(c, *font, layoutText(*font, text, box), box);
+  }
+}
+
 DITHER_NOINLINE void drawChart(const Canvas& c, JsonView el, const RenderContext& ctx) {
   const Value& v = reference(ctx, el);
   if (!v.isSeries() || v.asSeries().empty()) return;
@@ -106,6 +150,7 @@ DITHER_NOINLINE void drawChart(const Canvas& c, JsonView el, const RenderContext
   spec.lw = field(el, "lw", 2);
   spec.smooth = el["smooth"].boolean(false);
   drawChartSeries(c, spec, v.asSeries());
+  if (el["labels"].isObject()) drawChartLabels(c, spec, v.asSeries(), el["labels"], ctx);
 }
 
 DITHER_NOINLINE void drawBitmapElement(const Canvas& c, JsonView el, const RenderContext& ctx) {

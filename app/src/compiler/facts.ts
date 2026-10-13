@@ -93,7 +93,8 @@ export function scoped(c: Condition, sources: SourceMap): Condition {
   if ("any" in c) return { any: c.any.map((x) => scoped(x, sources)) };
   if ("not" in c) return { not: scoped(c.not, sources) };
   const v = resolveKey(c.v, sources) ?? c.v;
-  const f = c.f?.shift ? { ...c.f, shift: { ...c.f.shift, v: resolveKey(c.f.shift.v, sources) ?? c.f.shift.v } } : c.f;
+  const shifted = c.f?.shift ? { ...c.f, shift: { ...c.f.shift, v: resolveKey(c.f.shift.v, sources) ?? c.f.shift.v } } : c.f;
+  const f = shifted?.times ? { ...shifted, times: resolveKey(shifted.times, sources) ?? shifted.times } : shifted;
   const vs = c.vs === undefined ? undefined : (resolveKey(c.vs, sources) ?? c.vs);
   return { ...c, v, ...(f ? { f } : {}), ...(vs !== undefined ? { vs } : {}) };
 }

@@ -4,7 +4,7 @@ import { decodeAsset, type Asset, type Bitmap, type Font } from "./assets";
 import { chooseScreen, evaluate } from "./conditions";
 import { formatValue, type FormatContext } from "./format";
 import { Framebuffer, circle, drawBitmap, fillRect, line, roundAway, strokeRect } from "./framebuffer";
-import { drawText } from "./text";
+import { drawText, layout, width } from "./text";
 import { parseZone } from "./tz";
 import type { Element, ElementOf, Part, Runtime, Values } from "./types";
 
@@ -100,6 +100,54 @@ function shadeUnder(fb: Framebuffer, heights: number[], x: number, floor: number
 function drawChart(el: ElementOf<"chart">, ctx: Ctx, ink: boolean): void {
   const series = ctx.values.get(el.v);
   if (!Array.isArray(series) || series.length === 0) return;
+  drawSeries(el, series, ctx, ink);
+  if (el.labels) drawLabels(el, series, ctx, ink);
+}
+
+/** Where each point's label hangs: a line's point, or the middle of a bar's top. */
+function anchors(el: ElementOf<"chart">, series: number[]): number[][] {
+  const n = series.length;
+  let lo = el.min ?? Math.min(...series);
+  let hi = el.max ?? Math.max(...series);
+  if (hi <= lo) hi = lo + 1;
+  const f = (s: number) => clamp01((s - lo) / (hi - lo));
+  if (el.kind !== "line" && el.kind !== "steps" && el.kind !== "area") {
+    return series.map((s, i) => [el.x + Math.floor(((2 * i + 1) * el.w) / (2 * n)), el.y + el.h - Math.max(1, Math.floor(f(s) * el.h))]);
+  }
+  return series.map((s, i) => [el.x + Math.floor((i * (el.w - 1)) / Math.max(1, n - 1)), el.y + (el.h - 1) - Math.floor(f(s) * (el.h - 1))]);
+}
+
+/** Each labelled point's value in a white box riding just above it: docs/format.md §4 "chart", labels. */
+function drawLabels(el: ElementOf<"chart">, series: number[], ctx: Ctx, ink: boolean): void {
+  const spec = el.labels!;
+  const font = ctx.assets.font(spec.font);
+  if (!font) return;
+  const every = typeof spec.every === "number" && spec.every >= 1 ? Math.floor(spec.every) : 1;
+  const text = (value: string) => `${typeof spec.pre === "string" ? spec.pre : ""}${value}${typeof spec.post === "string" ? spec.post : ""}`;
+  const n = series.length;
+  const at = anchors(el, series);
+  for (let i = 0; i < n; i++) {
+    if ((n - 1 - i) % every !== 0) continue;
+    const value = formatValue(series[i], spec.f, ctx.fmt);
+    if (value === "") continue;
+    const label = text(value);
+    const tw = width(font, layout(font, label, 32767, font.lineHeight, false)[0] ?? []);
+    const [px, py] = at[i];
+    const bw = tw + 2 * LABEL_PAD;
+    const bh = font.lineHeight + 2;
+    const bx = Math.max(el.x, Math.min(el.x + el.w - bw, px - Math.floor(bw / 2)));
+    const by = py - bh - LABEL_GAP;
+    circle(ctx.fb, px, py, 3, true, 1, ink);
+    fillRect(ctx.fb, bx, by, bw, bh, 3, !ink);
+    strokeRect(ctx.fb, bx, by, bw, bh, 3, 1, ink);
+    drawText(ctx.fb, font, label, { x: bx + LABEL_PAD, y: by + 1, w: tw, h: font.lineHeight, align: "l", valign: "t", wrap: false }, ink);
+  }
+}
+
+const LABEL_PAD = 4;
+const LABEL_GAP = 5;
+
+function drawSeries(el: ElementOf<"chart">, series: number[], ctx: Ctx, ink: boolean): void {
   const n = series.length;
   let lo = el.min ?? Math.min(...series);
   let hi = el.max ?? Math.max(...series);

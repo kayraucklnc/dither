@@ -2,7 +2,7 @@
 // the screens always do. Afterwards the panel shows what the simulator showed.
 
 import { useEffect, useRef, useState } from "react";
-import { Cable, CheckCircle2, CircleAlert, Download, Loader2, Usb } from "lucide-react";
+import { Activity, Cable, CheckCircle2, CircleAlert, Download, Loader2, Usb } from "lucide-react";
 import type { Compiled } from "@/compiler";
 import { DeviceError, FirmwareError, PanelConnection, getBoard, loadFirmware, openMonitor, type Monitor, type PanelInfo } from "@/device";
 import { parseProject, type Project } from "@/project/schema";
@@ -74,8 +74,10 @@ function checklist(project: Project, compiled: Compiled | null): string[] {
   return out;
 }
 
-export function FlashDialog({ open, onClose, compiled, onFlashed }: {
+export function FlashDialog({ open, onClose, compiled, onFlashed, onActivity }: {
   open: boolean; onClose: () => void; compiled: Compiled | null; onFlashed: () => void;
+  /** Close and follow the panel in Panel activity. */
+  onActivity: () => void;
 }) {
   const { project, replace } = useProject();
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
@@ -337,8 +339,12 @@ export function FlashDialog({ open, onClose, compiled, onFlashed }: {
                 <p className="text-[13px] text-muted">The panel is restarting. It joins Wi-Fi, fetches what it needs and redraws in under a minute.</p>
               </div>
             </div>
+            <div className="flex items-center gap-3 rounded-lg border border-line bg-raised p-3">
+              <p className="flex-1 text-[13px] text-muted">Keep it plugged in to see each wake: what it fetched, which screen it drew, and when it wakes next.</p>
+              <Button size="sm" variant="primary" icon={<Activity size={14} />} onClick={onActivity}>Open panel activity</Button>
+            </div>
             {log.length === 0 ? (
-              <Button size="sm" variant="ghost" onClick={watch}>Watch what the panel is doing</Button>
+              <Button size="sm" variant="ghost" onClick={watch}>Show the raw log here</Button>
             ) : (
               <pre className="max-h-48 overflow-auto rounded-md bg-bezel p-3 text-[12px] leading-relaxed text-paper">{log.join("\n")}</pre>
             )}
