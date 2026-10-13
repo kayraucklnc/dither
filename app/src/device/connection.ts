@@ -26,21 +26,26 @@ export interface FlashProgress {
   readonly fraction: number;
 }
 
+export interface ConnectEvents {
+  readonly onPicked?: () => void;
+  readonly onLog?: (line: string) => void;
+}
+
 export interface FlashInput {
   readonly firmware?: Uint8Array;
   readonly blob: Uint8Array;
 }
 
 /** Open at 921600, and once more at 115200 if that fails for any reason but a busy port. */
-export async function openWithFallback(open: SessionOpener, port: SerialPort): Promise<DeviceSession> {
+export async function openWithFallback(open: SessionOpener, port: SerialPort, onLog?: (line: string) => void): Promise<DeviceSession> {
   try {
-    return await open(port, FAST_BAUD);
+    return await open(port, FAST_BAUD, onLog);
   } catch (first) {
     const mapped = toDeviceError(first);
     if (mapped.kind !== "io") throw mapped;
   }
   try {
-    return await open(port, SAFE_BAUD);
+    return await open(port, SAFE_BAUD, onLog);
   } catch (second) {
     throw toDeviceError(second);
   }
@@ -61,7 +66,8 @@ export class PanelConnection {
     return typeof navigator !== "undefined" && "serial" in navigator && globalThis.isSecureContext === true;
   }
 
-  static async connect(board: Board): Promise<PanelConnection> {
+  /** `onPicked` fires once a port is chosen; `onLog` relays the flasher's progress lines. */
+  static async connect(board: Board, events: ConnectEvents = {}): Promise<PanelConnection> {
     if (typeof navigator === "undefined" || !("serial" in navigator)) {
       throw new DeviceError("unsupported", MESSAGES.unsupported);
     }
@@ -72,8 +78,9 @@ export class PanelConnection {
     } catch (err) {
       throw toDeviceError(err);
     }
+    events.onPicked?.();
     const { openEspSession } = await import("./espSession");
-    return new PanelConnection(board, await openWithFallback(openEspSession, port));
+    return new PanelConnection(board, await openWithFallback(openEspSession, port, events.onLog));
   }
 
   /** The serial port, for openMonitor after flashing. */

@@ -70,17 +70,19 @@ async function closeTransport(transport: Transport): Promise<void> {
   }
 }
 
-function createLog(): { terminal: IEspLoaderTerminal; lines: () => readonly string[] } {
+function createLog(onLine?: (line: string) => void): { terminal: IEspLoaderTerminal; lines: () => readonly string[] } {
   let lines: readonly string[] = [];
   const push = (line: string) => {
     lines = [...lines.slice(-(LOG_LINES - 1)), line];
+    const text = line.trim();
+    if (text) onLine?.(text);
   };
   return { terminal: { clean: () => (lines = []), write: push, writeLine: push }, lines: () => lines };
 }
 
 /** Open the port, sync with the ROM, load the stub and identify the chip. */
-export async function openEspSession(port: SerialPort, baudrate: number): Promise<DeviceSession> {
-  const log = createLog();
+export async function openEspSession(port: SerialPort, baudrate: number, onLog?: (line: string) => void): Promise<DeviceSession> {
+  const log = createLog(onLog);
   const transport = new Transport(port, false);
   const loader = new ESPLoader({ transport, baudrate, romBaudrate: ROM_BAUD, terminal: log.terminal });
   try {

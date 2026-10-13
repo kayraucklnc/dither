@@ -168,6 +168,18 @@ describe("openWithFallback", () => {
     expect(bauds).toEqual([FAST_BAUD]);
   });
 
+  it("passes the progress listener to every attempt", async () => {
+    const heard: (((line: string) => void) | undefined)[] = [];
+    const onLog = () => {};
+    const open = async (_p: SerialPort, baud: number, log?: (line: string) => void) => {
+      heard.push(log);
+      if (baud === FAST_BAUD) throw new Error("Failed to connect with the device");
+      return ok;
+    };
+    await openWithFallback(open, port, onLog);
+    expect(heard).toEqual([onLog, onLog]);
+  });
+
   it("falls back to 115200 after an io failure", async () => {
     const bauds: number[] = [];
     const open = async (_p: SerialPort, baud: number) => {

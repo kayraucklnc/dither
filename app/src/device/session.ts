@@ -28,4 +28,5 @@ export interface DeviceSession {
   close(): Promise<void>;
 }
 
-export type SessionOpener = (port: SerialPort, baudrate: number) => Promise<DeviceSession>;
+/** `onLog` hears the flasher's progress lines as they come ("Connecting...", "Chip is ESP32-C3"). */
+export type SessionOpener = (port: SerialPort, baudrate: number, onLog?: (line: string) => void) => Promise<DeviceSession>;
