@@ -145,7 +145,12 @@ export default defineExtension<Settings>({
       ],
     },
   ],
-  draw(d, s) {
+  draw(d, s, env) {
+    if (!(s.place ?? env.place)) {
+      d.icon("cloud-sun", { x: 0, y: d.height * 0.1, w: d.width, h: Math.min(d.height * 0.45, 96) });
+      d.text("Choose a place in Panel settings", { x: 0, y: d.height * 0.6, w: d.width, h: d.height * 0.3, size: d.fit(["Choose a place in"], d.width, 40, { max: 24 }), align: "center", wrap: true, lines: 2 });
+      return;
+    }
     const detail = s.detail === "auto"
       ? d.height >= 260 && d.width >= 320 ? "forecast" : d.height >= 150 ? "today" : "now"
       : s.detail;

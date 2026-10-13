@@ -3,11 +3,11 @@ import { defineExtension } from "../api";
 export default defineExtension({
   id: "status",
   name: "Panel status",
-  description: "Battery (where the board can tell), Wi-Fi and when the panel last woke.",
+  description: "Battery (where the board can tell), Wi-Fi and when the data last changed.",
   icon: "battery-medium",
   category: "device",
   size: { min: [3, 1], default: [6, 1] },
-  fields: [{ key: "showTime", label: "Show the last update", kind: "toggle" }],
+  fields: [{ key: "showTime", label: "Show when the data last changed", kind: "toggle" }],
   defaults: () => ({ showTime: true }),
   draw(d, s) {
     const h = d.height;
@@ -23,6 +23,11 @@ export default defineExtension({
       d.when({ all: [{ v: "device.battery", op: battery }, { v: "device.online", op: "true" }] }, () => d.icon("wifi", { x, y: 0, w: h, h }));
       d.when({ all: [{ v: "device.battery", op: battery }, { v: "device.online", op: "false" }] }, () => d.icon("wifi-off", { x, y: 0, w: h, h }));
     }
-    if (s.showTime) d.text(["Updated ", d.time("HH:mm")], { x: 0, y: 0, w: d.width, h, size, align: "right", valign: "middle" });
+    // When the data last changed, not when the panel woke: a wake that brings
+    // nothing new then draws the same frame, and the panel is left alone.
+    if (s.showTime) {
+      d.when({ v: "device.changed", op: "present" }, () =>
+        d.text(["Updated ", { v: "device.changed", f: { time: "HH:mm" } }], { x: 0, y: 0, w: d.width, h, size, align: "right", valign: "middle" }));
+    }
   },
 });

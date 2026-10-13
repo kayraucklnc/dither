@@ -7,7 +7,7 @@
 namespace dither {
 namespace {
 
-constexpr uint32_t kMagic = 0x33435644;  // "DVC3"
+constexpr uint32_t kMagic = 0x34435644;  // "DVC4"
 
 class Writer {
  public:
@@ -170,8 +170,9 @@ std::vector<uint8_t> encodeCache(const ValueCache& cache) {
   Writer w;
   w.u32(kMagic);
   w.u32(cache.blobCrc);
-  w.u8(static_cast<uint8_t>((cache.lastOnline ? 1 : 0) | (cache.lastRssi ? 2 : 0)));
+  w.u8(static_cast<uint8_t>((cache.lastOnline ? 1 : 0) | (cache.lastRssi ? 2 : 0) | (cache.changedAt ? 4 : 0)));
   w.f64(cache.lastRssi.value_or(0));
+  w.i64(cache.changedAt.value_or(0));
   w.u32(static_cast<uint32_t>(cache.sources.size()));
   for (const auto& [id, s] : cache.sources) {
     w.str(id);
@@ -201,8 +202,10 @@ bool decodeCache(ByteSpan bytes, ValueCache& out) {
   c.blobCrc = r.u32();
   const uint8_t network = r.u8();
   const double rssi = r.f64();
+  const int64_t changed = r.i64();
   c.lastOnline = network & 1;
   if (network & 2) c.lastRssi = rssi;
+  if (network & 4) c.changedAt = changed;
   uint32_t sources = r.u32();
   for (uint32_t i = 0; i < sources && r.ok(); ++i) {
     std::string id = r.str();

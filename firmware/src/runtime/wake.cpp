@@ -30,6 +30,7 @@ void setDeviceValues(ValueStore& values, const DeviceStatus& device) {
   values.set("device.usb", Value::boolean(device.usb));
   values.set("device.online", Value::boolean(device.online));
   values.set("device.rssi", optionalNumber(device.rssi));
+  values.set("device.changed", device.changed ? Value::number(static_cast<double>(*device.changed)) : Value());
 }
 
 void setSourceStatus(ValueStore& values, const std::string& id, const SourceState& state,
@@ -40,6 +41,14 @@ void setSourceStatus(ValueStore& values, const std::string& id, const SourceStat
     age = Value::number(static_cast<double>(std::max<int64_t>(0, floorDiv(*now - *state.lastSuccess, 60))));
   }
   values.set(id + "._age", age);
+}
+
+bool sameValues(const ValueStore& a, const ValueStore& b) {
+  if (a.all().size() != b.all().size()) return false;
+  for (const auto& [ref, v] : a.all()) {
+    if (b.get(ref) != v) return false;
+  }
+  return true;
 }
 
 bool sourceDue(const SourceState& state, uint32_t every, std::optional<int64_t> now) {

@@ -52,7 +52,7 @@ bool accessToken(const SourceSpec& source, std::optional<int64_t> now, ValueCach
 }  // namespace
 
 bool fetchSource(const SourceSpec& source, const Program& program, std::optional<int64_t> now, ValueCache& cache,
-                 JsonDoc& out, std::string& error) {
+                 JsonDoc& out, HtmlText& page, std::string& error) {
   if (source.decodes && !source.aesKey) {
     error = "decode key is not 64 hex digits";
     return false;
@@ -72,12 +72,21 @@ bool fetchSource(const SourceSpec& source, const Program& program, std::optional
   const JsonFilter filter = buildFilter(source);
   auto read = [&](CharSource& body, std::string& err) {
     if (!source.decodes) {
+      if (source.html) {
+        page.read(body);
+        return true;
+      }
       JsonParseResult r = out.parse(body, &filter, JsonLimits::response());
       if (!r.ok) err = "JSON: " + r.error + " at " + std::to_string(r.offset);
       return r.ok;
     }
     MbedAesDecrypter aes(*source.aesKey);
     AesEcbSource plain(body, aes);
+    if (source.html) {
+      page.read(plain);
+      if (!plain.error().empty()) err = "decode: " + plain.error();
+      return plain.error().empty();
+    }
     JsonParseResult r = out.parse(plain, &filter, JsonLimits::response());
     if (!plain.error().empty()) {
       err = "decode: " + plain.error();

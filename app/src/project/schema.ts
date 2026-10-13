@@ -23,6 +23,8 @@ export const screenSchema = z.object({
   id,
   name: z.string().max(60),
   widgets: z.array(widgetSchema).default([]),
+  /** Minutes between fetches for every widget on this screen; absent or null leaves it to each widget. */
+  fetchMinutes: z.number().int().min(5).max(1440).nullable().optional(),
 });
 
 export const checkSchema = z.object({

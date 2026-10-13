@@ -1,8 +1,8 @@
 // The panel, life size or as large as fits, with the widgets on it you can
 // pick up, move and resize. What is drawn underneath is the real render.
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Plus } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { Copy, Plus, Trash2 } from "lucide-react";
 import type { Compiled } from "@/compiler";
 import { CELL, cellsToBox, gridOf, rotated } from "@/compiler/grid";
 import { envOf, extensionFor, widgetTitle } from "@/compiler/widgets";
@@ -12,6 +12,7 @@ import { boardPanel } from "@/state/compile";
 import { useProject } from "@/state/project-store";
 import { Button } from "../kit";
 import { ScreenPreview } from "../Preview";
+import { useWidgetActions } from "./actions";
 import { clampWidget, overlapping } from "./placement";
 
 interface Props {
@@ -29,19 +30,35 @@ type Drag = { id: string; mode: "move" | "resize"; startX: number; startY: numbe
 
 const NOT_OURS = "dialog, button, input, select, textarea, [role=radiogroup], [contenteditable]:not([contenteditable=false])";
 
-/** Editor shortcuts apply only while focus is on the panel (or nowhere), and never with a modifier other than shift. */
-function ownsKey(e: KeyboardEvent, area: HTMLElement | null): boolean {
-  if (e.metaKey || e.ctrlKey || e.altKey) return false;
+/** Focus is on the panel, or nowhere: not in a field, a control or a dialog. */
+function focusIsOurs(e: KeyboardEvent, area: HTMLElement | null): boolean {
   const t = e.target instanceof Element ? e.target : null;
   if (!t || t === document.body) return true;
   return !t.closest(NOT_OURS) && (area?.contains(t) ?? false);
 }
+
+/** Editor shortcuts apply only while focus is ours, and never with a modifier other than shift. */
+function ownsKey(e: KeyboardEvent, area: HTMLElement | null): boolean {
+  return !(e.metaKey || e.ctrlKey || e.altKey) && focusIsOurs(e, area);
+}
+
+/** Room above a widget for its label; a widget nearer the top than this gets it below. */
+const LABEL_ROOM = 28;
 
 export function updateWidget(p: Project, screenIndex: number, id: string, fn: (w: Widget) => Widget): Project {
   return {
     ...p,
     screens: p.screens.map((s, i) => (i !== screenIndex ? s : { ...s, widgets: s.widgets.map((w) => (w.id === id ? fn(w) : w)) })),
   };
+}
+
+function ToolButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <button type="button" aria-label={label} title={label} onClick={onClick}
+      className="grid size-5 place-items-center rounded-[3px] hover:bg-white/20 focus-visible:outline focus-visible:outline-white">
+      {children}
+    </button>
+  );
 }
 
 export function ScreenEditor({ screenIndex, compiled, values, now, selected, onSelect, onAdd, flashKey }: Props) {
@@ -54,6 +71,7 @@ export function ScreenEditor({ screenIndex, compiled, values, now, selected, onS
   const [scale, setScale] = useState(1);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [ghost, setGhost] = useState<Widget | null>(null);
+  const actions = useWidgetActions(screenIndex, onSelect);
 
   useLayoutEffect(() => {
     const el = wrap.current;
@@ -105,17 +123,23 @@ export function ScreenEditor({ screenIndex, compiled, values, now, selected, onS
     setGhost(null);
   };
 
-  // Keyboard: arrows move, shift+arrows resize, delete removes.
+  // Keyboard: A adds, arrows move, shift+arrows resize, delete removes, ⌘D duplicates.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!selected || !ownsKey(e, wrap.current)) return;
+      if (e.key.toLowerCase() === "a" && !e.shiftKey && !e.repeat && ownsKey(e, wrap.current) && !drag) {
+        e.preventDefault();
+        return onAdd();
+      }
       const w = screen.widgets.find((x) => x.id === selected);
       if (!w) return;
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === "d" && focusIsOurs(e, wrap.current)) {
+        e.preventDefault();
+        return actions.duplicate(w);
+      }
+      if (!ownsKey(e, wrap.current)) return;
       if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
-        update((p) => ({ ...p, screens: p.screens.map((s, i) => (i !== screenIndex ? s : { ...s, widgets: s.widgets.filter((x) => x.id !== w.id) })) }));
-        onSelect(null);
-        return;
+        return actions.remove(w);
       }
       if (e.key === "Escape") return onSelect(null);
       const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
@@ -127,7 +151,7 @@ export function ScreenEditor({ screenIndex, compiled, values, now, selected, onS
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selected, screen.widgets, grid, commit, update, screenIndex, onSelect]);
+  }, [selected, screen.widgets, grid, commit, onSelect, onAdd, actions, drag]);
 
   const box = (w: Widget) => {
     const b = cellsToBox(w.x, w.y, w.w, w.h, panel);
@@ -159,6 +183,11 @@ export function ScreenEditor({ screenIndex, compiled, values, now, selected, onS
           {screen.widgets.map((w) => {
             const shown = ghost && ghost.id === w.id ? ghost : w;
             const isSel = selected === w.id;
+            const b = box(shown);
+            // Keep the label on the panel: above, else below, else inside; right-aligned on the right half.
+            const vertical = b.top >= LABEL_ROOM ? "bottom-full mb-1" : b.top + b.height + LABEL_ROOM <= panel.height * scale ? "top-full mt-1" : "top-1";
+            const right = b.left + b.width / 2 > (panel.width * scale) / 2;
+            const place = `${vertical} ${right ? (vertical === "top-1" ? "right-1" : "right-0") : vertical === "top-1" ? "left-1" : "left-0"}`;
             return (
               <div
                 key={w.id}
@@ -168,14 +197,27 @@ export function ScreenEditor({ screenIndex, compiled, values, now, selected, onS
                 aria-pressed={isSel}
                 onPointerDown={(e) => onPointerDown(e, w, "move")}
                 onFocus={() => onSelect(w.id)}
-                className={`absolute group rounded-[3px] cursor-move outline-none ${isSel ? "ring-2 ring-accent" : "hover:ring-1 hover:ring-accent/60"} ${clashes.has(w.id) && !isSel ? "ring-1 ring-danger/50" : ""}`}
-                style={box(shown)}
+                className={`absolute group rounded-[3px] cursor-move outline-none ${isSel ? "z-10 ring-2 ring-accent" : "hover:z-10 hover:ring-1 hover:ring-accent/60"} ${clashes.has(w.id) && !isSel ? "ring-1 ring-danger/50" : ""}`}
+                style={b}
               >
+                {!isSel && !drag && (
+                  <span className={`pointer-events-none absolute hidden whitespace-nowrap rounded bg-bezel/90 px-1.5 py-0.5 text-[11px] font-medium text-white group-hover:block ${place}`}>
+                    {widgetTitle(w, env)}
+                  </span>
+                )}
                 {isSel && (
                   <>
-                    <span className="absolute -top-6 left-0 whitespace-nowrap rounded bg-accent px-1.5 py-0.5 text-[11px] font-medium text-white">
-                      {widgetTitle(w, env)} · {shown.w}×{shown.h}
-                    </span>
+                    <div className={`absolute flex items-center gap-px whitespace-nowrap rounded bg-accent text-[11px] font-medium text-white shadow-sm ${place}`}
+                      onPointerDown={(e) => e.stopPropagation()}>
+                      <span className="px-1.5 py-0.5">{widgetTitle(w, env)} · {shown.w}×{shown.h}</span>
+                      {!drag && (
+                        <>
+                          <span className="h-3.5 w-px bg-white/30" aria-hidden="true" />
+                          <ToolButton label="Duplicate (⌘D)" onClick={() => actions.duplicate(w)}><Copy size={12} /></ToolButton>
+                          <ToolButton label="Delete (Del)" onClick={() => actions.remove(w)}><Trash2 size={12} /></ToolButton>
+                        </>
+                      )}
+                    </div>
                     <span
                       onPointerDown={(e) => onPointerDown(e, w, "resize")}
                       className="absolute -right-1.5 -bottom-1.5 size-3.5 rounded-sm border-2 border-accent bg-raised cursor-nwse-resize"

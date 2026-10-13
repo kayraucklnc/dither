@@ -5,12 +5,15 @@ import { parseZone, toLocal } from "./tz";
 import { readTime, type FormatContext } from "./format";
 import { daysFromCivil } from "./tz";
 import type { Source, SourceValue, Value } from "./types";
+import { htmlToText } from "./html";
 
 export interface DeviceState {
   battery: number | null;
   usb: boolean;
   online: boolean;
   rssi: number | null;
+  /** When a fetch last changed a kept value, Unix seconds; left out, the preview says "now". */
+  changed?: number | null;
 }
 
 // Like the XIAO panel: it cannot measure its own battery, so that reads as unknown.
@@ -31,6 +34,7 @@ export function builtins(now: number, tz: string, device: DeviceState = SIMULATE
     ["device.usb", device.usb],
     ["device.online", device.online],
     ["device.rssi", device.rssi],
+    ["device.changed", device.changed === undefined ? now : device.changed],
   ]);
 }
 
@@ -75,7 +79,17 @@ function buckets(items: unknown[], v: SourceValue, ctx: FormatContext): number[]
   return out;
 }
 
+/** A web page's values: `text` and `title`, anything else null. */
+function extractPage(source: Source, page: { text: string; title: string }): Map<string, Value> {
+  return new Map(source.values.map((v) => [
+    `${source.id}.${v.key}`,
+    v.count === undefined && !v.agg && (v.path === "text" || v.path === "title") ? page[v.path] : null,
+  ]));
+}
+
+/** `body` is the parsed JSON, or for an `html` source the page's bytes. */
 export function extract(source: Source, body: unknown, ctx?: FormatContext): Map<string, Value> {
+  if (source.html) return extractPage(source, htmlToText(body instanceof Uint8Array ? body : new Uint8Array()));
   const out = new Map<string, Value>();
   for (const v of source.values) {
     const ref = `${source.id}.${v.key}`;

@@ -5,6 +5,7 @@
     "device.usb": false,
     "device.online": true,
     "device.rssi": -61,
+    "device.changed": 1791118530,
     "s0.alert": "Lavori tra Saronno e Milano Bovisa",
     "s0._ok": true,
     "s0._age": 3,

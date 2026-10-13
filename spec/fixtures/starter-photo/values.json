@@ -4,6 +4,7 @@
     "device.battery": 64,
     "device.usb": false,
     "device.online": true,
-    "device.rssi": -61
+    "device.rssi": -61,
+    "device.changed": 1791118530
   }
 }

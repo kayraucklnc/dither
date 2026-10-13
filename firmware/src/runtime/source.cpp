@@ -75,6 +75,7 @@ std::vector<SourceSpec> parseSources(JsonView sources) {
       spec.decodes = true;
       spec.aesKey = parseHexKey(s["decode"]["aes256ecb"].string());
     }
+    spec.html = s["html"].boolean(false);
     spec.usesPlaceholders = hasPlaceholder(spec.url);
     for (const auto& h : spec.headers) spec.usesPlaceholders = spec.usesPlaceholders || hasPlaceholder(h.second);
     for (JsonView v = s["values"].first(); v.exists(); v = v.next()) {
@@ -154,6 +155,17 @@ void applyResponse(const SourceSpec& source, const JsonDoc& doc, ValueStore& sto
       value = bucketsFrom(doc.root().path(v.path), v, now, tz);
     } else if (auto total = doc.aggregate(v.aggId)) {
       value = Value::number(*total);
+    }
+    store.set(source.id + "." + v.key, std::move(value));
+  }
+}
+
+void applyPage(const SourceSpec& source, const HtmlText& page, ValueStore& store) {
+  for (const auto& v : source.values) {
+    Value value;
+    if (v.agg == SourceValueSpec::Agg::None && v.count < 0) {
+      if (v.path == "text") value = Value::string(page.text());
+      if (v.path == "title") value = Value::string(page.title());
     }
     store.set(source.id + "." + v.key, std::move(value));
   }

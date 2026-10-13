@@ -48,8 +48,8 @@ export interface Compiled {
 
 const MIN_FETCH_MINUTES = 5;
 
-function sourceKey(s: Pick<Source, "url" | "headers" | "every" | "auth" | "decode">): string {
-  return JSON.stringify([s.url, s.headers ?? [], s.every, s.auth ?? null, s.decode ?? null]);
+function sourceKey(s: Pick<Source, "url" | "headers" | "every" | "auth" | "decode" | "html">): string {
+  return JSON.stringify([s.url, s.headers ?? [], s.every, s.auth ?? null, s.decode ?? null, s.html ?? false]);
 }
 
 function buildSources(project: Project): { sources: CompiledSource[]; ids: Map<string, SourceMap> } {
@@ -72,10 +72,11 @@ function buildSources(project: Project): { sources: CompiledSource[]; ids: Map<s
           : { key, path: p.path, agg: p.agg, ...(p.field ? { field: p.field } : {}) });
         const base = {
           url: spec.url,
-          every: Math.max(MIN_FETCH_MINUTES, spec.every) * 60,
+          every: Math.max(MIN_FETCH_MINUTES, screen.fetchMinutes ?? spec.every) * 60,
           ...(spec.headers?.length ? { headers: spec.headers } : {}),
           ...(spec.auth ? { auth: spec.auth } : {}),
           ...(spec.decode ? { decode: spec.decode } : {}),
+          ...(spec.html ? { html: true as const } : {}),
         };
         const key = sourceKey(base);
         let entry = byKey.get(key);

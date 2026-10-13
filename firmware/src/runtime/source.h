@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "html.h"
 #include "json.h"
 #include "timezone.h"
 #include "value.h"
@@ -52,6 +53,7 @@ struct SourceSpec {
   bool decodes = false;  // `decode.aes256ecb` present
   std::optional<std::array<uint8_t, 32>> aesKey;  // unset when the hex is malformed
   bool usesPlaceholders = false;  // in the URL or a header value
+  bool html = false;              // the answer is a web page, read as text
 };
 
 std::vector<SourceSpec> parseSources(JsonView sources);
@@ -73,6 +75,9 @@ Value extractPath(JsonView root, std::string_view path, int count);
 // Buckets need the clock (`now` unknown: null) and the zone.
 void applyResponse(const SourceSpec& source, const JsonDoc& doc, ValueStore& store, std::optional<int64_t> now,
                    const TimeZone& tz);
+
+// A web page's values: path `text` or `title`; anything else is null.
+void applyPage(const SourceSpec& source, const HtmlText& page, ValueStore& store);
 
 // The `buckets` series from the (kept) elements of `target`.
 Value bucketsFrom(JsonView target, const SourceValueSpec& spec, std::optional<int64_t> now, const TimeZone& tz);

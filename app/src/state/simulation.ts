@@ -23,7 +23,7 @@ const RETRY_FAILED_MS = 60_000;
 const cache = new Map<string, Fetched>();
 const inflight = new Map<string, Promise<Fetched>>();
 
-const keyOf = (source: Source): string => JSON.stringify([source.url, source.headers ?? []]);
+const keyOf = (source: Source): string => JSON.stringify([source.url, source.headers ?? [], source.html ?? false]);
 
 function isCurrent(f: Fetched, source: Source): boolean {
   const ttl = source.every * 1000;
@@ -77,9 +77,10 @@ async function request(source: Source, ctx: FormatContext): Promise<Fetched> {
   }
   if (!res.ok) return fail(`The server answered ${res.status}`);
   try {
-    return { at: Date.now(), ok: true, body: await res.json() };
+    // A page stays bytes: the panel reads it byte by byte, and so does the preview.
+    return { at: Date.now(), ok: true, body: source.html ? new Uint8Array(await res.arrayBuffer()) : await res.json() };
   } catch (e) {
-    return fail(timedOut(e) ? "The server took too long to answer." : "The server's answer is not JSON.");
+    return fail(timedOut(e) ? "The server took too long to answer." : source.html ? "The page could not be read." : "The server's answer is not JSON.");
   }
 }
 
@@ -149,7 +150,10 @@ export function useSimulation(compiled: Compiled | null, overrides: Overrides = 
   return useMemo(() => {
     const now = overrides.time ?? clock;
     const tz = compiled?.runtime.tz ?? "STD0";
-    const values = builtins(now, tz, { ...SIMULATED_DEVICE, ...overrides.device });
+    // Live answers say when the data last moved; with only examples, it is now.
+    const fetched = (compiled?.sources ?? []).map((s) => results.get(keyOf(s.source))).filter((f) => f?.ok).map((f) => Math.floor(f!.at / 1000));
+    const changed = fetched.length ? Math.max(...fetched) : now;
+    const values = builtins(now, tz, { ...SIMULATED_DEVICE, changed, ...overrides.device });
     const status = new Map<string, SourceStatus>();
     for (const s of compiled?.sources ?? []) {
       const f = results.get(keyOf(s.source));

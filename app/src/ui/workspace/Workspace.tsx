@@ -1,6 +1,6 @@
 // The editor: screens on the left, the panel in the middle, settings on the right.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Copy, FolderOpen, Sparkles, LayoutGrid, Plus, Redo2, Save, Settings2, Trash2, Undo2, Usb, Workflow } from "lucide-react";
 import { gridOf, rotated } from "@/compiler/grid";
 import type { Extension } from "@/extensions/api";
@@ -23,6 +23,7 @@ import { PanelSettings } from "../panel/PanelSettings";
 import { SaveWarning } from "./SaveWarning";
 import { ScreenPreview } from "../Preview";
 import { RulesView } from "../rules/RulesView";
+import { ToastProvider, useToast } from "../toast";
 import { NO_SIM, type SimState } from "../rules/SimulatePanel";
 import { Wordmark } from "../Mark";
 
@@ -44,7 +45,20 @@ function toOverrides(sim: SimState, now: number, tz: string | undefined): Overri
 }
 
 export function Workspace({ onNew }: { onNew: () => void }) {
+  return (
+    <ToastProvider>
+      <Editor onNew={onNew} />
+    </ToastProvider>
+  );
+}
+
+function Editor({ onNew }: { onNew: () => void }) {
   const { project, update, replace, undo, redo, canUndo, canRedo } = useProject();
+  const toast = useToast();
+  const latest = useRef(project);
+  useEffect(() => {
+    latest.current = project;
+  }, [project]);
   const { compiled, error } = useCompiled(project);
   const [view, setView] = useState<View>({ kind: "screen", index: 0 });
   const [selected, setSelected] = useState<string | null>(null);
@@ -90,16 +104,25 @@ export function Workspace({ onNew }: { onNew: () => void }) {
 
   const removeScreen = (i: number) => {
     const s = project.screens[i];
-    update((p) => {
-      const screens = p.screens.filter((_, j) => j !== i);
-      return {
-        ...p,
-        screens,
-        defaultScreenId: p.defaultScreenId === s.id ? screens[0].id : p.defaultScreenId,
-        rules: p.rules.filter((r) => r.screenId !== s.id),
-      };
-    });
+    const screens = project.screens.filter((_, j) => j !== i);
+    const after = {
+      ...project,
+      screens,
+      defaultScreenId: project.defaultScreenId === s.id ? screens[0].id : project.defaultScreenId,
+      rules: project.rules.filter((r) => r.screenId !== s.id),
+    };
+    update(() => after);
     setView({ kind: "screen", index: Math.max(0, i - 1) });
+    setSelected(null);
+    toast(`Removed “${s.name}”`, {
+      label: "Undo",
+      // Only while nothing else has changed; after that, the toolbar's undo is the way back.
+      run: () => {
+        if (latest.current !== after) return;
+        undo();
+        setView({ kind: "screen", index: i });
+      },
+    });
   };
 
   const openFile = async (file: File | undefined) => {
@@ -194,7 +217,10 @@ export function Workspace({ onNew }: { onNew: () => void }) {
             <div className="grid h-full min-h-[560px] grid-cols-[minmax(0,1fr)_320px]">
               <div className="flex min-h-0 flex-col">
                 <div className="flex items-center gap-3 px-6 pt-4">
-                  <Button variant="secondary" icon={<Plus size={15} />} onClick={() => setGallery(true)}>Add widget</Button>
+                  <Button variant="primary" icon={<Plus size={15} />} onClick={() => setGallery(true)} title="Add a widget (A)">
+                    Add widget
+                    <kbd className="ml-0.5 rounded bg-white/20 px-1 font-sans text-[11px] leading-4">A</kbd>
+                  </Button>
                   <span className="text-[13px] text-muted">
                     {showing === screenIndex
                       ? "The panel would show this screen right now."

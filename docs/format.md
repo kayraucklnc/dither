@@ -152,6 +152,52 @@ keeps the token until a minute before it expires (across sleeps), and sends
 `Authorization: Bearer <token>` with the GET. A failed token request fails the
 source. With `decode`, the body is decrypted before it is read as JSON.
 
+### Web pages
+
+```jsonc
+{ "id": "p0", "url": "https://example.com/menu", "every": 3600, "html": true,
+  "values": [{ "key": "text", "path": "text" }, { "key": "title", "path": "title" }] }
+```
+
+With `"html": true` the reply is a web page, not JSON. It is read as bytes,
+one at a time (after `decode`, if any), into two strings: the **title**, the
+text inside `<title>`, and the **text**, everything else a reader would see.
+A value whose `path` is `text` or `title` gets that string; any other value
+(another path, `count`, `agg`) is `null`.
+
+The reader is a state machine, case-insensitive for tag names (ASCII only):
+
+- `<` followed by a letter starts a tag: its name is the run of letters,
+  digits, `-` and `:` (lower-cased, at most 16 kept), and the tag ends at the
+  next `>` that is not inside a quoted attribute value. A quote (`"` or `'`)
+  opens a value only when the last character before it that is not white
+  space was `=`. `</` starts an end tag, which ends at the next `>`. `<!--`
+  starts a comment, ending at the first `>` preceded by at least two `-`;
+  any other `<!…>` or `<?…>` ends at the next `>`. `<` followed by anything
+  else is text, and that next character is read as text too.
+- `script`, `style`, `noscript`, `template` and `svg` hide everything up to
+  their own end tag (`</script`, any case, then up to `>`); nothing inside is
+  read as a tag.
+- `<title>` sends text to the title until `</title>`.
+- Opening or closing `address article aside blockquote br dd div dl dt
+  figcaption figure footer form h1`–`h6 header hr li main nav ol p pre section
+  table tr ul` is a line break; `<li>` then writes `-` and a space. Opening or
+  closing `td` or `th` is white space.
+- `&name;` with `name` at most 10 letters, digits or `#`: `amp lt gt quot
+  apos` are `& < > " '`, `nbsp` is white space, `#N` and `#xH` are that
+  codepoint (1 to U+10FFFF, not a surrogate) in UTF-8. Anything else, or an
+  `&` not closed by `;` in time, is text as written.
+- Every other byte is text. Bytes from 0x80 up are copied as they are.
+
+White space (space, tab, CR, LF, form feed) collapses: one space is written
+before the next text byte, unless nothing has been written yet or the last
+byte written is a line break. A line break is written only if something has
+been written and the last byte is not already one; it also drops a pending
+space. The text keeps at most 1024 bytes and the title 256: past that, the
+string is cut back to a UTF-8 character boundary as for any kept string.
+Finally, trailing line breaks are removed. `spec/html/cases.json` holds
+examples both implementations are tested against.
+
 ### Merges
 
 Some lists come from several sources — one calendar per account — and read
@@ -206,6 +252,7 @@ Built-in sources, always present:
 | `device.usb` | boolean | powered over USB |
 | `device.online` | boolean | Wi-Fi joined on this wake |
 | `device.rssi` | number \| null | dBm |
+| `device.changed` | number \| null | Unix seconds of the last wake whose fetches changed a kept value; null until one has |
 
 Every fetched source also has two derived values:
 
@@ -555,7 +602,9 @@ never written.
    `_ok` false. With the clock unknown, `clock.*` is `null` and every source is
    due. A blob with a new CRC starts with an empty value cache.
 4. Fetch every source whose `every` has elapsed since its last attempt (or that
-   has never been fetched). Values are cached across sleeps.
+   has never been fetched). Values are cached across sleeps. If any kept value
+   is now different (a reference added, removed, or holding an unequal value)
+   and the clock is known, `device.changed` becomes now; it is cached too.
 5. Evaluate the rules, draw the chosen screen.
 6. If the framebuffer is identical to what the panel already shows, leave the
    panel alone.
