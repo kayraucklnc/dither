@@ -2,7 +2,7 @@
 // the screens always do. Afterwards the panel shows what the simulator showed.
 
 import { useEffect, useRef, useState } from "react";
-import { Cable, CheckCircle2, CircleAlert, Download, Usb } from "lucide-react";
+import { Cable, CheckCircle2, CircleAlert, Download, Loader2, Usb } from "lucide-react";
 import type { Compiled } from "@/compiler";
 import { DeviceError, FirmwareError, PanelConnection, getBoard, loadFirmware, openMonitor, type Monitor, type PanelInfo } from "@/device";
 import { parseProject, type Project } from "@/project/schema";
@@ -13,11 +13,24 @@ import { Button, Dialog, Note } from "../kit";
 
 type Phase =
   | { kind: "idle" }
-  | { kind: "connecting" }
+  | { kind: "connecting"; step: ConnectStep; line: string | null }
   | { kind: "ready"; info: PanelInfo; firmwareVersion: string | null; firmwareError: string | null }
   | { kind: "working"; label: string; fraction: number }
   | { kind: "done"; installedFirmware: boolean }
   | { kind: "error"; message: string };
+
+type ConnectStep = "choose" | "talk" | "read";
+
+const STEPS: { step: ConnectStep; label: string }[] = [
+  { step: "choose", label: "Choose the panel in the browser's list" },
+  { step: "talk", label: "Say hello to it" },
+  { step: "read", label: "Read what is on it" },
+];
+
+// esptool gives up on its own eventually, but only after a long, silent minute or two.
+const CONNECT_TIMEOUT_MS = 45_000;
+const NO_ANSWER =
+  "The panel was chosen but didn't answer. Unplug it, then hold the BOOT button on the back while plugging it back in, and click Connect again. Also close any other tab with Dither open, and Arduino IDE or a serial monitor.";
 
 const STAGE: Record<string, string> = {
   firmware: "Installing the Dither firmware",
@@ -104,11 +117,16 @@ export function FlashDialog({ open, onClose, compiled, onFlashed }: {
     if (!board) return setPhase({ kind: "error", message: `Unknown display “${project.board}”.` });
     const a = attempt.current;
     release();
-    setPhase({ kind: "connecting" });
+    const step = (s: ConnectStep, line: string | null = null) => a === attempt.current && setPhase({ kind: "connecting", step: s, line });
+    step("choose");
     try {
-      const c = await PanelConnection.connect(board);
+      const c = await PanelConnection.connect(board, {
+        onPicked: () => step("talk"),
+        onLog: (line) => a === attempt.current && setPhase((p) => (p.kind === "connecting" ? { ...p, line } : p)),
+      });
       if (a !== attempt.current) return void c.disconnect();
       conn.current = c;
+      step("read");
       const info = await c.info();
       const firmware = await firmwareFor(board.id);
       if (a !== attempt.current) return;
@@ -119,6 +137,21 @@ export function FlashDialog({ open, onClose, compiled, onFlashed }: {
       setPhase(e instanceof DeviceError && e.kind === "cancelled" ? { kind: "idle" } : { kind: "error", message: message(e) });
     }
   };
+
+  /** Leave a connect in flight to fail on its own; whatever it opens is let go when it does. */
+  const abandon = (next: Phase) => {
+    attempt.current += 1;
+    release();
+    setPhase(next);
+  };
+
+  const connecting = phase.kind === "connecting" && phase.step !== "choose";
+  useEffect(() => {
+    if (!connecting) return;
+    const t = setTimeout(() => abandon({ kind: "error", message: NO_ANSWER }), CONNECT_TIMEOUT_MS);
+    return () => clearTimeout(t);
+    // abandon only touches refs and setters.
+  }, [connecting]);
 
   const flash = async (needsFirmware: boolean) => {
     const c = conn.current;
@@ -207,7 +240,35 @@ export function FlashDialog({ open, onClose, compiled, onFlashed }: {
           </>
         )}
 
-        {phase.kind === "connecting" && <p className="text-muted">Waiting for the panel… pick it in the browser's list.</p>}
+        {phase.kind === "connecting" && (
+          <div className="space-y-4">
+            <ol className="space-y-2">
+              {STEPS.map(({ step, label }, i) => {
+                const at = STEPS.findIndex((s) => s.step === phase.step);
+                const state = i < at ? "done" : i === at ? "now" : "later";
+                return (
+                  <li key={step} className={`flex items-center gap-2.5 ${state === "later" ? "text-muted" : ""}`}>
+                    {state === "done" ? <CheckCircle2 size={16} className="text-accent" />
+                      : state === "now" ? <Loader2 size={16} className="animate-spin text-accent" />
+                      : <span className="size-4 rounded-full border border-line" />}
+                    <span className={state === "now" ? "font-medium" : ""}>{label}</span>
+                  </li>
+                );
+              })}
+            </ol>
+            {phase.step === "choose" && (
+              <Note>
+                The browser opened a small box at the top of the window. Click the panel in it — it is listed as
+                {" "}<b>USB JTAG/serial debug unit</b> — and then <b>Connect</b>. If the box is empty, the panel is asleep or the cable only
+                charges: unplug it, hold BOOT on the back while plugging it in, and try again.
+              </Note>
+            )}
+            {phase.step !== "choose" && phase.line && <p className="font-mono text-[12px] text-muted truncate">{phase.line}</p>}
+            <div className="flex justify-end">
+              <Button variant="ghost" onClick={() => abandon({ kind: "idle" })}>Cancel</Button>
+            </div>
+          </div>
+        )}
 
         {phase.kind === "ready" && (() => {
           const { info, firmwareVersion, firmwareError } = phase;
