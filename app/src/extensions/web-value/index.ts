@@ -1,4 +1,10 @@
-import { defineExtension } from "../api";
+import { defineExtension, type Draw } from "../api";
+
+/** What an address-less widget shows until it has one. */
+function needsAddress(d: Draw): void {
+  d.icon("info", { x: 0, y: d.height * 0.1, w: d.width, h: Math.min(d.height * 0.45, 96) });
+  d.text("Enter an address in its settings", { x: 0, y: d.height * 0.6, w: d.width, h: d.height * 0.3, size: d.fit(["Enter an address in"], d.width, 40, { max: 24 }), align: "center", wrap: true, lines: 2 });
+}
 
 export default defineExtension({
   id: "web-value",
@@ -30,9 +36,11 @@ export default defineExtension({
       values: { value: String(s.path) },
     };
   },
+  example: { label: "Followers", url: "https://example.com/stats.json", path: "followers" },
   sample: () => ({ value: 1234 }),
   facts: (s) => [{ key: "value", label: String(s.label || "Value"), type: "number", value: "value" }],
   draw(d, s) {
+    if (!/^https?:\/\//.test(String(s.url ?? "").trim())) return needsAddress(d);
     const labelH = s.label ? Math.round(d.height * 0.28) : 0;
     const shown = `${s.prefix ?? ""}8,888,888${s.suffix ?? ""}`;
     const size = d.fit([shown], d.width, d.height - labelH, { weight: 700 });

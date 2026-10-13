@@ -5,6 +5,7 @@
     "device.usb": false,
     "device.online": true,
     "device.rssi": -61,
+    "device.changed": 1791118530,
     "s0.temp": 18.4,
     "s0.code": 2,
     "s0.isDay": 1,

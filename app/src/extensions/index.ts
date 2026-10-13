@@ -13,8 +13,9 @@ import stripe from "./stripe";
 import text from "./text";
 import trenord from "./trenord";
 import weather from "./weather";
+import webPage from "./web-page";
 import webValue from "./web-value";
 
 export const EXTENSIONS: readonly Extension[] = [
-  clock, date, weather, googleCalendar, trenord, text, messages, countdown, picture, stripe, crypto, webValue, status,
+  clock, date, weather, googleCalendar, trenord, text, messages, countdown, picture, stripe, crypto, webValue, webPage, status,
 ] as unknown as Extension[];

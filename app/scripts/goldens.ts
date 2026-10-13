@@ -19,13 +19,13 @@ import { builtins } from "../src/runtime/values";
 
 const root = fileURLToPath(new URL("../../spec/fixtures/", import.meta.url));
 const NOW = Date.UTC(2026, 9, 4, 13, 7, 30) / 1000; // Sunday 15:07:30 in Rome
-const DEVICE = { "device.battery": 64, "device.usb": false, "device.online": true, "device.rssi": -61 };
+const DEVICE = { "device.battery": 64, "device.usb": false, "device.online": true, "device.rssi": -61, "device.changed": NOW - 12 * 60 };
 
 function write(name: string, blob: Uint8Array, runtime: Runtime, values: Record<string, Value>, now = NOW) {
   const dir = `${root}${name}/`;
   mkdirSync(dir, { recursive: true });
-  const all = builtins(now, runtime.tz, { battery: null, usb: false, online: false, rssi: null });
-  for (const k of ["device.battery", "device.usb", "device.online", "device.rssi"]) all.set(k, null);
+  const all = builtins(now, runtime.tz, { battery: null, usb: false, online: false, rssi: null, changed: null });
+  for (const k of ["device.battery", "device.usb", "device.online", "device.rssi", "device.changed"]) all.set(k, null);
   for (const [k, v] of Object.entries(values)) all.set(k, v);
   applyMerges(runtime.merges, all, formatContext(runtime, now, all));
   const { fb, screen } = render(runtime, blob, all, now);
@@ -38,7 +38,7 @@ function write(name: string, blob: Uint8Array, runtime: Runtime, values: Record<
 const fonts = await loadFonts();
 const deps = { library: nodeLibrary, fonts, picture: async () => null, boardPanel: () => ({ width: 800, height: 480 }) };
 
-for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "primitives", "text-and-formats"]) {
+for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "starter-showcase", "primitives", "text-and-formats"]) {
   rmSync(`${root}${dir}`, { recursive: true, force: true });
 }
 

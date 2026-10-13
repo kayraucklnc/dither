@@ -84,7 +84,9 @@ uint32_t Device::run(const Program& program) {
     device.online = cache.lastOnline = wifi.online;
     device.rssi = cache.lastRssi = wifi.rssi;
     if (wifi.online && syncTime(program.ntpServer())) now = clockNow();
+    const ValueStore before = cache.values;
     fetchDue(program, wifi.online, now, cache);
+    if (now && !sameValues(before, cache.values)) cache.changedAt = now;
     stopWifi();
     saveCache(cache);  // before drawing, so a crash while drawing does not refetch
   } else {
@@ -95,6 +97,7 @@ uint32_t Device::run(const Program& program) {
   dlog("clock %s, online %s, usb %s", now ? "set" : "unknown", device.online ? "yes" : "no",
        device.usb ? "yes" : "no");
 
+  device.changed = cache.changedAt;
   ValueStore values = cache.values;
   setClockValues(values, now, program.timeZone());
   setDeviceValues(values, device);
@@ -126,11 +129,16 @@ void Device::fetchDue(const Program& program, bool online, std::optional<int64_t
       dlog("source %s: due, but offline", source.id.c_str());
     } else {
       JsonDoc doc;
+      HtmlText page;
       std::string error;
       const uint32_t start = millis();
-      state.ok = fetchSource(source, program, now, cache, doc, error);
+      state.ok = fetchSource(source, program, now, cache, doc, page, error);
       if (state.ok) {
-        applyResponse(source, doc, cache.values, now, program.timeZone());
+        if (source.html) {
+          applyPage(source, page, cache.values);
+        } else {
+          applyResponse(source, doc, cache.values, now, program.timeZone());
+        }
         state.everSucceeded = true;
         state.lastSuccess = now;  // unknown without a clock: _age reads null
         dlog("source %s: ok in %lu ms (%u values, %u bytes of text kept), heap %lu", source.id.c_str(),

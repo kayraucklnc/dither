@@ -5,6 +5,7 @@
     "device.usb": false,
     "device.online": true,
     "device.rssi": -61,
+    "device.changed": 1791118530,
     "s0.total": 3402150,
     "s0.count": 588,
     "s0.more": true,

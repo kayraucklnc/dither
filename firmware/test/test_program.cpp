@@ -170,6 +170,10 @@ TEST(builtin_values) {
   CHECK(v.get("device.battery").isNull());
   CHECK(v.get("device.usb") == Value::boolean(true));
   CHECK(v.get("device.online") == Value::boolean(false));
+  CHECK(v.get("device.changed").isNull());
+  d.changed = 1782907200;
+  setDeviceValues(v, d);
+  CHECK(v.get("device.changed") == Value::number(1782907200));
 
   SourceState s;
   setSourceStatus(v, "w", s, 1000);
@@ -262,6 +266,22 @@ TEST(quiet_and_crash_backoff) {
   CHECK_EQ(crashBackoffSeconds(7), 900u);
 }
 
+TEST(same_values) {
+  ValueStore a, b;
+  CHECK(sameValues(a, b));
+  a.set("w.t", Value::number(20.5));
+  CHECK(!sameValues(a, b));
+  b.set("w.t", Value::number(20.5));
+  CHECK(sameValues(a, b));
+  b.set("w.t", Value::number(20.6));
+  CHECK(!sameValues(a, b));
+  b.set("w.t", Value::number(20.5));
+  b.set("w.u", Value());
+  CHECK(!sameValues(a, b));  // a reference that appeared, even as null
+  a.set("w.u", Value());
+  CHECK(sameValues(a, b));
+}
+
 TEST(value_cache_round_trip) {
   ValueCache c;
   c.blobCrc = 0xDEADBEEF;
@@ -278,6 +298,7 @@ TEST(value_cache_round_trip) {
   c.values.set("w.h", Value::series({1.5, 2, -3}));
   c.lastOnline = true;
   c.lastRssi = -67;
+  c.changedAt = 1782907260;
   auto bytes = encodeCache(c);
   ValueCache d;
   CHECK(decodeCache({bytes.data(), bytes.size()}, d));
@@ -287,6 +308,7 @@ TEST(value_cache_round_trip) {
   for (const auto& [ref, v] : c.values.all()) CHECK(d.values.get(ref) == v);
   CHECK_EQ(d.values.all().size(), size_t{5});
   CHECK(d.lastOnline && d.lastRssi && *d.lastRssi == -67);
+  CHECK(d.changedAt == 1782907260);
   ValueCache unknownTimes;
   SourceState u;
   u.attempted = u.ok = u.everSucceeded = true;  // fetched with no clock
@@ -297,7 +319,7 @@ TEST(value_cache_round_trip) {
   ValueCache offline;
   auto offlineBytes = encodeCache(offline);
   CHECK(decodeCache({offlineBytes.data(), offlineBytes.size()}, d));
-  CHECK(!d.lastOnline && !d.lastRssi);
+  CHECK(!d.lastOnline && !d.lastRssi && !d.changedAt);
 
   for (size_t cut = 0; cut < bytes.size(); ++cut) CHECK(!decodeCache({bytes.data(), cut}, d));
   bytes.push_back(0);

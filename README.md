@@ -10,7 +10,12 @@
 </p>
 
 <p align="center">
-  <a href="https://kayraucklnc.github.io/dither/"><b>Open the app</b></a> ·
+  <a href="https://kayraucklnc.github.io/dither/"><img src="docs/images/open-the-app.svg" width="300" height="64" alt="Open the app" /></a>
+  <br />
+  <sub>Runs in Chrome or Edge on a computer. Nothing to install, no account.</sub>
+</p>
+
+<p align="center">
   <a href="#get-started">Get started</a> ·
   <a href="#make-your-own-widget">Make a widget</a> ·
   <a href="#roadmap">Roadmap</a> ·
@@ -129,11 +134,12 @@ back in, then let go.
 | 💶 | Revenue (Stripe) | A figure, a smooth graph, a ledger or a full board with payments | A restricted Stripe key |
 | ₿ | Crypto price | A coin's price and today's change ([CoinGecko](https://www.coingecko.com/)) | — |
 | 🔢 | Number from the web | Any value from a JSON address: a sensor, a counter, a price | — |
+| 📄 | Web page | The text of any web page, fetched by the panel itself: a status page, a menu, a notice | — |
 | ⏳ | Countdown | Days until something you're looking forward to | — |
 | 💬 | Messages | A different line every day or every hour, from a list you write | — |
 | ✍️ | Text | A heading, a note, anything you type | — |
 | 🖼️ | Picture | A photo or drawing, dithered for e-ink | — |
-| 📶 | Panel status | Wi-Fi, battery where the board can measure it, and when the panel last woke | — |
+| 📶 | Panel status | Wi-Fi, battery where the board can measure it, and when the data last changed | — |
 
 Keys and account links stay in your browser and on your panel. When you save
 a project to a file, they're left out unless you choose to include them.
@@ -267,6 +273,7 @@ of these patterns, and there's a bundled widget to copy for each:
 | An OAuth login | `auth`: the panel trades a refresh token for an access token on each wake | Google Calendar |
 | Totals or a graph from a list | `values: { x: { path, agg: "sum" \| "count" \| "buckets" } }` | Stripe |
 | An encrypted reply | `decode: { aes256ecb: key }` | Trains (Trenord) |
+| A web page, not JSON | `html: true`, then `values: { text: "text", title: "title" }` | Web page |
 | The date or time in the URL | `{{now\|YYYY-MM-DD}}`, `{{today-86400}}` | Google Calendar, Stripe |
 
 The panel can't run JavaScript, follow a login page, or read anything other
@@ -301,6 +308,9 @@ The full guide, with layout tips and the whole `Draw` API, is
 - ✅ Cached values, so a screen still draws when Wi-Fi drops
 - ✅ OAuth refresh, encrypted replies and list totals on the panel
 - ✅ Smooth, dithered graphs drawn on the panel
+- ✅ The panel is only redrawn when what it would show has changed
+- ✅ How often each screen fetches its data, set per screen
+- ✅ Web pages read as text on the panel
 - ⬜ Update the design over Wi-Fi, without a cable
 - ⬜ Set up Wi-Fi from a phone over Bluetooth
 - ⬜ Only refresh the parts of the screen that changed

@@ -84,6 +84,8 @@ export interface Source {
   headers?: [string, string][];
   auth?: SourceAuth;
   decode?: { aes256ecb: string };
+  /** The answer is a web page, read as text: docs/format.md "Web pages". */
+  html?: true;
   every: number;
   values: SourceValue[];
 }

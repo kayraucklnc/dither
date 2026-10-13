@@ -19,7 +19,7 @@ describe.skipIf(names.length === 0)("golden fixtures", () => {
     const blob = decodeBlob(new Uint8Array(readFileSync(`${root}${name}/blob.bin`)));
     const { now, values } = JSON.parse(readFileSync(`${root}${name}/values.json`, "utf8")) as { now: number; values: Record<string, Value> };
     const all = builtins(now, blob.runtime.tz);
-    for (const k of ["device.battery", "device.usb", "device.online", "device.rssi"]) all.set(k, null);
+    for (const k of ["device.battery", "device.usb", "device.online", "device.rssi", "device.changed"]) all.set(k, null);
     for (const [k, v] of Object.entries(values)) all.set(k, v);
     applyMerges(blob.runtime.merges, all, formatContext(blob.runtime, now, all));
     const { fb } = render(blob.runtime, blob.bytes, all, now);

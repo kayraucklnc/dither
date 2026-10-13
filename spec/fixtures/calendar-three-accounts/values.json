@@ -5,6 +5,7 @@
     "device.usb": false,
     "device.online": true,
     "device.rssi": -61,
+    "device.changed": 1791118530,
     "s0.t0": "Standup",
     "s0.s0": "2026-10-04T16:00:00+03:00",
     "s0.e0": "2026-10-04T16:30:00+03:00",

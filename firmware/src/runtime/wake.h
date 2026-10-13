@@ -33,6 +33,7 @@ struct DeviceStatus {
   bool usb = false;
   bool online = false;
   std::optional<double> rssi;
+  std::optional<int64_t> changed;  // when a fetch last changed a kept value
 };
 
 // clock.* from `now`; all null when the clock is unknown.
@@ -44,6 +45,9 @@ void setSourceStatus(ValueStore& values, const std::string& id, const SourceStat
 
 // After kCrashLimit consecutive crash resets, wait before trying again.
 uint32_t crashBackoffSeconds(uint32_t consecutiveCrashes);
+
+// Every reference holds an equal value in both: a fetch that changed nothing.
+bool sameValues(const ValueStore& a, const ValueStore& b);
 
 bool sourceDue(const SourceState& state, uint32_t every, std::optional<int64_t> now);
 // A source with time placeholders cannot be asked while the clock is unknown.

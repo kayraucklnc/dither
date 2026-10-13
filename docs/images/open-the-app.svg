@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="64" viewBox="0 0 300 64" role="img" aria-label="Open the app">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7a5cf0"/>
+      <stop offset="1" stop-color="#5636cf"/>
+    </linearGradient>
+  </defs>
+  <rect x="0.5" y="0.5" width="299" height="63" rx="14" fill="url(#g)" stroke="#4a2db8"/>
+  <text x="138" y="40" text-anchor="middle" fill="#ffffff"
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="22" font-weight="700">Open the app</text>
+  <path d="M226 32h20m-8-8 8 8-8 8" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

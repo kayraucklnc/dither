@@ -13,10 +13,11 @@
 
 namespace dither {
 
+// A source marked `html` is read into `page`; any other into `out`.
 // HTTPS is verified against the ESP-IDF certificate bundle linked into the
 // Arduino core. `cache` supplies and receives the source's OAuth token.
 // False on any failure, with a reason in `error`.
 bool fetchSource(const SourceSpec& source, const Program& program, std::optional<int64_t> now, ValueCache& cache,
-                 JsonDoc& out, std::string& error);
+                 JsonDoc& out, HtmlText& page, std::string& error);
 
 }  // namespace dither

@@ -55,6 +55,8 @@ export interface SourceSpec {
   auth?: { url: string; form: [string, string][]; token: string; expires?: string };
   /** The reply is AES-256-ECB; the key as 64 hex digits. */
   decode?: { aes256ecb: string };
+  /** The answer is a web page: its values' paths are `text` (the page as plain text) or `title`. */
+  html?: boolean;
   /** Minutes between fetches. */
   every: number;
   /**
@@ -207,6 +209,8 @@ export interface Extension<S extends Record<string, unknown> = Record<string, un
    * under (`all/t0`); `from` names this widget's sources. See docs/format.md "Merges".
    */
   merges?: (settings: S, env: Env) => Record<string, MergeSpec>;
+  /** Settings for the gallery's picture of a widget that shows nothing until it is set up. */
+  example?: Partial<S>;
   /** Plausible values for the preview before anything has been fetched. */
   sample?: (settings: S, env: Env) => Record<string, Value>;
   facts?: (settings: S, env: Env) => Fact[];

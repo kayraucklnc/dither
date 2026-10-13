@@ -23,6 +23,8 @@ struct ValueCache {
   // none reports these again (format.md §5 step 3).
   bool lastOnline = false;
   std::optional<double> lastRssi;
+  // When a fetch last changed a kept value: device.changed.
+  std::optional<int64_t> changedAt;
   // OAuth access tokens by source id.
   struct Token {
     std::string token;
