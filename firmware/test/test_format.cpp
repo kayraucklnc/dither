@@ -214,6 +214,23 @@ TEST(format_num_compact) {
   CHECK_EQ(run(str("1234"), f), kDash);
 }
 
+TEST(format_pick_index_and_times) {
+  const Value s = Value::series({3, -7, 9});
+  CHECK_EQ(run(s, R"({"pick":0})"), "3");
+  CHECK_EQ(run(s, R"({"pick":2})"), "9");
+  CHECK_EQ(run(s, R"({"pick":3})"), kDash);    // past the end
+  CHECK_EQ(run(s, R"({"pick":-1})"), kDash);
+  CHECK_EQ(run(s, R"({"pick":1.5})"), kDash);
+  CHECK_EQ(run(num(4), R"({"pick":0})"), kDash);  // not a series
+  CHECK_EQ(run(s, R"({"pick":true})"), kDash);
+  CHECK_EQ(run(s, R"({"pick":1,"scale":0.5,"times":"t.delay","add":1,"num":{"d":1}})"), "-23.5");  // -7 x 0.5 x 7 + 1
+  CHECK_EQ(run(num(3), R"({"times":"t.delay"})"), "21");
+  CHECK_EQ(run(num(3), R"({"times":"t.none"})"), kDash);
+  CHECK_EQ(run(num(3), R"({"times":"t.text"})"), kDash);
+  CHECK_EQ(run(num(3), R"({"times":"t.missing"})"), kDash);
+  CHECK_EQ(run(str("3"), R"({"times":"t.delay"})"), kDash);
+}
+
 TEST(format_pick) {
   const Value s = Value::series({3, -7, 9, 9, -7, 2});
   CHECK_EQ(run(s, R"({"pick":"max"})"), "9");

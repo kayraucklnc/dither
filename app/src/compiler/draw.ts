@@ -78,9 +78,10 @@ export class ElementDraw implements Draw {
     return format ? { v: this.sourceRef(key), f: this.scopeFormat(format) } : { v: this.sourceRef(key) };
   }
 
-  /** A format's own references (`shift`) are this widget's values too. */
+  /** A format's own references (`shift`, `times`) are this widget's values too. */
   private scopeFormat(f: Format): Format {
-    return f.shift && !f.shift.v.includes(".") ? { ...f, shift: { ...f.shift, v: this.sourceRef(f.shift.v) } } : f;
+    const shifted = f.shift && !f.shift.v.includes(".") ? { ...f, shift: { ...f.shift, v: this.sourceRef(f.shift.v) } } : f;
+    return shifted.times && !shifted.times.includes(".") ? { ...shifted, times: this.sourceRef(shifted.times) } : shifted;
   }
 
   ref(key: string): string {
@@ -171,7 +172,8 @@ export class ElementDraw implements Draw {
     this.push({ t: "bar", ...this.at(box), v: this.ref(ref), min, max, ...(o?.vertical ? { dir: "u" } : {}), ...this.color() });
   }
 
-  chart(box: Box, ref: string, o?: { kind?: "bars" | "line" | "steps" | "area"; min?: number; max?: number; gap?: number; width?: number; smooth?: boolean }): void {
+  chart(box: Box, ref: string, o?: Parameters<Draw["chart"]>[2]): void {
+    const labels = o?.labels;
     this.push({
       t: "chart", ...this.at(box), v: this.ref(ref), kind: o?.kind ?? "line",
       ...(o?.min !== undefined ? { min: o.min } : {}),
@@ -179,6 +181,15 @@ export class ElementDraw implements Draw {
       ...(o?.gap !== undefined ? { gap: o.gap } : {}),
       ...(o?.width !== undefined ? { lw: o.width } : {}),
       ...(o?.smooth ? { smooth: true } : {}),
+      ...(labels ? {
+        labels: {
+          font: this.fontAsset(this.font(labels.size, labels.weight ?? 700).info),
+          ...(labels.format ? { f: this.scopeFormat(labels.format) } : {}),
+          ...(labels.every && labels.every > 1 ? { every: labels.every } : {}),
+          ...(labels.before ? { pre: labels.before } : {}),
+          ...(labels.after ? { post: labels.after } : {}),
+        },
+      } : {}),
       ...this.color(),
     });
   }

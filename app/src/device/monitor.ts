@@ -21,6 +21,8 @@ export interface MonitorOptions {
 export interface Monitor {
   readonly port: SerialPort;
   readonly lines: AsyncIterable<string>;
+  /** Write one line to the panel — a firmware command such as "CMD:WAKE". */
+  send(line: string): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -42,7 +44,8 @@ export function keepLine(line: string, prefix: string | null): boolean {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function isPanelPort(port: SerialPort): boolean {
+/** True for a port that belongs to a board Dither knows (by USB vendor and product id). */
+export function isPanelPort(port: SerialPort): boolean {
   const { usbVendorId, usbProductId } = port.getInfo();
   return listBoards().some((b) =>
     b.usbFilters.some((f) => f.usbVendorId === usbVendorId && (f.usbProductId ?? usbProductId) === usbProductId),
@@ -126,5 +129,15 @@ export async function openMonitor(port?: SerialPort, options: MonitorOptions = {
   };
   if (options.onLine) void pump(options.onLine);
 
-  return { port: opened, lines, close };
+  const send = async (line: string) => {
+    if (!opened.writable) throw toDeviceError(new Error("device has been lost"));
+    const writer = opened.writable.getWriter();
+    try {
+      await writer.write(new TextEncoder().encode(`${line}\n`));
+    } finally {
+      writer.releaseLock();
+    }
+  };
+
+  return { port: opened, lines, send, close };
 }

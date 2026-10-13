@@ -169,8 +169,11 @@ function routeLine(d: Draw, s: Record<string, unknown>, h: number) {
 /** Nothing to catch: every listed train has gone or been cancelled. */
 function noTrains(d: Draw, box: { x: number; y: number; w: number; h: number }) {
   const all = arrangements().map((a) => a.when);
-  d.when({ not: { any: all } }, () =>
-    d.text("No more trains for now", { ...box, size: Math.max(16, Math.min(28, Math.round(box.h * 0.12))), weight: 700, align: "center", valign: "middle" }));
+  const size = Math.max(16, Math.min(28, Math.round(box.h * 0.12)));
+  const say = (text: string) => d.text(text, { ...box, size, weight: 700, align: "center", valign: "middle", wrap: true, lines: 2 });
+  // An empty answer and no answer are different news: only the first means the trains are gone.
+  d.when({ all: [{ not: { any: all } }, { v: "_ok", op: "true" }] }, () => say("Trenord lists no more trains for now"));
+  d.when({ all: [{ not: { any: all } }, { not: { v: "_ok", op: "true" } }] }, () => say("Trenord isn't answering — trains will show when it does"));
 }
 
 function board(d: Draw, s: Record<string, unknown>) {

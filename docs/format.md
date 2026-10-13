@@ -279,7 +279,7 @@ through the leaf's `f` as well. `{ "v": "s1.today", "op": "gt", "vs":
 "s2.yesterday" }`.
 
 A leaf may carry a format `f`: the value goes through its `pick`, `shift`, `days`, `until`,
-`scale`, `add`, `steps` and `map` steps (the rest are ignored) before it is compared,
+`scale`, `times`, `add`, `steps` and `map` steps (the rest are ignored) before it is compared,
 and a step that gives `null` makes the value `null`.
 
 | `op` | true when |
@@ -320,7 +320,10 @@ A **format** turns a value into text. All fields optional; applied in this order
    "count"` — value is a series; becomes its largest, smallest, total, first,
    last element, the index of its largest or smallest (the earliest on a
    tie), or its length. An empty series is `null` (its `count` is 0); a value
-   that is not a series, or a name not listed here, is `null`.
+   that is not a series, or a name not listed here, is `null`. `pick` may
+   instead be a number `n`: the element at index `n` (0 is the first); a
+   fraction, a negative number or an index past the end is `null`, as is any
+   `pick` that is neither a string nor a number.
 1. `shift: { "v": ref, "scale": n }` — value is a time; it becomes the instant
    (Unix seconds) moved by the referenced value × `scale` seconds (`scale`
    defaults to 1). A reference that is not a number moves it by 0. A
@@ -332,7 +335,10 @@ A **format** turns a value into text. All fields optional; applied in this order
    `until`, `days` is used and `until` ignored.
 3. `until: true` — value is a time (§ times below); becomes whole minutes from
    now to it, `floor((t - now) / 60)`. A time in the past becomes `null`.
-4. `scale: n` — multiply. `add: n` — add (after `scale`).
+4. `scale: n` — multiply. `times: ref` — multiply by the referenced value
+   (after `scale`); a reference that is not a finite number makes the value
+   `null`. `add: n` — add (after both). Each is one double operation, in that
+   order.
 5. `steps: { "t": [t0, t1, …], "o": [o0, o1, …, oN] }` — numeric value becomes
    `o[k]` where `k` is how many thresholds are `<= value`. `o` has one more
    entry than `t`.
@@ -411,7 +417,7 @@ logical pixels.
 | `icon` | `x y w h`, `v` (reference), `f` (format, optional), `set` (`{ "name": assetIndex }`) — the value, formatted, picks a bitmap drawn centred in the box |
 | `bar` | `x y w h`, `v`, `min max`, `dir` (`r` grows rightwards, `u` upwards; default `r`) |
 | `group` | `els` — elements drawn in order, and only when the group's `when` holds. Groups nest up to 8 deep; a group's `c` is ignored |
-| `chart` | `x y w h`, `v` (a series), `kind` (`bars`/`line`/`steps`/`area`), `min max` (optional, else from the data), `gap` (bars, default 1), `lw` (line thickness, default 2), `smooth` (curve the `line`/`area`, default false) |
+| `chart` | `x y w h`, `v` (a series), `kind` (`bars`/`line`/`steps`/`area`), `min max` (optional, else from the data), `gap` (bars, default 1), `lw` (line thickness, default 2), `smooth` (curve the `line`/`area`, default false), `labels` (optional: `font`, `f`, `every`, `pre`, `post` — each point's value written above it) |
 
 `parts` is an array; each part is a literal string, `{ "v": ref, "f": format }`,
 or `{ "k": constant, "f": format }` — a fixed value (number, string, boolean or
@@ -433,7 +439,7 @@ Both implementations agree on these; tests hold them to it.
 - **Conditions.** `eq` holds only for number/number, string/string and
   bool/bool — `null` never equals `null`. An unknown `op` or a malformed node
   is false; a missing or `null` `when` is true.
-- **Formats.** `scale`, `add`, `steps` and `num` on a non-number give `null`;
+- **Formats.** `scale`, `times`, `add`, `steps` and `num` on a non-number give `null`;
   `map` never matches booleans; the fallback is used as is (no `upper`).
 - **Rules.** A rule naming a screen that does not exist shows screen 0.
 - **Elements.** `bar` without `min` or `max` draws nothing. `chart` `kind`
@@ -554,6 +560,25 @@ never written.
     round_half_away(v / 2)` clamped to `[y, y + h - 1]`. The line joins
     `(px - 1, cy(px - 1))` to `(px, cy(px))` for every column after the
     first, with thickness `lw`; `area` shades beneath `cy` in place of `ly`.
+- **chart labels.** After the series is drawn, with `labels` present and its
+  `font` a font asset: `every` is `floor(every)` when it is a number of at
+  least 1, else 1 (a larger `every` than the series is long labels only the
+  last point). Point `i` of `n` is labelled when `(n - 1 - i) mod every = 0`.
+  Its text is the element `s_i` through `f` (§ formats); an empty result
+  labels nothing; otherwise the text is `pre + result + post` (each only when
+  a string). The anchor `(px, py)` is the point itself for `line`, `steps` and
+  `area` (the unsmoothed point, which a smooth curve passes through), and
+  `(x + floor((2i + 1) · w / (2n)), y + h − bh)` for bars, `bh` being that
+  bar's height. With `tw` the text's width (its glyphs' advances, after
+  glyph substitution, on one line), the box is `bw = tw + 8` wide and `bh =
+  lineHeight + 2` tall, at `bx = max(x, min(x + w − bw, px − floor(bw / 2)))`
+  and `by = py − bh − 5` — above the point and possibly above the chart, so
+  leave room there. Drawn in order: a filled circle of radius 3 at the
+  anchor in the element's colour; the box filled with radius 3 in the other
+  colour; its outline, radius 3 and width 1, in the element's colour; the
+  text as a `text` element `(bx + 4, by + 1, tw, lineHeight)`, left and top
+  aligned, not wrapping, in the element's colour. Labels go in index order,
+  so a later one covers an earlier one where they meet.
 - **bitmap.** Top-left at `(x, y)`.
 - **icon.** Value through `f`, then to text (§ formats); if `set` has that
   name, the bitmap is drawn at `(x + floor((w - bw) / 2), y + floor((h - bh) / 2))`

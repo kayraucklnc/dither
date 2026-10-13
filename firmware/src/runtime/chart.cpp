@@ -104,8 +104,7 @@ int64_t catmullRomRow(int64_t px, int64_t x0, int64_t x1, int64_t p0, int64_t p1
   return std::clamp(row, top, bottom);
 }
 
-void drawChartSeries(const Canvas& c, const ChartSpec& s, const std::vector<double>& series) {
-  if (series.empty()) return;
+std::vector<double> fractions(const ChartSpec& s, const std::vector<double>& series) {
   double lo = s.min ? *s.min : *std::min_element(series.begin(), series.end());
   double hi = s.max ? *s.max : *std::max_element(series.begin(), series.end());
   if (hi <= lo) hi = lo + 1;
@@ -115,6 +114,30 @@ void drawChartSeries(const Canvas& c, const ChartSpec& s, const std::vector<doub
     const double f = std::clamp((v - lo) / (hi - lo), 0.0, 1.0);
     fracs.push_back(std::isfinite(f) ? f : 0.0);
   }
+  return fracs;
+}
+
+std::vector<std::pair<int64_t, int64_t>> chartAnchors(const ChartSpec& s, const std::vector<double>& series) {
+  std::vector<std::pair<int64_t, int64_t>> out;
+  if (series.empty()) return out;
+  const std::vector<double> fracs = fractions(s, series);
+  const int64_t n = static_cast<int64_t>(series.size());
+  for (int64_t i = 0; i < n; ++i) {
+    const double f = fracs[static_cast<size_t>(i)];
+    if (s.kind == ChartSpec::Kind::Bars) {
+      const int64_t bh = std::max<int64_t>(1, static_cast<int64_t>(std::floor(f * s.h)));
+      out.emplace_back(s.x + floorDiv((2 * i + 1) * s.w, 2 * n), s.y + s.h - bh);
+    } else {
+      out.emplace_back(s.x + floorDiv(i * (s.w - 1), std::max<int64_t>(1, n - 1)),
+                       s.y + (s.h - 1) - static_cast<int64_t>(std::floor(f * (s.h - 1))));
+    }
+  }
+  return out;
+}
+
+void drawChartSeries(const Canvas& c, const ChartSpec& s, const std::vector<double>& series) {
+  if (series.empty()) return;
+  const std::vector<double> fracs = fractions(s, series);
   if (s.kind == ChartSpec::Kind::Bars) {
     drawBars(c, s, fracs);
     return;

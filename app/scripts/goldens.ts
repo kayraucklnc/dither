@@ -38,7 +38,7 @@ function write(name: string, blob: Uint8Array, runtime: Runtime, values: Record<
 const fonts = await loadFonts();
 const deps = { library: nodeLibrary, fonts, picture: async () => null, boardPanel: () => ({ width: 800, height: 480 }) };
 
-for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "starter-showcase", "primitives", "text-and-formats"]) {
+for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "starter-showcase", "primitives", "text-and-formats", "chart-labels"]) {
   rmSync(`${root}${dir}`, { recursive: true, force: true });
 }
 
@@ -215,6 +215,18 @@ await custom("primitives", [
 ], [], {
   "t.min": 13, "t.mins": 547, "t.five": 5, "t.pct": 62.5, "t.over": 140,
   "t.series": [3, 7, 2, 9, 4, 4, 10, 1, 6, 8, 5, 2.5], "t.flat": [5, 5, 5, 5],
+});
+
+// Values riding on charts: every bar, every second point of a line (from the
+// last), a white-on-black chart, and a label whose format gives nothing.
+await custom("chart-labels", [
+  { t: "chart", x: 20, y: 40, w: 360, h: 160, v: "t.series", kind: "bars", gap: 6, min: 0, labels: { font: 0, pre: "€", f: { num: { d: 0 } } } },
+  { t: "chart", x: 420, y: 40, w: 360, h: 160, v: "t.series", kind: "area", smooth: true, labels: { font: 0, every: 2, post: "k", f: { scale: 0.5, num: { d: 1 } } } },
+  { t: "rect", x: 0, y: 240, w: 800, h: 240 },
+  { t: "chart", x: 20, y: 290, w: 360, h: 160, v: "t.series", kind: "steps", c: 0, labels: { font: 1, f: { num: { d: 0 } } } },
+  { t: "chart", x: 420, y: 290, w: 360, h: 160, v: "t.gaps", kind: "line", c: 0, labels: { font: 0, f: { map: { k: [4], o: [""], d: "x" } } } },
+], [[14, 700], [18, 400]], {
+  "t.series": [3, 7, 2, 9, 4, 10, 1, 6], "t.gaps": [4, 8, 4, 2, 4, 6],
 });
 
 await custom("text-and-formats", [

@@ -1,8 +1,10 @@
 // The editor: screens on the left, the panel in the middle, settings on the right.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Copy, FolderOpen, Sparkles, LayoutGrid, Plus, Redo2, Save, Settings2, Trash2, Undo2, Usb, Workflow } from "lucide-react";
+import { Activity, Copy, FolderOpen, Sparkles, LayoutGrid, Plus, Redo2, Save, Settings2, Trash2, Undo2, Usb, Workflow } from "lucide-react";
 import { gridOf, rotated } from "@/compiler/grid";
+import { getBoard } from "@/device";
+import { blobCrc } from "@/device/activity";
 import type { Extension } from "@/extensions/api";
 import { newId } from "@/project/ids";
 import { withShowcase } from "@/project/showcase";
@@ -26,8 +28,13 @@ import { RulesView } from "../rules/RulesView";
 import { ToastProvider, useToast } from "../toast";
 import { NO_SIM, type SimState } from "../rules/SimulatePanel";
 import { Wordmark } from "../Mark";
+import { ActivityView } from "../activity/ActivityView";
+import { DEMO_ACTIVITY } from "../activity/demo";
+import { activityNames } from "../activity/labels";
+import { usePanelActivity } from "../activity/usePanelActivity";
+import { PreviewBadge, previewData } from "./PreviewBadge";
 
-type View = { kind: "screen"; index: number } | { kind: "rules" } | { kind: "panel" };
+type View = { kind: "screen"; index: number } | { kind: "rules" } | { kind: "panel" } | { kind: "activity" };
 
 function toOverrides(sim: SimState, now: number, tz: string | undefined): Overrides {
   let time: number | undefined;
@@ -78,6 +85,15 @@ function Editor({ onNew }: { onNew: () => void }) {
 
   const screenIndex = view.kind === "screen" ? Math.min(view.index, project.screens.length - 1) : 0;
   const panel = rotated(boardPanel(project.board), project.rotation);
+
+  const names = useMemo(() => activityNames(project, compiled), [project, compiled]);
+  const demo = useMemo(
+    () => (DEMO_ACTIVITY ? { sources: (compiled?.sources ?? []).map((s) => s.source.id), screens: project.screens.length, crc: compiled ? blobCrc(compiled.blob) : null } : null),
+    [compiled, project.screens.length],
+  );
+  const activity = usePanelActivity({ board: getBoard(project.board), paused: flashing, demo });
+  const preview = previewData(compiled, screenIndex, status);
+  const sourceName = (id: string) => names.sources.get(id) ?? id;
 
   const addWidget = (ext: Extension) => {
     const s = project.screens[screenIndex];
@@ -200,6 +216,10 @@ function Editor({ onNew }: { onNew: () => void }) {
               <Settings2 size={16} /> Panel
               {!project.wifi.some((n) => n.ssid.trim()) && <span className="ml-auto size-1.5 rounded-full bg-danger" title="Wi-Fi is not set" />}
             </button>
+            <button type="button" className={navItem(view.kind === "activity")} onClick={() => setView({ kind: "activity" })}>
+              <Activity size={16} /> Panel activity
+              {activity.link.kind === "watching" && <span className="ml-auto size-1.5 rounded-full bg-accent" title="Listening to the panel" />}
+            </button>
           </div>
           <div className="mt-auto space-y-1.5 px-1">
             <button type="button" onClick={() => setConfirmShowcase(true)} className="flex items-center gap-2 text-[13px] text-muted hover:text-ink">
@@ -221,11 +241,14 @@ function Editor({ onNew }: { onNew: () => void }) {
                     Add widget
                     <kbd className="ml-0.5 rounded bg-white/20 px-1 font-sans text-[11px] leading-4">A</kbd>
                   </Button>
-                  <span className="text-[13px] text-muted">
+                  <span className="min-w-0 truncate text-[13px] text-muted">
                     {showing === screenIndex
                       ? "The panel would show this screen right now."
                       : `Right now the panel would show “${project.screens[showing]?.name}”.`}
                   </span>
+                  <div className="ml-auto shrink-0">
+                    <PreviewBadge data={preview} name={sourceName} onActivity={() => setView({ kind: "activity" })} />
+                  </div>
                 </div>
                 <div className="min-h-0 flex-1">
                   <ScreenEditor
@@ -247,12 +270,17 @@ function Editor({ onNew }: { onNew: () => void }) {
           )}
           {view.kind === "rules" && <RulesView compiled={compiled} values={values} now={now} sim={sim} onSim={setSim} />}
           {view.kind === "panel" && <PanelSettings />}
+          {view.kind === "activity" && (
+            <ActivityView panel={activity} names={names} compiledCrc={compiled ? blobCrc(compiled.blob) : null}
+              refreshSeconds={compiled?.runtime.refresh ?? null} />
+          )}
         </main>
       </div>
 
       <WidgetGallery open={gallery} onClose={() => setGallery(false)} onPick={addWidget} project={project}
         onConnect={() => { setGallery(false); setView({ kind: "panel" }); }} />
-      <FlashDialog open={flashing} onClose={() => setFlashing(false)} compiled={compiled} onFlashed={() => setFlashKey((k) => k + 1)} />
+      <FlashDialog open={flashing} onClose={() => setFlashing(false)} compiled={compiled} onFlashed={() => setFlashKey((k) => k + 1)}
+        onActivity={() => { setFlashing(false); setView({ kind: "activity" }); activity.watch(); }} />
       <Dialog open={saving} onClose={() => setSaving(false)} title="Save to a file">
         <div className="space-y-4">
           <p>Everything is already saved in this browser, and a copy goes onto the panel each time you flash. A file is for keeping a copy elsewhere or sharing a design.</p>

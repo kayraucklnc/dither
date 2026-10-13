@@ -189,6 +189,7 @@ function sameKey(a: Value, k: number | string): boolean {
 /** One number out of a series: docs/format.md "Formats", step 0. */
 function pick(v: Value, how: NonNullable<Format["pick"]>): number | null {
   if (!Array.isArray(v)) return null;
+  if (typeof how === "number") return Number.isInteger(how) && how >= 0 && how < v.length ? v[how] : null;
   if (!["max", "min", "sum", "first", "last", "argmax", "argmin", "count"].includes(how)) return null;
   if (how === "count") return v.length;
   if (v.length === 0) return null;
@@ -215,7 +216,7 @@ function pick(v: Value, how: NonNullable<Format["pick"]>): number | null {
 export function applyValueSteps(input: Value, f: Format, ctx: FormatContext): Value {
   let v: Value = input;
   if (v === null) return null;
-  if (f.pick) {
+  if (f.pick !== undefined) {
     v = pick(v, f.pick);
     if (v === null) return null;
   }
@@ -235,9 +236,15 @@ export function applyValueSteps(input: Value, f: Format, ctx: FormatContext): Va
     if (!m || m.epoch < ctx.now) return null;
     v = Math.floor((m.epoch - ctx.now) / 60);
   }
-  if (f.scale !== undefined || f.add !== undefined) {
+  if (f.scale !== undefined || f.times !== undefined || f.add !== undefined) {
     if (typeof v !== "number") return null;
-    v = v * (f.scale ?? 1) + (f.add ?? 0);
+    v *= f.scale ?? 1;
+    if (f.times !== undefined) {
+      const by = ctx.values?.get(f.times);
+      if (typeof by !== "number" || !Number.isFinite(by)) return null;
+      v *= by;
+    }
+    v += f.add ?? 0;
   }
   if (f.steps) {
     if (typeof v !== "number") return null;
