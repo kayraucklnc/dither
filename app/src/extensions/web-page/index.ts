@@ -6,6 +6,10 @@ function needsAddress(d: Draw): void {
   d.text("Enter an address in its settings", { x: 0, y: d.height * 0.6, w: d.width, h: d.height * 0.3, size: d.fit(["Enter an address in"], d.width, 40, { max: 24 }), align: "center", wrap: true, lines: 2 });
 }
 
+const EXAMPLE_URL = "https://example.com/office";
+
+const hostOf = (url: unknown): string | undefined => /^https?:\/\/([^/?#]+)/.exec(String(url ?? "").trim())?.[1];
+
 const SIZES: Record<string, number> = { small: 18, medium: 24, large: 32 };
 
 export default defineExtension({
@@ -34,7 +38,7 @@ export default defineExtension({
   ],
   defaults: () => ({ url: "", heading: "title", label: "", size: "medium", every: 60, header: "", headerValue: "" }),
   title: (s) => {
-    const host = /^https?:\/\/([^/?#]+)/.exec(String(s.url ?? ""))?.[1];
+    const host = hostOf(s.url);
     return host ? `Web page · ${host}` : "Web page";
   },
   source(s) {
@@ -48,11 +52,18 @@ export default defineExtension({
       values: { text: "text", title: "title" },
     };
   },
-  example: { url: "https://example.com/office" },
-  sample: () => ({
-    title: "Today at the office",
-    text: "Lunch: risotto with peas, or a lentil salad.\nThe 3rd floor printer is fixed.\nFire drill on Thursday at 11:00 — please leave by the east stairs.",
-  }),
+  example: { url: EXAMPLE_URL },
+  // Most sites do not let a browser read them, so the preview often has only
+  // this to show; for a real address it says so rather than make text up.
+  sample: (s) => String(s.url ?? "").trim() === EXAMPLE_URL
+    ? {
+      title: "Today at the office",
+      text: "Lunch: risotto with peas, or a lentil salad.\nThe 3rd floor printer is fixed.\nFire drill on Thursday at 11:00 — please leave by the east stairs.",
+    }
+    : {
+      title: hostOf(s.url) ?? "Web page",
+      text: "This browser is not allowed to read this page, so the preview cannot show it. The panel can: after flashing, the page's text appears here.",
+    },
   facts: () => [{ key: "text", label: "Page text", type: "text", value: "text" }],
   draw(d, s) {
     if (!/^https?:\/\//.test(String(s.url ?? "").trim())) return needsAddress(d);
