@@ -128,12 +128,16 @@ export interface PictureOptions {
   brightness?: number;
 }
 
-/** A piece of the Earth, in degrees: what a map shows. */
-export interface MapArea {
-  north: number;
-  south: number;
-  west: number;
-  east: number;
+/**
+ * Where a placed group lands: the values of `x` and `y` (this widget's keys)
+ * within their ranges, scaled onto `box`. `ys: [north, south]` puts north up.
+ */
+export interface Placement {
+  x: string;
+  y: string;
+  box: Box;
+  xs: [number, number];
+  ys: [number, number];
 }
 
 export interface Draw {
@@ -172,11 +176,11 @@ export interface Draw {
   }): void;
   image(imageId: string, box: Box, options?: PictureOptions): void;
   /**
-   * A map of `area` — coastlines, water and motorways from OpenStreetMap —
-   * drawn into `box` when the project compiles; the panel never fetches maps.
-   * False where no map can be had (tests, goldens): draw without one.
+   * Everything drawn inside `fn` is placed by two values when the panel wakes:
+   * draw it around (0, 0), and it lands where `at` puts it. Nothing shows while
+   * either value is missing or out of its range. A plane on a radar, say.
    */
-  basemap(box: Box, area: MapArea): boolean;
+  place(at: Placement, fn: () => void): void;
   /**
    * Everything drawn inside `fn` only shows when `condition` holds on the panel.
    * References without a dot are this widget's own values.

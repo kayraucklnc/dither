@@ -37,6 +37,15 @@ export interface Format {
   fallback?: string;
 }
 
+/** A group placed by two values: each falls within its range and lands on the box. */
+export interface Placement {
+  x: string;
+  y: string;
+  box: [number, number, number, number];
+  xs: [number, number];
+  ys: [number, number];
+}
+
 export type Part = string | { v: string; f?: Format } | { k: Value; f?: Format };
 
 interface Base {
@@ -56,7 +65,7 @@ export type Element =
   | (Base & { t: "bitmap"; x: number; y: number; a: number })
   | (Base & { t: "icon"; x: number; y: number; w: number; h: number; v: string; f?: Format; set: Record<string, number> })
   | (Base & { t: "bar"; x: number; y: number; w: number; h: number; v: string; min: number; max: number; dir?: "r" | "u" })
-  | (Base & { t: "group"; els: Element[] })
+  | (Base & { t: "group"; els: Element[]; at?: Placement })
   | (Base & {
       t: "chart"; x: number; y: number; w: number; h: number; v: string;
       kind: "bars" | "line" | "steps" | "area"; min?: number; max?: number; gap?: number; lw?: number; smooth?: boolean;

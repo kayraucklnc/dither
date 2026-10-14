@@ -7,7 +7,7 @@ import type { Project } from "@/project/schema";
 import type { Env, SourceSpec } from "../api";
 import { formatValue } from "@/runtime/format";
 import { parseZone } from "@/runtime/tz";
-import aircraft, { airportsIn, boxAround, HEADING } from "./index";
+import aircraft, { airportsIn, boxAround, heading } from "./index";
 
 const milan = { name: "Milan", latitude: 45.46, longitude: 9.19 };
 const env = { units: "metric", place: milan, language: "en", timezone: "Europe/Rome", accounts: { google: [], stripe: null, opensky: null } } as unknown as Env;
@@ -69,14 +69,16 @@ describe("aircraft source", () => {
 
 describe("aircraft details", () => {
   const ctx = { now: 0, zone: parseZone("UTC0"), locale: { days: [], daysShort: [], months: [], monthsShort: [] } };
-  it("points each plane along its heading", () => {
-    const icon = (trk: number) => formatValue(trk, HEADING, ctx);
-    expect(icon(0)).toBe("plane-0");
-    expect(icon(355)).toBe("plane-0");
-    expect(icon(11)).toBe("plane-0");
-    expect(icon(12)).toBe("plane-22");
-    expect(icon(100)).toBe("plane-90");
-    expect(icon(250)).toBe("plane-247");
+  it("points each aircraft along its heading", () => {
+    const icon = (trk: number | null, kind: Parameters<typeof heading>[0] = "jet") => formatValue(trk, heading(kind), ctx);
+    expect(icon(0)).toBe("jet-0");
+    expect(icon(355)).toBe("jet-0");
+    expect(icon(10)).toBe("jet-0");
+    expect(icon(12)).toBe("jet-22");
+    expect(icon(100, "heli")).toBe("heli-90");
+    expect(icon(250, "prop")).toBe("prop-247");
+    // No heading: it still shows, pointing north.
+    expect(icon(null, "glider")).toBe("glider-0");
   });
 
   it("knows the airports around a place", () => {
@@ -104,12 +106,12 @@ describe("aircraft on the panel", () => {
     expect(out.problems).toEqual([]);
     const near = out.widgetSources.get("sky")!.near;
     const values = sampleValues(out, Math.floor(Date.now() / 1000));
-    expect(values.get(`${near}.cs0`)).toMatch(/^THY1TU/);
-    expect(values.get(`${near}.cs1`)).toMatch(/^EJU12HZ/);
+    expect(values.get(`${near}.cs0`)).toMatch(/^IHELI/);
+    expect(values.get(`${near}.cs1`)).toMatch(/^IABCD/);
     // The one on the ground is left out.
     const listed = Array.from({ length: 12 }, (_, i) => values.get(`${near}.cs${i}`));
     expect(listed.some((c) => String(c).startsWith("ITY1325"))).toBe(false);
-    expect(listed.filter(Boolean)).toHaveLength(6);
+    expect(listed.filter(Boolean)).toHaveLength(8);
   });
 
   it("keeps a full-panel radar and its list within budget", async () => {

@@ -39,7 +39,9 @@ struct Box {
 // Coordinates are 64-bit so out-of-range JSON numbers cannot overflow.
 class Canvas {
  public:
-  Canvas(Framebuffer& fb, bool black);
+  // (dx, dy) moves everything drawn: the clip box stays in the caller's
+  // coordinates, which reach the panel's edges wherever they have moved to.
+  Canvas(Framebuffer& fb, bool black, int64_t dx = 0, int64_t dy = 0);
   Canvas withClip(const Box& box) const;
   Canvas withColor(bool black) const;
   bool black() const { return black_; }
@@ -53,6 +55,7 @@ class Canvas {
  private:
   Framebuffer* fb_;
   bool black_;
+  int64_t dx_ = 0, dy_ = 0;
   Box clip_;
 };
 

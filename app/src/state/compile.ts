@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { library } from "@/assets/browser";
 import { FONTS } from "@/assets/library";
 import { compile, type Compiled } from "@/compiler";
-import { browserBasemap } from "@/compiler/basemap-browser";
 import { browserPicture } from "@/compiler/picture-browser";
 import { getBoard } from "@/device";
 import type { Project } from "@/project/schema";
@@ -32,7 +31,7 @@ const outcomes = new WeakMap<Project, { compiled: Compiled } | { error: string }
 export async function compileInBrowser(project: Project): Promise<Compiled> {
   try {
     const fonts = await loadBrowserFonts();
-    const compiled = await compile(project, { library, fonts, picture: browserPicture(project.images), basemap: browserBasemap, gzip, boardPanel });
+    const compiled = await compile(project, { library, fonts, picture: browserPicture(project.images), gzip, boardPanel });
     outcomes.set(project, { compiled });
     return compiled;
   } catch (e) {

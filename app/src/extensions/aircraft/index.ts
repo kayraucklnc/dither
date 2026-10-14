@@ -34,7 +34,6 @@ interface Settings extends Record<string, unknown> {
   layout: Layout;
   units: Units;
   hideGround: boolean;
-  map: boolean;
   airports: boolean;
 }
 
@@ -92,11 +91,35 @@ const CATEGORIES: [number, string][] = [
 const CATEGORY: Format = { map: { k: CATEGORIES.map(([c]) => c), o: CATEGORIES.map(([, n]) => n), d: "" } };
 const AIRLINE: Format = { head: 3, map: { k: Object.keys(AIRLINES), o: Object.values(AIRLINES), d: "" } };
 
-/** A plane drawn flying its heading: 16 icons, each the middle of its 22.5° slice. */
-const HEADING_NAMES = Array.from({ length: 16 }, (_, i) => `plane-${Math.floor(i * 22.5)}`);
-export const HEADING: Format = {
-  steps: { t: Array.from({ length: 16 }, (_, i) => i * 22.5 + 11.25), o: [...HEADING_NAMES, HEADING_NAMES[0]] },
+// --------------------------------------------------------------- what kind of aircraft
+
+/** Each kind's icon, flying its heading: 16 of them, each the middle of its 22.5° slice. */
+const KINDS = ["jet", "heavy", "prop", "heli", "glider", "fast"] as const;
+type Kind = (typeof KINDS)[number];
+const namesOf = (kind: Kind) => Array.from({ length: 16 }, (_, i) => `${kind}-${Math.floor(i * 22.5)}`);
+/** Where one heading's slice ends and the next begins, to the degree: each is spelled out in every icon. */
+const SLICES = Array.from({ length: 16 }, (_, i) => Math.round(i * 22.5 + 11.25));
+/** The icon for a heading; without one, the aircraft points north. */
+export const heading = (kind: Kind): Format => ({
+  steps: { t: SLICES, o: [...namesOf(kind), `${kind}-0`] },
+  fallback: `${kind}-0`,
+});
+
+/** Categories OpenSky reports for each kind. Most transponders report none at all. */
+const CATS: Record<Exclude<Kind, "jet">, number[]> & { jet: number[] } = {
+  jet: [3, 4], heavy: [5, 6], prop: [2, 11, 12, 14], heli: [8], glider: [9, 10], fast: [7],
 };
+const KNOWN = Object.values(CATS).flat();
+/** With no category, slow and low is taken for a light aircraft, anything else for a jet. */
+const slowAndLow = (i: number): Condition => ({ all: [{ v: k("vel", i), op: "lt", x: 70 }, { v: k("alt", i), op: "lt", x: 3000 }] });
+
+function kindIs(kind: Kind, i: number): Condition {
+  const reported: Condition = { v: k("cat", i), op: "in", x: CATS[kind] };
+  const unreported: Condition = { not: { v: k("cat", i), op: "in", x: KNOWN } };
+  if (kind === "jet") return { any: [reported, { all: [unreported, { not: slowAndLow(i) }] }] };
+  if (kind === "prop") return { any: [reported, { all: [unreported, slowAndLow(i)] }] };
+  return reported;
+}
 
 const altitude = (u: Units): Format => ({ scale: UNITS[u].alt, num: { d: 0, sep: "," } });
 const shortAltitude = (u: Units): Format => ({ scale: UNITS[u].alt, num: { d: 0, compact: true } });
@@ -123,9 +146,9 @@ function callsignSize(d: Draw, w: number, h: number): number {
   return 14;
 }
 
-/** The plane itself, pointing where it flies. Without a heading, it points nowhere and is left out. */
-function plane(d: Draw, i: number, box: Box) {
-  d.iconFor(k("trk", i), HEADING, HEADING_NAMES, box);
+/** The aircraft itself: its kind, pointing where it flies. */
+function craft(d: Draw, i: number, box: Box) {
+  for (const kind of KINDS) d.when(kindIs(kind, i), () => d.iconFor(k("trk", i), heading(kind), namesOf(kind), box));
 }
 
 function trend(d: Draw, i: number, box: Box) {
@@ -140,8 +163,11 @@ function altitudeText(d: Draw, i: number, u: Units, x: number, baseline: number,
 
 /** "Turkish Airlines · Heavy", or the emergency instead, in a black band. */
 function about(d: Draw, i: number, x: number, baseline: number, w: number, size: number) {
-  d.when({ not: emergency(i) }, () =>
-    onBaseline(d, [d.value(k("cs", i), AIRLINE), "  ", d.value(k("cat", i), CATEGORY)], x, baseline, w, size, 400));
+  // Airline on the left, kind on the right: either may be unknown and blank.
+  d.when({ not: emergency(i) }, () => {
+    onBaseline(d, [d.value(k("cs", i), AIRLINE)], x, baseline, w, size, 400);
+    onBaseline(d, [d.value(k("cat", i), CATEGORY)], x, baseline, w, size, 400, "right");
+  });
   d.when(emergency(i), () => {
     const m = d.metrics(size, 700);
     const label = ["SQUAWK ", d.value(k("sq", i)), " ", d.value(k("sq", i), SQUAWK)];
@@ -195,9 +221,9 @@ function hero(d: Draw, s: Settings, box: Box) {
   const { x, y, w, h } = box;
   const footH = h >= 160 ? Math.max(18, Math.round(h * 0.12)) : 0;
   const bodyH = h - footH;
-  // Sixteen headings of it go on the panel: 96 px is as large as that stays cheap.
-  const iconS = Math.max(24, Math.min(Math.round(bodyH * 0.8), Math.round(w * 0.3), 96));
-  plane(d, 0, { x, y: y + Math.round((bodyH - iconS) / 2), w: iconS, h: iconS });
+  // Sixteen headings of six kinds go on the panel: 64 px is as large as that stays cheap.
+  const iconS = Math.max(24, Math.min(Math.round(bodyH * 0.8), Math.round(w * 0.3), 64));
+  craft(d, 0, { x, y: y + Math.round((bodyH - iconS) / 2), w: iconS, h: iconS });
   const tx = x + iconS + 14;
   const tw = w - (tx - x);
   const big = callsignSize(d, tw, Math.round(bodyH * 0.4));
@@ -251,7 +277,7 @@ function list(d: Draw, s: Settings, box: Box) {
     const ry = y + i * rowH;
     d.when(there(i), () => {
       if (i > 0) d.line(x, ry, x + w, ry, { width: 1 });
-      plane(d, i, { x, y: ry + Math.round((rowH - iconS) / 2), w: iconS, h: iconS });
+      craft(d, i, { x, y: ry + Math.round((rowH - iconS) / 2), w: iconS, h: iconS });
       const base = roomy ? ry + Math.round(rowH * 0.48) : centre(ry, rowH, size);
       onBaseline(d, [d.value(k("cs", i), { fallback: "?" })], csX, base, csW, size, 700);
       if (roomy) about(d, i, csX, ry + rowH - Math.round(small * 0.45), w - (csX - x), small);
@@ -263,36 +289,30 @@ function list(d: Draw, s: Settings, box: Box) {
 }
 
 /**
- * Where they are, on a map of the place. Positions arrive after drawing, so
- * every cell holds a mark for every plane, shown when that plane is in it:
- * rows test latitude, cells within a row longitude. A cell's mark is a dot
- * and a line along the heading; the three lowest planes are larger and
- * labelled with callsign and height. This is the costly part of the widget.
+ * Where they are: each aircraft placed by its latitude and longitude, its
+ * kind's icon turned to its heading, north up. The lowest few carry their
+ * callsign and height; one squawking an emergency is ringed.
  */
 function radar(d: Draw, s: Settings, env: Env, box: Box) {
   const u = s.units;
   const km = radiusOf(s);
   const b = boxAround(placeOf(s, env)!, km);
-  const side = Math.min(box.w, box.h);
-  const grid = side >= 360 ? 8 : 7;
-  const planes = side >= 360 ? 6 : 5;
-  const labelled = 3;
-  const cell = Math.floor(side / grid);
-  const span = cell * grid;
+  const span = Math.min(box.w, box.h);
   const x0 = box.x + Math.round((box.w - span) / 2);
   const y0 = box.y + Math.round((box.h - span) / 2);
   const cx = x0 + Math.round(span / 2);
   const cy = y0 + Math.round(span / 2);
   const R = Math.round(span / 2);
-  const small = Math.max(13, Math.min(16, Math.round(cell * 0.24)));
+  const small = Math.max(13, Math.min(16, Math.round(span / 30)));
+  const iconS = span >= 400 ? 32 : span >= 220 ? 24 : 16;
   const px = (lon: number) => x0 + ((lon - b.lomin) / (b.lomax - b.lomin)) * span;
   const py = (lat: number) => y0 + ((b.lamax - lat) / (b.lamax - b.lamin)) * span;
 
-  // The ground: a map, the range rings, the airports and home.
-  const mapped = s.map !== false && d.basemap({ x: x0, y: y0, w: span, h: span }, { north: b.lamax, south: b.lamin, west: b.lomin, east: b.lomax });
-  d.rect({ x: x0, y: y0, w: span, h: span }, { fill: false, stroke: 1 });
+  // The ground: range rings, compass points, airports and home.
   d.circle(cx, cy, R - 1, { fill: false, stroke: 2 });
   d.circle(cx, cy, Math.round(R / 2), { fill: false, stroke: 1 });
+  d.line(cx, y0 + small, cx, y0 + span - small, { width: 1 });
+  d.line(x0 + small, cy, x0 + span - small, cy, { width: 1 });
   const tag = (text: string, x: number, y: number, align: "left" | "center" | "right" = "center", weight: 400 | 700 = 700) => {
     const tw = d.measure(text, small, weight) + 6;
     const tx = align === "center" ? x - tw / 2 : align === "right" ? x - tw : x;
@@ -304,52 +324,36 @@ function radar(d: Draw, s: Settings, env: Env, box: Box) {
   tag("S", cx, y0 + span - 2);
   tag("W", x0 + 8, cy);
   tag("E", x0 + span - 8, cy);
-  tag(`${km} km`, cx + R - 4, cy + Math.round(small * 0.9), "right", 400);
-  tag(`${Math.round(km / 2)} km`, cx + Math.round(R / 2) - 4, cy + Math.round(small * 0.9), "right", 400);
+  // Each ring's distance where it crosses the line south, clear of the compass points.
+  tag(`${Math.round(km / 2)} km`, cx + 4, cy + Math.round(R / 2), "left", 400);
+  tag(`${km} km`, cx + 4, cy + R - Math.round(small * 1.8), "left", 400);
   if (s.airports !== false) {
     for (const a of airportsIn(b).slice(0, 6)) {
       const ax = Math.round(px(a.lon));
       const ay = Math.round(py(a.lat));
-      const m = a.large ? 6 : 4;
+      const m = a.large ? 5 : 4;
       d.rect({ x: ax - m, y: ay - m, w: m * 2, h: m * 2 }, { white: true });
       d.rect({ x: ax - m, y: ay - m, w: m * 2, h: m * 2 }, { fill: false, stroke: 2 });
       tag(a.code, ax + m + 2, ay, "left", a.large ? 700 : 400);
     }
   }
   d.icon("house", { x: cx - 8, y: cy - 8, w: 16, h: 16 });
-  if (mapped) d.text("© OpenStreetMap", { x: x0 + 4, y: y0 + span - small - 4, w: span / 2, h: small + 2, size: 12 });
 
-  // The planes, later slots first so the lowest is drawn on top.
-  // Edges to four decimals (about 10 m): every one is spelled out in the blob, many times.
-  const edge = (n: number) => Math.round(n * 1e4) / 1e4;
-  const dLat = (b.lamax - b.lamin) / grid;
-  const dLon = (b.lomax - b.lomin) / grid;
+  // The aircraft, highest first so the lowest are drawn on top.
+  const labelled = 4;
   const labelW = d.measure("WZZ1234 88.8k", small, 700) + 8;
-  for (let i = planes - 1; i >= 0; i--) {
-    const big = i < labelled;
-    const dot = big ? Math.max(4, Math.round(cell * 0.09)) : Math.max(3, Math.round(cell * 0.06));
-    for (let row = 0; row < grid; row++) {
-      // North is up: the first row is the top of the box.
-      d.when({ v: k("lat", i), op: "between", x: [edge(b.lamax - (row + 1) * dLat), edge(b.lamax - row * dLat)] }, () => {
-        for (let col = 0; col < grid; col++) {
-          d.when({ v: k("lon", i), op: "between", x: [edge(b.lomin + col * dLon), edge(b.lomin + (col + 1) * dLon)] }, () => {
-            const mx = x0 + col * cell + Math.round(cell / 2);
-            const my = y0 + row * cell + Math.round(cell / 2);
-            if (big) d.circle(mx, my, dot + 3, { white: true });
-            d.circle(mx, my, dot);
-            d.hand(mx, my, Math.round(cell * (big ? 0.5 : 0.38)), k("trk", i), 360, { width: 2 });
-            if (big) {
-              // Labels sit right of the dot, or left near the east edge.
-              const lx = col >= grid - 2 ? mx - dot - 4 - labelW : mx + dot + 4;
-              const th = d.lineHeight(small, 700);
-              d.rect({ x: lx, y: my - th - 1, w: labelW, h: th }, { white: true });
-              d.text([d.value(k("cs", i), { fallback: "?" }), " ", d.value(k("alt", i), { ...shortAltitude(u), fallback: "" })],
-                { x: lx + 3, y: my - th - 1, w: labelW - 6, h: th, size: small, weight: 700, align: col >= grid - 2 ? "right" : "left" });
-            }
-          });
-        }
-      });
-    }
+  const th = d.lineHeight(small, 700);
+  const half = Math.round(iconS / 2);
+  for (let i = SLOTS - 1; i >= 0; i--) {
+    d.place({ x: k("lon", i), y: k("lat", i), box: { x: x0, y: y0, w: span, h: span }, xs: [b.lomin, b.lomax], ys: [b.lamax, b.lamin] }, () => {
+      d.when(emergency(i), () => d.circle(0, 0, half + 5, { fill: false, stroke: 3 }));
+      craft(d, i, { x: -half, y: -half, w: iconS, h: iconS });
+      if (i < labelled) {
+        d.rect({ x: -labelW / 2, y: half + 1, w: labelW, h: th }, { white: true });
+        d.text([d.value(k("cs", i), { fallback: "?" }), " ", d.value(k("alt", i), { ...shortAltitude(u), fallback: "" })],
+          { x: -labelW / 2, y: half + 1, w: labelW, h: th, size: small, weight: 700, align: "center" });
+      }
+    });
   }
 }
 
@@ -395,11 +399,13 @@ function sampleFor(s: Settings, env: Env): Record<string, string | number | bool
   const at = (fy: number, fx: number) => ({ lat: b.lamin + (b.lamax - b.lamin) * fy, lon: b.lomin + (b.lomax - b.lomin) * fx });
   const planes = [
     { cs: "EJU12HZ ", ...at(0.62, 0.71), alt: 3802, vel: 184, trk: 244, vr: -4.6, cat: 4, sq: "5554" },
-    { cs: "RYR4QK  ", ...at(0.2, 0.3), alt: 11278, vel: 231, trk: 58, vr: 0, cat: 4, sq: "2310" },
+    { cs: "RYR4QK  ", ...at(0.2, 0.3), alt: 11278, vel: 231, trk: 58, vr: 0, cat: 0, sq: "2310" },
     { cs: "DLH9AC  ", ...at(0.85, 0.45), alt: 10972, vel: 240, trk: 172, vr: 0, cat: 4, sq: "1000" },
-    { cs: "THY1TU  ", ...at(0.4, 0.55), alt: 1220, vel: 82, trk: 355, vr: 6.2, cat: 6, sq: "4611" },
+    { cs: "THY1TU  ", ...at(0.4, 0.58), alt: 1220, vel: 82, trk: 355, vr: 6.2, cat: 6, sq: "4611" },
     { cs: "SWR17M  ", ...at(0.75, 0.15), alt: 7620, vel: 205, trk: 120, vr: 8.1, cat: 4, sq: "7700" },
     { cs: "UAE91   ", ...at(0.1, 0.82), alt: 12192, vel: 252, trk: 300, vr: 0, cat: 6, sq: "3301" },
+    { cs: "IHELI   ", ...at(0.3, 0.62), alt: 310, vel: 48, trk: 205, vr: 0, cat: 8, sq: "7000" },
+    { cs: "IABCD   ", ...at(0.58, 0.33), alt: 900, vel: 55, trk: 80, vr: 1.5, cat: 0, sq: "7000" },
     { cs: "ITY1325 ", ...at(0.5, 0.5), alt: null, vel: 4, trk: 90, vr: null, cat: 4, sq: null },
   ];
   const out: Record<string, string | number | boolean | null> = { n: planes.length };
@@ -410,7 +416,7 @@ function sampleFor(s: Settings, env: Env): Record<string, string | number | bool
 export default defineExtension<Settings>({
   id: "aircraft",
   name: "Aircraft overhead",
-  description: "The planes flying near you right now — on a map, whose, how high, how fast and which way. From OpenSky, no account needed.",
+  description: "The planes flying near you right now — where, what kind, whose, how high and which way. From OpenSky, no account needed.",
   icon: "plane",
   category: "data",
   size: { min: [3, 2], default: [8, 8] },
@@ -436,10 +442,9 @@ export default defineExtension<Settings>({
       ],
     },
     { key: "hideGround", label: "Leave out planes on the ground", kind: "toggle" },
-    { key: "map", label: "Map under the radar", kind: "toggle", help: "Coasts, water and motorways from OpenStreetMap, drawn once when you flash." },
     { key: "airports", label: "Airports on the radar", kind: "toggle" },
   ],
-  defaults: () => ({ place: null, radius: 25, layout: "auto", units: "aviation", hideGround: true, map: true, airports: true }),
+  defaults: () => ({ place: null, radius: 25, layout: "auto", units: "aviation", hideGround: true, airports: true }),
   title: (s, env) => `Aircraft · ${placeOf(s, env)?.name ?? "…"}`,
   refresh: () => 5,
   source: sourceFor,

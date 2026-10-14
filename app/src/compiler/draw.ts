@@ -1,9 +1,9 @@
 // The `Draw` an extension is handed: its calls become runtime elements, offset
 // into the widget's box and coloured for its frame.
 
-import type { Box, Content, Draw, MapArea, PictureOptions, TextOptions } from "@/extensions/api";
+import type { Box, Content, Draw, PictureOptions, Placement, TextOptions } from "@/extensions/api";
 import { FONT_SIZES, fontInfo, iconSizeFor, type AssetLibrary, type FontInfo, type Weight } from "@/assets/library";
-import { encodeBitmap, type Font } from "@/runtime/assets";
+import type { Font } from "@/runtime/assets";
 import { layout, shape, width } from "@/runtime/text";
 import type { Condition, Element, Format, Part, Value } from "@/runtime/types";
 import type { AssetTable } from "./asset-table";
@@ -16,8 +16,6 @@ export interface DrawDeps {
   assets: AssetTable;
   /** Turn a project image into a 1-bit bitmap of exactly this size. */
   picture: (imageId: string, w: number, h: number, options: PictureOptions) => Promise<Uint8Array | null>;
-  /** A 1-bit map of an area at exactly this size; null when it cannot be fetched. Absent outside the browser. */
-  basemap?: (area: MapArea, w: number, h: number) => Promise<Uint8Array | null>;
 }
 
 export interface WidgetFrame {
@@ -39,6 +37,7 @@ export class ElementDraw implements Draw {
   constructor(private deps: DrawDeps, private frame: WidgetFrame) {
     this.width = frame.box.w;
     this.height = frame.box.h;
+    this.origin = { x: frame.box.x, y: frame.box.y };
   }
 
   // ------------------------------------------------------------ helpers
@@ -64,8 +63,11 @@ export class ElementDraw implements Draw {
     this.target.push(el);
   }
 
+  /** Where coordinates start: the widget's corner, or a placed group's point. */
+  private origin: { x: number; y: number };
+
   private at(b: Box): Box {
-    return { x: this.frame.box.x + Math.round(b.x), y: this.frame.box.y + Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h) };
+    return { x: this.origin.x + Math.round(b.x), y: this.origin.y + Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h) };
   }
 
   private sourceRef(key: string): string {
@@ -206,15 +208,23 @@ export class ElementDraw implements Draw {
     this.push({ t: "bitmap", x: b.x, y: b.y, a: index });
   }
 
-  basemap(box: Box, area: MapArea): boolean {
-    const fetchMap = this.deps.basemap;
-    if (!fetchMap) return false;
-    const b = this.at(box);
-    const key = `map:${[area.north, area.south, area.west, area.east].map((n) => n.toFixed(4)).join(",")}:${b.w}x${b.h}`;
-    // Offline the map is blank rather than the compile failing: the planes matter more.
-    const index = this.deps.assets.add(key, async () => (await fetchMap(area, b.w, b.h).catch(() => null)) ?? encodeBitmap(b.w, b.h, false, () => false));
-    this.push({ t: "bitmap", x: b.x, y: b.y, a: index, ...this.color() });
-    return true;
+  place(at: Placement, fn: () => void): void {
+    const box = this.at(at.box);
+    const parent = this.target;
+    const origin = this.origin;
+    const els: Element[] = [];
+    this.target = els;
+    // Inside, coordinates are around the point the values pick, not the widget's corner.
+    this.origin = { x: 0, y: 0 };
+    try {
+      fn();
+    } finally {
+      this.target = parent;
+      this.origin = origin;
+    }
+    if (els.length) {
+      parent.push({ t: "group", at: { x: this.ref(at.x), y: this.ref(at.y), box: [box.x, box.y, box.w, box.h], xs: at.xs, ys: at.ys }, els });
+    }
   }
 
   when(condition: Condition, fn: () => void): void {

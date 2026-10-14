@@ -420,8 +420,20 @@ logical pixels.
 | `bitmap` | `x y`, `a` (asset index) |
 | `icon` | `x y w h`, `v` (reference), `f` (format, optional), `set` (`{ "name": assetIndex }`) — the value, formatted, picks a bitmap drawn centred in the box |
 | `bar` | `x y w h`, `v`, `min max`, `dir` (`r` grows rightwards, `u` upwards; default `r`) |
-| `group` | `els` — elements drawn in order, and only when the group's `when` holds. Groups nest up to 8 deep; a group's `c` is ignored |
+| `group` | `els` — elements drawn in order, and only when the group's `when` holds. Groups nest up to 8 deep; a group's `c` is ignored. `at` (optional) places the group by two values, below |
 | `chart` | `x y w h`, `v` (a series), `kind` (`bars`/`line`/`steps`/`area`), `min max` (optional, else from the data), `gap` (bars, default 1), `lw` (line thickness, default 2), `smooth` (curve the `line`/`area`, default false), `labels` (optional: `font`, `f`, `every`, `pre`, `post` — each point's value written above it) |
+
+A **placed group** has `"at": { "x": ref, "y": ref, "box": [x, y, w, h], "xs": [a, b], "ys": [a, b] }`.
+Everything in it is drawn as at its own coordinates and then moved by
+`(dx, dy)`, where `dx = x + floor(((vx − a) / (b − a)) · w)` with `vx` the value
+of `x` and `[a, b]` its range `xs`, and `dy` the same for `y`, `ys`, `h` — so a
+group drawn around `(0, 0)` lands where the values put it in the box. Each
+value's fraction `(v − a) / (b − a)` is computed in doubles as written, then
+multiplied by the box's size and floored; `a > b` runs the axis backwards
+(latitude, north up). The group draws nothing when a value is not a finite number, `a = b`, a
+range is not two numbers, or a fraction falls outside `[0, 1]`. Clip boxes
+(text, icons) move with their elements; nothing reaches past the panel's
+edges. Placed groups inside placed groups add their moves.
 
 `parts` is an array; each part is a literal string, `{ "v": ref, "f": format }`,
 or `{ "k": constant, "f": format }` — a fixed value (number, string, boolean or

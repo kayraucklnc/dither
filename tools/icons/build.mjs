@@ -47,21 +47,33 @@ const NAMES = [
   "gift", "cake", "map-pin", "sparkles",
 ];
 
-// Lucide's plane, filled and turned to each of 16 headings: "plane-0" flies
-// north, "plane-90" east. Lucide draws it flying north-east, so each turns by
-// its heading less 45°. Names are the heading rounded down to a whole degree.
-// Filled, the stock pen makes a blob of it: the outline is drawn thin.
+// Aircraft seen from above, nose up, one per kind, each turned to 16
+// headings: "jet-0" flies north, "heli-90" east. Names are the heading
+// rounded down to a whole degree. Drawn here rather than taken from Lucide,
+// whose aircraft are side views or a single airliner.
+const AIRCRAFT = {
+  // An airliner: swept wings, a tailplane.
+  jet: `<path d="M12 1.5c.9 0 1.4 1 1.4 2.4V9l8.6 4.6v2l-8.6-2.4v4.6l2.8 2.2v1.6L12 20.6l-4.2 1v-1.6l2.8-2.2v-4.6L2 15.6v-2L10.6 9V3.9c0-1.4.5-2.4 1.4-2.4z"/>`,
+  // A wide-body: a fatter fuselage, longer wings, four engines.
+  heavy: `<path d="M12 .8c1.3 0 1.9 1.2 1.9 2.8v4.9l9.6 5.4v2.3l-9.6-2.7v5l3.3 2.4v1.6L12 21.2l-5.2 1.3v-1.6l3.3-2.4v-5L.5 16.2v-2.3l9.6-5.4V3.6C10.1 2 10.7.8 12 .8z"/><rect x="16.2" y="11.6" width="1.6" height="3" rx=".8"/><rect x="19.4" y="13.4" width="1.6" height="2.6" rx=".8"/><rect x="6.2" y="11.6" width="1.6" height="3" rx=".8"/><rect x="3" y="13.4" width="1.6" height="2.6" rx=".8"/>`,
+  // A light propeller plane: straight wings, a propeller across the nose.
+  prop: `<rect x="11" y="3.5" width="2" height="17" rx="1"/><rect x="2" y="7.5" width="20" height="3.2" rx="1"/><rect x="7.5" y="18" width="9" height="2.4" rx="1"/><rect x="8" y="1.6" width="8" height="1.6" rx=".8"/>`,
+  // A helicopter: the rotor as a ring, the cabin, the tail boom and its rotor.
+  heli: `<circle cx="12" cy="9.5" r="8" fill="none" stroke="#000" stroke-width="1.6"/><ellipse cx="12" cy="9.5" rx="3.2" ry="4.6"/><rect x="11.2" y="13" width="1.6" height="9" rx=".8"/><rect x="9" y="20.4" width="6" height="1.6" rx=".8"/>`,
+  // A glider: long thin wings, a T tail.
+  glider: `<rect x="11.2" y="3" width="1.6" height="18" rx=".8"/><rect x=".5" y="8.2" width="23" height="1.8" rx=".9"/><rect x="9" y="19.2" width="6" height="1.5" rx=".75"/>`,
+  // Fast and military: a delta.
+  fast: `<path d="M12 1l2 6 8 12.5-7.4-1.4L12 22l-2.6-3.9L2 19.5 10 7z"/>`,
+};
 const HEADINGS = Array.from({ length: 16 }, (_, i) => i * 22.5);
-const headingName = (deg) => `plane-${Math.floor(deg)}`;
-const ROTATED = Object.fromEntries(HEADINGS.map((deg) => [headingName(deg), deg]));
+const ROTATED = {};
+for (const kind of Object.keys(AIRCRAFT)) for (const deg of HEADINGS) ROTATED[`${kind}-${Math.floor(deg)}`] = [kind, deg];
 NAMES.push(...Object.keys(ROTATED));
 
 async function loadSvg(name) {
   if (name in ROTATED) {
-    const svg = await loadSvg("plane");
-    return svg
-      .replace(/\sfill="none"/, ' fill="#000"')
-      .replace(/(<svg\b[^>]*>)([\s\S]*)(<\/svg>)/, (_, open, body, close) => `${open}<g transform="rotate(${ROTATED[name] - 45} 12 12)" stroke-width="0.75">${body}</g>${close}`);
+    const [kind, deg] = ROTATED[name];
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#000" stroke="none" stroke-width="0"><g transform="rotate(${deg} 12 12)">${AIRCRAFT[kind]}</g></svg>`;
   }
   const lucideName = ALIASES[name] ?? name;
   const file = path.join(lucideDir, "icons", `${lucideName}.svg`);

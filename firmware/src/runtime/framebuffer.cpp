@@ -43,7 +43,8 @@ Box Box::intersect(const Box& o) const {
   return {std::max(x0, o.x0), std::max(y0, o.y0), std::min(x1, o.x1), std::min(y1, o.y1)};
 }
 
-Canvas::Canvas(Framebuffer& fb, bool black) : fb_(&fb), black_(black), clip_{0, 0, fb.width(), fb.height()} {}
+Canvas::Canvas(Framebuffer& fb, bool black, int64_t dx, int64_t dy)
+    : fb_(&fb), black_(black), dx_(dx), dy_(dy), clip_{-dx, -dy, fb.width() - dx, fb.height() - dy} {}
 
 Canvas Canvas::withClip(const Box& box) const {
   Canvas c = *this;
@@ -59,7 +60,7 @@ Canvas Canvas::withColor(bool black) const {
 
 void Canvas::plotColor(int64_t x, int64_t y, bool black) const {
   if (x < clip_.x0 || x >= clip_.x1 || y < clip_.y0 || y >= clip_.y1) return;
-  fb_->set(static_cast<int>(x), static_cast<int>(y), black);
+  fb_->set(static_cast<int>(x + dx_), static_cast<int>(y + dy_), black);
 }
 
 void Canvas::plot(int64_t x, int64_t y) const {
@@ -71,7 +72,7 @@ void Canvas::span(int64_t y, int64_t x0, int64_t x1) const {
   x0 = std::max(x0, clip_.x0);
   x1 = std::min(x1, clip_.x1);
   if (x0 >= x1) return;
-  fb_->fillSpan(static_cast<int>(y), static_cast<int>(x0), static_cast<int>(x1), black_);
+  fb_->fillSpan(static_cast<int>(y + dy_), static_cast<int>(x0 + dx_), static_cast<int>(x1 + dx_), black_);
 }
 
 void Canvas::fillRect(int64_t x, int64_t y, int64_t w, int64_t h) const {
