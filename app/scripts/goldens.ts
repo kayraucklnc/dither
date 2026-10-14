@@ -38,7 +38,7 @@ function write(name: string, blob: Uint8Array, runtime: Runtime, values: Record<
 const fonts = await loadFonts();
 const deps = { library: nodeLibrary, fonts, picture: async () => null, boardPanel: () => ({ width: 800, height: 480 }) };
 
-for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "starter-showcase", "primitives", "text-and-formats", "chart-labels"]) {
+for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "starter-showcase", "primitives", "text-and-formats", "chart-labels", "aircraft"]) {
   rmSync(`${root}${dir}`, { recursive: true, force: true });
 }
 
@@ -66,7 +66,7 @@ for (const s of STARTERS.filter((x) => x.id !== "blank")) {
     { id: "next", type: "google-calendar", x: 12, y: 6, w: 8, h: 5, frame: "none", settings: { show: "next" } },
     { id: "strip", type: "trenord", x: 0, y: 8, w: 12, h: 2, frame: "none", settings: {} },
   ];
-  project.accounts = { google: [account], stripe: null };
+  project.accounts = { google: [account], stripe: null, opensky: null };
   project.alerts = [
     { id: "late", enabled: true, match: "any", checks: [{ fact: "train:trouble", op: "is", value: true }], icon: "train-front", text: "Trouble on your line", value: null, style: "banner" },
   ];
@@ -114,7 +114,7 @@ for (const s of STARTERS.filter((x) => x.id !== "blank")) {
 {
   const project = createProject({ starter: "blank", timezone: "Europe/Istanbul", language: "en", units: "metric", place });
   const link = (id: string, label: string) => ({ id, clientId: "id", clientSecret: "secret", refreshToken: `token-${id}`, email: `${id}@example.com`, label });
-  project.accounts = { google: [link("me", "Personal"), link("work", "Work"), link("home", "Family")], stripe: null };
+  project.accounts = { google: [link("me", "Personal"), link("work", "Work"), link("home", "Family")], stripe: null, opensky: null };
   project.screens[0].widgets = [
     { id: "cal", type: "google-calendar", x: 0, y: 0, w: 20, h: 12, frame: "none", settings: {} },
   ];
@@ -142,7 +142,7 @@ for (const s of STARTERS.filter((x) => x.id !== "blank")) {
 // Revenue: a board (totals, buckets, a comparison, names) and a compact figure.
 {
   const project = createProject({ starter: "blank", timezone: "Europe/Istanbul", language: "tr", units: "metric", place });
-  project.accounts = { google: [], stripe: { key: "rk_test_golden", name: "" } };
+  project.accounts = { google: [], stripe: { key: "rk_test_golden", name: "" }, opensky: null };
   project.screens[0].widgets = [
     { id: "board", type: "stripe", x: 0, y: 0, w: 20, h: 8, frame: "none", settings: { currency: "try", names: true, period: "month" } },
     { id: "fig", type: "stripe", x: 0, y: 8, w: 8, h: 4, frame: "outline", settings: { style: "figure", compact: true, currency: "jpy" } },
@@ -165,6 +165,24 @@ for (const s of STARTERS.filter((x) => x.id !== "blank")) {
     [`${st.now}.total`]: 128450, [`${st.now}.count`]: 23,
   };
   write("revenue", c.blob, c.runtime, values);
+}
+
+// Aircraft: positional arrays, a sorted merge, a radar of nested conditions, hands by heading.
+{
+  const project = createProject({ starter: "blank", timezone: "Europe/Rome", language: "en", units: "metric", place });
+  const plane = (id: string, x: number, y: number, w: number, h: number, layout: string, frame: "none" | "outline" | "inverted" = "none") =>
+    ({ id, type: "aircraft", x, y, w, h, frame, settings: { layout } });
+  project.screens[0].widgets = [
+    plane("radar", 0, 0, 12, 12, "radar"),
+    plane("list", 12, 0, 8, 7, "list", "outline"),
+    plane("hero", 12, 7, 8, 3, "hero"),
+    plane("count", 12, 10, 8, 2, "count", "inverted"),
+  ];
+  const c = await compile(project, deps);
+  const values: Record<string, Value> = { ...DEVICE };
+  for (const src of c.sources) for (const [k, v] of src.sample) values[k] = v;
+  for (const src of c.sources) Object.assign(values, { [`${src.source.id}._ok`]: true, [`${src.source.id}._age`]: 2 });
+  write("aircraft", c.blob, c.runtime, values);
 }
 
 // Hand-placed elements at their edges: what the starters do not reach.

@@ -128,6 +128,14 @@ export interface PictureOptions {
   brightness?: number;
 }
 
+/** A piece of the Earth, in degrees: what a map shows. */
+export interface MapArea {
+  north: number;
+  south: number;
+  west: number;
+  east: number;
+}
+
 export interface Draw {
   /** The widget's own box, origin at 0,0. Draw in these coordinates. */
   readonly width: number;
@@ -163,6 +171,12 @@ export interface Draw {
     labels?: { size: number; weight?: Weight; format?: Format; every?: number; before?: string; after?: string };
   }): void;
   image(imageId: string, box: Box, options?: PictureOptions): void;
+  /**
+   * A map of `area` — coastlines, water and motorways from OpenStreetMap —
+   * drawn into `box` when the project compiles; the panel never fetches maps.
+   * False where no map can be had (tests, goldens): draw without one.
+   */
+  basemap(box: Box, area: MapArea): boolean;
   /**
    * Everything drawn inside `fn` only shows when `condition` holds on the panel.
    * References without a dot are this widget's own values.

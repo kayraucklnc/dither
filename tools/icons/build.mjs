@@ -47,7 +47,22 @@ const NAMES = [
   "gift", "cake", "map-pin", "sparkles",
 ];
 
+// Lucide's plane, filled and turned to each of 16 headings: "plane-0" flies
+// north, "plane-90" east. Lucide draws it flying north-east, so each turns by
+// its heading less 45°. Names are the heading rounded down to a whole degree.
+// Filled, the stock pen makes a blob of it: the outline is drawn thin.
+const HEADINGS = Array.from({ length: 16 }, (_, i) => i * 22.5);
+const headingName = (deg) => `plane-${Math.floor(deg)}`;
+const ROTATED = Object.fromEntries(HEADINGS.map((deg) => [headingName(deg), deg]));
+NAMES.push(...Object.keys(ROTATED));
+
 async function loadSvg(name) {
+  if (name in ROTATED) {
+    const svg = await loadSvg("plane");
+    return svg
+      .replace(/\sfill="none"/, ' fill="#000"')
+      .replace(/(<svg\b[^>]*>)([\s\S]*)(<\/svg>)/, (_, open, body, close) => `${open}<g transform="rotate(${ROTATED[name] - 45} 12 12)" stroke-width="0.75">${body}</g>${close}`);
+  }
   const lucideName = ALIASES[name] ?? name;
   const file = path.join(lucideDir, "icons", `${lucideName}.svg`);
   try {

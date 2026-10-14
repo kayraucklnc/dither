@@ -26,6 +26,8 @@ export interface Format {
   /** Multiplied by this reference's value, e.g. an exchange rate. */
   times?: string;
   add?: number;
+  /** The first n code points of a string. */
+  head?: number;
   steps?: { t: number[]; o: string[] };
   map?: { k: (number | string)[]; o: string[]; d?: string };
   num?: { d: number; sep?: string; compact?: boolean };

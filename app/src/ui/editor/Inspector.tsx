@@ -1,7 +1,7 @@
 // The right-hand panel: the selected widget's settings, or the screen's.
 
 import { ArrowDownToLine, ArrowUpToLine, Copy, Star, Trash2 } from "lucide-react";
-import { BatteryMedium, Bitcoin, Calendar, CalendarDays, ChartLine, Clock, CloudSun, FileCode, Gift, Globe, Image, Quote, Square, TrainFront, Type, type LucideIcon } from "lucide-react";
+import { BatteryMedium, Bitcoin, Calendar, CalendarDays, ChartLine, Clock, CloudSun, FileCode, Gift, Globe, Image, Plane, Quote, Square, TrainFront, Type, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import type { Compiled } from "@/compiler";
 import { envOf, extensionFor, missingAccounts, settingsOf, widgetTitle } from "@/compiler/widgets";
@@ -18,6 +18,7 @@ const ICONS: Record<string, LucideIcon> = {
   clock: Clock, calendar: Calendar, "cloud-sun": CloudSun, type: Type, quote: Quote, gift: Gift,
   image: Image, bitcoin: Bitcoin, globe: Globe, "battery-medium": BatteryMedium,
   "calendar-days": CalendarDays, "train-front": TrainFront, "chart-line": ChartLine, "file-code": FileCode,
+  plane: Plane,
 };
 
 export function ExtensionIcon({ name, size = 16 }: { name: string; size?: number }) {

@@ -339,19 +339,23 @@ A **format** turns a value into text. All fields optional; applied in this order
    (after `scale`); a reference that is not a finite number makes the value
    `null`. `add: n` — add (after both). Each is one double operation, in that
    order.
-5. `steps: { "t": [t0, t1, …], "o": [o0, o1, …, oN] }` — numeric value becomes
+5. `head: n` — value is a string; becomes its first `n` code points (all of
+   it when shorter). A value that is not a string, or an `n` that is not a
+   whole number from 0, is `null`. A callsign's first three letters through
+   `map` are its airline.
+6. `steps: { "t": [t0, t1, …], "o": [o0, o1, …, oN] }` — numeric value becomes
    `o[k]` where `k` is how many thresholds are `<= value`. `o` has one more
    entry than `t`.
-6. `map: { "k": [k0, …], "o": [o0, …], "d": default }` — exact match (number to
+7. `map: { "k": [k0, …], "o": [o0, …], "d": default }` — exact match (number to
    number, string to string); unmatched becomes `d` (or `null` if no `d`).
-7. `num: { "d": decimals, "sep": ",", "compact": true }` — fixed decimals
+8. `num: { "d": decimals, "sep": ",", "compact": true }` — fixed decimals
    (§ numbers); `sep` inserts a thousands separator into the integer part.
    With `compact`, a value whose magnitude is at least 1,000 is divided by the
    largest of 10⁹, 10⁶, 10³ not above it, printed with 1 decimal (a trailing
    `.0` dropped) and suffixed `B`, `M` or `k`: 74,120 → `74.1k`, 2,000,000 →
    `2M`; smaller values print as without `compact`.
-8. `time: "HH:mm"` — value is a time; rendered with the tokens below.
-9. `upper: true` — the value becomes text, then: `a–z` → `A–Z`; U+00E0–U+00FE
+9. `time: "HH:mm"` — value is a time; rendered with the tokens below.
+10. `upper: true` — the value becomes text, then: `a–z` → `A–Z`; U+00E0–U+00FE
    except U+00F7 → minus 0x20; `ğ→Ğ`, `ş→Ş`, `ı→I`. With `"tr": true` also set,
    `i→İ` instead of `i→I`. Nothing else changes.
 

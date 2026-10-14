@@ -21,6 +21,7 @@ export interface CompileDeps {
   library: AssetLibrary;
   fonts: ReadonlyMap<string, Font>;
   picture: DrawDeps["picture"];
+  basemap?: DrawDeps["basemap"];
   /** gzip; injected so tests can skip it. */
   gzip?: (bytes: Uint8Array) => Promise<Uint8Array>;
   boardPanel: (board: string) => Panel;

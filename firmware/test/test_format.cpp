@@ -89,6 +89,20 @@ TEST(format_map) {
   CHECK_EQ(run(num(15), R"({"steps":{"t":[10],"o":[0,1]},"map":{"k":[1],"o":["high"]}})"), "high");
 }
 
+TEST(format_head) {
+  CHECK_EQ(run(str("THY1TU  "), R"({"head":3})"), "THY");
+  CHECK_EQ(run(str("AB"), R"({"head":3})"), "AB");
+  CHECK_EQ(run(str("AB"), R"({"head":0,"fallback":"x"})"), "");
+  // Code points, not bytes.
+  CHECK_EQ(run(str("\xC3\x85sa"), R"({"head":2})"), "\xC3\x85s");
+  CHECK_EQ(run(num(123), R"({"head":2})"), kDash);
+  CHECK_EQ(run(str("ABC"), R"({"head":1.5})"), kDash);
+  CHECK_EQ(run(str("ABC"), R"({"head":-1})"), kDash);
+  CHECK_EQ(run(str("ABC"), R"({"head":"2"})"), kDash);
+  // head feeds map: an airline from a callsign.
+  CHECK_EQ(run(str("THY1TU  "), R"({"head":3,"map":{"k":["THY"],"o":["Turkish Airlines"],"d":""}})"), "Turkish Airlines");
+}
+
 TEST(format_time_and_until) {
   CHECK_EQ(run(num(1782907200), R"({"time":"HH:mm dddd"})"), "14:00 Wednesday");
   CHECK_EQ(run(str("2026-07-01T09:30"), R"({"time":"HH:mm"})"), "09:30");  // local, as written
