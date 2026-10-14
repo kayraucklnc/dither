@@ -251,10 +251,14 @@ export default defineExtension({
   title: (s) => `${nameOf(s.from) || "?"} to ${nameOf(s.to) || "?"}`,
   refresh: () => 5,
   source(s) {
-    if (!s.from || !s.to) return null;
+    // The planner takes stations by name now: given a station code it answers
+    // with an empty list, which reads as "no more trains" on the panel.
+    const orig = nameOf(s.from).toUpperCase();
+    const dest = nameOf(s.to).toUpperCase();
+    if (!orig || !dest) return null;
     const lang = String(s.language) === "it" ? "it" : "en";
     const q = new URLSearchParams({
-      orig: String(s.from), dest: String(s.to), transfers: String(s.transfers ?? "0"), language: lang,
+      orig, dest, transfers: String(s.transfers ?? "0"), language: lang,
       products: "tickets", live_data: "true", with_routes: "true",
     });
     const at = (i: number, path: string) => `solutions.${i}.${path}`;
