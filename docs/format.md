@@ -146,7 +146,8 @@ Two optional blocks cover APIs that are not a plain GET:
 
 With `auth`, the panel POSTs `form` as `application/x-www-form-urlencoded`
 (every byte outside `A–Z a–z 0–9 - . _ ~` percent-encoded, space as `%20`),
-keeps the token until a minute before it expires (across sleeps), and sends
+keeps the token — whole, however long: unlike a value it is never cut to 256
+bytes — until a minute before it expires (across sleeps), and sends
 `Authorization: Bearer <token>` with the GET. A failed token request fails the
 source. With `decode`, the body is decrypted before it is read as JSON.
 

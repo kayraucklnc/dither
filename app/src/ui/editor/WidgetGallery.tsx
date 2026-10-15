@@ -32,10 +32,10 @@ const LABEL = Object.fromEntries(CATEGORIES.map((c) => [c.id, c.label])) as Reco
 const PREVIEW_ACCOUNTS: Project["accounts"] = {
   google: [{ id: "preview", clientId: "preview", clientSecret: "preview", refreshToken: "preview", email: "", label: "Personal" }],
   stripe: { key: "rk_test_preview", name: "" },
-  opensky: null,
+  opensky: { clientId: "preview", clientSecret: "preview" },
 };
 
-const ACCOUNT_NAMES: Record<string, string> = { google: "Google", stripe: "Stripe" };
+const ACCOUNT_NAMES: Record<string, string> = { google: "Google", stripe: "Stripe", opensky: "OpenSky" };
 
 // Thumbnails compile in the browser, so each is compiled once per look (zone, language, units, place, pictures).
 const compiledThumbs = new WeakMap<object, Map<string, Promise<Compiled | null>>>();

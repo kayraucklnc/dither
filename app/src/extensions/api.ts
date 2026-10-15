@@ -57,6 +57,12 @@ export interface SourceSpec {
   decode?: { aes256ecb: string };
   /** The answer is a web page: its values' paths are `text` (the page as plain text) or `title`. */
   html?: boolean;
+  /**
+   * The server refuses browsers (no CORS). The preview then never asks: a
+   * refused request still reaches the server and spends the panel's share of
+   * its limit. The panel is not affected; it is not written into the blob.
+   */
+  panelOnly?: string;
   /** Minutes between fetches. */
   every: number;
   /**

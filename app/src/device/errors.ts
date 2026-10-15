@@ -18,7 +18,7 @@ export const MESSAGES = {
     "This browser can't talk to USB devices. Open Dither in Chrome or Edge on a computer (not a phone).",
   insecure: "USB access needs a secure page. Open Dither over https:// or from localhost.",
   cancelled: "No panel was chosen. Click Connect and pick the panel from the list.",
-  busy: "The port is in use by another program — close Arduino IDE or any serial monitor and try again.",
+  busy: "Something else has the panel's USB port open — another browser tab with Dither, a serial monitor, Arduino IDE or a script. Close it and try again.",
   inProgress: "The panel is still busy with the last step. Wait for it to finish, then try again.",
   noAnswer:
     "The panel didn't answer. Unplug it, plug it back in and try again. If it still doesn't answer, hold the BOOT button while plugging it in.",

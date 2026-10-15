@@ -11,6 +11,8 @@
 namespace dither {
 namespace {
 
+constexpr uint32_t kRetryDelayMs = 1500;
+
 // The token from the cache, or a fresh one from the token endpoint.
 bool accessToken(const SourceSpec& source, std::optional<int64_t> now, ValueCache& cache, std::string& token,
                  std::string& error) {
@@ -30,7 +32,7 @@ bool accessToken(const SourceSpec& source, std::optional<int64_t> now, ValueCach
   filter.addPath(auth.expiresPath);
   JsonDoc reply;
   auto read = [&](CharSource& body, std::string& err) {
-    JsonParseResult r = reply.parse(body, &filter, JsonLimits::response());
+    JsonParseResult r = reply.parse(body, &filter, JsonLimits::token());
     if (!r.ok) err = "token reply: " + r.error;
     return r.ok;
   };
@@ -97,6 +99,17 @@ bool fetchSource(const SourceSpec& source, const Program& program, std::optional
   };
   int status = 0;
   bool ok = httpExchange(request, read, status, error);
+  // A connection that did not open, or a server having a bad moment, is often
+  // fine a second later: one more try before the source counts as failed —
+  // unless the name could not be looked up (no internet: trying again only
+  // costs memory) or memory is already short.
+  const bool noInternet = error.rfind(kNoInternet, 0) == 0;
+  if (!ok && (status < 0 || status >= 500) && !noInternet && ESP.getFreeHeap() >= kMinHeapForTls) {
+    dlog("source %s: %s - trying once more", source.id.c_str(), error.c_str());
+    delay(kRetryDelayMs);
+    error.clear();
+    ok = httpExchange(request, read, status, error);
+  }
   if (!ok && source.auth && status == 401) cache.dropToken(source.id);  // renew next time
   return ok;
 }

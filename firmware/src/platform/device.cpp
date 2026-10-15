@@ -9,6 +9,7 @@
 #include "../runtime/wake.h"
 #include "blob_store.h"
 #include "board.h"
+#include "http_client.h"
 #include "http_fetch.h"
 #include "log.h"
 #include "network.h"
@@ -163,6 +164,9 @@ uint32_t Device::run(const Program& program) {
 }
 
 void Device::fetchDue(const Program& program, bool online, std::optional<int64_t> now, ValueCache& cache) {
+  // Once a name cannot be looked up there is no internet this wake: the rest
+  // are not tried, which saves the battery and the memory each attempt costs.
+  std::string noInternet;
   for (const auto& source : program.sources()) {
     SourceState state = cache.stateOf(source.id);
     if (!sourceDue(state, source.every, now)) continue;
@@ -177,12 +181,22 @@ void Device::fetchDue(const Program& program, bool online, std::optional<int64_t
       state.ok = false;
       dlog("source %s: due, but offline", source.id.c_str());
       noteSource(source.id, "offline");
+    } else if (!noInternet.empty() || ESP.getFreeHeap() < kMinHeapForTls) {
+      state.ok = false;
+      if (noInternet.empty()) {
+        dlog("source %s: failed: not enough memory for a secure connection (%lu KB free)", source.id.c_str(),
+             static_cast<unsigned long>(ESP.getFreeHeap() / 1024));
+      } else {
+        dlog("source %s: failed: not tried, %s", source.id.c_str(), noInternet.c_str());
+      }
+      noteSource(source.id, "fail");
     } else {
       JsonDoc doc;
       HtmlText page;
       std::string error;
       const uint32_t start = millis();
       state.ok = fetchSource(source, program, now, cache, doc, page, error);
+      if (!state.ok && error.rfind(kNoInternet, 0) == 0) noInternet = "no internet on this Wi-Fi";
       if (state.ok) {
         if (source.html) {
           applyPage(source, page, cache.values);
