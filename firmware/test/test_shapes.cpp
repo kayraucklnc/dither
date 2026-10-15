@@ -474,3 +474,36 @@ TEST(placed_group) {
                            R"({"t":"group","at":{"x":"p.x","y":"p.y","box":[1,0,4,0],"xs":[0,10],"ys":[10,0]},"els":[{"t":"rect","x":0,"y":0,"w":1,"h":1}]}]})", v)),
            (Rows{".....#.."}));
 }
+
+TEST(globe_placed_group) {
+  ValueStore v;
+  const double pts[][2] = {{0, 0}, {0, 90}, {90, 0}, {30, 30}, {0, 180}, {0, -170}};
+  for (int n = 0; n < 6; ++n) {
+    v.set("g.lat" + std::to_string(n), Value::number(pts[n][0]));
+    v.set("g.lon" + std::to_string(n), Value::number(pts[n][1]));
+  }
+  // Where the one dot lands on an 11 x 11 panel, or (-1, -1) when nothing is drawn.
+  auto spot = [&](int n, const char* side, const char* globe = "[0,0]") {
+    std::string el = std::string(R"({"t":"group","at":{"lat":"g.lat)") + std::to_string(n) + R"(","lon":"g.lon)" +
+                     std::to_string(n) + R"(","globe":)" + globe + R"(,"c":[5,5],"r":4)" +
+                     (side ? std::string(R"(,"side":")") + side + "\"" : std::string()) +
+                     R"(},"els":[{"t":"rect","x":0,"y":0,"w":1,"h":1}]})";
+    Rows r = all(drawn(11, 11, el.c_str(), v));
+    for (int y = 0; y < 11; ++y) {
+      auto x = r[static_cast<size_t>(y)].find('#');
+      if (x != std::string::npos) return std::make_pair(static_cast<int>(x), y);
+    }
+    return std::make_pair(-1, -1);
+  };
+  CHECK(spot(0, nullptr) == std::make_pair(5, 5));
+  CHECK(spot(1, nullptr) == std::make_pair(9, 5));
+  CHECK(spot(2, nullptr) == std::make_pair(5, 1));
+  CHECK(spot(3, nullptr) == std::make_pair(7, 3));
+  // The far side only when asked.
+  CHECK(spot(4, "front") == std::make_pair(-1, -1));
+  CHECK(spot(4, "back") == std::make_pair(5, 5));
+  CHECK(spot(0, "back") == std::make_pair(-1, -1));
+  CHECK(spot(4, nullptr) == std::make_pair(5, 5));
+  // Across the date line.
+  CHECK(spot(5, "front", "[0,170]") == std::make_pair(6, 5));
+}

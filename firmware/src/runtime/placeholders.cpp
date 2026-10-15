@@ -48,10 +48,7 @@ std::optional<Placeholder> match(std::string_view s) {
   if (s.substr(0, kHead.size()) != kHead) return std::nullopt;
   Placeholder p;
   size_t i = kHead.size();
-  if (i < s.size() && (s[i] == '+' || s[i] == '-')) {
-    if (!readOffset(s, i, p.offset)) return std::nullopt;
-    if (i >= s.size() || s[i] != '|') return std::nullopt;  // {{now+N}} needs a pattern
-  }
+  if (i < s.size() && (s[i] == '+' || s[i] == '-') && !readOffset(s, i, p.offset)) return std::nullopt;
   if (i < s.size() && s[i] == '|') {
     size_t close = s.find("}}", i + 1);
     if (close == std::string_view::npos) return std::nullopt;
@@ -96,7 +93,7 @@ std::string expandPlaceholders(std::string_view text, bool encode, int64_t now, 
     }
     std::string value = p->today        ? std::to_string(localMidnight(now, tz) + p->offset)
                         : p->hasPattern ? formatTime(tz.toLocal(now + p->offset), p->pattern, locale)
-                                        : std::to_string(now);
+                                        : std::to_string(now + p->offset);
     out += encode ? percentEncode(value) : value;
     i = at + p->length;
   }

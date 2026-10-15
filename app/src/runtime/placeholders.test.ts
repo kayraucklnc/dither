@@ -11,13 +11,15 @@ describe("placeholders", () => {
     expect(expand("d={{now|YYYYMMDD}}&h={{now+3600|HH:mm}}", ctx, true)).toBe("d=20261004&h=16%3A07");
     expect(expand("from={{now-86400|YYYY-MM-DD[T]HH:mm:ssZ}}", ctx, true)).toBe("from=2026-10-03T15%3A07%3A30%2B02%3A00");
     expect(expand("{{now|HH:mm}}", ctx, false)).toBe("15:07");
+    // Without a pattern, an offset moves the Unix seconds.
+    expect(expand("t={{now-2700}},{{now+300}}", ctx, true)).toBe(`t=${ctx.now - 2700},${ctx.now + 300}`);
   });
   it("crosses a clock change by the zone's own rule", () => {
     const sunday = { ...ctx, now: Date.UTC(2026, 9, 25, 0, 30) / 1000 };
     expect(expand("{{now|HH:mmZ}} {{now+3600|HH:mmZ}}", sunday, false)).toBe("02:30+02:00 02:30+01:00");
   });
   it("leaves other braces alone", () => {
-    expect(expand("a={{later}}&b={x}&c={{now+60}}", ctx, true)).toBe("a={{later}}&b={x}&c={{now+60}}");
+    expect(expand("a={{later}}&b={x}&c={{now +60}}", ctx, true)).toBe("a={{later}}&b={x}&c={{now +60}}");
     expect(hasPlaceholders("x{{now|D}}")).toBe(true);
     expect(hasPlaceholders("x{{nowhere}}")).toBe(false);
   });

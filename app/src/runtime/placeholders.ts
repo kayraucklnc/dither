@@ -5,8 +5,8 @@
 import { formatTime, type FormatContext } from "./format";
 import { fromLocal, toLocal } from "./tz";
 
-// `{{now}}`, or `{{now|PATTERN}}` with an optional offset; `{{now+N}}` alone is not one.
-const PLACEHOLDER = /\{\{now(?:(?:([+-])(\d+))?\|([^}]*))?\}\}/g;
+// `{{now}}` or `{{now|PATTERN}}`, either with an optional offset: `{{now+N}}` is Unix seconds N later.
+const PLACEHOLDER = /\{\{now(?:([+-])(\d+))?(?:\|([^}]*))?\}\}/g;
 
 /** Percent-encode everything but RFC 3986's unreserved characters. */
 function encode(text: string): string {

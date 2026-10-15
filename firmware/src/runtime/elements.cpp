@@ -190,9 +190,47 @@ DITHER_NOINLINE void drawText(const Canvas& c, JsonView el, const RenderContext&
   drawTextLines(c, *font, lines, box);
 }
 
+bool finiteNumber(const Value& v) { return v.isNumber() && std::isfinite(v.asNumber()); }
+
+// A globe-placed group's move: the point on an orthographic globe, if it is on
+// the side asked for. Each step is its own operation, as the spec writes it.
+std::optional<Offset> globePlacement(JsonView at, const RenderContext& ctx) {
+  const Value vlat = ctx.values->get(at["lat"].string());
+  const Value vlon = ctx.values->get(at["lon"].string());
+  JsonView g = at["globe"], c = at["c"];
+  if (!finiteNumber(vlat) || !finiteNumber(vlon) || !g[0].isNumber() || !g[1].isNumber() || !c[0].isNumber() ||
+      !c[1].isNumber() || !at["r"].isNumber()) {
+    return std::nullopt;
+  }
+  const double r = at["r"].number();
+  const double phi = vlat.asNumber() * kPi / 180;
+  const double lam = vlon.asNumber() * kPi / 180;
+  const double phi0 = g[0].number() * kPi / 180;
+  const double lam0 = g[1].number() * kPi / 180;
+  const double d = lam - lam0;
+  const double sp = std::sin(phi), cp = std::cos(phi), sp0 = std::sin(phi0), cp0 = std::cos(phi0);
+  const double sd = std::sin(d), cd = std::cos(d);
+  const double u1 = sp0 * sp;
+  const double u2 = cp0 * cp;
+  const double u3 = u2 * cd;
+  const double cosc = u1 + u3;
+  const std::string_view side = at["side"].string();
+  if ((side == "front" && !(cosc >= 0)) || (side == "back" && !(cosc < 0))) return std::nullopt;
+  const double x = cp * sd;
+  const double rx = r * x;
+  const double t1 = cp0 * sp;
+  const double t2 = sp0 * cp;
+  const double t3 = t2 * cd;
+  const double y = t1 - t3;
+  const double ry = r * y;
+  return Offset{static_cast<int64_t>(c[0].integer(0)) + static_cast<int64_t>(std::round(rx)),
+                static_cast<int64_t>(c[1].integer(0)) - static_cast<int64_t>(std::round(ry))};
+}
+
 // A placed group's move: where its two values fall within their ranges,
 // scaled onto its box. Nothing when a value is not a number or falls outside.
 std::optional<Offset> placement(JsonView at, const RenderContext& ctx) {
+  if (at["globe"].exists()) return globePlacement(at, ctx);
   auto axis = [&](const char* ref, const char* range, int origin, int size) -> std::optional<int64_t> {
     const Value v = ctx.values->get(at[ref].string());
     JsonView r = at[range];

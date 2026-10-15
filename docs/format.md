@@ -120,7 +120,7 @@ baked into the URL and headers by the compiler. The one thing it cannot know is
 
 | Placeholder | Becomes |
 |---|---|
-| `{{now}}` | Unix seconds |
+| `{{now}}`, `{{now+N}}`, `{{now-N}}` | Unix seconds, moved by `N` seconds |
 | `{{now\|PATTERN}}` | local time in the time tokens below (plus `Z` → `+02:00`) |
 | `{{now+N\|PATTERN}}`, `{{now-N\|PATTERN}}` | the same, `N` seconds later or earlier |
 | `{{today}}`, `{{today+N}}`, `{{today-N}}` | Unix seconds of local midnight today, moved by `N` seconds |
@@ -129,8 +129,6 @@ In `url` the substituted text is percent-encoded (letters, digits and `-._~`
 are kept); in headers it is inserted as is. Anything else in braces is left
 alone. While the clock is unknown, a source whose URL or headers use a
 placeholder is not fetched (and not counted as attempted).
-
-`{{now+N}}` without a pattern is not a placeholder and stays as written.
 
 A kept string is cut to at most 256 bytes, at a UTF-8 character boundary.
 
@@ -453,6 +451,20 @@ multiplied by the box's size and floored; `a > b` runs the axis backwards
 range is not two numbers, or a fraction falls outside `[0, 1]`. Clip boxes
 (text, icons) move with their elements; nothing reaches past the panel's
 edges. Placed groups inside placed groups add their moves.
+
+A **globe-placed group** puts a point of the Earth on an orthographic globe:
+`"at": { "lat": ref, "lon": ref, "globe": [a, o], "c": [cx, cy], "r": R, "side": "front" }`,
+the globe centred on latitude `a`, longitude `o` (degrees), drawn around
+`(cx, cy)` with radius `R` pixels. With `vlat`, `vlon` the values, each
+converted as `v · π / 180` (left to right, `π` = `Math.PI`), and `Δ = λ − λ0`:
+`dx = cx + round_half_away(R · (cos φ · sin Δ))` and
+`dy = cy − round_half_away(R · (cos φ0 · sin φ − sin φ0 · cos φ · cos Δ))`,
+every product, sum and difference a separate double operation in the order
+written (no fused multiply-add). With `cosc = sin φ0 · sin φ + cos φ0 · cos φ · cos Δ`,
+`side` `front` draws only when `cosc >= 0` (the near hemisphere), `back` only
+when `cosc < 0`, `any` (the default) always. Nothing is drawn when a value is
+not a finite number or `globe`, `c` or `r` is not numbers. A larger `R` lifts
+points off the surface — an orbit above the globe.
 
 `parts` is an array; each part is a literal string, `{ "v": ref, "f": format }`,
 or `{ "k": constant, "f": format }` — a fixed value (number, string, boolean or

@@ -35,3 +35,32 @@ describe("placed groups", () => {
     expect(rows({ t: "group", at: at("p.x", { box: [0, 0, 4, 0] }), els: [inner] }, 8, 1, values)).toEqual([".....#.."]);
   });
 });
+
+describe("globe-placed groups", () => {
+  const where: Record<string, Value> = {
+    "g.lat0": 0, "g.lon0": 0, "g.lat1": 0, "g.lon1": 90, "g.lat2": 90, "g.lon2": 0,
+    "g.lat3": 30, "g.lon3": 30, "g.lat4": 0, "g.lon4": 180, "g.lat5": 0, "g.lon5": -170,
+  };
+  // Where the one dot lands on an 11 × 11 panel, or null when nothing is drawn.
+  const spot = (n: number, side?: string, globe = [0, 0]) => {
+    const el = { t: "group", at: { lat: `g.lat${n}`, lon: `g.lon${n}`, globe, c: [5, 5], r: 4, ...(side ? { side } : {}) }, els: [dot] } as Element;
+    const r = rows(el, 11, 11, where);
+    const y = r.findIndex((row) => row.includes("#"));
+    return y < 0 ? null : [r[y].indexOf("#"), y];
+  };
+  it("puts the centre in the middle, the limb at the rim, the pole at the top", () => {
+    expect(spot(0)).toEqual([5, 5]);
+    expect(spot(1)).toEqual([9, 5]);
+    expect(spot(2)).toEqual([5, 1]);
+    expect(spot(3)).toEqual([7, 3]);
+  });
+  it("draws the far side only when asked", () => {
+    expect(spot(4, "front")).toBeNull();
+    expect(spot(4, "back")).toEqual([5, 5]);
+    expect(spot(0, "back")).toBeNull();
+    expect(spot(4)).toEqual([5, 5]);
+  });
+  it("turns across the date line", () => {
+    expect(spot(5, "front", [0, 170])).toEqual([6, 5]);
+  });
+});

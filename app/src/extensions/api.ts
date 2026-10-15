@@ -134,13 +134,30 @@ export interface PictureOptions {
  * Where a placed group lands: the values of `x` and `y` (this widget's keys)
  * within their ranges, scaled onto `box`. `ys: [north, south]` puts north up.
  */
-export interface Placement {
+export interface BoxPlacement {
   x: string;
   y: string;
   box: Box;
   xs: [number, number];
   ys: [number, number];
 }
+
+/**
+ * A point of the Earth on a globe seen from space: `lat` and `lon` (this
+ * widget's keys) on a globe turned to `globe: [lat, lon]`, drawn around
+ * `centre` with radius `r`. `side: "front"` shows it only on the near
+ * hemisphere, `"back"` only behind; a larger `r` lifts it into orbit.
+ */
+export interface GlobePlacement {
+  lat: string;
+  lon: string;
+  globe: [number, number];
+  centre: { x: number; y: number };
+  r: number;
+  side?: "front" | "back" | "any";
+}
+
+export type Placement = BoxPlacement | GlobePlacement;
 
 export interface Draw {
   /** The widget's own box, origin at 0,0. Draw in these coordinates. */
@@ -183,6 +200,12 @@ export interface Draw {
    * either value is missing or out of its range. A plane on a radar, say.
    */
   place(at: Placement, fn: () => void): void;
+  /**
+   * A bitmap the widget draws itself when the project compiles — a globe, say.
+   * `ink(x, y)` is asked for every pixel of the box; set pixels draw, the rest
+   * are left as they are. `key` names it: the same key and size reuse it.
+   */
+  bitmap(box: Box, key: string, ink: (x: number, y: number) => boolean): void;
   /**
    * Everything drawn inside `fn` only shows when `condition` holds on the panel.
    * References without a dot are this widget's own values.
