@@ -231,7 +231,7 @@ TEST(line_spans_equal_stamped_squares) {
     Framebuffer expect = stamped(40, 30, clip, x1, y1, x2, y2, w);
     Framebuffer got(40, 30);
     drawLine(Canvas(got, true).withClip(clip), x1, y1, x2, y2, w);
-    if (got.bytes() != expect.bytes()) ++mismatches;
+    if (got != expect) ++mismatches;
   }
   CHECK_EQ(mismatches, 0);
 }
