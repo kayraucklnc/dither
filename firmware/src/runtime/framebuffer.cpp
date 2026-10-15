@@ -4,37 +4,43 @@
 
 namespace dither {
 
-Framebuffer::Framebuffer(int width, int height)
-    : width_(std::max(width, 0)),
-      height_(std::max(height, 0)),
-      bytes_(static_cast<size_t>(stride()) * static_cast<size_t>(height_), 0) {}
+Framebuffer::Framebuffer(int width, int height) : width_(std::max(width, 0)), height_(std::max(height, 0)) {
+  for (int y = 0; y < height_; y += kBandRows) {
+    const int rows = std::min(kBandRows, height_ - y);
+    bands_.emplace_back(static_cast<size_t>(stride()) * static_cast<size_t>(rows), 0);
+  }
+}
 
 void Framebuffer::clear() {
-  std::fill(bytes_.begin(), bytes_.end(), 0);
+  for (auto& band : bands_) std::fill(band.begin(), band.end(), 0);
+}
+
+bool Framebuffer::operator==(const Framebuffer& o) const {
+  return width_ == o.width_ && height_ == o.height_ && bands_ == o.bands_;
 }
 
 bool Framebuffer::get(int x, int y) const {
   if (x < 0 || y < 0 || x >= width_ || y >= height_) return false;
-  return (bytes_[static_cast<size_t>(y * stride() + x / 8)] >> (7 - x % 8)) & 1;
+  return (row(y)[x / 8] >> (7 - x % 8)) & 1;
 }
 
 void Framebuffer::set(int x, int y, bool black) {
   if (x < 0 || y < 0 || x >= width_ || y >= height_) return;
-  uint8_t& b = bytes_[static_cast<size_t>(y * stride() + x / 8)];
+  uint8_t& b = row(y)[x / 8];
   uint8_t mask = static_cast<uint8_t>(0x80 >> (x % 8));
   b = black ? (b | mask) : (b & ~mask);
 }
 
 void Framebuffer::fillSpan(int y, int x0, int x1, bool black) {
-  uint8_t* row = bytes_.data() + static_cast<size_t>(y * stride());
+  uint8_t* bytes = row(y);
   for (int x = x0; x < x1;) {
     if (x % 8 == 0 && x + 8 <= x1) {
-      row[x / 8] = black ? 0xFF : 0x00;
+      bytes[x / 8] = black ? 0xFF : 0x00;
       x += 8;
       continue;
     }
     uint8_t mask = static_cast<uint8_t>(0x80 >> (x % 8));
-    row[x / 8] = black ? (row[x / 8] | mask) : (row[x / 8] & ~mask);
+    bytes[x / 8] = black ? (bytes[x / 8] | mask) : (bytes[x / 8] & ~mask);
     ++x;
   }
 }

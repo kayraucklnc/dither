@@ -7,16 +7,23 @@
 
 namespace dither {
 
+// Rows are held in bands of kBandRows, never as one block: after Wi-Fi and TLS
+// the panel has the memory for a frame but no single 48 KB piece of it.
 class Framebuffer {
  public:
+  static constexpr int kBandRows = 32;
+
   Framebuffer() = default;
   Framebuffer(int width, int height);
 
   int width() const { return width_; }
   int height() const { return height_; }
   int stride() const { return (width_ + 7) / 8; }
-  const std::vector<uint8_t>& bytes() const { return bytes_; }
-  std::vector<uint8_t>& bytes() { return bytes_; }
+  // Row y's stride() bytes; y must be in range.
+  uint8_t* row(int y) { return bands_[static_cast<size_t>(y / kBandRows)].data() + rowOffset(y); }
+  const uint8_t* row(int y) const { return bands_[static_cast<size_t>(y / kBandRows)].data() + rowOffset(y); }
+  bool operator==(const Framebuffer& o) const;
+  bool operator!=(const Framebuffer& o) const { return !(*this == o); }
 
   void clear();  // all white
   bool get(int x, int y) const;
@@ -24,8 +31,10 @@ class Framebuffer {
   void fillSpan(int y, int x0, int x1, bool black);  // [x0, x1), already clipped
 
  private:
+  size_t rowOffset(int y) const { return static_cast<size_t>(y % kBandRows) * static_cast<size_t>(stride()); }
+
   int width_ = 0, height_ = 0;
-  std::vector<uint8_t> bytes_;
+  std::vector<std::vector<uint8_t>> bands_;
 };
 
 // Half-open box [x0, x1) x [y0, y1).

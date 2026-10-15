@@ -27,15 +27,17 @@ inline std::optional<dither::Framebuffer> readPbm(const std::string& path) {
   }
   in.get();  // the single whitespace before the raster
   dither::Framebuffer fb(dims[0], dims[1]);
-  in.read(reinterpret_cast<char*>(fb.bytes().data()), static_cast<std::streamsize>(fb.bytes().size()));
-  if (in.gcount() != static_cast<std::streamsize>(fb.bytes().size())) return std::nullopt;
+  for (int y = 0; y < fb.height(); ++y) {
+    in.read(reinterpret_cast<char*>(fb.row(y)), fb.stride());
+    if (in.gcount() != fb.stride()) return std::nullopt;
+  }
   return fb;
 }
 
 inline bool writePbm(const std::string& path, const dither::Framebuffer& fb) {
   std::ofstream out(path, std::ios::binary);
   out << "P4\n" << fb.width() << " " << fb.height() << "\n";
-  out.write(reinterpret_cast<const char*>(fb.bytes().data()), static_cast<std::streamsize>(fb.bytes().size()));
+  for (int y = 0; y < fb.height(); ++y) out.write(reinterpret_cast<const char*>(fb.row(y)), fb.stride());
   return static_cast<bool>(out);
 }
 

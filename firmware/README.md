@@ -24,7 +24,7 @@ src/platform/   Arduino side: partition mmap, UC8179 driver, Wi-Fi + NTP,
 src/main.cpp    one wake after another; deep sleep unless a USB host is attached
 test/           host tests (unit + golden fixtures from ../spec/fixtures)
 tools/          make_test_blob.py (shapes-only blob), package.py (merged image)
-partitions.csv  nvs 0x9000, factory app 0x10000 (2.9 MB), dither 0x300000 (1 MB)
+partitions.csv  nvs 0x9000 (28 KB), factory app 0x10000 (2.9 MB), dither 0x300000 (1 MB)
 ```
 
 ## Test
@@ -66,8 +66,9 @@ esptool --chip esp32c3 erase_region 0x300000 0x100000   # back to "Not set up"
 peak at. Limits worth knowing: a source response keeps at most 2048 JSON values and
 16 KB of text, strings are cut at 256 bytes, kept nesting is at most 20 deep
 (skipped parts of a response are not limited), and the value cache that
-survives sleep is capped at 6 KB - the largest values are dropped first, with
-a `WARNING` line in the log. Three crash resets in a row make the board wait
+survives sleep is capped at 10 KB - the largest values are dropped first, with
+a `WARNING` line in the log. The frame is kept in 32-row bands: after Wi-Fi and
+TLS the heap has room for it but no single 48 KB block. Three crash resets in a row make the board wait
 15 minutes before the next attempt. Log lines on the USB serial
 port start with `[dither]`. While a USB host is attached the board stays awake
 and accepts `CMD:INFO`, `CMD:WAKE`, `CMD:SCREENSHOT` (the panel frame, P4

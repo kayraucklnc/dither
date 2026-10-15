@@ -35,23 +35,25 @@ bool SerialCommands::poll(const Framebuffer& lastFrame) {
 
 void SerialCommands::run(const std::string& line, const Framebuffer& lastFrame, bool& wake) {
   if (line == "CMD:SCREENSHOT") {
-    const auto& bytes = lastFrame.bytes();
-    Serial.printf("SCREENSHOT_START:%u\n", static_cast<unsigned>(bytes.size()));
+    const size_t stride = static_cast<size_t>(lastFrame.stride());
+    const size_t total = stride * static_cast<size_t>(lastFrame.height());
+    Serial.printf("SCREENSHOT_START:%u\n", static_cast<unsigned>(total));
     // The TX timeout is 0 so logging never blocks; feed the frame only as
     // fast as the port drains, or most of it would be dropped.
     size_t sent = 0;
     const uint32_t start = millis();
-    while (sent < bytes.size() && millis() - start < kScreenshotTimeoutMs) {
+    while (sent < total && millis() - start < kScreenshotTimeoutMs) {
       int room = Serial.availableForWrite();
       if (room <= 0) {
         delay(1);
         continue;
       }
-      size_t n = std::min(bytes.size() - sent, static_cast<size_t>(room));
-      sent += Serial.write(bytes.data() + sent, n);
+      const size_t offset = sent % stride;  // within the row being sent
+      const size_t n = std::min(stride - offset, static_cast<size_t>(room));
+      sent += Serial.write(lastFrame.row(static_cast<int>(sent / stride)) + offset, n);
     }
     Serial.flush();
-    dlog("screenshot: sent %u of %u bytes (%dx%d)", static_cast<unsigned>(sent), static_cast<unsigned>(bytes.size()),
+    dlog("screenshot: sent %u of %u bytes (%dx%d)", static_cast<unsigned>(sent), static_cast<unsigned>(total),
          lastFrame.width(), lastFrame.height());
   } else if (line == "CMD:WAKE") {
     dlog("wake requested over serial");
