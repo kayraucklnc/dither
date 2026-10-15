@@ -137,6 +137,7 @@ back in, then let go.
 | 📄 | Web page | The text of any web page, fetched by the panel itself: a status page, a menu, a notice | — |
 | ⏳ | Countdown | Days until something you're looking forward to | — |
 | 💬 | Messages | A different line every day or every hour, from a list you write | — |
+| 📖 | Quote | A line from a great book or a philosopher, a new one every day — or from your own list | — |
 | ✍️ | Text | A heading, a note, anything you type | — |
 | 🖼️ | Picture | A photo or drawing, dithered for e-ink | — |
 | 📶 | Panel status | Wi-Fi, battery where the board can measure it, and when the data last changed | — |
@@ -325,7 +326,7 @@ The full guide, with layout tips and the whole `Draw` API, is
 - ✅ Google Calendar, several accounts merged into one agenda
 - ✅ Stripe: figure, curved graph, ledger and payments board
 - ✅ Trains from Trenord, with delays, cancellations and line alerts
-- ✅ Crypto prices, countdowns, messages, pictures, text and any JSON value
+- ✅ Crypto prices, countdowns, messages, quotes, pictures, text and any JSON value
 - ⬜ Any calendar from an iCal link, with no OAuth
 - ⬜ Public transport anywhere through GTFS-Realtime, plus TfL, SBB, BVG and NS
 - ⬜ Home Assistant: sensors, rooms and switches
