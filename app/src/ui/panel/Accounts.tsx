@@ -162,22 +162,29 @@ function OpenSky({ account, set }: { account: AccountsDef["opensky"]; set: (a: A
 
   if (account) return <Linked who={`OpenSky — ${account.clientId}`} onUnlink={() => set(null)} />;
 
-  // The same token trade the panel makes proves the client works before it depends on it.
+  // The same token trade the panel makes, to catch a mistyped client before the panel depends on it.
+  // OpenSky lets a browser read a refusal but not a success: a token comes back
+  // without the header that would let this page see it, and the browser reports
+  // only that the request failed. So a refusal we can read means a wrong client;
+  // an answer we cannot read is the token, and the panel will make the same trade.
   const check = async () => {
     setBusy(true);
     setError(null);
+    const account = { clientId: clientId.trim(), clientSecret: clientSecret.trim() };
     try {
       const res = await fetch(OPENSKY_TOKEN_URL, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ grant_type: "client_credentials", client_id: clientId.trim(), client_secret: clientSecret.trim() }),
+        body: new URLSearchParams({ grant_type: "client_credentials", client_id: account.clientId, client_secret: account.clientSecret }),
         credentials: "omit",
       });
       if (res.status === 400 || res.status === 401) throw new Error("OpenSky does not recognise that client ID and secret.");
       if (!res.ok) throw new Error(`OpenSky answered ${res.status}.`);
-      set({ clientId: clientId.trim(), clientSecret: clientSecret.trim() });
+      set(account);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not reach OpenSky.");
+      // A TypeError is the browser hiding an answer it may not show: OpenSky's success.
+      if (e instanceof TypeError) set(account);
+      else setError(e instanceof Error ? e.message : "Could not reach OpenSky.");
     } finally {
       setBusy(false);
     }
@@ -214,8 +221,8 @@ export function Accounts() {
         <Stripe account={project.accounts.stripe} set={(a) => set("stripe", a)} />
       </div>
       <div className="space-y-2">
-        <h3 className="font-medium">OpenSky <span className="font-normal text-muted">(optional)</span></h3>
-        <p className="text-[13px] text-muted">The Aircraft widget works without it; a linked client lets it look every 2 minutes instead of every 5.</p>
+        <h3 className="font-medium">OpenSky</h3>
+        <p className="text-[13px] text-muted">For the Aircraft widget. The account is free; without one OpenSky allows only 400 requests a day for your whole connection, which a day of trying things out runs through.</p>
         <OpenSky account={project.accounts.opensky} set={(a) => set("opensky", a)} />
       </div>
     </div>

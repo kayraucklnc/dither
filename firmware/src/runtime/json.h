@@ -146,6 +146,8 @@ struct JsonLimits {
 
   static JsonLimits runtime() { return {200000, 4u << 20, 64, 0}; }
   static JsonLimits response() { return {2048, 16 * 1024, 20, 256}; }
+  // A token endpoint's reply: the token is read whole, however long (a JWT runs to kilobytes).
+  static JsonLimits token() { return {256, 16 * 1024, 20, 0}; }
 };
 
 struct JsonParseResult {

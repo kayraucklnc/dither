@@ -190,6 +190,7 @@ for (const [name, timezone, at, pollen] of [
 // Aircraft: positional arrays, a sorted merge, a radar of nested conditions, hands by heading.
 {
   const project = createProject({ starter: "blank", timezone: "Europe/Rome", language: "en", units: "metric", place });
+  project.accounts = { ...project.accounts, opensky: { clientId: "golden-client", clientSecret: "golden-secret" } };
   const plane = (id: string, x: number, y: number, w: number, h: number, layout: string, frame: "none" | "outline" | "inverted" = "none") =>
     ({ id, type: "aircraft", x, y, w, h, frame, settings: { layout } });
   project.screens[0].widgets = [

@@ -30,6 +30,8 @@ export type Field =
   | (FieldBase & { kind: "date" })
   | (FieldBase & { kind: "secret"; placeholder?: string })
   | (FieldBase & { kind: "image" })
+  /** Several pictures, in order: the user's own and prints from the collection. */
+  | (FieldBase & { kind: "images" })
   | (FieldBase & { kind: "icon" })
   | (FieldBase & { kind: "list"; placeholder?: string })
   /** Type to find one of many options — stations, stops, symbols. */
@@ -57,6 +59,12 @@ export interface SourceSpec {
   decode?: { aes256ecb: string };
   /** The answer is a web page: its values' paths are `text` (the page as plain text) or `title`. */
   html?: boolean;
+  /**
+   * The server refuses browsers (no CORS). The preview then never asks: a
+   * refused request still reaches the server and spends the panel's share of
+   * its limit. The panel is not affected; it is not written into the blob.
+   */
+  panelOnly?: string;
   /** Minutes between fetches. */
   every: number;
   /**

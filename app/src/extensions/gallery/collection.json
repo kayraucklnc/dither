@@ -1,0 +1,114 @@
+[
+  {
+    "id": "great-wave",
+    "title": "The Great Wave off Kanagawa",
+    "artist": "Katsushika Hokusai",
+    "year": "c. 1831",
+    "source": "https://commons.wikimedia.org/wiki/File:The_Great_Wave_off_Kanagawa.jpg",
+    "licence": "Public domain"
+  },
+  {
+    "id": "red-fuji",
+    "title": "Fine Wind, Clear Morning",
+    "artist": "Katsushika Hokusai",
+    "year": "c. 1831",
+    "source": "https://commons.wikimedia.org/wiki/File:Red_Fuji_southern_wind_clear_morning.jpg",
+    "licence": "Public domain"
+  },
+  {
+    "id": "sudden-shower",
+    "title": "Sudden Shower over Shin-Ōhashi Bridge",
+    "artist": "Utagawa Hiroshige",
+    "year": "1857",
+    "source": "https://commons.wikimedia.org/wiki/File:Hiroshige,_Sudden_shower_over_Shin-Ohashi_bridge_and_Atake,_1857_expanded.jpg",
+    "licence": "Public domain"
+  },
+  {
+    "id": "the-shower",
+    "title": "The Shower",
+    "artist": "Félix Vallotton",
+    "year": "1894",
+    "source": "https://commons.wikimedia.org/wiki/File:F%C3%A9lix_Vallotton,_L%27Averse_(The_Shower),_1894,_NGA_42219.jpg",
+    "licence": "CC0"
+  },
+  {
+    "id": "the-demonstration",
+    "title": "The Demonstration",
+    "artist": "Félix Vallotton",
+    "year": "1893",
+    "source": "https://commons.wikimedia.org/wiki/File:The_Demonstration_(La_Manifestation)_MET_DP838462.jpg",
+    "licence": "CC0"
+  },
+  {
+    "id": "laziness",
+    "title": "Laziness",
+    "artist": "Félix Vallotton",
+    "year": "1896",
+    "source": "https://commons.wikimedia.org/wiki/File:F%C3%A9lix_Vallotton,_La_paresse_(Laziness),_1896,_NGA_69505.jpg",
+    "licence": "CC0"
+  },
+  {
+    "id": "mont-rose",
+    "title": "Mont-Rose",
+    "artist": "Félix Vallotton",
+    "year": "1892",
+    "source": "https://commons.wikimedia.org/wiki/File:Felix_Vallotton,_Mont-Rose,_1892.jpg",
+    "licence": "Public domain"
+  },
+  {
+    "id": "rhinoceros",
+    "title": "The Rhinoceros",
+    "artist": "Albrecht Dürer",
+    "year": "1515",
+    "source": "https://commons.wikimedia.org/wiki/File:The_Rhinoceros_(NGA_1964.8.697)_enhanced.png",
+    "licence": "Public domain"
+  },
+  {
+    "id": "charon",
+    "title": "Charon Herds the Sinners onto His Boat",
+    "artist": "Gustave Doré",
+    "year": "1857",
+    "source": "https://commons.wikimedia.org/wiki/File:Gustave_Dor%C3%A9_-_Dante_Alighieri_-_Inferno_-_Plate_10_(Canto_III_-_Charon_herds_the_sinners_onto_his_boat).jpg",
+    "licence": "Public domain"
+  },
+  {
+    "id": "satan",
+    "title": "Satan's Despair",
+    "artist": "Gustave Doré",
+    "year": "1866",
+    "source": "https://commons.wikimedia.org/wiki/File:Gustave_Dore_Satan%27s_Despair.jpg",
+    "licence": "Public domain"
+  },
+  {
+    "id": "raven",
+    "title": "The Raven",
+    "artist": "Gustave Doré",
+    "year": "1884",
+    "source": "https://commons.wikimedia.org/wiki/File:Dore_The_Raven_1884-17.jpg",
+    "licence": "Public domain"
+  },
+  {
+    "id": "carceri",
+    "title": "The Pier with Chains",
+    "artist": "Giovanni Battista Piranesi",
+    "year": "1761",
+    "source": "https://commons.wikimedia.org/wiki/File:Piranesi-Carceri-16Pfeiler_mit_Ketten.jpg",
+    "licence": "CC0"
+  },
+  {
+    "id": "sleep-of-reason",
+    "title": "The Sleep of Reason Produces Monsters",
+    "artist": "Francisco Goya",
+    "year": "1799",
+    "source": "https://commons.wikimedia.org/wiki/File:Goya-Capricho-43.jpg",
+    "licence": "Public domain"
+  },
+  {
+    "id": "bats",
+    "title": "Chiroptera",
+    "artist": "Ernst Haeckel",
+    "year": "1904",
+    "source": "https://commons.wikimedia.org/wiki/File:Haeckel_Chiroptera.jpg",
+    "licence": "Public domain"
+  }
+]

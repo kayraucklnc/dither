@@ -52,7 +52,12 @@ export function withoutSecrets(project: Project): Project {
 export function pruneImages(project: Project): Project {
   const used = new Set<string>();
   for (const s of project.screens) {
-    for (const w of s.widgets) for (const v of Object.values(w.settings)) if (typeof v === "string") used.add(v);
+    for (const w of s.widgets) {
+      for (const v of Object.values(w.settings)) {
+        if (typeof v === "string") used.add(v);
+        else if (Array.isArray(v)) for (const x of v) if (typeof x === "string") used.add(x);
+      }
+    }
   }
   const ids = Object.keys(project.images);
   if (ids.every((id) => used.has(id))) return project;

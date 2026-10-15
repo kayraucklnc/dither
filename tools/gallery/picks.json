@@ -1,0 +1,16 @@
+[
+  { "id": "great-wave", "title": "The Great Wave off Kanagawa", "artist": "Katsushika Hokusai", "year": "c. 1831", "file": "The_Great_Wave_off_Kanagawa.jpg" },
+  { "id": "red-fuji", "title": "Fine Wind, Clear Morning", "artist": "Katsushika Hokusai", "year": "c. 1831", "file": "Red_Fuji_southern_wind_clear_morning.jpg" },
+  { "id": "sudden-shower", "title": "Sudden Shower over Shin-Ōhashi Bridge", "artist": "Utagawa Hiroshige", "year": "1857", "file": "Hiroshige,_Sudden_shower_over_Shin-Ohashi_bridge_and_Atake,_1857_expanded.jpg", "focus": [0.5, 0.55] },
+  { "id": "the-shower", "title": "The Shower", "artist": "Félix Vallotton", "year": "1894", "file": "Félix_Vallotton,_L'Averse_(The_Shower),_1894,_NGA_42219.jpg" },
+  { "id": "the-demonstration", "title": "The Demonstration", "artist": "Félix Vallotton", "year": "1893", "file": "The_Demonstration_(La_Manifestation)_MET_DP838462.jpg" },
+  { "id": "laziness", "title": "Laziness", "artist": "Félix Vallotton", "year": "1896", "file": "Félix_Vallotton,_La_paresse_(Laziness),_1896,_NGA_69505.jpg" },
+  { "id": "mont-rose", "title": "Mont-Rose", "artist": "Félix Vallotton", "year": "1892", "file": "Felix_Vallotton,_Mont-Rose,_1892.jpg" },
+  { "id": "rhinoceros", "title": "The Rhinoceros", "artist": "Albrecht Dürer", "year": "1515", "file": "The_Rhinoceros_(NGA_1964.8.697)_enhanced.png", "focus": [0.5, 0.55] },
+  { "id": "charon", "title": "Charon Herds the Sinners onto His Boat", "artist": "Gustave Doré", "year": "1857", "file": "Gustave_Doré_-_Dante_Alighieri_-_Inferno_-_Plate_10_(Canto_III_-_Charon_herds_the_sinners_onto_his_boat).jpg" },
+  { "id": "satan", "title": "Satan's Despair", "artist": "Gustave Doré", "year": "1866", "file": "Gustave_Dore_Satan's_Despair.jpg", "focus": [0.5, 0.4] },
+  { "id": "raven", "title": "The Raven", "artist": "Gustave Doré", "year": "1884", "file": "Dore_The_Raven_1884-17.jpg", "focus": [0.5, 0.4] },
+  { "id": "carceri", "title": "The Pier with Chains", "artist": "Giovanni Battista Piranesi", "year": "1761", "file": "Piranesi-Carceri-16Pfeiler_mit_Ketten.jpg" },
+  { "id": "sleep-of-reason", "title": "The Sleep of Reason Produces Monsters", "artist": "Francisco Goya", "year": "1799", "file": "Goya-Capricho-43.jpg", "focus": [0.5, 0.55] },
+  { "id": "bats", "title": "Chiroptera", "artist": "Ernst Haeckel", "year": "1904", "file": "Haeckel_Chiroptera.jpg" }
+]

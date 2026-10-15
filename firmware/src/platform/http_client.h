@@ -9,6 +9,13 @@
 
 namespace dither {
 
+// The start of the error when a host's name cannot be looked up: no internet
+// on this Wi-Fi, or one that wants a sign-in page first.
+constexpr const char* kNoInternet = "could not look up";
+// Free heap a TLS handshake needs. Below it the panel does not try: a failed
+// handshake can leave memory behind, and a few of those in a row crash it.
+constexpr uint32_t kMinHeapForTls = 45 * 1024;
+
 struct HttpRequest {
   bool post = false;
   std::string url;

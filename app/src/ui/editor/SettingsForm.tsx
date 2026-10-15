@@ -11,6 +11,7 @@ import { useProject } from "@/state/project-store";
 import { Field, NumberInput, Select, TextArea, TextInput, Toggle } from "../kit";
 import type { Lane } from "@/extensions/google-calendar";
 import { CalendarsField } from "../fields/CalendarsField";
+import { ImagesField } from "../fields/ImagesField";
 import { RemoteSelect } from "../fields/RemoteSelect";
 import { PlaceSearch } from "../fields/PlaceSearch";
 import { SearchField } from "../fields/SearchField";
@@ -91,6 +92,8 @@ export function SettingsForm({ fields, values, onChange }: Props) {
                 return <Select id={id} value={String(v ?? ICON_NAMES[0])} onChange={(x) => onChange(f.key, x)} options={ICON_NAMES.map((n) => ({ value: n, label: n }))} />;
               case "image":
                 return <ImageField value={String(v ?? "")} onChange={(x, also) => onChange(f.key, x, also)} />;
+              case "images":
+                return <ImagesField value={(Array.isArray(v) ? v : []).filter((x): x is string => typeof x === "string")} onChange={(x, also) => onChange(f.key, x, also)} />;
               case "search":
                 return <SearchField id={id} value={String(v ?? "")} onChange={(x) => onChange(f.key, x)} options={f.options()} placeholder={f.placeholder} />;
               case "calendars":

@@ -4,12 +4,16 @@
 import { applyMerges } from "@/runtime/merge";
 import { formatContext } from "@/runtime/render";
 import type { Value } from "@/runtime/types";
-import { builtins, type DeviceState } from "@/runtime/values";
+import { builtins, freshness, type DeviceState } from "@/runtime/values";
 import type { Compiled } from "./index";
 
 export function sampleValues(compiled: Compiled, now: number, device?: DeviceState): Map<string, Value> {
   const values = builtins(now, compiled.runtime.tz, device);
-  for (const s of compiled.sources) for (const [k, v] of s.sample) values.set(k, v);
+  for (const s of compiled.sources) {
+    for (const [k, v] of s.sample) values.set(k, v);
+    // Examples stand for an answer that has just come in: widgets that hide stale data show them.
+    if (s.sample.size) for (const [k, v] of freshness(s.source.id, true, now, now)) values.set(k, v);
+  }
   applyMerges(compiled.runtime.merges, values, formatContext(compiled.runtime, now, values));
   return values;
 }

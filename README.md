@@ -140,6 +140,7 @@ back in, then let go.
 | 📖 | Quote | A line from a great book or a philosopher, a new one every day — or from your own list | — |
 | ✍️ | Text | A heading, a note, anything you type | — |
 | 🖼️ | Picture | A photo or drawing, dithered for e-ink | — |
+| 🌊 | Gallery | Pictures that take turns, yours or public-domain prints (Hokusai, Doré, Vallotton, Goya…) | — |
 | 📶 | Panel status | Wi-Fi, battery where the board can measure it, and when the data last changed | — |
 
 Keys and account links stay in your browser and on your panel. When you save
@@ -364,7 +365,7 @@ pixel-for-pixel comparison of both renderers.
 | [`firmware/`](firmware) | The panel's firmware (PlatformIO, Arduino-ESP32) |
 | [`docs/format.md`](docs/format.md) | The contract between the app and the firmware |
 | [`spec/fixtures/`](spec/fixtures) | Golden images that both renderers must match |
-| [`tools/`](tools) | Font and icon generators (Inter and Lucide, turned into 1-bit images) |
+| [`tools/`](tools) | Font and icon generators (Inter and Lucide, turned into 1-bit images), and the gallery's prints |
 
 ## Contributing
 

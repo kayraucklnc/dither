@@ -33,6 +33,8 @@ export interface CompiledSource {
   widgetIds: string[];
   /** Sample values by full reference, for the simulator before anything is fetched. */
   sample: Map<string, Value>;
+  /** Why the preview must not ask this server itself (it refuses browsers); the panel still does. */
+  panelOnly?: string;
 }
 
 export interface Compiled {
@@ -88,6 +90,7 @@ function buildSources(project: Project): { sources: CompiledSource[]; ids: Map<s
         }
         for (const v of values) if (!entry.source.values.some((e) => e.key === v.key)) entry.source.values.push(v);
         if (!entry.widgetIds.includes(w.id)) entry.widgetIds.push(w.id);
+        if (spec.panelOnly) entry.panelOnly = spec.panelOnly;
         map[name] = entry.source.id;
       }
       ids.set(w.id, map);

@@ -162,7 +162,8 @@ function noTrains(d: Draw, box: { x: number; y: number; w: number; h: number }) 
 
 function board(d: Draw, s: Record<string, unknown>) {
   const { width: w, height: h } = d;
-  const headH = h >= 150 ? Math.max(22, Math.min(32, Math.round(h * 0.09))) : 0;
+  // The stations are the widget's own setting; the board only names them when asked.
+  const headH = s.route && h >= 150 ? Math.max(22, Math.min(32, Math.round(h * 0.09))) : 0;
   if (headH) routeLine(d, s, headH);
   const top = headH ? headH + 8 : 0;
   const avail = h - top;
@@ -227,11 +228,12 @@ export default defineExtension({
   fields: [
     { key: "from", label: "From", kind: "search", placeholder: "Milano Cadorna", options: () => stations },
     { key: "to", label: "To", kind: "search", placeholder: "Saronno", options: () => stations },
+    { key: "route", label: "Name the stations above the board", kind: "toggle", help: "Off, the board is all trains." },
     { key: "transfers", label: "Changes", kind: "select", options: [{ value: "0", label: "Direct trains only" }, { value: "1", label: "Up to one change" }, { value: "2", label: "Up to two changes" }] },
     { key: "language", label: "Alerts in", kind: "select", options: [{ value: "it", label: "Italian" }, { value: "en", label: "English" }] },
     { key: "passphrase", label: "Passphrase (advanced)", kind: "secret", help: "Only change this if Trenord changes theirs and the board stops updating." },
   ],
-  defaults: () => ({ from: "S01066", to: "S01933", transfers: "0", language: "en", passphrase: PASSPHRASE }),
+  defaults: () => ({ from: "S01066", to: "S01933", transfers: "0", language: "en", passphrase: PASSPHRASE, route: false }),
   title: (s) => `${nameOf(s.from) || "?"} to ${nameOf(s.to) || "?"}`,
   refresh: () => 5,
   source(s) {
