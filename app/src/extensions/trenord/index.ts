@@ -28,10 +28,11 @@ const and = (...c: Condition[]): Condition => ({ all: c });
 
 // --------------------------------------------------------------- the board
 //
-// One table, one grid: countdown | time and train | state. The train worth
-// running for is the first row, drawn as a black band in larger type; every
-// later train lines up beneath it in the same columns, so the eye runs down
-// "6 min, 25 min, 48 min" without hunting.
+// One table, one grid: when it leaves | train | state. The train worth running
+// for is the first row, drawn as a black band in larger type; every later train
+// lines up beneath it in the same columns, so the eye runs down "16:31, 16:44,
+// 16:55" without hunting. Times, not countdowns: the panel redraws every few
+// minutes, and "17 min" is wrong a minute after it is drawn - "16:31" is not.
 
 /** Not gone and not cancelled: a train you can actually catch. */
 const catchable = (i: number): Condition => and(upcoming(i), not(cancelled(i)));
@@ -65,41 +66,30 @@ function onBaseline(d: Draw, content: Parameters<Draw["text"]>[0], x: number, ba
 interface Grid {
   x: number;
   w: number;
-  /** The countdown column, as wide as the hero's countdown — every row lines up behind it. */
-  countW: number;
+  /** The hero's time column; later rows size theirs to their own, smaller type. */
+  timeW: number;
   stateW: number;
-  /** Two-line middle column (time over train) for narrow boards. */
+  /** Narrow: "+8 min" rather than "8 min late", and the line (S5) without the train number. */
   stacked: boolean;
   heroBig: number;
   heroPad: number;
 }
 
-const heroUnit = (big: number) => Math.max(14, Math.round(big * 0.34));
-
-/** The largest hero countdown that leaves the rest of its row room to breathe. */
+/** The largest hero time that leaves the rest of its row room to breathe. */
 function heroSize(d: Draw, h: number, w: number): number {
   for (const size of [96, 80, 64, 48, 40, 32, 28, 24]) {
     if (size > h * 0.66) continue;
-    if (d.measure("88", size, 700) + d.measure("min", heroUnit(size), 700) + size * 0.25 <= w * 0.4) return size;
+    if (d.measure("88:88", size, 700) + size * 0.25 <= w * 0.45) return size;
   }
   return 20;
 }
+
+const timeColumn = (d: Draw, big: number) => d.measure("88:88", big, 700) + Math.round(big * 0.35);
 
 /** Baseline that centres a line of this size in a band of height h. */
 function centre(y: number, h: number, size: number): number {
   // Digits and capitals stop well below the font's ascent; centre on the cap height.
   return y + Math.round((h + Math.round(size * 0.73)) / 2);
-}
-
-function countdown(d: Draw, i: number, x: number, baseline: number, w: number, size: number, white: boolean, unitSize: number) {
-  d.when({ v: `t${i}`, f: minutesTo(i), op: "lt", x: 1 }, () => onBaseline(d, "now", x, baseline, w, size, 700, "left", white));
-  for (const [lo, hi, digits] of [[1, 10, "8"], [10, 100, "88"], [100, 1440, "888"]] as const) {
-    d.when({ v: `t${i}`, f: minutesTo(i), op: "between", x: [lo, hi] }, () => {
-      const nw = d.measure(digits, size, 700);
-      onBaseline(d, [d.value(`t${i}`, { ...minutesTo(i), num: { d: 0 } })], x, baseline, nw + 4, size, 700, "left", white);
-      onBaseline(d, "min", x + nw + Math.max(3, Math.round(unitSize * 0.25)), baseline, w - nw, unitSize, 700, "left", white);
-    });
-  }
 }
 
 function state(d: Draw, i: number, x: number, baseline: number, w: number, size: number, white: boolean, roomy: boolean) {
@@ -115,34 +105,28 @@ function row(d: Draw, i: number, y: number, h: number, g: Grid, hero: boolean) {
   if (hero) d.rect({ x: g.x, y, w: g.w, h }, { radius: 8 });
   const pad = hero ? g.heroPad : 0;
   const big = hero ? g.heroBig : Math.min(40, Math.max(16, Math.min(Math.round(h * 0.55), Math.round(g.heroBig * 0.5))));
-  const unit = hero ? heroUnit(big) : Math.max(13, Math.round(big * 0.45));
   const mid = hero ? Math.max(18, Math.min(40, Math.round(big * 0.5))) : Math.max(16, Math.min(30, Math.round(big * 0.8)));
   const small = Math.max(14, Math.round(mid * 0.68));
   const base = centre(y, h, big);
 
-  countdown(d, i, g.x + pad, base, g.countW, big, white, unit);
+  // When it actually leaves, the delay already added.
+  const timeX = g.x + pad;
+  const timeW = hero ? g.timeW : timeColumn(d, big);
+  onBaseline(d, [d.value(`t${i}`, clock(i))], timeX, base, g.timeW, big, 700, "left", white);
+  d.when(cancelled(i), () => {
+    // Struck through: still on the board, plainly not happening.
+    const sy = base - Math.round(big * 0.36);
+    d.line(timeX - 2, sy, timeX + d.measure("88:88", big, 700) + 2, sy, { width: Math.max(2, Math.round(big / 12)), white });
+  });
 
   // The state column is as wide as its words at this row's size.
   const stateSize = hero && !g.stacked ? mid : small;
   const widest = hero && !g.stacked ? ["88 min late", "Cancelled"] : ["+88 min", "Cancelled"];
   const stateW = g.stateW > 0 ? Math.max(...widest.map((t) => d.measure(t, stateSize, 700))) + 6 : 0;
-  const midX = g.x + pad + g.countW;
-  const midW = g.w - pad * 2 - g.countW - stateW;
-  const timeW = d.measure("88:88", mid, 700) + Math.round(mid * 0.45);
-  const train = [d.value(`k${i}`, { fallback: "" }), " ", d.value(`n${i}`, { fallback: "" })];
-  const lineY = g.stacked ? y + Math.round(h / 2) - 2 : base;
-  if (g.stacked) {
-    onBaseline(d, [d.value(`t${i}`, clock(i))], midX, lineY, midW, mid, 700, "left", white);
-    onBaseline(d, train, midX, lineY + d.metrics(small).lineHeight, midW, small, 400, "left", white);
-  } else {
-    onBaseline(d, [d.value(`t${i}`, clock(i))], midX, base, timeW, mid, 700, "left", white);
-    onBaseline(d, train, midX + timeW, base, midW - timeW, small, 400, "left", white);
-  }
-  d.when(cancelled(i), () => {
-    // Struck through: still on the board, plainly not happening.
-    const sy = lineY - Math.round(mid * 0.36);
-    d.line(midX - 2, sy, midX + timeW - Math.round(mid * 0.3), sy, { width: Math.max(2, Math.round(mid / 10)), white });
-  });
+  const midX = timeX + timeW;
+  const midW = g.w - pad * 2 - timeW - stateW;
+  const train = g.stacked ? [d.value(`k${i}`, { fallback: "" })] : [d.value(`k${i}`, { fallback: "" }), " ", d.value(`n${i}`, { fallback: "" })];
+  onBaseline(d, train, midX, base, midW, small, 400, "left", white);
   if (stateW > 0) state(d, i, g.x + g.w - pad - stateW, base, stateW, stateSize, white, hero && !g.stacked);
 }
 
@@ -193,7 +177,7 @@ function board(d: Draw, s: Record<string, unknown>) {
   const stateSize = Math.max(18, Math.min(40, Math.round(heroBig * 0.5)));
   const g: Grid = {
     x: 0, w, stacked, heroBig, heroPad,
-    countW: d.measure("88", heroBig, 700) + d.measure("min", heroUnit(heroBig), 700) + Math.round(heroBig * 0.45),
+    timeW: timeColumn(d, heroBig),
     stateW: d.measure(stacked ? "+88 min" : "Cancelled", stateSize, 700) + 6,
   };
   noTrains(d, { x: 0, y: top, w, h: avail });
@@ -226,7 +210,7 @@ function strip(d: Draw) {
   const stateSize = Math.max(16, Math.round(heroBig * 0.5));
   const g: Grid = {
     x: 0, w: d.width, stacked: false, heroBig, heroPad: Math.round(Math.min(d.height * 0.16, 16)),
-    countW: d.measure("88", heroBig, 700) + d.measure("min", heroUnit(heroBig), 700) + Math.round(heroBig * 0.45),
+    timeW: timeColumn(d, heroBig),
     stateW: d.width >= 360 ? d.measure("Cancelled", stateSize, 700) + 6 : 0,
   };
   noTrains(d, { x: 0, y: 0, w: d.width, h: d.height });
