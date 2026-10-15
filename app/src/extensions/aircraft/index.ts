@@ -570,22 +570,33 @@ function sourceFor(s: Settings, env: Env): SourceSpec | null {
   };
 }
 
-/** Plausible traffic around the place: overflights, one on approach, one in trouble, one on the ground. */
+/**
+ * Plausible traffic around the place: overflights, one on approach, one in
+ * trouble, one on the ground, and a few farther out. Each sits a fixed distance
+ * east and north of the place, as real planes do, so a wider radius takes in
+ * more of them rather than moving them. OpenSky answers only what is in its box.
+ */
 function sampleFor(s: Settings, env: Env): Record<string, string | number | boolean | null> {
   const place = placeOf(s, env) ?? { name: "", latitude: 45.46, longitude: 9.19 };
-  const b = boxAround(place, radiusOf(s));
-  const at = (fy: number, fx: number) => ({ lat: b.lamin + (b.lamax - b.lamin) * fy, lon: b.lomin + (b.lomax - b.lomin) * fx });
+  const km = radiusOf(s);
+  const at = (east: number, north: number) => ({
+    lat: place.latitude + north / KM_PER_DEG,
+    lon: place.longitude + east / (KM_PER_DEG * Math.max(0.05, Math.cos((place.latitude * Math.PI) / 180))),
+  });
   const planes = [
-    { cs: "EJU12HZ ", ...at(0.62, 0.71), alt: 3802, vel: 184, trk: 244, vr: -4.6, cat: 4, sq: "5554" },
-    { cs: "RYR4QK  ", ...at(0.2, 0.3), alt: 11278, vel: 231, trk: 58, vr: 0, cat: 0, sq: "2310" },
-    { cs: "DLH9AC  ", ...at(0.85, 0.45), alt: 10972, vel: 240, trk: 172, vr: 0, cat: 4, sq: "1000" },
-    { cs: "THY1TU  ", ...at(0.4, 0.58), alt: 1220, vel: 82, trk: 355, vr: 6.2, cat: 6, sq: "4611" },
-    { cs: "SWR17M  ", ...at(0.75, 0.15), alt: 7620, vel: 205, trk: 120, vr: 8.1, cat: 4, sq: "7700" },
-    { cs: "UAE91   ", ...at(0.1, 0.82), alt: 12192, vel: 252, trk: 300, vr: 0, cat: 6, sq: "3301" },
-    { cs: "IHELI   ", ...at(0.3, 0.62), alt: 310, vel: 48, trk: 205, vr: 0, cat: 8, sq: "7000" },
-    { cs: "IABCD   ", ...at(0.58, 0.33), alt: 900, vel: 55, trk: 80, vr: 1.5, cat: 0, sq: "7000" },
-    { cs: "ITY1325 ", ...at(0.5, 0.5), alt: null, vel: 4, trk: 90, vr: null, cat: 4, sq: null },
-  ];
+    { cs: "EJU12HZ ", ...at(10.5, 6), alt: 3802, vel: 184, trk: 244, vr: -4.6, cat: 4, sq: "5554", e: 10.5, n: 6 },
+    { cs: "RYR4QK  ", ...at(-10, -15), alt: 11278, vel: 231, trk: 58, vr: 0, cat: 0, sq: "2310", e: -10, n: -15 },
+    { cs: "DLH9AC  ", ...at(-2.5, 17.5), alt: 10972, vel: 240, trk: 172, vr: 0, cat: 4, sq: "1000", e: -2.5, n: 17.5 },
+    { cs: "THY1TU  ", ...at(4, -5), alt: 1220, vel: 82, trk: 355, vr: 6.2, cat: 6, sq: "4611", e: 4, n: -5 },
+    { cs: "SWR17M  ", ...at(-17.5, 12.5), alt: 7620, vel: 205, trk: 120, vr: 8.1, cat: 4, sq: "7700", e: -17.5, n: 12.5 },
+    { cs: "UAE91   ", ...at(16, -20), alt: 12192, vel: 252, trk: 300, vr: 0, cat: 6, sq: "3301", e: 16, n: -20 },
+    { cs: "IHELI   ", ...at(6, -10), alt: 310, vel: 48, trk: 205, vr: 0, cat: 8, sq: "7000", e: 6, n: -10 },
+    { cs: "IABCD   ", ...at(-8.5, 4), alt: 900, vel: 55, trk: 80, vr: 1.5, cat: 0, sq: "7000", e: -8.5, n: 4 },
+    { cs: "ITY1325 ", ...at(0, 0), alt: null, vel: 4, trk: 90, vr: null, cat: 4, sq: null, e: 0, n: 0 },
+    { cs: "AZA784  ", ...at(-22, 38), alt: 9450, vel: 228, trk: 140, vr: 0, cat: 4, sq: "2265", e: -22, n: 38 },
+    { cs: "BAW572  ", ...at(55, -45), alt: 11580, vel: 236, trk: 310, vr: 0, cat: 4, sq: "6012", e: 55, n: -45 },
+    { cs: "AFR1622 ", ...at(30, 72), alt: 10360, vel: 230, trk: 200, vr: -2, cat: 4, sq: "1301", e: 30, n: 72 },
+  ].filter((p) => Math.abs(p.e) <= km && Math.abs(p.n) <= km);
   const out: Record<string, string | number | boolean | null> = { n: planes.length };
   planes.forEach((p, i) => { for (const f of FIELDS) out[`${f}${i}`] = p[f]; });
   return out;
