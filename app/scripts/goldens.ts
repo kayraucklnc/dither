@@ -38,7 +38,7 @@ function write(name: string, blob: Uint8Array, runtime: Runtime, values: Record<
 const fonts = await loadFonts();
 const deps = { library: nodeLibrary, fonts, picture: async () => null, boardPanel: () => ({ width: 800, height: 480 }) };
 
-for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "starter-showcase", "primitives", "text-and-formats", "chart-labels", "air-quality", "air-quality-no-pollen", "air-quality-quiet", "aircraft", "aircraft-sky", "iss"]) {
+for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "starter-showcase", "primitives", "text-and-formats", "chart-labels", "air-quality", "air-quality-no-pollen", "air-quality-quiet", "aircraft", "aircraft-sky", "iss", "quote"]) {
   rmSync(`${root}${dir}`, { recursive: true, force: true });
 }
 
@@ -230,6 +230,18 @@ for (const [name, timezone, at, pollen] of [
   for (const src of c.sources) for (const [k, v] of src.sample) values[k] = v;
   for (const src of c.sources) Object.assign(values, { [`${src.source.id}._ok`]: true, [`${src.source.id}._age`]: 3 });
   write("iss", c.blob, c.runtime, values);
+}
+
+// Quotes: each laid out at its own size, the day's chosen by the clock; a short one, a long one, my own.
+{
+  const project = createProject({ starter: "blank", timezone: "Europe/Rome", language: "en", units: "metric", place });
+  project.screens[0].widgets = [
+    { id: "wide", type: "quote", x: 0, y: 0, w: 20, h: 5, frame: "none", settings: { collection: "all", credit: "work", bold: false, align: "center" } },
+    { id: "tall", type: "quote", x: 0, y: 5, w: 8, h: 7, frame: "outline", settings: { collection: "philosophy", credit: "name", bold: true, align: "left" } },
+    { id: "mine", type: "quote", x: 8, y: 5, w: 12, h: 7, frame: "inverted", settings: { collection: "mine", mine: ["Simplicity is the ultimate sophistication."], credit: "work", bold: false, align: "center" } },
+  ];
+  const c = await compile(project, deps);
+  write("quote", c.blob, c.runtime, { ...DEVICE });
 }
 
 // Hand-placed elements at their edges: what the starters do not reach.

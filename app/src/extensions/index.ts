@@ -12,6 +12,7 @@ import gallery from "./gallery";
 import googleCalendar from "./google-calendar";
 import messages from "./messages";
 import picture from "./picture";
+import quote from "./quote";
 import status from "./status";
 import stripe from "./stripe";
 import text from "./text";
@@ -21,5 +22,5 @@ import webPage from "./web-page";
 import webValue from "./web-value";
 
 export const EXTENSIONS: readonly Extension[] = [
-  clock, date, weather, airQuality, googleCalendar, trenord, aircraft, iss, text, messages, countdown, picture, gallery, stripe, crypto, webValue, webPage, status,
+  clock, date, weather, airQuality, googleCalendar, trenord, aircraft, iss, text, messages, quote, countdown, picture, gallery, stripe, crypto, webValue, webPage, status,
 ] as unknown as Extension[];
