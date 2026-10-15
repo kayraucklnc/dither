@@ -79,6 +79,8 @@ describe("aircraft details", () => {
     expect(icon(250, "prop")).toBe("prop-247");
     // No heading: it still shows, pointing north.
     expect(icon(null, "glider")).toBe("glider-0");
+    // The 3D view's solid models, seen side-on when flying east.
+    expect(formatValue(90, heading("heavy", "-3d"), ctx)).toBe("heavy-3d-90");
   });
 
   it("knows the airports around a place", () => {
@@ -101,8 +103,24 @@ describe("aircraft on the panel", () => {
     return p;
   }
 
-  it("lists the lowest plane first", async () => {
+  it("lists the nearest plane first, and how far and which way it is", async () => {
     const out = await compile(project("list"), deps);
+    expect(out.problems).toEqual([]);
+    const near = out.widgetSources.get("sky")!.near;
+    const values = sampleValues(out, Math.floor(Date.now() / 1000));
+    const listed = Array.from({ length: 12 }, (_, i) => [String(values.get(`${near}.cs${i}`)).trim(), values.get(`${near}.dist${i}`)]);
+    expect(listed[0][0]).toBe("THY1TU");
+    const dists = listed.map(([, dist]) => dist).filter((x): x is number => typeof x === "number");
+    expect(dists).toEqual([...dists].sort((a, b) => a - b));
+    // Only those within the radius: the box's corners are farther.
+    expect(Math.max(...dists)).toBeLessThanOrEqual(25);
+    expect(listed.some(([cs]) => cs === "UAE91")).toBe(false);
+  });
+
+  it("lists the lowest plane first when asked", async () => {
+    const p = project("list");
+    p.screens[0].widgets[0].settings.order = "low";
+    const out = await compile(p, deps);
     expect(out.problems).toEqual([]);
     const near = out.widgetSources.get("sky")!.near;
     const values = sampleValues(out, Math.floor(Date.now() / 1000));
@@ -111,7 +129,7 @@ describe("aircraft on the panel", () => {
     // The one on the ground is left out.
     const listed = Array.from({ length: 12 }, (_, i) => values.get(`${near}.cs${i}`));
     expect(listed.some((c) => String(c).startsWith("ITY1325"))).toBe(false);
-    expect(listed.filter(Boolean)).toHaveLength(8);
+    expect(listed.filter(Boolean)).toHaveLength(7); // and UAE91, in the box's corner, beyond 25 km
   });
 
   it("keeps a full-panel radar and its list within budget", async () => {
@@ -120,5 +138,7 @@ describe("aircraft on the panel", () => {
     const radar = (await compile(project("radar"), deps)).blob.length;
     // Every cell holds a dot for every plane; this is what that costs.
     expect(radar - base).toBeLessThan(230_000);
+    const sky = (await compile(project("sky"), deps)).blob.length;
+    expect(sky - base).toBeLessThan(230_000);
   });
 });

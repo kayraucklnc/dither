@@ -2,7 +2,7 @@
 // every linked calendar as one agenda. docs/format.md "Merges".
 
 import { readTime, type FormatContext } from "./format";
-import type { Merge, Value } from "./types";
+import type { Geo, Merge, Value } from "./types";
 
 interface Record_ {
   from: number;
@@ -16,6 +16,27 @@ function same(a: Value, b: Value): boolean {
   return typeof a === typeof b && a === b;
 }
 
+const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+const round = (x: number, d: number) => {
+  const r = x * 10 ** d;
+  return (Math.sign(r) * Math.round(Math.abs(r))) / 10 ** d;
+};
+
+/** Distance in km and bearing in degrees from `geo.at`, both null without a position. */
+export function where(geo: Geo, lat: Value, lon: Value): { dist: number | null; brg: number | null } {
+  const at = geo.at;
+  if (!isNum(lat) || !isNum(lon) || !isNum(geo.kx) || !isNum(geo.ky) || !Array.isArray(at) || !isNum(at[0]) || !isNum(at[1])) return { dist: null, brg: null };
+  const dx = (lon - at[1]) * geo.kx;
+  const dy = (lat - at[0]) * geo.ky;
+  const xx = dx * dx;
+  const yy = dy * dy;
+  let deg = (Math.atan2(dx, dy) * 180) / Math.PI;
+  if (deg < 0) deg += 360;
+  let brg = round(deg, 1);
+  if (brg === 360) brg = 0;
+  return { dist: round(Math.sqrt(xx + yy), 2), brg };
+}
+
 export function applyMerges(merges: readonly Merge[] | undefined, values: Map<string, Value>, ctx: FormatContext): void {
   for (const merge of merges ?? []) {
     const m = { ...merge, count: Math.max(0, Math.min(64, Math.trunc(merge.count || 0))) };
@@ -24,6 +45,12 @@ export function applyMerges(merges: readonly Merge[] | undefined, values: Map<st
       for (let n = 0; n < m.count; n++) {
         const r = new Map(m.fields.map((f) => [f, values.get(`${src}.${f}${n}`) ?? null] as const));
         if ([...r.values()].every((v) => v === null)) continue; // not a record: the list ended
+        if (m.geo) {
+          const { dist, brg } = where(m.geo, r.get(m.geo.lat) ?? null, r.get(m.geo.lon) ?? null);
+          r.set("dist", dist);
+          r.set("brg", brg);
+          if (dist !== null && isNum(m.geo.within) && dist > m.geo.within) continue;
+        }
         if ((m.skip ?? []).some((f) => r.get(f) === null)) continue;
         let at: number | null = null;
         for (const f of m.sort ?? []) {
@@ -50,7 +77,7 @@ export function applyMerges(merges: readonly Merge[] | undefined, values: Map<st
     }
     for (let n = 0; n < m.count; n++) {
       const r = kept[n];
-      for (const f of m.fields) values.set(`${m.id}.${f}${n}`, r ? (r.values.get(f) ?? null) : null);
+      for (const f of m.geo ? [...m.fields, "dist", "brg"] : m.fields) values.set(`${m.id}.${f}${n}`, r ? (r.values.get(f) ?? null) : null);
       values.set(`${m.id}.from${n}`, r ? r.from : null);
     }
   }

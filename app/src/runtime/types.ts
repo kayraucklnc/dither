@@ -115,6 +115,17 @@ export interface Merge {
   skip?: string[];
   sort?: string[];
   unique?: string[];
+  geo?: Geo;
+}
+
+/** How far and which way each record of a merge is from a place: docs/format.md "Merges". */
+export interface Geo {
+  lat: string;
+  lon: string;
+  at: [number, number];
+  kx: number;
+  ky: number;
+  within?: number;
 }
 
 export interface Screen {

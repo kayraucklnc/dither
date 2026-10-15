@@ -6,8 +6,8 @@ import AIRPORTS from "./airports.json";
 
 // OpenSky's live state vectors: every aircraft whose transponder was heard in
 // a box around the place. The answer is a list of positional arrays, read slot
-// by slot; the panel cannot work out distances, so "near" means "in the box",
-// and the list is ordered lowest first — the planes you can see and hear.
+// by slot; the panel works out how far and which way each one is from you, keeps
+// those within the radius, and lists them nearest (or lowest) first.
 
 export const OPENSKY_TOKEN_URL = "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token";
 
@@ -26,12 +26,14 @@ const STALE = 15;
 const LOW = 1524;
 
 type Units = "aviation" | "metric" | "imperial";
-type Layout = "auto" | "radar" | "hero" | "list" | "count";
+type Layout = "auto" | "radar" | "sky" | "hero" | "list" | "count";
+type Order = "near" | "low";
 
 interface Settings extends Record<string, unknown> {
   place: Place | null;
   radius: number;
   layout: Layout;
+  order: Order;
   units: Units;
   hideGround: boolean;
   airports: boolean;
@@ -69,7 +71,7 @@ export function airportsIn(b: ReturnType<typeof boxAround>): { code: string; lat
 
 // --------------------------------------------------------------- what a plane is
 
-const k = (field: Field, i: number) => `near/${field}${i}`;
+const k = (field: Field | "dist" | "brg", i: number) => `near/${field}${i}`;
 const there = (i: number): Condition => ({ v: k("lat", i), op: "present" });
 const climbing = (i: number): Condition => ({ v: k("vr", i), op: "gt", x: CLIMB });
 const descending = (i: number): Condition => ({ v: k("vr", i), op: "lt", x: -CLIMB });
@@ -96,13 +98,14 @@ const AIRLINE: Format = { head: 3, map: { k: Object.keys(AIRLINES), o: Object.va
 /** Each kind's icon, flying its heading: 16 of them, each the middle of its 22.5° slice. */
 const KINDS = ["jet", "heavy", "prop", "heli", "glider", "fast"] as const;
 type Kind = (typeof KINDS)[number];
-const namesOf = (kind: Kind) => Array.from({ length: 16 }, (_, i) => `${kind}-${Math.floor(i * 22.5)}`);
+/** "-3d" picks the same kind as a solid model, seen at a slant, for the 3D view. */
+const namesOf = (kind: Kind, view = "") => Array.from({ length: 16 }, (_, i) => `${kind}${view}-${Math.floor(i * 22.5)}`);
 /** Where one heading's slice ends and the next begins, to the degree: each is spelled out in every icon. */
 const SLICES = Array.from({ length: 16 }, (_, i) => Math.round(i * 22.5 + 11.25));
 /** The icon for a heading; without one, the aircraft points north. */
-export const heading = (kind: Kind): Format => ({
-  steps: { t: SLICES, o: [...namesOf(kind), `${kind}-0`] },
-  fallback: `${kind}-0`,
+export const heading = (kind: Kind, view = ""): Format => ({
+  steps: { t: SLICES, o: [...namesOf(kind, view), `${kind}${view}-0`] },
+  fallback: `${kind}${view}-0`,
 });
 
 /** Categories OpenSky reports for each kind. Most transponders report none at all. */
@@ -120,6 +123,14 @@ function kindIs(kind: Kind, i: number): Condition {
   if (kind === "prop") return { any: [reported, { all: [unreported, slowAndLow(i)] }] };
   return reported;
 }
+
+/** Which way a plane is from you, on eight points. */
+const COMPASS: Format = {
+  steps: { t: [22.5, 67.5, 112.5, 157.5, 202.5, 247.5, 292.5, 337.5], o: ["N", "NE", "E", "SE", "S", "SW", "W", "NW", "N"] },
+  fallback: "",
+};
+const overhead = (i: number): Condition => ({ v: k("dist", i), op: "lt", x: 1 });
+const located = (i: number): Condition => ({ v: k("dist", i), op: "present" });
 
 const altitude = (u: Units): Format => ({ scale: UNITS[u].alt, num: { d: 0, sep: "," } });
 const shortAltitude = (u: Units): Format => ({ scale: UNITS[u].alt, num: { d: 0, compact: true } });
@@ -154,6 +165,13 @@ function craft(d: Draw, i: number, box: Box) {
 function trend(d: Draw, i: number, box: Box) {
   d.when(climbing(i), () => d.icon("arrow-up", box));
   d.when(descending(i), () => d.icon("arrow-down", box));
+}
+
+/** "8 km NE", or "overhead" when it is within a kilometre. */
+function directionText(d: Draw, i: number, x: number, baseline: number, w: number, size: number, weight: 400 | 700, align: "left" | "right", prefix = "") {
+  d.when({ all: [located(i), { not: overhead(i) }] }, () =>
+    onBaseline(d, [prefix, d.value(k("dist", i), { num: { d: 0 } }), " km ", d.value(k("brg", i), COMPASS)], x, baseline, w, size, weight, align));
+  d.when(overhead(i), () => onBaseline(d, `${prefix}overhead`, x, baseline, w, size, weight, align));
 }
 
 function altitudeText(d: Draw, i: number, u: Units, x: number, baseline: number, w: number, size: number, weight: 400 | 700, align: "left" | "right") {
@@ -196,26 +214,36 @@ function needsPlace(d: Draw) {
 
 // --------------------------------------------------------------- layouts
 
+/**
+ * How many are within the radius: the slots that hold a plane. OpenSky's own
+ * count is the whole box, corners and runways too. Drawn once per count.
+ */
+function howMany(d: Draw, draw: (text: string) => void) {
+  d.when({ not: there(0) }, () => draw("0"));
+  for (let i = 0; i < SLOTS - 1; i++) d.when({ all: [there(i), { not: there(i + 1) }] }, () => draw(String(i + 1)));
+  d.when(there(SLOTS - 1), () => draw(`${SLOTS}+`));
+}
+
 /** Just how many: "7 aircraft within 25 km". */
 function count(d: Draw, s: Settings) {
   const { width: w, height: h } = d;
   const icon = Math.min(Math.round(h * 0.6), Math.round(w * 0.28), 64);
-  const big = d.fit(["88"], Math.round((w - icon - 12) * 0.45), h, { weight: 700, max: 96 });
+  const big = d.fit([`${SLOTS}+`], Math.round((w - icon - 12) * 0.45), h, { weight: 700, max: 96 });
   const small = Math.max(14, Math.min(22, Math.round(big * 0.3)));
-  const numW = d.measure("88", big, 700) + 6;
+  const numW = d.measure(`${SLOTS}+`, big, 700) + 6;
   const block = numW + small * 0.4 + Math.max(d.measure("aircraft", small, 700), d.measure(`within ${radiusOf(s)} km`, small));
   const x0 = Math.max(0, Math.round((w - icon - 12 - block) / 2));
   d.icon("plane", { x: x0, y: Math.round((h - icon) / 2), w: icon, h: icon });
   const nx = x0 + icon + 12;
   const base = centre(0, h, big);
-  d.when(fresh, () => onBaseline(d, [d.value("n", { num: { d: 0 }, fallback: "0" })], nx, base, numW, big, 700));
+  d.when(fresh, () => howMany(d, (n) => onBaseline(d, n, nx, base, numW, big, 700)));
   d.when({ not: fresh }, () => onBaseline(d, "–", nx, base, numW, big, 700));
   const tx = nx + numW + Math.round(small * 0.4);
   onBaseline(d, "aircraft", tx, base - Math.round(small * 1.15), w - tx, small, 700);
   onBaseline(d, `within ${radiusOf(s)} km`, tx, base, w - tx, small, 400);
 }
 
-/** The lowest plane, large: who it is, whose, how high, how fast, which way. */
+/** The first plane, large: who it is, whose, how high, how fast, where. */
 function hero(d: Draw, s: Settings, box: Box) {
   const u = s.units;
   const { x, y, w, h } = box;
@@ -241,15 +269,17 @@ function hero(d: Draw, s: Settings, box: Box) {
   const arrow = Math.round(mid * 0.9);
   trend(d, 0, { x: tx + altW, y: base - Math.round(mid * 0.73) - Math.round((arrow - mid * 0.73) / 2), w: arrow, h: arrow });
   base += d.metrics(mid, 700).lineHeight;
-  onBaseline(d, [d.value(k("vel", 0), speed(u)), ` ${UNITS[u].velUnit}`], tx, base, tw, mid, 400);
+  const velW = d.measure(`888 ${UNITS[u].velUnit}`, mid) + 4;
+  onBaseline(d, [d.value(k("vel", 0), speed(u)), ` ${UNITS[u].velUnit}`], tx, base, velW, mid, 400);
+  directionText(d, 0, tx + velW, base, tw - velW, mid, 400, "left", "· ");
   if (footH) {
     const fs = Math.max(13, Math.min(18, Math.round(footH * 0.8)));
     d.line(x, y + bodyH + 2, x + w, y + bodyH + 2, { width: 1 });
-    onBaseline(d, [d.value("n", { num: { d: 0 }, fallback: "0" }), ` aircraft within ${radiusOf(s)} km`], x, y + h - Math.round(fs * 0.25), w, fs, 400, "left");
+    howMany(d, (n) => onBaseline(d, `${n} aircraft within ${radiusOf(s)} km`, x, y + h - Math.round(fs * 0.25), w, fs, 400, "left"));
   }
 }
 
-/** One row per plane, lowest first, in columns that line up. */
+/** One row per plane, nearest (or lowest) first, in columns that line up. */
 function list(d: Draw, s: Settings, box: Box) {
   const u = s.units;
   const { x, y, w, h } = box;
@@ -260,18 +290,21 @@ function list(d: Draw, s: Settings, box: Box) {
   const iconS = Math.max(16, Math.min(32, Math.round(rowH * (roomy ? 0.62 : 0.75))));
   const csX = x + iconS + 10;
   // The callsign is never cut short: speed goes first, then the type shrinks.
-  const columns = (size: number, withSpeed: boolean) => {
+  // Then where it is goes too.
+  const columns = (size: number, withSpeed: boolean, withWhere = true) => {
     const altW = d.measure(`88,888 ${UNITS[u].altUnit}`, size, 700) + 8;
+    const dirW = withWhere ? d.measure("88 km NW", size) + 12 : 0;
     const velW = withSpeed ? d.measure(`888 ${UNITS[u].velUnit}`, size) + 12 : 0;
     const arrow = Math.round(size * 0.85);
-    return { size, altW, velW, arrow, csW: w - (csX - x) - altW - velW - arrow - 6 };
+    return { size, altW, dirW, velW, arrow, csW: w - (csX - x) - altW - dirW - velW - arrow - 6 };
   };
   const fits = (c: ReturnType<typeof columns>) => c.csW >= d.measure("WZZ1234", c.size, 700) + 4;
   const target = roomy ? Math.round(rowH * 0.42) : Math.round(rowH * 0.75);
   let c = columns(Math.min(callsignSize(d, w * 0.4, target), 28), true);
   if (!fits(c)) c = columns(c.size, false);
   for (const size of [24, 20, 16, 14]) if (!fits(c) && size < c.size) c = columns(size, false);
-  const { size, altW, velW, arrow, csW } = c;
+  if (!fits(c)) c = columns(c.size, false, false);
+  const { size, altW, dirW, velW, arrow, csW } = c;
   const small = Math.max(13, Math.min(18, Math.round(size * 0.7)));
   for (let i = 0; i < rows; i++) {
     const ry = y + i * rowH;
@@ -282,7 +315,8 @@ function list(d: Draw, s: Settings, box: Box) {
       onBaseline(d, [d.value(k("cs", i), { fallback: "?" })], csX, base, csW, size, 700);
       if (roomy) about(d, i, csX, ry + rowH - Math.round(small * 0.45), w - (csX - x), small);
       altitudeText(d, i, u, csX + csW, base, altW, size, 700, "right");
-      if (velW) onBaseline(d, [d.value(k("vel", i), speed(u)), ` ${UNITS[u].velUnit}`], csX + csW + altW, base, velW, size, 400, "right");
+      if (dirW) directionText(d, i, csX + csW + altW, base, dirW, size, 400, "right");
+      if (velW) onBaseline(d, [d.value(k("vel", i), speed(u)), ` ${UNITS[u].velUnit}`], csX + csW + altW + dirW, base, velW, size, 400, "right");
       trend(d, i, { x: x + w - arrow, y: base - Math.round(size * 0.73) - Math.round((arrow - size * 0.73) / 2), w: arrow, h: arrow });
     });
   }
@@ -360,6 +394,147 @@ function radar(d: Draw, s: Settings, env: Env, box: Box) {
   }
 }
 
+/** The ground seen at a slant: a circle this many times as tall as it is wide. */
+const TILT = 0.38;
+/** The top of the sky in the 3D view, in metres: 51,000 ft, above anything but a few business jets. */
+const CEILING = 15500;
+
+/** The aircraft as a solid model seen at a slant, turned to where it flies. */
+function solidCraft(d: Draw, i: number, box: Box) {
+  for (const kind of KINDS) d.when(kindIs(kind, i), () => d.iconFor(k("trk", i), heading(kind, "-3d"), namesOf(kind, "-3d"), box));
+}
+
+/** An ellipse as straight segments, from angle a0 to a1 (radians, 0 = east, counterclockwise on screen is up). */
+function arc(d: Draw, cx: number, cy: number, rx: number, ry: number, a0: number, a1: number, steps: number, width: number) {
+  let px = Math.round(cx + rx * Math.cos(a0));
+  let py = Math.round(cy - ry * Math.sin(a0));
+  for (let j = 1; j <= steps; j++) {
+    const a = a0 + ((a1 - a0) * j) / steps;
+    const x = Math.round(cx + rx * Math.cos(a));
+    const y = Math.round(cy - ry * Math.sin(a));
+    if (x !== px || y !== py) d.line(px, py, x, y, { width });
+    px = x;
+    py = y;
+  }
+}
+
+/** A model seen at a slant is flatter than its box: one size up from the radar's. */
+const skyIcon = (w: number, h: number) => (Math.min(w, h) >= 400 ? 48 : Math.min(w, h) >= 220 ? 32 : 24);
+
+/** How much room the 3D view takes for a given ground radius. */
+function skySize(R: number, th: number, iconS: number) {
+  const H = Math.round(R * 0.8);
+  return { H, w: 2 * R + 2 * (th + 8), h: Math.round(iconS / 2) + 4 + H + Math.round(2 * R * TILT) + th + 6 };
+}
+
+function skyRadius(box: Box, th: number, iconS: number): number {
+  let R = Math.floor((box.w - 2 * (th + 8)) / 2);
+  while (R > 20 && skySize(R, th, iconS).h > box.h) R--;
+  return R;
+}
+
+/**
+ * Where they are and how high, at a slant: the ground as a tilted scope, each
+ * aircraft standing above its spot on a thin stalk as tall as its altitude.
+ * Its shadow on the ground is where it is; how high the icon floats is how high
+ * it flies. The mast at your house carries the altitude scale.
+ */
+function sky(d: Draw, s: Settings, env: Env, box: Box) {
+  const u = s.units;
+  const km = radiusOf(s);
+  const b = boxAround(placeOf(s, env)!, km);
+  const small = Math.max(13, Math.min(16, Math.round(Math.min(box.w, box.h) / 30)));
+  const th = d.lineHeight(small, 700);
+  const iconS = skyIcon(box.w, box.h);
+  const R = skyRadius(box, th, iconS);
+  const size = skySize(R, th, iconS);
+  const H = size.H;
+  const ry = Math.round(R * TILT);
+  const cx = box.x + Math.round(box.w / 2);
+  const top = box.y + Math.max(0, Math.round((box.h - size.h) / 2));
+  const cy = top + Math.round(iconS / 2) + 4 + H + ry;
+  // The ground square the aircraft are placed in, squashed like the scope.
+  const plot = { x: cx - R, y: cy - ry, w: R * 2, h: ry * 2 };
+  const gx = (lon: number) => plot.x + ((lon - b.lomin) / (b.lomax - b.lomin)) * plot.w;
+  const gy = (lat: number) => plot.y + ((b.lamax - lat) / (b.lamax - b.lamin)) * plot.h;
+
+  // The ground: the far half of the rim thin, the near half bold, so it reads as a disc seen from above the edge.
+  arc(d, cx, cy, R, ry, 0, Math.PI, 48, 1);
+  arc(d, cx, cy, R, ry, Math.PI, 2 * Math.PI, 48, 3);
+  for (const f of [1 / 3, 2 / 3]) arc(d, cx, cy, Math.round(R * f), Math.round(ry * f), 0, 2 * Math.PI, 48, 1);
+  d.line(cx - R, cy, cx + R, cy, { width: 1 });
+  d.line(cx, cy - ry, cx, cy + ry, { width: 1 });
+  const letter = (t: string, x: number, y: number) => d.text(t, { x: x - th, y: y - th / 2, w: th * 2, h: th, size: small, weight: 700, align: "center" });
+  letter("N", cx + Math.round(th * 0.6), cy - ry - th / 2 - 1);
+  letter("S", cx, cy + ry + th / 2 + 3);
+  letter("W", cx - R - th / 2 - 4, cy);
+  letter("E", cx + R + th / 2 + 4, cy);
+  // Each ring's distance where it crosses the near (south) axis, the quietest part of the ground.
+  [Math.round(km / 3), Math.round((km * 2) / 3), km].forEach((dist, j) => {
+    const text = `${dist} km`;
+    const y = cy + Math.round((ry * (j + 1)) / 3);
+    d.text(text, { x: cx + 4, y: y - th + 1, w: d.measure(text, small - 1) + 4, h: th, size: small - 1 });
+  });
+  if (s.airports !== false) {
+    for (const a of airportsIn(b).slice(0, 6)) {
+      const ax = Math.round(gx(a.lon));
+      const ay = Math.round(gy(a.lat));
+      const m = a.large ? 4 : 3;
+      d.rect({ x: ax - m - 1, y: ay - m + 1, w: m * 2 + 2, h: m * 2 - 2 }, { fill: false, stroke: 2 });
+      d.text(a.code, { x: ax + m + 3, y: ay - th / 2, w: d.measure(a.code, small, 700) + 4, h: th, size: small, weight: a.large ? 700 : 400 });
+    }
+  }
+
+  // The mast at home: a dotted pole with the altitude scale.
+  const scale = u === "metric" ? { step: 4000, unit: 1, label: (n: number) => `${n / 1000} km` } : { step: 3048, unit: 3.28084, label: (n: number) => `${Math.round((n * 3.28084) / 1000)}k ft` };
+  for (let y = cy - 4; y > cy - H; y -= 4) d.line(cx, y, cx, y - 1, { width: 1 });
+  for (let m = scale.step; m < CEILING; m += scale.step) {
+    const y = cy - Math.round((m / CEILING) * H);
+    d.line(cx - 4, y, cx + 4, y, { width: 1 });
+    const text = scale.label(m);
+    d.text(text, { x: cx - 8 - d.measure(text, small - 1) - 4, y: y - th / 2, w: d.measure(text, small - 1) + 4, h: th, size: small - 1, align: "right" });
+  }
+  d.icon("house", { x: cx - 8, y: cy - 14, w: 16, h: 16 });
+
+  // The aircraft, last slot first so the first are drawn on top.
+  const labelled = 4;
+  const half = Math.round(iconS / 2);
+  // The label floats just above: a plane seen side-on is wide but flat, and its stalk hangs below.
+  const labelY = -Math.round(iconS * 0.3) - th;
+  const labelW = d.measure("WZZ1234 88.8k", small, 700) + 8;
+  const plane = (i: number) => {
+    d.when(emergency(i), () => d.circle(0, 0, half + 5, { fill: false, stroke: 3 }));
+    solidCraft(d, i, { x: -half, y: -half, w: iconS, h: iconS });
+  };
+  // Ringed in white, a pixel each way, so it reads over a plane or a line.
+  const label = (i: number) => {
+    const parts = [d.value(k("cs", i), { fallback: "?" }), " ", d.value(k("alt", i), { ...shortAltitude(u), fallback: "" })];
+    const at = (dx: number, dy: number, white: boolean) =>
+      d.text(parts, { x: -Math.round(labelW / 2) + dx, y: labelY + dy, w: labelW, h: th, size: small, weight: 700, align: "center", white });
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) at(dx, dy, true);
+    at(0, 0, false);
+  };
+  const ground = (i: number, fn: () => void) => d.place({ x: k("lon", i), y: k("lat", i), box: plot, xs: [b.lomin, b.lomax], ys: [b.lamax, b.lamin] }, fn);
+  const aloftAt = (i: number, fn: () => void) => d.place({ x: k("alt", i), y: k("alt", i), box: { x: 0, y: -H, w: 0, h: H }, xs: [0, CEILING], ys: [CEILING, 0] }, fn);
+  for (let i = SLOTS - 1; i >= 0; i--) {
+    ground(i, () => {
+      // Its shadow, and the stalk up to it.
+      d.rect({ x: -2, y: -1, w: 5, h: 3 });
+      d.bar({ x: 0, y: -H, w: 1, h: H }, k("alt", i), 0, CEILING, { vertical: true });
+      aloftAt(i, () => plane(i));
+      // Each copy of a plane costs its every icon; the one on the ground only when it is shown at all.
+      if (!s.hideGround) d.when({ not: aloft(i) }, () => plane(i));
+    });
+  }
+  // The labels last, so no plane covers another's name.
+  for (let i = labelled - 1; i >= 0; i--) {
+    ground(i, () => {
+      aloftAt(i, () => label(i));
+      if (!s.hideGround) d.when({ not: aloft(i) }, () => label(i));
+    });
+  }
+}
+
 function layoutFor(d: Draw, s: Settings): Exclude<Layout, "auto"> {
   if (s.layout !== "auto") return s.layout;
   const { width: w, height: h } = d;
@@ -425,15 +600,23 @@ export default defineExtension<Settings>({
   size: { min: [3, 2], default: [8, 8] },
   fields: [
     { key: "place", label: "Place", kind: "place", help: "Leave empty to use the project's place." },
-    { key: "radius", label: "Within", kind: "number", min: 5, max: 100, step: 5, unit: "km", help: "Planes in a square this far each way. The panel lists the lowest first, not the nearest — it cannot work out distances." },
+    { key: "radius", label: "Within", kind: "number", min: 5, max: 100, step: 5, unit: "km", help: "Planes this far from you, in any direction." },
     {
       key: "layout", label: "Show", kind: "select",
       options: [
         { value: "auto", label: "Whatever fits" },
         { value: "radar", label: "Radar: where they are" },
-        { value: "list", label: "List, lowest first" },
-        { value: "hero", label: "The lowest plane" },
+        { value: "sky", label: "3D: where they are and how high" },
+        { value: "list", label: "List" },
+        { value: "hero", label: "The first plane, large" },
         { value: "count", label: "Just how many" },
+      ],
+    },
+    {
+      key: "order", label: "First", kind: "select",
+      options: [
+        { value: "near", label: "The nearest" },
+        { value: "low", label: "The lowest" },
       ],
     },
     {
@@ -447,19 +630,28 @@ export default defineExtension<Settings>({
     { key: "hideGround", label: "Leave out planes on the ground", kind: "toggle" },
     { key: "airports", label: "Airports on the radar", kind: "toggle" },
   ],
-  defaults: () => ({ place: null, radius: 25, layout: "auto", units: "aviation", hideGround: true, airports: true }),
+  defaults: () => ({ place: null, radius: 25, layout: "auto", order: "near", units: "aviation", hideGround: true, airports: true }),
   title: (s, env) => `Aircraft · ${placeOf(s, env)?.name ?? "…"}`,
   refresh: () => 5,
   source: sourceFor,
-  merges: (s) => ({
-    // The lowest first; with no altitude (on the ground) last, or not at all.
-    near: { from: [""], fields: [...FIELDS], count: SLOTS, sort: ["alt"], skip: s.hideGround ? ["alt"] : [] },
-  }),
+  merges: (s, env) => {
+    const place = placeOf(s, env);
+    // How far and which way from the place, worked out on the panel; the box's corners are beyond the radius.
+    const geo = place ? {
+      lat: "lat", lon: "lon", at: [place.latitude, place.longitude] as [number, number],
+      kx: Math.round(KM_PER_DEG * Math.cos((place.latitude * Math.PI) / 180) * 1000) / 1000, ky: KM_PER_DEG, within: radiusOf(s),
+    } : undefined;
+    return {
+      // The nearest (or lowest) first; with no altitude (on the ground) last, or not at all.
+      near: { from: [""], fields: [...FIELDS], count: SLOTS, sort: s.order === "low" ? ["alt"] : ["dist"], skip: s.hideGround ? ["alt"] : [], ...(geo ? { geo } : {}) },
+    };
+  },
   sample: sampleFor,
   facts: (s) => [
-    { key: "count", label: "Aircraft nearby", type: "number", value: "n" },
-    { key: "lowest", label: "Lowest plane's altitude", type: "number", value: "near/alt0", unit: ` ${UNITS[s.units].altUnit}`, format: { scale: UNITS[s.units].alt } },
-    { key: "low", label: s.units === "metric" ? "A plane below 1,500 m" : "A plane below 5,000 ft", type: "flag", test: { v: "near/alt0", op: "lt", x: LOW } },
+    { key: "count", label: "Aircraft in the area (the whole square)", type: "number", value: "n" },
+    { key: "nearest", label: "Nearest plane's distance", type: "number", value: "near/dist0", unit: " km" },
+    { key: "lowest", label: s.order === "low" ? "Lowest plane's altitude" : "Nearest plane's altitude", type: "number", value: "near/alt0", unit: ` ${UNITS[s.units].altUnit}`, format: { scale: UNITS[s.units].alt } },
+    { key: "low", label: s.units === "metric" ? "A plane below 1,500 m" : "A plane below 5,000 ft", type: "flag", test: { any: Array.from({ length: SLOTS }, (_, i) => ({ v: k("alt", i), op: "lt", x: LOW }) as Condition) } },
     { key: "emergency", label: "A plane nearby squawks an emergency", type: "flag", test: { any: Array.from({ length: SLOTS }, (_, i) => emergency(i)) } },
   ],
   draw(d, s, env) {
@@ -471,6 +663,18 @@ export default defineExtension<Settings>({
     d.when(showing, () => {
       if (layout === "hero") return hero(d, s, full);
       if (layout === "list") return list(d, s, full);
+      if (layout === "sky") {
+        // As much ground as the height allows; the list beside it when that leaves room.
+        const small = Math.max(13, Math.min(16, Math.round(Math.min(d.width, d.height) / 30)));
+        const th = d.lineHeight(small, 700);
+        const iconS = skyIcon(d.width, d.height);
+        const used = skySize(skyRadius({ ...full, w: Math.round(d.height * 1.6) }, th, iconS), th, iconS).w;
+        if (d.width - used >= 220) {
+          sky(d, s, env, { x: 0, y: 0, w: used, h: d.height });
+          return list(d, s, { x: used + 12, y: 0, w: d.width - used - 12, h: d.height });
+        }
+        return sky(d, s, env, full);
+      }
       // A radar with room beside it lists the planes there too.
       const side = Math.min(d.width, d.height);
       if (d.width - side >= 200) {

@@ -12,6 +12,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
+import { obliqueSvg, KINDS_3D } from "./aircraft3d.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "../..");
@@ -69,8 +70,13 @@ const HEADINGS = Array.from({ length: 16 }, (_, i) => i * 22.5);
 const ROTATED = {};
 for (const kind of Object.keys(AIRCRAFT)) for (const deg of HEADINGS) ROTATED[`${kind}-${Math.floor(deg)}`] = [kind, deg];
 NAMES.push(...Object.keys(ROTATED));
+// The same kinds as solid models for the 3D view: "jet-3d-90" is seen side-on.
+const MODELLED = {};
+for (const kind of KINDS_3D) for (const deg of HEADINGS) MODELLED[`${kind}-3d-${Math.floor(deg)}`] = [kind, deg];
+NAMES.push(...Object.keys(MODELLED));
 
-async function loadSvg(name) {
+async function loadSvg(name, size) {
+  if (name in MODELLED) return obliqueSvg(...MODELLED[name], size);
   if (name in ROTATED) {
     const [kind, deg] = ROTATED[name];
     return `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#000" stroke="none" stroke-width="0"><g transform="rotate(${deg} 12 12)">${AIRCRAFT[kind]}</g></svg>`;
@@ -109,8 +115,9 @@ async function rasterize(svg, size) {
   const rows = Buffer.alloc(stride * size);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      const alpha = data[(y * size + x) * info.channels + info.channels - 1];
-      if (alpha >= THRESHOLD) rows[y * stride + (x >> 3)] |= 0x80 >> (x & 7);
+      // Ink is opaque and dark: the 3D aircraft cut white gaps between their parts.
+      const i = (y * size + x) * info.channels;
+      if (data[i + info.channels - 1] >= THRESHOLD && data[i] < THRESHOLD) rows[y * stride + (x >> 3)] |= 0x80 >> (x & 7);
     }
   }
   return rows;
@@ -132,7 +139,7 @@ async function buildPack(size) {
   const icons = {};
   let offset = 0;
   for (const name of NAMES) {
-    const svg = prepareSvg(await loadSvg(name), size);
+    const svg = prepareSvg(await loadSvg(name, size), size);
     const asset = encodeMask(size, size, await rasterize(svg, size));
     icons[name] = [offset, asset.length];
     const padded = align4(asset.length);

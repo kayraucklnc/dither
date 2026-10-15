@@ -7,7 +7,7 @@
 // arithmetic it likes about layout, and the firmware never needs to know it
 // exists.
 
-import type { Condition, Format, Part, Value } from "@/runtime/types";
+import type { Condition, Format, Geo, Part, Value } from "@/runtime/types";
 import type { AccountKind, Accounts, Place } from "@/project/schema";
 import type { Weight } from "@/assets/library";
 
@@ -77,6 +77,8 @@ export interface MergeSpec {
   skip?: string[];
   sort?: string[];
   unique?: string[];
+  /** Adds `dist` (km) and `brg` (degrees from north) to each record. */
+  geo?: Geo;
 }
 
 /** Something a rule can check, e.g. "Rain chance today". */

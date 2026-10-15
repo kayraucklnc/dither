@@ -38,7 +38,7 @@ function write(name: string, blob: Uint8Array, runtime: Runtime, values: Record<
 const fonts = await loadFonts();
 const deps = { library: nodeLibrary, fonts, picture: async () => null, boardPanel: () => ({ width: 800, height: 480 }) };
 
-for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "starter-showcase", "primitives", "text-and-formats", "chart-labels", "aircraft"]) {
+for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "starter-showcase", "primitives", "text-and-formats", "chart-labels", "aircraft", "aircraft-sky"]) {
   rmSync(`${root}${dir}`, { recursive: true, force: true });
 }
 
@@ -183,6 +183,18 @@ for (const s of STARTERS.filter((x) => x.id !== "blank")) {
   for (const src of c.sources) for (const [k, v] of src.sample) values[k] = v;
   for (const src of c.sources) Object.assign(values, { [`${src.source.id}._ok`]: true, [`${src.source.id}._age`]: 2 });
   write("aircraft", c.blob, c.runtime, values);
+
+  // The same planes at a slant, each on a stalk as tall as it flies high.
+  project.screens[0].widgets = [
+    plane("sky", 0, 0, 12, 12, "sky"),
+    plane("list", 12, 0, 8, 8, "list", "outline"),
+    plane("hero", 12, 8, 8, 4, "hero", "outline"),
+  ];
+  const sky = await compile(project, deps);
+  const skyValues: Record<string, Value> = { ...DEVICE };
+  for (const src of sky.sources) for (const [k, v] of src.sample) skyValues[k] = v;
+  for (const src of sky.sources) Object.assign(skyValues, { [`${src.source.id}._ok`]: true, [`${src.source.id}._age`]: 2 });
+  write("aircraft-sky", sky.blob, sky.runtime, skyValues);
 }
 
 // Hand-placed elements at their edges: what the starters do not reach.

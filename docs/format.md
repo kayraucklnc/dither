@@ -212,7 +212,13 @@ the sources already keep:
   "count": 6,                       // records read per source, and records kept
   "skip": ["s"],                    // a record with any of these null is left out
   "sort": ["s", "a"],               // by the first of these that is a time
-  "unique": ["t", "s", "a"]         // equal on all of these to an earlier record: dropped
+  "unique": ["t", "s", "a"],        // equal on all of these to an earlier record: dropped
+  "geo": {                          // optional: how far and which way each record is
+    "lat": "lat", "lon": "lon",     // the fields holding its position, in degrees
+    "at": [45.46, 9.19],            // from here
+    "kx": 78.08, "ky": 111.32,      // km per degree of longitude and of latitude there
+    "within": 25                    // optional: farther than this, in km, is left out
+  }
 }]
 ```
 
@@ -227,6 +233,19 @@ none go last; ties keep source order, then record order. A record whose
 wins; an empty `unique` drops nothing. The first `count` become the merge's own
 values: `m0.t0`, `m0.s0`, … and `m0.from0` — the position in `from` (0, 1, …)
 of the source each came from. Positions past the end are `null`.
+
+With `geo`, every record gets two more fields before anything is skipped or
+sorted, so `skip`, `sort` and `unique` may name them: `dist`, its distance in km,
+and `brg`, its bearing in degrees clockwise from north. With `vlat`, `vlon` the
+record's `lat` and `lon` and `[a, o]` the `at`:
+`dx = (vlon − o) · kx`, `dy = (vlat − a) · ky`, each one double multiplication;
+`dist = round(sqrt(dx·dx + dy·dy), 2)`, the squares and their sum each a
+separate double operation (no fused multiply-add); `brg = atan2(dx, dy) · 180 / π`,
+plus 360 when negative, then `round(·, 1)`, and 360 becomes 0 — where `round(x, d)`
+is `round_half_away(x · 10^d) / 10^d`. Both are `null` when either position
+field is not a finite number, or `kx`, `ky` or `at` is missing or not numbers.
+A record with `dist` greater than `within` is left out; a record with no `dist`
+is not. These are fields like any other: `m0.dist0`, `m0.brg0`.
 
 Merges run in order, after every source has been read on a wake, and in the
 simulator likewise. A merge's id is a reference prefix like a source's.
