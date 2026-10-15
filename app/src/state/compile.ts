@@ -6,6 +6,7 @@ import { FONTS } from "@/assets/library";
 import { compile, type Compiled } from "@/compiler";
 import { browserPicture } from "@/compiler/picture-browser";
 import { getBoard } from "@/device";
+import { COLLECTION_IMAGES } from "@/extensions/gallery/collection";
 import type { Project } from "@/project/schema";
 import { decodeFont, type Font } from "@/runtime/assets";
 import { gzip } from "./storage";
@@ -31,7 +32,7 @@ const outcomes = new WeakMap<Project, { compiled: Compiled } | { error: string }
 export async function compileInBrowser(project: Project): Promise<Compiled> {
   try {
     const fonts = await loadBrowserFonts();
-    const compiled = await compile(project, { library, fonts, picture: browserPicture(project.images), gzip, boardPanel });
+    const compiled = await compile(project, { library, fonts, picture: browserPicture({ ...COLLECTION_IMAGES, ...project.images }), gzip, boardPanel });
     outcomes.set(project, { compiled });
     return compiled;
   } catch (e) {
