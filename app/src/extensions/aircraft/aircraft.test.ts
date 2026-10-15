@@ -117,6 +117,13 @@ describe("aircraft on the panel", () => {
     expect(listed.some(([cs]) => cs === "UAE91")).toBe(false);
   });
 
+  it("is never asked from the browser, which OpenSky refuses, and the panel is not told so", async () => {
+    const out = await compile(project("list"), deps);
+    const sky = out.sources.find((s) => s.source.url.includes("opensky-network.org"))!;
+    expect(sky.panelOnly).toMatch(/only answers the panel/);
+    expect(JSON.stringify(out.runtime)).not.toContain("panelOnly");
+  });
+
   it("lists the lowest plane first when asked", async () => {
     const p = project("list");
     p.screens[0].widgets[0].settings.order = "low";

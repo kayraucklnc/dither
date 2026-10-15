@@ -81,6 +81,18 @@ TEST(source_spec_auth_decode_placeholders) {
   CHECK(readToken(reply.root(), *s[0].auth, token, lifetime) && lifetime == 3600);
   CHECK(reply.parse(R"({"error":"invalid_grant"})").ok);
   CHECK(!readToken(reply.root(), *s[0].auth, token, lifetime));
+
+  // A JWT, as OpenSky's sign-in gives, runs far past the 256 bytes a value keeps: the token is read whole.
+  const std::string jwt = "eyJhbGciOiJSUzI1NiJ9." + std::string(1400, 'x') + ".sig";
+  JsonFilter filter;
+  filter.addPath("access_token");
+  filter.addPath("expires_in");
+  CHECK(reply.parse(R"({"access_token":")" + jwt + R"(","expires_in":1800})", &filter, JsonLimits::token()).ok);
+  CHECK(readToken(reply.root(), *s[0].auth, token, lifetime));
+  CHECK_EQ(token.size(), jwt.size());
+  // What the panel did before: read with a value's limits, the token came back cut.
+  CHECK(reply.parse(R"({"access_token":")" + jwt + R"("})", &filter, JsonLimits::response()).ok);
+  CHECK(readToken(reply.root(), *s[0].auth, token, lifetime) && token.size() < jwt.size());
 }
 
 TEST(placeholders_today) {

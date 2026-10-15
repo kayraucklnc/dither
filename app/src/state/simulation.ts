@@ -136,6 +136,8 @@ export function useSimulation(compiled: Compiled | null, overrides: Overrides = 
     setResults((r) => ([...r.keys()].every((k) => keys.has(k)) ? r : new Map([...r].filter(([k]) => keys.has(k)))));
     const ctx = formatContext(compiled!.runtime, clock);
     for (const s of sources) {
+      // A server that refuses browsers is never asked: each refused request still counts against its limit.
+      if (s.panelOnly) continue;
       const key = keyOf(s.source);
       fetchSource(s.source, ctx).then((f) => {
         if (!cancelled) setResults((r) => (r.get(key) === f ? r : new Map(r).set(key, f)));
@@ -164,7 +166,7 @@ export function useSimulation(compiled: Compiled | null, overrides: Overrides = 
       } else {
         for (const [k, v] of s.sample) values.set(k, v);
         for (const [k, v] of freshness(s.source.id, true, now, now)) values.set(k, v);
-        status.set(s.source.id, f ? { state: "sample", reason: f.error } : { state: "loading" });
+        status.set(s.source.id, s.panelOnly ? { state: "sample", reason: s.panelOnly } : f ? { state: "sample", reason: f.error } : { state: "loading" });
       }
     }
     for (const [k, v] of Object.entries(overrides.values ?? {})) values.set(k, v);

@@ -202,7 +202,8 @@ function empty(d: Draw, s: Settings, box: Box) {
   const say = (text: string) => d.text(text, { ...box, size, weight: 700, align: "center", valign: "middle", wrap: true, lines: 2 });
   // An empty sky and no answer are different news. Positions kept from an
   // answer long ago are no news at all: those planes are elsewhere by now.
-  const emptySky: Condition = { all: [{ not: there(0) }, { v: "_ok", op: "true" }, fresh] };
+  // A failed look after a recent empty answer is still an empty sky: OpenSky misses a beat now and then.
+  const emptySky: Condition = { all: [{ not: there(0) }, fresh] };
   d.when(emptySky, () => say(`No aircraft within ${radiusOf(s)} km`));
   d.when({ all: [{ not: showing }, { not: emptySky }] }, () => say("OpenSky isn't answering — planes will show when it does"));
 }
@@ -556,6 +557,7 @@ function sourceFor(s: Settings, env: Env): SourceSpec | null {
   const account = env.accounts?.opensky;
   return {
     url: `https://opensky-network.org/api/states/all?${q}`,
+    panelOnly: "OpenSky only answers the panel, so the preview shows example planes.",
     // Anonymous callers get 400 requests a day; a linked client gets 4,000.
     every: account ? 2 : 5,
     ...(account ? {

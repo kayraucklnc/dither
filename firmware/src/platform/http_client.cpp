@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <HTTPClient.h>
 #include <NetworkClientSecure.h>
+#include <WiFi.h>
 
 #include <memory>
 
@@ -84,6 +85,33 @@ std::unique_ptr<NetworkClient> makeClient(const std::string& url) {
   return nullptr;
 }
 
+std::string hostOf(const std::string& url) {
+  size_t start = url.find("://");
+  start = start == std::string::npos ? 0 : start + 3;
+  size_t end = url.find_first_of(":/?", start);
+  return url.substr(start, end == std::string::npos ? std::string::npos : end - start);
+}
+
+// HTTPClient says "connection refused" for every way a connection can fail
+// to open. Say which: the name not found, the TLS handshake (and why — often
+// too little memory), or the server not taking the connection.
+std::string connectFailure(NetworkClientSecure* secure, const std::string& url) {
+  const std::string host = hostOf(url);
+  IPAddress ip;
+  if (!WiFi.hostByName(host.c_str(), ip)) {
+    return std::string(kNoInternet) + " " + host + " - the Wi-Fi may need a sign-in page, or has no internet";
+  }
+  const uint32_t heap = ESP.getFreeHeap();
+  const std::string memory = heap < 48 * 1024 ? " (only " + std::to_string(heap / 1024) + " KB of memory free)" : "";
+  if (secure) {
+    char reason[96] = {0};
+    if (secure->lastError(reason, sizeof reason) != 0 && reason[0]) {
+      return "secure connection to " + host + " failed: " + reason + memory;
+    }
+  }
+  return "could not connect to " + host + memory;
+}
+
 bool isRedirect(int status) {
   return status == 301 || status == 302 || status == 303 || status == 307 || status == 308;
 }
@@ -94,6 +122,8 @@ bool httpExchange(const HttpRequest& request, const BodyReader& read, int& statu
   std::string url = request.url;
   for (int hop = 0;; ++hop) {
     std::unique_ptr<NetworkClient> client = makeClient(url);
+    // makeClient gives a secure client for https, and only then.
+    NetworkClientSecure* secure = url.rfind("https://", 0) == 0 ? static_cast<NetworkClientSecure*>(client.get()) : nullptr;
     if (!client) {
       error = "unsupported URL scheme";
       return false;
@@ -132,8 +162,9 @@ bool httpExchange(const HttpRequest& request, const BodyReader& read, int& statu
       continue;
     }
     if (status != HTTP_CODE_OK) {
-      error = status < 0 ? std::string("HTTP: ") + http.errorToString(status).c_str()
-                         : "HTTP status " + std::to_string(status);
+      error = status == HTTPC_ERROR_CONNECTION_REFUSED ? connectFailure(secure, url)
+              : status < 0                             ? std::string("HTTP: ") + http.errorToString(status).c_str()
+                                                       : "HTTP status " + std::to_string(status);
       http.end();
       return false;
     }
