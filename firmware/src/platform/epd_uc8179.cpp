@@ -130,7 +130,7 @@ void Uc8179::writePlane(uint8_t cmd, const Framebuffer& frame) {
   const int stride = frame.stride();
   uint8_t row[board::kPanelWidth / 8];
   for (int y = 0; y < frame.height(); ++y) {
-    const uint8_t* src = frame.bytes().data() + static_cast<size_t>(y) * static_cast<size_t>(stride);
+    const uint8_t* src = frame.row(y);
     for (int i = 0; i < stride; ++i) row[i] = static_cast<uint8_t>(~src[i]);  // ours: 1 = black
     data(row, static_cast<size_t>(stride));
   }

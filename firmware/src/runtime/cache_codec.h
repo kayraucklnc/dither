@@ -40,7 +40,10 @@ struct ValueCache {
   void dropToken(const std::string& id);
 };
 
-constexpr size_t kMaxCacheBytes = 6 * 1024;
+// NVS is 28 KB (partitions.csv): seven pages, one kept free for garbage
+// collection, and a rewritten blob briefly exists twice. 10 KB leaves room for
+// both copies and Wi-Fi's own keys; a dozen sources need about 7.5 KB.
+constexpr size_t kMaxCacheBytes = 10 * 1024;
 
 // Drops fetched values, largest first, until the encoding fits `maxBytes`.
 // Returns the references dropped (the caller logs them).

@@ -51,6 +51,8 @@ make -C firmware flash PORT=/dev/cu.usbmodem101   # by hand, without the app
 - **A deep-sleeping C3 has no USB port.** The firmware stays awake while a USB
   host is attached so the browser can always reach it; if it is asleep, hold
   BOOT while plugging in.
+- **After Wi-Fi and TLS the C3 has no 48 KB block left.** The framebuffer is
+  stored in row bands; never reserve it before fetching (that starves TLS).
 - **esptool-js `after("hard_reset")` does not reset this board.** The device
   module uses a custom `D0|R1|W100|R0` sequence.
 - **Reading flash over this USB is ~10 KB/s.** Read the header first and then

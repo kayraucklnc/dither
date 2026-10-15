@@ -117,6 +117,9 @@ uint32_t Device::run(const Program& program) {
     }
   }
 
+  // Awake on USB, last wake's frame is let go before Wi-Fi and TLS need the room.
+  frame_ = Framebuffer();
+
   ValueCache cache = loadCache(program.header().crc);
   DeviceStatus device;
   device.usb = usbHostConnected();
@@ -153,7 +156,9 @@ uint32_t Device::run(const Program& program) {
   const uint32_t drawStart = millis();
   Framebuffer logical;
   program.render(screen, values, now, logical);
-  dlog("screen %d drawn in %lu ms", screen, static_cast<unsigned long>(millis() - drawStart));
+  dlog("screen %d drawn in %lu ms, heap %lu (largest block %lu)", screen,
+       static_cast<unsigned long>(millis() - drawStart), static_cast<unsigned long>(ESP.getFreeHeap()),
+       static_cast<unsigned long>(ESP.getMaxAllocHeap()));
   present(rotateToPanel(std::move(logical), program.rotation()));
   return sleepSeconds(program.refreshFor(screen), program.sources(), states, now);
 }
@@ -224,7 +229,8 @@ uint32_t Device::notSetUp(const std::string& reason, uint32_t sleepSeconds) {
 
 void Device::present(Framebuffer frame) {
   frame_ = std::move(frame);
-  const uint32_t hash = crc32(frame_.bytes().data(), frame_.bytes().size());
+  uint32_t hash = 0;
+  for (int y = 0; y < frame_.height(); ++y) hash = crc32(frame_.row(y), static_cast<size_t>(frame_.stride()), hash);
   if (panelShows(hash)) {
     dlog("panel already shows this frame (%08lx), left alone", static_cast<unsigned long>(hash));
     frameResult_ = Frame::Same;
