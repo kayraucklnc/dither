@@ -214,8 +214,8 @@ export function Accounts() {
         <Stripe account={project.accounts.stripe} set={(a) => set("stripe", a)} />
       </div>
       <div className="space-y-2">
-        <h3 className="font-medium">OpenSky <span className="font-normal text-muted">(optional)</span></h3>
-        <p className="text-[13px] text-muted">The Aircraft widget works without it; a linked client lets it look every 2 minutes instead of every 5.</p>
+        <h3 className="font-medium">OpenSky</h3>
+        <p className="text-[13px] text-muted">For the Aircraft widget. The account is free; without one OpenSky allows only 400 requests a day for your whole connection, which a day of trying things out runs through.</p>
         <OpenSky account={project.accounts.opensky} set={(a) => set("opensky", a)} />
       </div>
     </div>

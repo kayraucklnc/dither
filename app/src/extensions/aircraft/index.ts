@@ -208,9 +208,9 @@ function empty(d: Draw, s: Settings, box: Box) {
   d.when({ all: [{ not: showing }, { not: emptySky }] }, () => say("OpenSky isn't answering — planes will show when it does"));
 }
 
-function needsPlace(d: Draw) {
+function needsSetup(d: Draw, text: string) {
   d.icon("plane", { x: 0, y: d.height * 0.1, w: d.width, h: Math.min(d.height * 0.45, 96) });
-  d.text("Choose a place in Panel settings", { x: 0, y: d.height * 0.6, w: d.width, h: d.height * 0.3, size: d.fit(["Choose a place in"], d.width, 40, { max: 24 }), align: "center", wrap: true, lines: 2 });
+  d.text(text, { x: 0, y: d.height * 0.6, w: d.width, h: d.height * 0.3, size: d.fit([text.split(" ").slice(0, 4).join(" ")], d.width, 40, { max: 24 }), align: "center", wrap: true, lines: 2 });
 }
 
 // --------------------------------------------------------------- layouts
@@ -549,25 +549,25 @@ function layoutFor(d: Draw, s: Settings): Exclude<Layout, "auto"> {
 
 function sourceFor(s: Settings, env: Env): SourceSpec | null {
   const place = placeOf(s, env);
-  if (!place) return null;
+  // Never anonymously: its 400 requests a day are shared by everything on the
+  // connection, and a day of flashing runs them out without a word.
+  const account = env.accounts?.opensky;
+  if (!place || !account) return null;
   const b = boxAround(place, radiusOf(s));
   const q = new URLSearchParams({ ...Object.fromEntries(Object.entries(b).map(([key, v]) => [key, String(v)])), extended: "1" });
   const values: SourceSpec["values"] = { n: { path: "states", agg: "count" } };
   for (let i = 0; i < SLOTS; i++) for (const f of FIELDS) values[`${f}${i}`] = `states.${i}.${COLUMN[f]}`;
-  const account = env.accounts?.opensky;
   return {
     url: `https://opensky-network.org/api/states/all?${q}`,
     panelOnly: "OpenSky only answers the panel, so the preview shows example planes.",
-    // Anonymous callers get 400 requests a day; a linked client gets 4,000.
-    every: account ? 2 : 5,
-    ...(account ? {
-      auth: {
-        url: OPENSKY_TOKEN_URL,
-        form: [["grant_type", "client_credentials"], ["client_id", account.clientId], ["client_secret", account.clientSecret]],
-        token: "access_token",
-        expires: "expires_in",
-      },
-    } : {}),
+    // A linked client gets 4,000 requests a day: every 2 minutes is 720.
+    every: 2,
+    auth: {
+      url: OPENSKY_TOKEN_URL,
+      form: [["grant_type", "client_credentials"], ["client_id", account.clientId], ["client_secret", account.clientSecret]],
+      token: "access_token",
+      expires: "expires_in",
+    },
     values,
   };
 }
@@ -607,9 +607,10 @@ function sampleFor(s: Settings, env: Env): Record<string, string | number | bool
 export default defineExtension<Settings>({
   id: "aircraft",
   name: "Aircraft overhead",
-  description: "The planes flying near you right now — where, what kind, whose, how high and which way. From OpenSky, no account needed.",
+  description: "The planes flying near you right now — where, what kind, whose, how high and which way. From OpenSky, with a free account.",
   icon: "plane",
   category: "data",
+  requires: ["opensky"],
   size: { min: [3, 2], default: [8, 8] },
   fields: [
     { key: "place", label: "Place", kind: "place", help: "Leave empty to use the project's place." },
@@ -668,7 +669,8 @@ export default defineExtension<Settings>({
     { key: "emergency", label: "A plane nearby squawks an emergency", type: "flag", test: { any: Array.from({ length: SLOTS }, (_, i) => emergency(i)) } },
   ],
   draw(d, s, env) {
-    if (!placeOf(s, env)) return needsPlace(d);
+    if (!env.accounts?.opensky) return needsSetup(d, "Link an OpenSky account in Panel settings");
+    if (!placeOf(s, env)) return needsSetup(d, "Choose a place in Panel settings");
     const layout = layoutFor(d, s);
     if (layout === "count") return count(d, s);
     const full = { x: 0, y: 0, w: d.width, h: d.height };

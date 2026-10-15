@@ -10,7 +10,7 @@ import { parseZone } from "@/runtime/tz";
 import aircraft, { airportsIn, boxAround, heading } from "./index";
 
 const milan = { name: "Milan", latitude: 45.46, longitude: 9.19 };
-const env = { units: "metric", place: milan, language: "en", timezone: "Europe/Rome", accounts: { google: [], stripe: null, opensky: null } } as unknown as Env;
+const env = { units: "metric", place: milan, language: "en", timezone: "Europe/Rome", accounts: { google: [], stripe: null, opensky: { clientId: "me-api-client", clientSecret: "shh" } } } as unknown as Env;
 const settings = aircraft.defaults(env);
 const source = (s = settings, e = env) => aircraft.source!(s, e) as SourceSpec | null;
 
@@ -44,10 +44,9 @@ describe("aircraft source", () => {
     expect(v.n).toEqual({ path: "states", agg: "count" });
   });
 
-  it("signs in only with a linked client, and then asks more often", () => {
-    expect(source()!.auth).toBeUndefined();
-    expect(source()!.every).toBe(5);
-    const linked = source(settings, { ...env, accounts: { ...env.accounts, opensky: { clientId: "me-api-client", clientSecret: "shh" } } })!;
+  it("always signs in, and asks nothing without a linked account", () => {
+    expect(source(settings, { ...env, accounts: { ...env.accounts, opensky: null } })).toBeNull();
+    const linked = source()!;
     expect(linked.auth?.form).toContainEqual(["grant_type", "client_credentials"]);
     expect(linked.auth?.form).toContainEqual(["client_id", "me-api-client"]);
     expect(linked.auth?.token).toBe("access_token");
@@ -99,6 +98,7 @@ describe("aircraft on the panel", () => {
 
   function project(layout: string): Project {
     const p = createProject({ starter: "blank", timezone: "Europe/Rome", language: "en", units: "metric", place: milan });
+    p.accounts = { ...p.accounts, opensky: { clientId: "me-api-client", clientSecret: "shh" } };
     p.screens[0].widgets = [{ id: "sky", type: "aircraft", x: 0, y: 0, w: 20, h: 12, frame: "none", settings: { layout } }];
     return p;
   }
