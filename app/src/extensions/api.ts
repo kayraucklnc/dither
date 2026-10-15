@@ -30,6 +30,8 @@ export type Field =
   | (FieldBase & { kind: "date" })
   | (FieldBase & { kind: "secret"; placeholder?: string })
   | (FieldBase & { kind: "image" })
+  /** Several pictures, in order: the user's own and prints from the collection. */
+  | (FieldBase & { kind: "images" })
   | (FieldBase & { kind: "icon" })
   | (FieldBase & { kind: "list"; placeholder?: string })
   /** Type to find one of many options — stations, stops, symbols. */

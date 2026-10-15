@@ -52,6 +52,11 @@ describe("pruneImages", () => {
     expect(p.images).toEqual({ img_1: "AAA", img_2: "BBB" });
   });
 
+  it("keeps pictures a widget lists", () => {
+    const p = withWidgets([widget("a", "gallery", { images: ["img_1", "gallery:bats"] })], { images: { img_1: "AAA", img_2: "BBB" } });
+    expect(pruneImages(p).images).toEqual({ img_1: "AAA" });
+  });
+
   it("returns the same project when every picture is used", () => {
     const p = withWidgets([widget("a", "picture", { image: "img_1" })], { images: { img_1: "AAA" } });
     expect(pruneImages(p)).toBe(p);

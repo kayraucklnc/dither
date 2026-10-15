@@ -27,7 +27,8 @@ After an intended visual change: `make goldens`, look at what changed, then
 - `app/src/device/` — Web Serial: boards, firmware manifest, connect/info/flash/read-back.
 - `app/src/ui/` — React. `kit.tsx` holds every primitive control.
 - `firmware/src/runtime/` portable C++17; `firmware/src/platform/` Arduino side.
-- `tools/` — font (FreeType mono) and icon (Lucide via sharp) generators.
+- `tools/` — font (FreeType mono) and icon (Lucide via sharp) generators; the
+  gallery's public-domain prints (`tools/gallery/build.py`, from Wikimedia Commons).
 
 ## Commands
 
