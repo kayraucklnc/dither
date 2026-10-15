@@ -26,6 +26,8 @@ export interface Format {
   /** Multiplied by this reference's value, e.g. an exchange rate. */
   times?: string;
   add?: number;
+  /** The first n code points of a string. */
+  head?: number;
   steps?: { t: number[]; o: string[] };
   map?: { k: (number | string)[]; o: string[]; d?: string };
   num?: { d: number; sep?: string; compact?: boolean };
@@ -33,6 +35,15 @@ export interface Format {
   upper?: boolean;
   tr?: boolean;
   fallback?: string;
+}
+
+/** A group placed by two values: each falls within its range and lands on the box. */
+export interface Placement {
+  x: string;
+  y: string;
+  box: [number, number, number, number];
+  xs: [number, number];
+  ys: [number, number];
 }
 
 export type Part = string | { v: string; f?: Format } | { k: Value; f?: Format };
@@ -54,7 +65,7 @@ export type Element =
   | (Base & { t: "bitmap"; x: number; y: number; a: number })
   | (Base & { t: "icon"; x: number; y: number; w: number; h: number; v: string; f?: Format; set: Record<string, number> })
   | (Base & { t: "bar"; x: number; y: number; w: number; h: number; v: string; min: number; max: number; dir?: "r" | "u" })
-  | (Base & { t: "group"; els: Element[] })
+  | (Base & { t: "group"; els: Element[]; at?: Placement })
   | (Base & {
       t: "chart"; x: number; y: number; w: number; h: number; v: string;
       kind: "bars" | "line" | "steps" | "area"; min?: number; max?: number; gap?: number; lw?: number; smooth?: boolean;
@@ -104,6 +115,17 @@ export interface Merge {
   skip?: string[];
   sort?: string[];
   unique?: string[];
+  geo?: Geo;
+}
+
+/** How far and which way each record of a merge is from a place: docs/format.md "Merges". */
+export interface Geo {
+  lat: string;
+  lon: string;
+  at: [number, number];
+  kx: number;
+  ky: number;
+  within?: number;
 }
 
 export interface Screen {

@@ -152,3 +152,21 @@ describe("pick", () => {
     expect(formatValue(5, { pick: "max", fallback: "none" }, ctx)).toBe("none");
   });
 });
+
+describe("head", () => {
+  it("keeps the first code points of a string", () => {
+    expect(formatValue("THY1TU  ", { head: 3 }, ctx)).toBe("THY");
+    expect(formatValue("AB", { head: 3 }, ctx)).toBe("AB");
+    expect(formatValue("AB", { head: 0, fallback: "x" }, ctx)).toBe("");
+    expect(formatValue("Åsa", { head: 2 }, ctx)).toBe("Ås");
+  });
+  it("is null for anything else", () => {
+    expect(formatValue(123, { head: 2 }, ctx)).toBe("–");
+    expect(formatValue("ABC", { head: 1.5 }, ctx)).toBe("–");
+    expect(formatValue("ABC", { head: -1 }, ctx)).toBe("–");
+    expect(formatValue("ABC", { head: "2" as unknown as number }, ctx)).toBe("–");
+  });
+  it("feeds map: an airline from a callsign", () => {
+    expect(formatValue("THY1TU  ", { head: 3, map: { k: ["THY"], o: ["Turkish Airlines"], d: "" } }, ctx)).toBe("Turkish Airlines");
+  });
+});

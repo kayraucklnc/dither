@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 #include <vector>
 
 #include "assets.h"
@@ -189,6 +190,26 @@ DITHER_NOINLINE void drawText(const Canvas& c, JsonView el, const RenderContext&
   drawTextLines(c, *font, lines, box);
 }
 
+// A placed group's move: where its two values fall within their ranges,
+// scaled onto its box. Nothing when a value is not a number or falls outside.
+std::optional<Offset> placement(JsonView at, const RenderContext& ctx) {
+  auto axis = [&](const char* ref, const char* range, int origin, int size) -> std::optional<int64_t> {
+    const Value v = ctx.values->get(at[ref].string());
+    JsonView r = at[range];
+    if (!v.isNumber() || !r[0].isNumber() || !r[1].isNumber()) return std::nullopt;
+    const double a = r[0].number(), b = r[1].number();
+    if (a == b) return std::nullopt;
+    const double f = (v.asNumber() - a) / (b - a);
+    if (!(f >= 0 && f <= 1)) return std::nullopt;
+    JsonView box = at["box"];
+    return static_cast<int64_t>(box[origin].integer(0)) + static_cast<int64_t>(std::floor(f * box[size].number()));
+  };
+  auto dx = axis("x", "xs", 0, 2);
+  auto dy = axis("y", "ys", 1, 3);
+  if (!dx || !dy) return std::nullopt;
+  return Offset{*dx, *dy};
+}
+
 }  // namespace
 
 std::string buildText(JsonView parts, const RenderContext& ctx) {
@@ -205,19 +226,24 @@ std::string buildText(JsonView parts, const RenderContext& ctx) {
   return out;
 }
 
-void drawElement(Framebuffer& fb, JsonView el, const RenderContext& ctx, int groupDepth) {
+void drawElement(Framebuffer& fb, JsonView el, const RenderContext& ctx, int groupDepth, Offset at) {
   if (!evalCondition(el["when"], *ctx.values, ctx.format)) return;
   std::string_view t = el["t"].string();
   if (t == "group") {
     // Groups nest at most kMaxGroupDepth deep; a deeper one is empty.
     if (groupDepth >= kMaxGroupDepth) return;
+    if (el["at"].exists()) {
+      auto moved = el["at"].isObject() ? placement(el["at"], ctx) : std::nullopt;
+      if (!moved) return;
+      at = {at.dx + moved->dx, at.dy + moved->dy};
+    }
     for (JsonView child = el["els"].first(); child.exists(); child = child.next()) {
-      drawElement(fb, child, ctx, groupDepth + 1);
+      drawElement(fb, child, ctx, groupDepth + 1, at);
     }
     return;
   }
   const bool black = !(el["c"].isNumber() && el["c"].number() == 0);
-  const Canvas c(fb, black);
+  const Canvas c(fb, black, at.dx, at.dy);
   if (t == "rect") drawRect(c, el);
   else if (t == "circle") drawCircleElement(c, el);
   else if (t == "line") drawLineElement(c, el);

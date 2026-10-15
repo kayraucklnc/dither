@@ -129,6 +129,23 @@ MaybeValue applyMap(const Value& v, JsonView map) {
   return nonNull(valueFromJsonScalar(map["d"]));
 }
 
+// Step 5: the first n code points of a string. A value that is not text, or
+// an n that is not a whole number from 0, goes null.
+MaybeValue applyHead(const Value& v, JsonView head) {
+  if (!v.isString() || !head.isNumber()) return std::nullopt;
+  const double n = head.number();
+  if (!(n >= 0) || n != std::floor(n)) return std::nullopt;
+  const std::string& s = v.asString();
+  // Count lead bytes, so a malformed sequence is cut nowhere but before a code point.
+  size_t at = 0;
+  for (double seen = 0; at < s.size(); ++at) {
+    if ((static_cast<unsigned char>(s[at]) & 0xC0) == 0x80) continue;
+    if (seen == n) break;
+    seen += 1;
+  }
+  return Value::string(s.substr(0, at));
+}
+
 MaybeValue applyNum(const Value& v, JsonView num) {
   if (!v.isNumber()) return std::nullopt;
   if (num["compact"].boolean(false) && std::fabs(v.asNumber()) >= 1000) {
@@ -168,6 +185,7 @@ std::optional<Value> applyValueSteps(const Value& input, JsonView f, const Forma
     v = applyUntil(*v, ctx);
   }
   if (v) v = applyArithmetic(*v, f, ctx);
+  if (v && f["head"].exists()) v = applyHead(*v, f["head"]);
   if (v && f["steps"].isObject()) v = applySteps(*v, f["steps"]);
   if (v && f["map"].isObject()) v = applyMap(*v, f["map"]);
   return v;

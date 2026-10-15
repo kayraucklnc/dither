@@ -9,7 +9,7 @@ namespace dither {
 std::u32string decodeUtf8(std::string_view s);
 std::string encodeUtf8(std::u32string_view s);
 
-// The `upper` format (format.md §2, step 7).
+// The `upper` format (format.md §2 "Formats", step 10).
 std::string upperText(std::string_view s, bool turkish);
 
 }  // namespace dither

@@ -449,3 +449,28 @@ TEST(chart_smooth_crowded_columns) {
   CHECK(testutil::countInk(fb) > 0);
   CHECK_EQ(catmullRomRow(1, 1, 1, 0, 4, 0, 4, 0, 4), int64_t{4});
 }
+
+TEST(placed_group) {
+  ValueStore v;
+  v.set("p.x", Value::number(5));
+  v.set("p.y", Value::number(2.5));
+  v.set("p.far", Value::number(11));
+  v.set("p.edge", Value::number(10));
+  // x: 5 in [0, 10] is halfway across 8 px; y: 2.5 in [10, 0] (north up) is three quarters down.
+  const char* placed = R"({"t":"group","at":{"x":"p.x","y":"p.y","box":[0,0,8,8],"xs":[0,10],"ys":[10,0]},)"
+                       R"("els":[{"t":"rect","x":-1,"y":-1,"w":2,"h":2}]})";
+  CHECK_EQ(all(drawn(8, 8, placed, v)),
+           (Rows{"........", "........", "........", "........", "........", "...##...", "...##...", "........"}));
+  // Out of range, missing, or a range of nothing: no drawing at all.
+  const Rows blank(8, "........");
+  CHECK_EQ(all(drawn(8, 8, R"({"t":"group","at":{"x":"p.far","y":"p.y","box":[0,0,8,8],"xs":[0,10],"ys":[10,0]},"els":[{"t":"rect","x":0,"y":0,"w":1,"h":1}]})", v)), blank);
+  CHECK_EQ(all(drawn(8, 8, R"({"t":"group","at":{"x":"p.none","y":"p.y","box":[0,0,8,8],"xs":[0,10],"ys":[10,0]},"els":[{"t":"rect","x":0,"y":0,"w":1,"h":1}]})", v)), blank);
+  CHECK_EQ(all(drawn(8, 8, R"({"t":"group","at":{"x":"p.x","y":"p.y","box":[0,0,8,8],"xs":[3,3],"ys":[10,0]},"els":[{"t":"rect","x":0,"y":0,"w":1,"h":1}]})", v)), blank);
+  // At the edge it lands on the box's far side, and the panel clips it.
+  CHECK_EQ(all(drawn(8, 2, R"({"t":"group","at":{"x":"p.edge","y":"p.y","box":[0,0,7,0],"xs":[0,10],"ys":[10,0]},"els":[{"t":"rect","x":0,"y":0,"w":3,"h":1}]})", v)),
+           (Rows{".......#", "........"}));
+  // Placed groups inside placed groups add their moves.
+  CHECK_EQ(all(drawn(8, 1, R"({"t":"group","at":{"x":"p.x","y":"p.y","box":[0,0,4,0],"xs":[0,10],"ys":[10,0]},"els":[)"
+                           R"({"t":"group","at":{"x":"p.x","y":"p.y","box":[1,0,4,0],"xs":[0,10],"ys":[10,0]},"els":[{"t":"rect","x":0,"y":0,"w":1,"h":1}]}]})", v)),
+           (Rows{".....#.."}));
+}

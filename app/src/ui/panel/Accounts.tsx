@@ -5,6 +5,7 @@ import { useState } from "react";
 import { ChevronDown, ExternalLink, LogIn } from "lucide-react";
 import { CALENDAR_SCOPES } from "@/extensions/google-calendar";
 import { linkGoogle, redirectUri } from "@/extensions/google-calendar/oauth";
+import { OPENSKY_TOKEN_URL } from "@/extensions/aircraft";
 import { isStripeKey } from "@/extensions/stripe";
 import type { Accounts as AccountsDef, GoogleLink } from "@/project/schema";
 import { useProject } from "@/state/project-store";
@@ -153,6 +154,49 @@ function Stripe({ account, set }: { account: AccountsDef["stripe"]; set: (a: Acc
   );
 }
 
+function OpenSky({ account, set }: { account: AccountsDef["opensky"]; set: (a: AccountsDef["opensky"]) => void }) {
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (account) return <Linked who={`OpenSky — ${account.clientId}`} onUnlink={() => set(null)} />;
+
+  // The same token trade the panel makes proves the client works before it depends on it.
+  const check = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(OPENSKY_TOKEN_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ grant_type: "client_credentials", client_id: clientId.trim(), client_secret: clientSecret.trim() }),
+        credentials: "omit",
+      });
+      if (res.status === 400 || res.status === 401) throw new Error("OpenSky does not recognise that client ID and secret.");
+      if (!res.ok) throw new Error(`OpenSky answered ${res.status}.`);
+      set({ clientId: clientId.trim(), clientSecret: clientSecret.trim() });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not reach OpenSky.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <Field label="Client ID" help="On opensky-network.org, sign in, open your account page and create an API client.">
+        {(id) => <TextInput id={id} value={clientId} onChange={setClientId} placeholder="you-api-client" />}
+      </Field>
+      <Field label="Client secret" help="It is stored on the panel and in this browser.">
+        {(id) => <TextInput id={id} type="password" value={clientSecret} onChange={setClientSecret} />}
+      </Field>
+      <Button variant="primary" disabled={busy || !clientId.trim() || !clientSecret.trim()} onClick={check}>{busy ? "Checking…" : "Connect OpenSky"}</Button>
+      {error && <Note tone="warn">{error}</Note>}
+    </div>
+  );
+}
+
 export function Accounts() {
   const { project, update } = useProject();
   const set = <K extends keyof AccountsDef>(kind: K, value: AccountsDef[K]) =>
@@ -168,6 +212,11 @@ export function Accounts() {
         <h3 className="font-medium">Stripe</h3>
         <p className="text-[13px] text-muted">For the Revenue widget, and rules about what came in today.</p>
         <Stripe account={project.accounts.stripe} set={(a) => set("stripe", a)} />
+      </div>
+      <div className="space-y-2">
+        <h3 className="font-medium">OpenSky <span className="font-normal text-muted">(optional)</span></h3>
+        <p className="text-[13px] text-muted">The Aircraft widget works without it; a linked client lets it look every 2 minutes instead of every 5.</p>
+        <OpenSky account={project.accounts.opensky} set={(a) => set("opensky", a)} />
       </div>
     </div>
   );

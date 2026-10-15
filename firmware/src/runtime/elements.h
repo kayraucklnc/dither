@@ -23,8 +23,13 @@ std::string buildText(JsonView parts, const RenderContext& ctx);
 
 constexpr int kMaxGroupDepth = 8;
 
+// Where enclosing placed groups (`at`) have moved the drawing to.
+struct Offset {
+  int64_t dx = 0, dy = 0;
+};
+
 // `groupDepth`: how many groups enclose the element.
-void drawElement(Framebuffer& fb, JsonView element, const RenderContext& ctx, int groupDepth = 0);
+void drawElement(Framebuffer& fb, JsonView element, const RenderContext& ctx, int groupDepth = 0, Offset at = {});
 
 // Clears to white, then draws every element in order.
 void renderElements(Framebuffer& fb, JsonView elements, const RenderContext& ctx);

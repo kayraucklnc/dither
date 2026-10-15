@@ -212,7 +212,7 @@ function pick(v: Value, how: NonNullable<Format["pick"]>): number | null {
   }
 }
 
-/** A format's value steps alone — until, scale, add, steps, map — as rules use them. */
+/** A format's value steps alone — until, scale, add, head, steps, map — as rules use them. */
 export function applyValueSteps(input: Value, f: Format, ctx: FormatContext): Value {
   let v: Value = input;
   if (v === null) return null;
@@ -245,6 +245,12 @@ export function applyValueSteps(input: Value, f: Format, ctx: FormatContext): Va
       v *= by;
     }
     v += f.add ?? 0;
+  }
+  if (f.head !== undefined) {
+    const n = f.head;
+    if (typeof v !== "string" || typeof n !== "number" || !(n >= 0) || !Number.isInteger(n)) return null;
+    // Code points, as the panel counts them.
+    v = Array.from(v).slice(0, n).join("");
   }
   if (f.steps) {
     if (typeof v !== "number") return null;

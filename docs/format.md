@@ -212,7 +212,13 @@ the sources already keep:
   "count": 6,                       // records read per source, and records kept
   "skip": ["s"],                    // a record with any of these null is left out
   "sort": ["s", "a"],               // by the first of these that is a time
-  "unique": ["t", "s", "a"]         // equal on all of these to an earlier record: dropped
+  "unique": ["t", "s", "a"],        // equal on all of these to an earlier record: dropped
+  "geo": {                          // optional: how far and which way each record is
+    "lat": "lat", "lon": "lon",     // the fields holding its position, in degrees
+    "at": [45.46, 9.19],            // from here
+    "kx": 78.08, "ky": 111.32,      // km per degree of longitude and of latitude there
+    "within": 25                    // optional: farther than this, in km, is left out
+  }
 }]
 ```
 
@@ -227,6 +233,19 @@ none go last; ties keep source order, then record order. A record whose
 wins; an empty `unique` drops nothing. The first `count` become the merge's own
 values: `m0.t0`, `m0.s0`, … and `m0.from0` — the position in `from` (0, 1, …)
 of the source each came from. Positions past the end are `null`.
+
+With `geo`, every record gets two more fields before anything is skipped or
+sorted, so `skip`, `sort` and `unique` may name them: `dist`, its distance in km,
+and `brg`, its bearing in degrees clockwise from north. With `vlat`, `vlon` the
+record's `lat` and `lon` and `[a, o]` the `at`:
+`dx = (vlon − o) · kx`, `dy = (vlat − a) · ky`, each one double multiplication;
+`dist = round(sqrt(dx·dx + dy·dy), 2)`, the squares and their sum each a
+separate double operation (no fused multiply-add); `brg = atan2(dx, dy) · 180 / π`,
+plus 360 when negative, then `round(·, 1)`, and 360 becomes 0 — where `round(x, d)`
+is `round_half_away(x · 10^d) / 10^d`. Both are `null` when either position
+field is not a finite number, or `kx`, `ky` or `at` is missing or not numbers.
+A record with `dist` greater than `within` is left out; a record with no `dist`
+is not. These are fields like any other: `m0.dist0`, `m0.brg0`.
 
 Merges run in order, after every source has been read on a wake, and in the
 simulator likewise. A merge's id is a reference prefix like a source's.
@@ -339,19 +358,23 @@ A **format** turns a value into text. All fields optional; applied in this order
    (after `scale`); a reference that is not a finite number makes the value
    `null`. `add: n` — add (after both). Each is one double operation, in that
    order.
-5. `steps: { "t": [t0, t1, …], "o": [o0, o1, …, oN] }` — numeric value becomes
+5. `head: n` — value is a string; becomes its first `n` code points (all of
+   it when shorter). A value that is not a string, or an `n` that is not a
+   whole number from 0, is `null`. A callsign's first three letters through
+   `map` are its airline.
+6. `steps: { "t": [t0, t1, …], "o": [o0, o1, …, oN] }` — numeric value becomes
    `o[k]` where `k` is how many thresholds are `<= value`. `o` has one more
    entry than `t`.
-6. `map: { "k": [k0, …], "o": [o0, …], "d": default }` — exact match (number to
+7. `map: { "k": [k0, …], "o": [o0, …], "d": default }` — exact match (number to
    number, string to string); unmatched becomes `d` (or `null` if no `d`).
-7. `num: { "d": decimals, "sep": ",", "compact": true }` — fixed decimals
+8. `num: { "d": decimals, "sep": ",", "compact": true }` — fixed decimals
    (§ numbers); `sep` inserts a thousands separator into the integer part.
    With `compact`, a value whose magnitude is at least 1,000 is divided by the
    largest of 10⁹, 10⁶, 10³ not above it, printed with 1 decimal (a trailing
    `.0` dropped) and suffixed `B`, `M` or `k`: 74,120 → `74.1k`, 2,000,000 →
    `2M`; smaller values print as without `compact`.
-8. `time: "HH:mm"` — value is a time; rendered with the tokens below.
-9. `upper: true` — the value becomes text, then: `a–z` → `A–Z`; U+00E0–U+00FE
+9. `time: "HH:mm"` — value is a time; rendered with the tokens below.
+10. `upper: true` — the value becomes text, then: `a–z` → `A–Z`; U+00E0–U+00FE
    except U+00F7 → minus 0x20; `ğ→Ğ`, `ş→Ş`, `ı→I`. With `"tr": true` also set,
    `i→İ` instead of `i→I`. Nothing else changes.
 
@@ -416,8 +439,20 @@ logical pixels.
 | `bitmap` | `x y`, `a` (asset index) |
 | `icon` | `x y w h`, `v` (reference), `f` (format, optional), `set` (`{ "name": assetIndex }`) — the value, formatted, picks a bitmap drawn centred in the box |
 | `bar` | `x y w h`, `v`, `min max`, `dir` (`r` grows rightwards, `u` upwards; default `r`) |
-| `group` | `els` — elements drawn in order, and only when the group's `when` holds. Groups nest up to 8 deep; a group's `c` is ignored |
+| `group` | `els` — elements drawn in order, and only when the group's `when` holds. Groups nest up to 8 deep; a group's `c` is ignored. `at` (optional) places the group by two values, below |
 | `chart` | `x y w h`, `v` (a series), `kind` (`bars`/`line`/`steps`/`area`), `min max` (optional, else from the data), `gap` (bars, default 1), `lw` (line thickness, default 2), `smooth` (curve the `line`/`area`, default false), `labels` (optional: `font`, `f`, `every`, `pre`, `post` — each point's value written above it) |
+
+A **placed group** has `"at": { "x": ref, "y": ref, "box": [x, y, w, h], "xs": [a, b], "ys": [a, b] }`.
+Everything in it is drawn as at its own coordinates and then moved by
+`(dx, dy)`, where `dx = x + floor(((vx − a) / (b − a)) · w)` with `vx` the value
+of `x` and `[a, b]` its range `xs`, and `dy` the same for `y`, `ys`, `h` — so a
+group drawn around `(0, 0)` lands where the values put it in the box. Each
+value's fraction `(v − a) / (b − a)` is computed in doubles as written, then
+multiplied by the box's size and floored; `a > b` runs the axis backwards
+(latitude, north up). The group draws nothing when a value is not a finite number, `a = b`, a
+range is not two numbers, or a fraction falls outside `[0, 1]`. Clip boxes
+(text, icons) move with their elements; nothing reaches past the panel's
+edges. Placed groups inside placed groups add their moves.
 
 `parts` is an array; each part is a literal string, `{ "v": ref, "f": format }`,
 or `{ "k": constant, "f": format }` — a fixed value (number, string, boolean or

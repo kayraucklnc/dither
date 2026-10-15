@@ -6,7 +6,7 @@ import { formatValue, type FormatContext } from "./format";
 import { Framebuffer, circle, drawBitmap, fillRect, line, roundAway, strokeRect } from "./framebuffer";
 import { drawText, layout, width } from "./text";
 import { parseZone } from "./tz";
-import type { Element, ElementOf, Part, Runtime, Values } from "./types";
+import type { Element, ElementOf, Part, Placement, Runtime, Values } from "./types";
 
 export class AssetStore {
   private cache = new Map<number, Asset>();
@@ -187,6 +187,24 @@ function drawSeries(el: ElementOf<"chart">, series: number[], ctx: Ctx, ink: boo
 
 const MAX_GROUP_DEPTH = 8;
 
+/** Where a placed group lands: each value's place in its range, scaled onto the box. */
+function placement(at: Placement, ctx: Ctx): [number, number] | null {
+  if (typeof at !== "object" || at === null) return null;
+  const axis = (ref: string, range: unknown, origin: unknown, size: unknown): number | null => {
+    const v = num(ctx.values.get(ref));
+    if (v === null || !Array.isArray(range) || typeof range[0] !== "number" || typeof range[1] !== "number") return null;
+    const [a, b] = range as [number, number];
+    if (a === b) return null;
+    const f = (v - a) / (b - a);
+    if (!(f >= 0 && f <= 1)) return null;
+    return Math.trunc(typeof origin === "number" ? origin : 0) + Math.floor(f * (typeof size === "number" ? size : 0));
+  };
+  const box = Array.isArray(at.box) ? at.box : [];
+  const dx = axis(at.x, at.xs, box[0], box[2]);
+  const dy = axis(at.y, at.ys, box[1], box[3]);
+  return dx === null || dy === null ? null : [dx, dy];
+}
+
 function drawElement(el: Element, ctx: Ctx, depth = 0): void {
   if (el.when && !evaluate(el.when, ctx.values, ctx.fmt)) return;
   const ink = el.c !== 0;
@@ -248,10 +266,17 @@ function drawElement(el: Element, ctx: Ctx, depth = 0): void {
     case "chart":
       drawChart(el, ctx, ink);
       return;
-    case "group":
+    case "group": {
       if (depth >= MAX_GROUP_DEPTH) return;
-      for (const child of el.els) drawElement(child, ctx, depth + 1);
+      let inner = ctx;
+      if (el.at !== undefined) {
+        const moved = placement(el.at, ctx);
+        if (!moved) return;
+        inner = { ...ctx, fb: fb.moved(moved[0], moved[1]) };
+      }
+      for (const child of el.els) drawElement(child, inner, depth + 1);
       return;
+    }
   }
 }
 
