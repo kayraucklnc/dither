@@ -60,6 +60,8 @@ const placeOf = (s: Settings, env: Env) => s.place ?? env.place;
 export const indexOf = (s: Settings, env: Env): Index => (s.index === "eu" || s.index === "us" ? s.index : env.timezone.startsWith("America/") ? "us" : "eu");
 
 const anyPollen: Condition = { any: POLLEN.map((p) => ({ v: p.key, op: "present" })) };
+/** Some pollen at Low or above: worth a grid. Out of season everything sits below it. */
+const somePollen: Condition = { any: POLLEN.map((p) => ({ v: p.key, op: "ge", x: p.t[0] })) };
 
 // --------------------------------------------------------------- drawing helpers
 
@@ -87,23 +89,47 @@ function levels(d: Draw, key: string, t: number[], box: Box) {
 /** The index, large, with its band and the level bar beside it. */
 function air(d: Draw, index: Index, box: Box) {
   const sc = INDEX[index];
-  const big = d.fit(["888"], Math.round(box.w * 0.5), box.h, { weight: 700, max: 96 });
-  const nw = d.measure("888", big, 700);
+  // The number is as large as its own digits allow: "75" need not stay the
+  // size "888" would be. One arrangement per width, chosen when the value
+  // arrives; a lone digit is drawn the size of two.
+  const widths: [Condition, string, string][] = [
+    [{ any: [{ v: sc.key, op: "lt", x: 10 }, { v: sc.key, op: "absent" }] }, "8", "88"],
+    [{ v: sc.key, op: "between", x: [10, 99.5] }, "88", "88"],
+    [{ v: sc.key, op: "ge", x: 99.5 }, "888", "888"],
+  ];
+  for (const [when, digits, sizedFor] of widths) {
+    d.when(when, () => airArrangement(d, index, box, digits, d.fit([sizedFor], Math.round(box.w * 0.6), box.h, { weight: 700, max: 128 })));
+  }
+}
+
+/** The number flush left, its name, band and bar stacked beside it and centred on it. */
+function airArrangement(d: Draw, index: Index, box: Box, digits: string, big: number) {
+  const sc = INDEX[index];
   const capH = Math.round(big * 0.73);
   const top = box.y + Math.round((box.h - capH) / 2);
   const base = top + capH;
-  onBaseline(d, [d.value(sc.key, WHOLE)], box.x, base, nw + 4, big, 700, "right");
-  const tx = box.x + nw + Math.max(10, Math.round(big * 0.2));
+  const gap = Math.max(10, Math.round(big * 0.18));
+  const nw = d.measure(digits, big, 700);
+  const tx = box.x + nw + gap;
   const tw = box.x + box.w - tx;
   // Short of room, the index's name goes: the band and the bar say more.
   const named = capH >= 44;
-  const word = d.fit(sc.bands, tw, Math.round(capH * (named ? 0.45 : 0.6)), { weight: 700, max: 32 });
-  const small = Math.max(12, Math.min(18, Math.round(word * 0.6)));
-  // Name above, band in the middle, bar along the bottom: together as tall as the digits.
-  if (named) onBaseline(d, sc.name, tx, top + Math.round(small * 0.8), tw, small, 400);
-  onBaseline(d, [d.value(sc.key, { ...bandOf(index), fallback: "–" })], tx, top + Math.round(capH * (named ? 0.66 : 0.62)), tw, word, 700);
+  const small = Math.max(12, Math.min(18, Math.round(capH * 0.16)));
   const barH = Math.max(6, Math.round(capH * 0.14));
-  levels(d, sc.key, sc.t, { x: tx, y: base - barH, w: Math.min(tw, 220), h: barH });
+  // The band may take two lines — "Extremely poor" wraps rather than
+  // shrinking "Poor" — and the stack may stand a little taller than the digits.
+  const lines = sc.bands.some((b) => b.includes(" ")) ? 2 : 1;
+  const words = lines === 2 ? sc.bands.flatMap((b) => b.split(" ")) : sc.bands;
+  const room = Math.min(box.h, Math.round(capH * 1.5)) - (named ? small + 6 : 0) - barH - 6;
+  const word = d.fit(words, tw, Math.floor(room / lines), { weight: 700, min: 12, max: 32 });
+  const bandH = d.lineHeight(word, 700) * lines;
+  const stackH = (named ? small + 6 : 0) + bandH + 6 + barH;
+  const stackTop = top + Math.round((capH - stackH) / 2);
+  const bandY = stackTop + (named ? small + 6 : 0);
+  onBaseline(d, [d.value(sc.key, WHOLE)], box.x, base, nw + 4, big, 700);
+  if (named) onBaseline(d, sc.name, tx, stackTop + Math.round(small * 0.8), tw, small, 400);
+  d.text([d.value(sc.key, { ...bandOf(index), fallback: "–" })], { x: tx, y: bandY, w: tw, h: bandH, size: word, weight: 700, valign: "middle", wrap: true, lines });
+  levels(d, sc.key, sc.t, { x: tx, y: bandY + bandH + 6, w: Math.min(tw, 220), h: barH });
 }
 
 /** "UV 4 · Moderate, up to 6 today". */
@@ -121,6 +147,25 @@ function pollutants(d: Draw, x: number, baseline: number, w: number, size: numbe
     "PM2.5 ", d.value("pm25", WHOLE), "   PM10 ", d.value("pm10", WHOLE),
     "   O3 ", d.value("o3", WHOLE), "   NO2 ", d.value("no2", WHOLE), "  µg/m³",
   ], x, baseline, w, size, 400);
+}
+
+/** The sun as a row of its own, now and today's highest, with the pollutants beside it. */
+function uvBlock(d: Draw, box: Box, chartX: number, chartW: number, size: number, small: number) {
+  const big = Math.round(size * 1.3);
+  const icon = Math.round(big * 1.1);
+  const base = box.y + d.metrics(big, 700).ascent + 2;
+  d.icon("sun", { x: box.x, y: base - Math.round(big * 0.86), w: icon, h: icon });
+  onBaseline(d, ["UV ", d.value("uv", WHOLE), " · ", d.value("uv", UV_BAND)], box.x + icon + 8, base, chartX - box.x - icon - 20, big, 700);
+  onBaseline(d, ["Up to ", d.value("uvMax", WHOLE), " today"], box.x + icon + 8, box.y + box.h - Math.round(small * 0.3), chartX - box.x - icon - 20, small + 2, 400);
+  // Beside it, the pollutants, small: one to a row, label left, figure right.
+  const stats: [string, string][] = [["PM2.5", "pm25"], ["PM10", "pm10"], ["O3", "o3"], ["NO2", "no2"]];
+  const rowH = box.h / stats.length;
+  const statSize = Math.max(12, Math.min(small, Math.floor(rowH * 0.8)));
+  stats.forEach(([name, key], i) => {
+    const sy = box.y + Math.round((i + 0.8) * rowH);
+    onBaseline(d, name, chartX, sy, chartW, statSize, 400);
+    onBaseline(d, [d.value(key, WHOLE)], chartX, sy, chartW, statSize, 700, "right");
+  });
 }
 
 /** One pollen: what it is, how much, and four dots that fill with it. */
@@ -143,16 +188,74 @@ function pollenCell(d: Draw, p: (typeof POLLEN)[number], box: Box) {
   });
 }
 
-function pollen(d: Draw, box: Box) {
+function pollenGrid(d: Draw, box: Box) {
   const cols = box.w >= 540 ? 3 : 2;
   const rows = Math.ceil(POLLEN.length / cols);
   const cw = Math.floor(box.w / cols);
   const ch = Math.floor(box.h / rows);
-  d.when(anyPollen, () => {
-    POLLEN.forEach((p, i) => pollenCell(d, p, { x: box.x + (i % cols) * cw, y: box.y + Math.floor(i / cols) * ch, w: cw - 8, h: ch }));
-  });
-  d.when({ not: anyPollen }, () =>
-    d.text("No pollen forecast for this place", { ...box, size: Math.max(13, Math.min(18, Math.round(box.h * 0.12))), align: "center", valign: "middle" }));
+  POLLEN.forEach((p, i) => pollenCell(d, p, { x: box.x + (i % cols) * cw, y: box.y + Math.floor(i / cols) * ch, w: cw - 8, h: ch }));
+}
+
+/** Between seasons, or where there is no forecast, pollen gets a line rather than a grid of "None". */
+function pollenNote(d: Draw, x: number, baseline: number, w: number, size: number) {
+  const icon = Math.round(size * 1.1);
+  d.icon("flower-2", { x, y: baseline - Math.round(size * 0.86), w: icon, h: icon });
+  d.when(anyPollen, () => onBaseline(d, "Hardly any pollen in the air", x + icon + 8, baseline, w - icon - 8, size, 400));
+  d.when({ not: anyPollen }, () => onBaseline(d, "No pollen forecast for this place", x + icon + 8, baseline, w - icon - 8, size, 400));
+}
+
+/**
+ * Everything: the air and its day, the sun, the pollutants, then the pollen.
+ * Each part is as tall as it needs; what room is left is shared out evenly
+ * between them, so nothing piles up in one place. With pollen about it gets
+ * a grid; without, the pollutants grow into tiles and pollen is a line.
+ */
+function everything(d: Draw, index: Index, box: Box, withGrid: boolean) {
+  const sc = INDEX[index];
+  const { x, w, h } = box;
+  const line = Math.max(14, Math.min(22, Math.round(h * 0.07)));
+  const lh = d.lineHeight(line, 700);
+  const small = Math.max(12, Math.min(15, Math.round(line * 0.75)));
+  const note = Math.max(13, line - 4);
+  const chartX = x + Math.round(w * 0.7);
+  const chartW = x + w - chartX;
+  const colW = chartX - x - 12;
+  // The air row is as tall as its digits make it.
+  const big = d.fit(["88"], Math.round(colW * 0.6), Math.round(h * 0.42), { weight: 700, max: 128 });
+  const airH = Math.round(big * 0.73 * 1.7);
+  const uvH = withGrid ? lh : Math.max(Math.round(lh * 2.2), (small + 4) * 4);
+  const parts = withGrid
+    ? [airH, uvH, lh, Math.min(h * 0.4, Math.ceil(POLLEN.length / (w >= 540 ? 3 : 2)) * 64)]
+    : [airH, uvH, lh];
+  const gap = Math.max(10, Math.floor((h - parts.reduce((a, b) => a + b, 0)) / parts.length));
+  let y = box.y + Math.floor(gap / 3);
+  const rule = () => d.line(x, y + Math.round(gap / 2) - 1, x + w, y + Math.round(gap / 2) - 1, { width: 1 });
+
+  air(d, index, { x, y, w: colW, h: airH });
+  const chartH = Math.min(Math.round(airH * 0.6), Math.round(chartW * 0.6));
+  const chartY = y + Math.round((airH - chartH) / 2) + Math.round(small / 2);
+  onBaseline(d, "Next 24 hours", chartX, chartY - 6, chartW, small, 400);
+  // Scaled to its own highs and lows: the shape of the day is what it shows,
+  // with the ground beneath the line shaded grey.
+  d.chart({ x: chartX, y: chartY, w: chartW, h: chartH }, sc.series, { kind: "area", smooth: true, width: 3 });
+  y += airH;
+  rule();
+  y += gap;
+  if (withGrid) {
+    uvLine(d, x, y + Math.round(lh * 0.8), w, line);
+    y += lh + Math.round(gap / 2);
+    pollutants(d, x, y + Math.round(lh * 0.8), w, note);
+    y += lh;
+    rule();
+    y += gap;
+    pollenGrid(d, { x, y, w, h: box.y + h - y });
+    return;
+  }
+  uvBlock(d, { x, y, w, h: uvH }, chartX, chartW, line, small);
+  y += uvH;
+  rule();
+  // The pollen line follows the rule at the same spacing as the rows above it.
+  pollenNote(d, x, y + gap + Math.round(lh * 0.7), w, note);
 }
 
 function needsPlace(d: Draw) {
@@ -244,7 +347,6 @@ export default defineExtension<Settings>({
   draw(d, s, env) {
     if (!placeOf(s, env)) return needsPlace(d);
     const index = indexOf(s, env);
-    const sc = INDEX[index];
     const { width: w, height: h } = d;
     const show = s.show === "auto" ? (h >= 300 && w >= 360 ? "all" : h >= 150 ? "uv" : "air") : s.show;
     if (show === "air") return air(d, index, { x: 0, y: 0, w, h });
@@ -260,21 +362,8 @@ export default defineExtension<Settings>({
       return;
     }
 
-    // Everything: the air and its day, the sun and its day, then the pollen.
-    const airH = Math.round(h * 0.34);
-    const chartX = Math.round(w * 0.66);
-    air(d, index, { x: 0, y: 0, w: chartX - 12, h: airH });
-    const small = Math.max(12, Math.min(15, Math.round(line * 0.75)));
-    onBaseline(d, "Next 24 hours", chartX, small, w - chartX, small, 400);
-    d.chart({ x: chartX, y: small + 6, w: w - chartX, h: airH - small - 6 }, sc.series, { kind: "bars", min: 0, gap: 1 });
-    let y = airH + 10;
-    d.line(0, y, w, y, { width: 1 });
-    y += 6;
-    uvLine(d, 0, y + Math.round(lh * 0.8), w, line);
-    y += lh + 4;
-    pollutants(d, 0, y + Math.round(lh * 0.7), w, Math.max(13, line - 4));
-    y += lh + 8;
-    d.line(0, y, w, y, { width: 1 });
-    pollen(d, { x: 0, y: y + 8, w, h: h - y - 8 });
+    const full = { x: 0, y: 0, w, h };
+    d.when(somePollen, () => everything(d, index, full, true));
+    d.when({ not: somePollen }, () => everything(d, index, full, false));
   },
 });

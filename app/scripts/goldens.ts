@@ -38,7 +38,7 @@ function write(name: string, blob: Uint8Array, runtime: Runtime, values: Record<
 const fonts = await loadFonts();
 const deps = { library: nodeLibrary, fonts, picture: async () => null, boardPanel: () => ({ width: 800, height: 480 }) };
 
-for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "starter-showcase", "primitives", "text-and-formats", "chart-labels", "air-quality", "air-quality-no-pollen"]) {
+for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "starter-showcase", "primitives", "text-and-formats", "chart-labels", "air-quality", "air-quality-no-pollen", "air-quality-quiet"]) {
   rmSync(`${root}${dir}`, { recursive: true, force: true });
 }
 
@@ -171,6 +171,7 @@ for (const s of STARTERS.filter((x) => x.id !== "blank")) {
 for (const [name, timezone, at, pollen] of [
   ["air-quality", "Europe/Rome", place, true],
   ["air-quality-no-pollen", "America/New_York", { name: "New York", latitude: 40.71, longitude: -74 }, false],
+  ["air-quality-quiet", "Europe/Istanbul", { name: "Istanbul", latitude: 41.01, longitude: 28.98 }, 0],
 ] as const) {
   const project = createProject({ starter: "blank", timezone, language: "en", units: "metric", place: at });
   const aq = (id: string, x: number, y: number, w: number, h: number, frame: "none" | "outline" | "inverted" = "none") =>
@@ -179,7 +180,8 @@ for (const [name, timezone, at, pollen] of [
   const c = await compile(project, deps);
   const values: Record<string, Value> = { ...DEVICE };
   for (const src of c.sources) {
-    for (const [k, v] of src.sample) values[k] = !pollen && /\.(alder|birch|olive|grass|mugwort|ragweed)$/.test(k) ? null : v;
+    // false: no pollen forecast at all; 0: one between seasons, every count under Low.
+    for (const [k, v] of src.sample) values[k] = pollen !== true && /\.(alder|birch|olive|grass|mugwort|ragweed)$/.test(k) ? (pollen === 0 ? 0.2 : null) : v;
     Object.assign(values, { [`${src.source.id}._ok`]: true, [`${src.source.id}._age`]: 20 });
   }
   write(name, c.blob, c.runtime, values);
