@@ -72,5 +72,16 @@ TLS the heap has room for it but no single 48 KB block. Three crash resets in a 
 15 minutes before the next attempt. Log lines on the USB serial
 port start with `[dither]`. While a USB host is attached the board stays awake
 and accepts `CMD:INFO`, `CMD:WAKE`, `CMD:SCREENSHOT` (the panel frame, P4
-layout) and `CMD:SLEEP:<s>`. Open the port with DTR high and RTS low, or the
-USB-Serial/JTAG resets the chip.
+layout), `CMD:SLEEP:<s>` and `CMD:HISTORY`. Open the port with DTR high and RTS
+low, or the USB-Serial/JTAG resets the chip; and open it once - reopening it
+quickly can leave the C3 in download mode.
+
+Every wake also writes one line to its own NVS namespace (`dither-log`), a
+ring of the last 32 (`runtime/history.h`): the time, reset reason (1 power-on,
+8 deep sleep, 9 brownout), what was fetched or failed (with the first error),
+whether the panel redrew and how long it then slept. It survives deep sleep,
+power loss and reflashing a design, so `CMD:HISTORY` (between `history: begin`
+and `history: end <n>`) shows what the panel did while nobody was watching -
+and a power-on after a silent gap is a battery that ran out. The app's Panel
+activity asks for it on connect. The history is the first thing dropped if the
+value cache needs the room.

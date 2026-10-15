@@ -5,6 +5,7 @@
 
 #include <vector>
 
+#include "../runtime/history.h"
 #include "log.h"
 
 namespace dither {
@@ -12,6 +13,8 @@ namespace {
 
 constexpr const char* kNamespace = "dither";
 constexpr const char* kCacheKey = "cache";
+constexpr const char* kHistoryNamespace = "dither-log";
+constexpr const char* kHistoryCountKey = "n";
 constexpr uint32_t kRtcMagic = 0xD17E0001;
 constexpr uint32_t kCrashMagic = 0xC4A5D17E;
 
@@ -47,6 +50,26 @@ std::vector<uint8_t> readStored() {
   return bytes;
 }
 
+std::string historyKey(size_t slot) {
+  return "h" + std::to_string(slot);
+}
+
+// The history is the expendable part of NVS: when the cache does not fit, it goes.
+void clearHistory() {
+  Preferences prefs;
+  if (!prefs.begin(kHistoryNamespace, false)) return;
+  prefs.clear();
+  prefs.end();
+}
+
+size_t writeCache(const std::vector<uint8_t>& bytes) {
+  Preferences prefs;
+  if (!prefs.begin(kNamespace, false)) return 0;
+  size_t written = prefs.putBytes(kCacheKey, bytes.data(), bytes.size());
+  prefs.end();
+  return written;
+}
+
 }  // namespace
 
 ValueCache loadCache(uint32_t blobCrc) {
@@ -72,13 +95,12 @@ void saveCache(const ValueCache& original) {
   }
   std::vector<uint8_t> bytes = encodeCache(cache);
   if (bytes == readStored()) return;
-  Preferences prefs;
-  if (!prefs.begin(kNamespace, false)) {
-    dlog("cache: NVS unavailable, not saved");
-    return;
+  size_t written = writeCache(bytes);
+  if (written != bytes.size()) {
+    dlog("cache: NVS full, dropping the wake history to make room");
+    clearHistory();
+    written = writeCache(bytes);
   }
-  size_t written = prefs.putBytes(kCacheKey, bytes.data(), bytes.size());
-  prefs.end();
   if (written != bytes.size()) {
     dlog("cache: NVS write failed (%u of %u bytes)", static_cast<unsigned>(written),
          static_cast<unsigned>(bytes.size()));
@@ -116,6 +138,29 @@ uint32_t recordReset(bool crashed) {
 
 void clearCrashes() {
   crashes = CrashState{kCrashMagic, 0};
+}
+
+void appendHistory(const std::string& line) {
+  Preferences prefs;
+  if (!prefs.begin(kHistoryNamespace, false)) return;
+  const uint32_t written = prefs.getUInt(kHistoryCountKey, 0);
+  // The line first, then the count: a wake cut short leaves the ring as it was.
+  if (prefs.putString(historyKey(historySlot(written)).c_str(), line.c_str()) == line.size()) {
+    prefs.putUInt(kHistoryCountKey, written + 1);
+  } else {
+    dlog("history: not saved (NVS full)");
+  }
+  prefs.end();
+}
+
+void forEachHistory(const std::function<void(const std::string&)>& visit) {
+  Preferences prefs;
+  if (!prefs.begin(kHistoryNamespace, true)) return;
+  for (size_t slot : historyOrder(prefs.getUInt(kHistoryCountKey, 0))) {
+    String line = prefs.getString(historyKey(slot).c_str(), "");
+    if (line.length() > 0) visit(line.c_str());
+  }
+  prefs.end();
 }
 
 }  // namespace dither

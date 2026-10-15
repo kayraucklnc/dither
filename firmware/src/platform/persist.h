@@ -4,6 +4,8 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
+#include <string>
 
 #include "../runtime/cache_codec.h"
 
@@ -28,5 +30,11 @@ uint32_t countWake();
 uint32_t recordReset(bool crashed);
 // A wake finished: the run of crashes is over.
 void clearCrashes();
+
+// The wake history (runtime/history.h), in its own NVS namespace so it
+// survives power loss and a newly flashed design.
+void appendHistory(const std::string& line);
+// Oldest first.
+void forEachHistory(const std::function<void(const std::string&)>& visit);
 
 }  // namespace dither
