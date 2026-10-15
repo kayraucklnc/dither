@@ -45,7 +45,7 @@ const NAMES = [
   "battery-charging", "wifi", "wifi-off", "trending-up", "trending-down", "arrow-up",
   "arrow-down", "bitcoin", "dollar-sign", "euro", "chart-line", "heart", "star",
   "check", "x", "circle-alert", "info", "music", "coffee", "book-open", "quote",
-  "gift", "cake", "map-pin", "sparkles",
+  "gift", "cake", "map-pin", "sparkles", "leaf", "flower-2", "trees", "wheat", "sprout", "haze",
 ];
 
 // Aircraft seen from above, nose up, one per kind, each turned to 16

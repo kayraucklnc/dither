@@ -1,6 +1,7 @@
 // Every extension Dither ships. Adding one is adding a folder and a line here.
 
 import type { Extension } from "./api";
+import airQuality from "./air-quality";
 import aircraft from "./aircraft";
 import clock from "./clock";
 import countdown from "./countdown";
@@ -18,5 +19,5 @@ import webPage from "./web-page";
 import webValue from "./web-value";
 
 export const EXTENSIONS: readonly Extension[] = [
-  clock, date, weather, googleCalendar, trenord, aircraft, text, messages, countdown, picture, stripe, crypto, webValue, webPage, status,
+  clock, date, weather, airQuality, googleCalendar, trenord, aircraft, text, messages, countdown, picture, stripe, crypto, webValue, webPage, status,
 ] as unknown as Extension[];

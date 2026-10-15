@@ -38,7 +38,7 @@ function write(name: string, blob: Uint8Array, runtime: Runtime, values: Record<
 const fonts = await loadFonts();
 const deps = { library: nodeLibrary, fonts, picture: async () => null, boardPanel: () => ({ width: 800, height: 480 }) };
 
-for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "starter-showcase", "primitives", "text-and-formats", "chart-labels", "aircraft", "aircraft-sky"]) {
+for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "starter-showcase", "primitives", "text-and-formats", "chart-labels", "air-quality", "air-quality-no-pollen", "air-quality-quiet", "aircraft", "aircraft-sky"]) {
   rmSync(`${root}${dir}`, { recursive: true, force: true });
 }
 
@@ -165,6 +165,26 @@ for (const s of STARTERS.filter((x) => x.id !== "blank")) {
     [`${st.now}.total`]: 128450, [`${st.now}.count`]: 23,
   };
   write("revenue", c.blob, c.runtime, values);
+}
+
+// Air quality: band steps, level bars, a 24-hour chart, pollen dots — and a place with no pollen.
+for (const [name, timezone, at, pollen] of [
+  ["air-quality", "Europe/Rome", place, true],
+  ["air-quality-no-pollen", "America/New_York", { name: "New York", latitude: 40.71, longitude: -74 }, false],
+  ["air-quality-quiet", "Europe/Istanbul", { name: "Istanbul", latitude: 41.01, longitude: 28.98 }, 0],
+] as const) {
+  const project = createProject({ starter: "blank", timezone, language: "en", units: "metric", place: at });
+  const aq = (id: string, x: number, y: number, w: number, h: number, frame: "none" | "outline" | "inverted" = "none") =>
+    ({ id, type: "air-quality", x, y, w, h, frame, settings: {} });
+  project.screens[0].widgets = [aq("all", 0, 0, 11, 12), aq("uv", 11, 0, 9, 6, "outline"), aq("air", 11, 7, 9, 3), aq("strip", 11, 10, 9, 2, "inverted")];
+  const c = await compile(project, deps);
+  const values: Record<string, Value> = { ...DEVICE };
+  for (const src of c.sources) {
+    // false: no pollen forecast at all; 0: one between seasons, every count under Low.
+    for (const [k, v] of src.sample) values[k] = pollen !== true && /\.(alder|birch|olive|grass|mugwort|ragweed)$/.test(k) ? (pollen === 0 ? 0.2 : null) : v;
+    Object.assign(values, { [`${src.source.id}._ok`]: true, [`${src.source.id}._age`]: 20 });
+  }
+  write(name, c.blob, c.runtime, values);
 }
 
 // Aircraft: positional arrays, a sorted merge, a radar of nested conditions, hands by heading.
