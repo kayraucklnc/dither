@@ -23,6 +23,8 @@ TEST(placeholders_expand) {
            std::string("https://x/?t=2026-07-01T14%3A00%3A00%2B02%3A00"));
   CHECK_EQ(expand("{{now|YYYY-MM-DDTHH:mm:ssZ}}", false, kNow), std::string("2026-07-01T14:00:00+02:00"));
   CHECK_EQ(expand("{{now+86400|YYYY-MM-DD}}/{{now-3600|HH}}", false, kNow), std::string("2026-07-02/13"));
+  // Without a pattern, an offset moves the Unix seconds.
+  CHECK_EQ(expand("t={{now-2700}},{{now+300}}", false, kNow), std::string("t=1782904500,1782907500"));
   CHECK_EQ(expand("{{now|dddd D MMMM}}", true, kNow), std::string("Wednesday%201%20July"));
   CHECK_EQ(expand("{{now|[at] HH}}", false, kNow), std::string("at 14"));
   // Across the spring change: 01:59:59 CET plus one second is 03:00 CEST.
@@ -30,7 +32,7 @@ TEST(placeholders_expand) {
 }
 
 TEST(placeholders_leave_other_braces_alone) {
-  const char* const literal[] = {"{{nowx}}", "{{now+5}}", "{{ now }}", "{{foo}}", "{{now|HH", "{", "}}{{", "{{now-|HH}}",
+  const char* const literal[] = {"{{nowx}}", "{{now +5}}", "{{ now }}", "{{foo}}", "{{now|HH", "{", "}}{{", "{{now-|HH}}",
                                  "{{now+12345678901|HH}}"};
   for (const char* s : literal) {
     CHECK_EQ(expand(s, true, kNow), std::string(s));

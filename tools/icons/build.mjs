@@ -45,7 +45,7 @@ const NAMES = [
   "battery-charging", "wifi", "wifi-off", "trending-up", "trending-down", "arrow-up",
   "arrow-down", "bitcoin", "dollar-sign", "euro", "chart-line", "heart", "star",
   "check", "x", "circle-alert", "info", "music", "coffee", "book-open", "quote",
-  "gift", "cake", "map-pin", "sparkles", "leaf", "flower-2", "trees", "wheat", "sprout", "haze",
+  "gift", "cake", "map-pin", "sparkles", "leaf", "flower-2", "trees", "wheat", "sprout", "haze", "satellite", "gauge", "navigation", "orbit",
 ];
 
 // Aircraft seen from above, nose up, one per kind, each turned to 16
@@ -74,9 +74,18 @@ NAMES.push(...Object.keys(ROTATED));
 const MODELLED = {};
 for (const kind of KINDS_3D) for (const deg of HEADINGS) MODELLED[`${kind}-3d-${Math.floor(deg)}`] = [kind, deg];
 NAMES.push(...Object.keys(MODELLED));
+// The space station face on: the long truss, four pairs of solar wings, the
+// modules down the middle, a radiator either side of them.
+const DRAWN = {
+  iss: `<rect x=".5" y="11.3" width="23" height="1.4"/>` +
+    [1, 5.6, 14.6, 19.2].map((x) => `<rect x="${x}" y="3.6" width="3.8" height="7" rx=".2"/><rect x="${x}" y="13.4" width="3.8" height="7" rx=".2"/>`).join("") +
+    `<rect x="10.6" y="6.2" width="2.8" height="11.6" rx=".8"/><rect x="9.2" y="8.6" width="5.6" height="2" rx=".5"/><rect x="9.6" y="15" width="4.8" height="1.6" rx=".4"/>`,
+};
+NAMES.push(...Object.keys(DRAWN));
 
 async function loadSvg(name, size) {
   if (name in MODELLED) return obliqueSvg(...MODELLED[name], size);
+  if (name in DRAWN) return `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#000" stroke="none" stroke-width="0">${DRAWN[name]}</svg>`;
   if (name in ROTATED) {
     const [kind, deg] = ROTATED[name];
     return `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#000" stroke="none" stroke-width="0"><g transform="rotate(${deg} 12 12)">${AIRCRAFT[kind]}</g></svg>`;

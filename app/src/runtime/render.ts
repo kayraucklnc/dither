@@ -6,7 +6,7 @@ import { formatValue, type FormatContext } from "./format";
 import { Framebuffer, circle, drawBitmap, fillRect, line, roundAway, strokeRect } from "./framebuffer";
 import { drawText, layout, width } from "./text";
 import { parseZone } from "./tz";
-import type { Element, ElementOf, Part, Placement, Runtime, Values } from "./types";
+import type { Element, ElementOf, GlobePlacement, Part, Placement, Runtime, Values } from "./types";
 
 export class AssetStore {
   private cache = new Map<number, Asset>();
@@ -187,9 +187,42 @@ function drawSeries(el: ElementOf<"chart">, series: number[], ctx: Ctx, ink: boo
 
 const MAX_GROUP_DEPTH = 8;
 
+const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+
+/** Where a point of the Earth lands on an orthographic globe, if on the side asked for. */
+function globePlacement(at: GlobePlacement, ctx: Ctx): [number, number] | null {
+  const vlat = num(ctx.values.get(at.lat));
+  const vlon = num(ctx.values.get(at.lon));
+  const g = at.globe;
+  const c = at.c;
+  if (vlat === null || vlon === null || !Array.isArray(g) || !isNum(g[0]) || !isNum(g[1]) || !Array.isArray(c) || !isNum(c[0]) || !isNum(c[1]) || !isNum(at.r)) return null;
+  const phi = (vlat * Math.PI) / 180;
+  const lam = (vlon * Math.PI) / 180;
+  const phi0 = (g[0] * Math.PI) / 180;
+  const lam0 = (g[1] * Math.PI) / 180;
+  const d = lam - lam0;
+  const [sp, cp, sp0, cp0, sd, cd] = [Math.sin(phi), Math.cos(phi), Math.sin(phi0), Math.cos(phi0), Math.sin(d), Math.cos(d)];
+  // Each step its own operation, as the spec writes them, so both sides round alike.
+  const u1 = sp0 * sp;
+  const u2 = cp0 * cp;
+  const u3 = u2 * cd;
+  const cosc = u1 + u3;
+  const side = at.side ?? "any";
+  if ((side === "front" && !(cosc >= 0)) || (side === "back" && !(cosc < 0))) return null;
+  const x = cp * sd;
+  const rx = at.r * x;
+  const t1 = cp0 * sp;
+  const t2 = sp0 * cp;
+  const t3 = t2 * cd;
+  const y = t1 - t3;
+  const ry = at.r * y;
+  return [Math.trunc(c[0]) + roundAway(rx), Math.trunc(c[1]) - roundAway(ry)];
+}
+
 /** Where a placed group lands: each value's place in its range, scaled onto the box. */
 function placement(at: Placement, ctx: Ctx): [number, number] | null {
   if (typeof at !== "object" || at === null) return null;
+  if ("globe" in at) return globePlacement(at, ctx);
   const axis = (ref: string, range: unknown, origin: unknown, size: unknown): number | null => {
     const v = num(ctx.values.get(ref));
     if (v === null || !Array.isArray(range) || typeof range[0] !== "number" || typeof range[1] !== "number") return null;

@@ -38,13 +38,25 @@ export interface Format {
 }
 
 /** A group placed by two values: each falls within its range and lands on the box. */
-export interface Placement {
+export interface BoxPlacement {
   x: string;
   y: string;
   box: [number, number, number, number];
   xs: [number, number];
   ys: [number, number];
 }
+
+/** A point of the Earth on an orthographic globe: docs/format.md "globe-placed group". */
+export interface GlobePlacement {
+  lat: string;
+  lon: string;
+  globe: [number, number];
+  c: [number, number];
+  r: number;
+  side?: "front" | "back" | "any";
+}
+
+export type Placement = BoxPlacement | GlobePlacement;
 
 export type Part = string | { v: string; f?: Format } | { k: Value; f?: Format };
 

@@ -1,9 +1,9 @@
 // The `Draw` an extension is handed: its calls become runtime elements, offset
 // into the widget's box and coloured for its frame.
 
-import type { Box, Content, Draw, PictureOptions, Placement, TextOptions } from "@/extensions/api";
+import type { Box, Content, Draw, GlobePlacement, PictureOptions, Placement, TextOptions } from "@/extensions/api";
 import { FONT_SIZES, fontInfo, iconSizeFor, type AssetLibrary, type FontInfo, type Weight } from "@/assets/library";
-import type { Font } from "@/runtime/assets";
+import { encodeBitmap, type Font } from "@/runtime/assets";
 import { layout, shape, width } from "@/runtime/text";
 import type { Condition, Element, Format, Part, Value } from "@/runtime/types";
 import type { AssetTable } from "./asset-table";
@@ -208,7 +208,14 @@ export class ElementDraw implements Draw {
     this.push({ t: "bitmap", x: b.x, y: b.y, a: index });
   }
 
+  bitmap(box: Box, key: string, ink: (x: number, y: number) => boolean): void {
+    const b = this.at(box);
+    const index = this.deps.assets.add(`bitmap:${key}:${b.w}x${b.h}`, async () => encodeBitmap(b.w, b.h, false, ink));
+    this.push({ t: "bitmap", x: b.x, y: b.y, a: index, ...this.color() });
+  }
+
   place(at: Placement, fn: () => void): void {
+    if ("globe" in at) return this.placeOnGlobe(at, fn);
     const box = this.at(at.box);
     const parent = this.target;
     const origin = this.origin;
@@ -225,6 +232,33 @@ export class ElementDraw implements Draw {
     if (els.length) {
       parent.push({ t: "group", at: { x: this.ref(at.x), y: this.ref(at.y), box: [box.x, box.y, box.w, box.h], xs: at.xs, ys: at.ys }, els });
     }
+  }
+
+  private placeOnGlobe(at: GlobePlacement, fn: () => void): void {
+    const c = this.at({ x: at.centre.x, y: at.centre.y, w: 0, h: 0 });
+    const els = this.inside(fn);
+    if (!els.length) return;
+    this.push({
+      t: "group",
+      at: { lat: this.ref(at.lat), lon: this.ref(at.lon), globe: at.globe, c: [c.x, c.y], r: Math.round(at.r), ...(at.side && at.side !== "any" ? { side: at.side } : {}) },
+      els,
+    });
+  }
+
+  /** What `fn` draws, around (0, 0), collected rather than drawn. */
+  private inside(fn: () => void): Element[] {
+    const parent = this.target;
+    const origin = this.origin;
+    const els: Element[] = [];
+    this.target = els;
+    this.origin = { x: 0, y: 0 };
+    try {
+      fn();
+    } finally {
+      this.target = parent;
+      this.origin = origin;
+    }
+    return els;
   }
 
   when(condition: Condition, fn: () => void): void {
