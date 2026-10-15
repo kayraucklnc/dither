@@ -298,43 +298,48 @@ function radar(d: Draw, s: Settings, env: Env, box: Box) {
   const km = radiusOf(s);
   const b = boxAround(placeOf(s, env)!, km);
   const span = Math.min(box.w, box.h);
-  const x0 = box.x + Math.round((box.w - span) / 2);
-  const y0 = box.y + Math.round((box.h - span) / 2);
-  const cx = x0 + Math.round(span / 2);
-  const cy = y0 + Math.round(span / 2);
-  const R = Math.round(span / 2);
+  const cx = box.x + Math.round(box.w / 2);
+  const cy = box.y + Math.round(box.h / 2);
   const small = Math.max(13, Math.min(16, Math.round(span / 30)));
+  // The compass points sit outside the scope, like a bezel, so nothing cuts the ring.
+  const R = Math.round(span / 2) - small - 6;
   const iconS = span >= 400 ? 32 : span >= 220 ? 24 : 16;
-  const px = (lon: number) => x0 + ((lon - b.lomin) / (b.lomax - b.lomin)) * span;
-  const py = (lat: number) => y0 + ((b.lamax - lat) / (b.lamax - b.lamin)) * span;
+  // The outer ring is the radius asked for: aircraft are placed within its square.
+  const plot = { x: cx - R, y: cy - R, w: R * 2, h: R * 2 };
+  const px = (lon: number) => plot.x + ((lon - b.lomin) / (b.lomax - b.lomin)) * plot.w;
+  const py = (lat: number) => plot.y + ((b.lamax - lat) / (b.lamax - b.lamin)) * plot.h;
 
-  // The ground: range rings, compass points, airports and home.
-  d.circle(cx, cy, R - 1, { fill: false, stroke: 2 });
-  d.circle(cx, cy, Math.round(R / 2), { fill: false, stroke: 1 });
-  d.line(cx, y0 + small, cx, y0 + span - small, { width: 1 });
-  d.line(x0 + small, cy, x0 + span - small, cy, { width: 1 });
-  const tag = (text: string, x: number, y: number, align: "left" | "center" | "right" = "center", weight: 400 | 700 = 700) => {
-    const tw = d.measure(text, small, weight) + 6;
-    const tx = align === "center" ? x - tw / 2 : align === "right" ? x - tw : x;
-    const th = d.lineHeight(small, weight);
-    d.rect({ x: tx, y: y - th / 2, w: tw, h: th }, { white: true });
-    d.text(text, { x: tx, y: y - th / 2, w: tw, h: th, size: small, weight, align: "center" });
-  };
-  tag("N", cx, y0 + 2);
-  tag("S", cx, y0 + span - 2);
-  tag("W", x0 + 8, cy);
-  tag("E", x0 + span - 8, cy);
-  // Each ring's distance where it crosses the line south, clear of the compass points.
-  tag(`${Math.round(km / 2)} km`, cx + 4, cy + Math.round(R / 2), "left", 400);
-  tag(`${km} km`, cx + 4, cy + R - Math.round(small * 1.8), "left", 400);
+  // The scope: a bold rim, range rings at thirds, crosshairs, and ticks every 10°.
+  d.circle(cx, cy, R, { fill: false, stroke: 3 });
+  for (const f of [1 / 3, 2 / 3]) d.circle(cx, cy, Math.round(R * f), { fill: false, stroke: 1 });
+  d.line(cx, cy - R, cx, cy + R, { width: 1 });
+  d.line(cx - R, cy, cx + R, cy, { width: 1 });
+  for (let deg = 0; deg < 360; deg += 10) {
+    const a = (deg * Math.PI) / 180;
+    const len = deg % 90 === 0 ? 0 : deg % 30 === 0 ? Math.round(R * 0.07) : Math.round(R * 0.035);
+    if (!len) continue;
+    d.line(cx + Math.sin(a) * (R - len), cy - Math.cos(a) * (R - len), cx + Math.sin(a) * R, cy - Math.cos(a) * R, { width: deg % 30 === 0 ? 2 : 1 });
+  }
+  const th = d.lineHeight(small, 700);
+  const letter = (t: string, x: number, y: number) => d.text(t, { x: x - th, y: y - th / 2, w: th * 2, h: th, size: small, weight: 700, align: "center" });
+  letter("N", cx, cy - R - th / 2 - 2);
+  letter("S", cx, cy + R + th / 2 + 2);
+  letter("W", cx - R - th / 2 - 2, cy);
+  letter("E", cx + R + th / 2 + 2, cy);
+  // Each ring's distance where it crosses the north axis, just inside and to the right.
+  const thirds = [Math.round(km / 3), Math.round((km * 2) / 3), km];
+  thirds.forEach((dist, j) => {
+    const ry = cy - Math.round((R * (j + 1)) / 3);
+    const text = `${dist} km`;
+    d.text(text, { x: cx + 4, y: ry + 2, w: d.measure(text, small - 1) + 4, h: th, size: small - 1 });
+  });
   if (s.airports !== false) {
     for (const a of airportsIn(b).slice(0, 6)) {
       const ax = Math.round(px(a.lon));
       const ay = Math.round(py(a.lat));
       const m = a.large ? 5 : 4;
-      d.rect({ x: ax - m, y: ay - m, w: m * 2, h: m * 2 }, { white: true });
       d.rect({ x: ax - m, y: ay - m, w: m * 2, h: m * 2 }, { fill: false, stroke: 2 });
-      tag(a.code, ax + m + 2, ay, "left", a.large ? 700 : 400);
+      d.text(a.code, { x: ax + m + 3, y: ay - th / 2, w: d.measure(a.code, small, 700) + 4, h: th, size: small, weight: a.large ? 700 : 400 });
     }
   }
   d.icon("house", { x: cx - 8, y: cy - 8, w: 16, h: 16 });
@@ -342,14 +347,12 @@ function radar(d: Draw, s: Settings, env: Env, box: Box) {
   // The aircraft, highest first so the lowest are drawn on top.
   const labelled = 4;
   const labelW = d.measure("WZZ1234 88.8k", small, 700) + 8;
-  const th = d.lineHeight(small, 700);
   const half = Math.round(iconS / 2);
   for (let i = SLOTS - 1; i >= 0; i--) {
-    d.place({ x: k("lon", i), y: k("lat", i), box: { x: x0, y: y0, w: span, h: span }, xs: [b.lomin, b.lomax], ys: [b.lamax, b.lamin] }, () => {
+    d.place({ x: k("lon", i), y: k("lat", i), box: plot, xs: [b.lomin, b.lomax], ys: [b.lamax, b.lamin] }, () => {
       d.when(emergency(i), () => d.circle(0, 0, half + 5, { fill: false, stroke: 3 }));
       craft(d, i, { x: -half, y: -half, w: iconS, h: iconS });
       if (i < labelled) {
-        d.rect({ x: -labelW / 2, y: half + 1, w: labelW, h: th }, { white: true });
         d.text([d.value(k("cs", i), { fallback: "?" }), " ", d.value(k("alt", i), { ...shortAltitude(u), fallback: "" })],
           { x: -labelW / 2, y: half + 1, w: labelW, h: th, size: small, weight: 700, align: "center" });
       }

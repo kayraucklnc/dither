@@ -52,18 +52,18 @@ const NAMES = [
 // rounded down to a whole degree. Drawn here rather than taken from Lucide,
 // whose aircraft are side views or a single airliner.
 const AIRCRAFT = {
-  // An airliner: swept wings, a tailplane.
-  jet: `<path d="M12 1.5c.9 0 1.4 1 1.4 2.4V9l8.6 4.6v2l-8.6-2.4v4.6l2.8 2.2v1.6L12 20.6l-4.2 1v-1.6l2.8-2.2v-4.6L2 15.6v-2L10.6 9V3.9c0-1.4.5-2.4 1.4-2.4z"/>`,
-  // A wide-body: a fatter fuselage, longer wings, four engines.
-  heavy: `<path d="M12 .8c1.3 0 1.9 1.2 1.9 2.8v4.9l9.6 5.4v2.3l-9.6-2.7v5l3.3 2.4v1.6L12 21.2l-5.2 1.3v-1.6l3.3-2.4v-5L.5 16.2v-2.3l9.6-5.4V3.6C10.1 2 10.7.8 12 .8z"/><rect x="16.2" y="11.6" width="1.6" height="3" rx=".8"/><rect x="19.4" y="13.4" width="1.6" height="2.6" rx=".8"/><rect x="6.2" y="11.6" width="1.6" height="3" rx=".8"/><rect x="3" y="13.4" width="1.6" height="2.6" rx=".8"/>`,
-  // A light propeller plane: straight wings, a propeller across the nose.
-  prop: `<rect x="11" y="3.5" width="2" height="17" rx="1"/><rect x="2" y="7.5" width="20" height="3.2" rx="1"/><rect x="7.5" y="18" width="9" height="2.4" rx="1"/><rect x="8" y="1.6" width="8" height="1.6" rx=".8"/>`,
-  // A helicopter: the rotor as a ring, the cabin, the tail boom and its rotor.
-  heli: `<circle cx="12" cy="9.5" r="8" fill="none" stroke="#000" stroke-width="1.6"/><ellipse cx="12" cy="9.5" rx="3.2" ry="4.6"/><rect x="11.2" y="13" width="1.6" height="9" rx=".8"/><rect x="9" y="20.4" width="6" height="1.6" rx=".8"/>`,
-  // A glider: long thin wings, a T tail.
-  glider: `<rect x="11.2" y="3" width="1.6" height="18" rx=".8"/><rect x=".5" y="8.2" width="23" height="1.8" rx=".9"/><rect x="9" y="19.2" width="6" height="1.5" rx=".75"/>`,
-  // Fast and military: a delta.
-  fast: `<path d="M12 1l2 6 8 12.5-7.4-1.4L12 22l-2.6-3.9L2 19.5 10 7z"/>`,
+  // An airliner: a slim fuselage, swept wings with an engine under each, a swept tailplane.
+  jet: `<path d="M12 1c.8 0 1.2 1 1.2 2.4v6.2l9.2 4.7v1.2l-9.2-1.9-.1 5.2 4.3 2.6v1L12.9 21.5 12 22.8l-.9-1.3-4.5.9v-1l4.3-2.6-.1-5.2-9.2 1.9v-1.2l9.2-4.7V3.4C10.8 2 11.2 1 12 1z"/><rect x="6.3" y="10.6" width="1.8" height="3" rx=".9"/><rect x="15.9" y="10.6" width="1.8" height="3" rx=".9"/>`,
+  // A wide-body: a longer, wider fuselage, a longer span, four engines.
+  heavy: `<path d="M12 .5c1 0 1.5 1.3 1.5 3.1v5.2l9.9 5.8v1.4l-9.9-2.8-.1 5.6 4.8 2.8v1l-5-1.1L12 23.3l-1.2-1.8-5 1.1v-1l4.8-2.8-.1-5.6-9.9 2.8v-1.4l9.9-5.8V3.6C10.5 1.8 11 .5 12 .5z"/><rect x="7.9" y="9.9" width="1.7" height="2.9" rx=".85"/><rect x="4.9" y="11.6" width="1.7" height="2.7" rx=".85"/><rect x="14.4" y="9.9" width="1.7" height="2.9" rx=".85"/><rect x="17.4" y="11.6" width="1.7" height="2.7" rx=".85"/>`,
+  // A light propeller plane: straight wings with rounded tips, a propeller and spinner.
+  prop: `<path d="M11 4.4c0-1 .4-1.6 1-1.6s1 .6 1 1.6l-.2 13.2-.3 3.9h-1l-.3-3.9z"/><rect x="1" y="7.2" width="22" height="3.2" rx="1.6"/><rect x="7.4" y="18.4" width="9.2" height="2.2" rx="1.1"/><rect x="7.8" y="1.2" width="8.4" height="1.4" rx=".7"/>`,
+  // A helicopter: four rotor blades crossing over the cabin, the tail boom and its rotor.
+  heli: `<rect x="11.3" y=".6" width="1.4" height="19.4" rx=".7" transform="rotate(45 12 10.3)"/><rect x="11.3" y=".6" width="1.4" height="19.4" rx=".7" transform="rotate(-45 12 10.3)"/><ellipse cx="12" cy="10.3" rx="3" ry="4.4"/><rect x="11.3" y="13.5" width="1.4" height="8.4" rx=".7"/><rect x="9.4" y="20.6" width="5.2" height="1.4" rx=".7"/>`,
+  // A glider: long tapered wings, a slender fuselage, a T tail.
+  glider: `<path d="M12 3c.6 0 .9.6.9 1.6l-.1 3.6 10.9.8v1.1l-10.9.9-.3 9.6h-1l-.3-9.6L.3 10.1V9l10.9-.8-.1-3.6C11.1 3.6 11.4 3 12 3z"/><rect x="8.6" y="19.6" width="6.8" height="1.4" rx=".7"/>`,
+  // Fast and military: a pointed nose, sharply swept wings, tailplanes.
+  fast: `<path d="M12 .8l1 3.4.4 4.3 8.1 7v1.5l-7.9-1.4.6 3 2.8 2.6v1.2l-4.2-1-.8 1.4-.8-1.4-4.2 1v-1.2l2.8-2.6.6-3-7.9 1.4v-1.5l8.1-7 .4-4.3z"/>`,
 };
 const HEADINGS = Array.from({ length: 16 }, (_, i) => i * 22.5);
 const ROTATED = {};
