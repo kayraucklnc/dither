@@ -1,6 +1,7 @@
 #include "merge.h"
 
 #include <algorithm>
+#include <cmath>
 
 #include "time_format.h"
 
@@ -17,13 +18,24 @@ std::vector<std::string> strings(JsonView list) {
 
 struct Record {
   int from = 0;                 // position in the spec's `from`
-  std::vector<Value> fields;    // in the spec's field order
+  std::vector<Value> fields;    // in the spec's field order, then dist and brg with geo
   std::optional<double> when;   // the sort instant
 };
 
+// With geo, dist and brg follow the spec's own fields.
 int fieldIndex(const MergeSpec& m, const std::string& name) {
   auto it = std::find(m.fields.begin(), m.fields.end(), name);
-  return it == m.fields.end() ? -1 : static_cast<int>(it - m.fields.begin());
+  if (it != m.fields.end()) return static_cast<int>(it - m.fields.begin());
+  if (m.geo && name == "dist") return static_cast<int>(m.fields.size());
+  if (m.geo && name == "brg") return static_cast<int>(m.fields.size()) + 1;
+  return -1;
+}
+
+bool finite(const Value& v) { return v.isNumber() && std::isfinite(v.asNumber()); }
+
+double roundTo(double x, int d) {
+  const double scale = d == 1 ? 10.0 : 100.0;
+  return std::round(x * scale) / scale;  // std::round is half away from zero
 }
 
 const Value& field(const Record& r, int index) {
@@ -45,7 +57,14 @@ std::vector<Record> collect(const MergeSpec& m, const ValueStore& values) {
         r.fields.push_back(values.get(m.from[pos] + "." + f + std::to_string(n)));
         any = any || !r.fields.back().isNull();
       }
-      if (any) out.push_back(std::move(r));
+      if (!any) continue;
+      if (m.geo) {
+        const GeoPoint p = geoWhere(*m.geo, field(r, fieldIndex(m, m.geo->lat)), field(r, fieldIndex(m, m.geo->lon)));
+        r.fields.push_back(p.dist);
+        r.fields.push_back(p.brg);
+        if (p.dist.isNumber() && m.geo->within && p.dist.asNumber() > *m.geo->within) continue;
+      }
+      out.push_back(std::move(r));
     }
   }
   return out;
@@ -97,6 +116,10 @@ void applyOne(const MergeSpec& m, ValueStore& values, std::optional<int64_t> now
     for (size_t f = 0; f < m.fields.size(); ++f) {
       values.set(m.id + "." + m.fields[f] + suffix, r ? r->fields[f] : Value());
     }
+    if (m.geo) {
+      values.set(m.id + ".dist" + suffix, r ? r->fields[m.fields.size()] : Value());
+      values.set(m.id + ".brg" + suffix, r ? r->fields[m.fields.size() + 1] : Value());
+    }
     values.set(m.id + ".from" + suffix, r ? Value::number(r->from) : Value());
   }
 }
@@ -114,9 +137,39 @@ std::vector<MergeSpec> parseMerges(JsonView merges) {
     spec.sort = strings(m["sort"]);
     spec.unique = strings(m["unique"]);
     spec.count = std::clamp(m["count"].integer(0), 0, kMaxMergeCount);
+    if (JsonView g = m["geo"]; g.exists()) {
+      GeoSpec geo;
+      geo.lat = std::string(g["lat"].string());
+      geo.lon = std::string(g["lon"].string());
+      JsonView at = g["at"];
+      geo.valid = at.isArray() && at[0].isNumber() && at[1].isNumber() && g["kx"].isNumber() && g["ky"].isNumber();
+      if (geo.valid) {
+        geo.atLat = at[0].number();
+        geo.atLon = at[1].number();
+        geo.kx = g["kx"].number();
+        geo.ky = g["ky"].number();
+      }
+      if (g["within"].isNumber()) geo.within = g["within"].number();
+      spec.geo = std::move(geo);
+    }
     if (!spec.id.empty()) out.push_back(std::move(spec));
   }
   return out;
+}
+
+GeoPoint geoWhere(const GeoSpec& geo, const Value& lat, const Value& lon) {
+  if (!geo.valid || !finite(lat) || !finite(lon)) return {};
+  const double dx = (lon.asNumber() - geo.atLon) * geo.kx;
+  const double dy = (lat.asNumber() - geo.atLat) * geo.ky;
+  // Separate statements, so no compiler fuses them into one multiply-add.
+  const double xx = dx * dx;
+  const double yy = dy * dy;
+  const double sum = xx + yy;
+  double deg = std::atan2(dx, dy) * 180.0 / 3.14159265358979323846;
+  if (deg < 0) deg += 360.0;
+  double brg = roundTo(deg, 1);
+  if (brg == 360.0) brg = 0.0;
+  return {Value::number(roundTo(std::sqrt(sum), 2)), Value::number(brg)};
 }
 
 void applyMerges(const std::vector<MergeSpec>& merges, ValueStore& values, std::optional<int64_t> now,

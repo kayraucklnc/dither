@@ -156,3 +156,32 @@ TEST(merges_run_in_order_and_parse_defensively) {
   CHECK_EQ(merges[0].count, kMaxMergeCount);
   CHECK_EQ(merges[0].fields.size(), size_t{1});
 }
+
+TEST(merge_geo_distance_bearing_and_within) {
+  ValueStore v;
+  auto plane = [&](int n, const char* cs, double lat, double lon) {
+    v.set("a.cs" + std::to_string(n), Value::string(cs));
+    v.set("a.lat" + std::to_string(n), Value::number(lat));
+    v.set("a.lon" + std::to_string(n), Value::number(lon));
+  };
+  plane(0, "far", 45.66, 9.19);   // 22.26 km north
+  plane(1, "east", 45.46, 9.29);  // 7.81 km east
+  plane(2, "out", 45.46, 9.69);   // 39 km: left out
+  v.set("a.cs3", Value::string("nowhere"));  // no position: kept, sorted last
+  plane(4, "sw", 45.41, 9.14);
+  applyMerges({spec(R"({"id":"m0","from":["a"],"fields":["cs","lat","lon"],"count":5,"sort":["dist"],)"
+                    R"("geo":{"lat":"lat","lon":"lon","at":[45.46,9.19],"kx":78.08,"ky":111.32,"within":25}})")},
+              v, kNow, cet());
+  CHECK(v.get("m0.cs0") == Value::string("sw"));
+  CHECK(v.get("m0.cs1") == Value::string("east"));
+  CHECK(v.get("m0.cs2") == Value::string("far"));
+  CHECK(v.get("m0.cs3") == Value::string("nowhere"));
+  CHECK(v.get("m0.cs4").isNull());
+  CHECK(v.get("m0.dist1") == Value::number(7.81));
+  CHECK(v.get("m0.brg1") == Value::number(90));
+  CHECK(v.get("m0.dist2") == Value::number(22.26));
+  CHECK(v.get("m0.brg2") == Value::number(0));
+  CHECK(v.get("m0.dist0") == Value::number(6.8));
+  CHECK(v.get("m0.brg0") == Value::number(215));
+  CHECK(v.get("m0.dist3").isNull() && v.get("m0.brg3").isNull());
+}

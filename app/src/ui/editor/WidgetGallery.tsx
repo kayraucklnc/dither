@@ -32,6 +32,7 @@ const LABEL = Object.fromEntries(CATEGORIES.map((c) => [c.id, c.label])) as Reco
 const PREVIEW_ACCOUNTS: Project["accounts"] = {
   google: [{ id: "preview", clientId: "preview", clientSecret: "preview", refreshToken: "preview", email: "", label: "Personal" }],
   stripe: { key: "rk_test_preview", name: "" },
+  opensky: null,
 };
 
 const ACCOUNT_NAMES: Record<string, string> = { google: "Google", stripe: "Stripe" };

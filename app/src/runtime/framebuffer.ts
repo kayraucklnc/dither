@@ -13,10 +13,24 @@ export interface Clip {
 export class Framebuffer {
   readonly stride: number;
   readonly bits: Uint8Array;
+  /** The panel's edges in this view's coordinates: a moved view (`moved`) draws at x + dx. */
+  readonly x0: number;
+  readonly y0: number;
+  readonly x1: number;
+  readonly y1: number;
 
-  constructor(readonly width: number, readonly height: number) {
+  constructor(readonly width: number, readonly height: number, bits?: Uint8Array, private dx = 0, private dy = 0) {
     this.stride = Math.ceil(width / 8);
-    this.bits = new Uint8Array(this.stride * height);
+    this.bits = bits ?? new Uint8Array(this.stride * height);
+    this.x0 = -dx;
+    this.y0 = -dy;
+    this.x1 = width - dx;
+    this.y1 = height - dy;
+  }
+
+  /** The same pixels, with everything drawn moved by (dx, dy): a placed group. */
+  moved(dx: number, dy: number): Framebuffer {
+    return new Framebuffer(this.width, this.height, this.bits, this.dx + dx, this.dy + dy);
   }
 
   get(x: number, y: number): boolean {
@@ -24,8 +38,10 @@ export class Framebuffer {
   }
 
   set(x: number, y: number, ink: boolean, clip?: Clip): void {
-    if (x < 0 || y < 0 || x >= this.width || y >= this.height) return;
     if (clip && (x < clip.x0 || y < clip.y0 || x >= clip.x1 || y >= clip.y1)) return;
+    x += this.dx;
+    y += this.dy;
+    if (x < 0 || y < 0 || x >= this.width || y >= this.height) return;
     const i = y * this.stride + (x >> 3);
     const bit = 0x80 >> (x & 7);
     this.bits[i] = ink ? this.bits[i] | bit : this.bits[i] & ~bit;
@@ -50,8 +66,8 @@ const clampRadius = (r: number, w: number, h: number) => Math.max(0, Math.min(r,
 export function fillRect(fb: Framebuffer, x: number, y: number, w: number, h: number, r: number, ink: boolean): void {
   if (w <= 0 || h <= 0) return;
   const rr = clampRadius(r, w, h);
-  for (let py = Math.max(0, y); py < Math.min(fb.height, y + h); py++) {
-    for (let px = Math.max(0, x); px < Math.min(fb.width, x + w); px++) {
+  for (let py = Math.max(fb.y0, y); py < Math.min(fb.y1, y + h); py++) {
+    for (let px = Math.max(fb.x0, x); px < Math.min(fb.x1, x + w); px++) {
       if (inRoundedRect(px, py, x, y, w, h, rr)) fb.set(px, py, ink);
     }
   }
@@ -63,8 +79,8 @@ export function strokeRect(fb: Framebuffer, x: number, y: number, w: number, h: 
   const iw = w - 2 * s;
   const ih = h - 2 * s;
   const ir = clampRadius(Math.max(0, rr - s), iw, ih);
-  for (let py = Math.max(0, y); py < Math.min(fb.height, y + h); py++) {
-    for (let px = Math.max(0, x); px < Math.min(fb.width, x + w); px++) {
+  for (let py = Math.max(fb.y0, y); py < Math.min(fb.y1, y + h); py++) {
+    for (let px = Math.max(fb.x0, x); px < Math.min(fb.x1, x + w); px++) {
       if (!inRoundedRect(px, py, x, y, w, h, rr)) continue;
       const inner = iw > 0 && ih > 0 && inRoundedRect(px, py, x + s, y + s, iw, ih, ir);
       if (!inner) fb.set(px, py, ink);

@@ -29,3 +29,23 @@ describe("merges", () => {
     expect(v.get("m0.from1")).toBeNull();
   });
 });
+
+describe("merges with a place", () => {
+  it("knows how far and which way, sorts by it and leaves out the far ones", () => {
+    const v = new Map<string, Value>();
+    const plane = (n: number, cs: string, lat: number | null, lon: number | null) => {
+      v.set(`a.cs${n}`, cs);
+      v.set(`a.lat${n}`, lat);
+      v.set(`a.lon${n}`, lon);
+    };
+    plane(0, "far", 45.66, 9.19);
+    plane(1, "east", 45.46, 9.29);
+    plane(2, "out", 45.46, 9.69);
+    plane(3, "nowhere", null, null);
+    plane(4, "sw", 45.41, 9.14);
+    const geo = { lat: "lat", lon: "lon", at: [45.46, 9.19] as [number, number], kx: 78.08, ky: 111.32, within: 25 };
+    applyMerges([{ id: "m0", from: ["a"], fields: ["cs", "lat", "lon"], count: 5, sort: ["dist"], geo }], v, ctx);
+    expect([0, 1, 2, 3, 4].map((n) => v.get(`m0.cs${n}`))).toEqual(["sw", "east", "far", "nowhere", null]);
+    expect([0, 1, 2, 3].map((n) => [v.get(`m0.dist${n}`), v.get(`m0.brg${n}`)])).toEqual([[6.8, 215], [7.81, 90], [22.26, 0], [null, null]]);
+  });
+});

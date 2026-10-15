@@ -1,7 +1,7 @@
 // The `Draw` an extension is handed: its calls become runtime elements, offset
 // into the widget's box and coloured for its frame.
 
-import type { Box, Content, Draw, PictureOptions, TextOptions } from "@/extensions/api";
+import type { Box, Content, Draw, PictureOptions, Placement, TextOptions } from "@/extensions/api";
 import { FONT_SIZES, fontInfo, iconSizeFor, type AssetLibrary, type FontInfo, type Weight } from "@/assets/library";
 import type { Font } from "@/runtime/assets";
 import { layout, shape, width } from "@/runtime/text";
@@ -37,6 +37,7 @@ export class ElementDraw implements Draw {
   constructor(private deps: DrawDeps, private frame: WidgetFrame) {
     this.width = frame.box.w;
     this.height = frame.box.h;
+    this.origin = { x: frame.box.x, y: frame.box.y };
   }
 
   // ------------------------------------------------------------ helpers
@@ -62,8 +63,11 @@ export class ElementDraw implements Draw {
     this.target.push(el);
   }
 
+  /** Where coordinates start: the widget's corner, or a placed group's point. */
+  private origin: { x: number; y: number };
+
   private at(b: Box): Box {
-    return { x: this.frame.box.x + Math.round(b.x), y: this.frame.box.y + Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h) };
+    return { x: this.origin.x + Math.round(b.x), y: this.origin.y + Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h) };
   }
 
   private sourceRef(key: string): string {
@@ -202,6 +206,25 @@ export class ElementDraw implements Draw {
       return bytes;
     });
     this.push({ t: "bitmap", x: b.x, y: b.y, a: index });
+  }
+
+  place(at: Placement, fn: () => void): void {
+    const box = this.at(at.box);
+    const parent = this.target;
+    const origin = this.origin;
+    const els: Element[] = [];
+    this.target = els;
+    // Inside, coordinates are around the point the values pick, not the widget's corner.
+    this.origin = { x: 0, y: 0 };
+    try {
+      fn();
+    } finally {
+      this.target = parent;
+      this.origin = origin;
+    }
+    if (els.length) {
+      parent.push({ t: "group", at: { x: this.ref(at.x), y: this.ref(at.y), box: [box.x, box.y, box.w, box.h], xs: at.xs, ys: at.ys }, els });
+    }
   }
 
   when(condition: Condition, fn: () => void): void {

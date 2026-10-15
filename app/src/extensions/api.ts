@@ -7,7 +7,7 @@
 // arithmetic it likes about layout, and the firmware never needs to know it
 // exists.
 
-import type { Condition, Format, Part, Value } from "@/runtime/types";
+import type { Condition, Format, Geo, Part, Value } from "@/runtime/types";
 import type { AccountKind, Accounts, Place } from "@/project/schema";
 import type { Weight } from "@/assets/library";
 
@@ -77,6 +77,8 @@ export interface MergeSpec {
   skip?: string[];
   sort?: string[];
   unique?: string[];
+  /** Adds `dist` (km) and `brg` (degrees from north) to each record. */
+  geo?: Geo;
 }
 
 /** Something a rule can check, e.g. "Rain chance today". */
@@ -128,6 +130,18 @@ export interface PictureOptions {
   brightness?: number;
 }
 
+/**
+ * Where a placed group lands: the values of `x` and `y` (this widget's keys)
+ * within their ranges, scaled onto `box`. `ys: [north, south]` puts north up.
+ */
+export interface Placement {
+  x: string;
+  y: string;
+  box: Box;
+  xs: [number, number];
+  ys: [number, number];
+}
+
 export interface Draw {
   /** The widget's own box, origin at 0,0. Draw in these coordinates. */
   readonly width: number;
@@ -163,6 +177,12 @@ export interface Draw {
     labels?: { size: number; weight?: Weight; format?: Format; every?: number; before?: string; after?: string };
   }): void;
   image(imageId: string, box: Box, options?: PictureOptions): void;
+  /**
+   * Everything drawn inside `fn` is placed by two values when the panel wakes:
+   * draw it around (0, 0), and it lands where `at` puts it. Nothing shows while
+   * either value is missing or out of its range. A plane on a radar, say.
+   */
+  place(at: Placement, fn: () => void): void;
   /**
    * Everything drawn inside `fn` only shows when `condition` holds on the panel.
    * References without a dot are this widget's own values.
