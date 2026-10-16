@@ -7,6 +7,7 @@
 
 #include "board.h"
 #include "log.h"
+#include "persist.h"
 #include "power.h"
 
 namespace dither {
@@ -66,6 +67,16 @@ void SerialCommands::run(const std::string& line, const Framebuffer& lastFrame, 
       return;
     }
     deepSleep(static_cast<uint32_t>(seconds));
+  } else if (line == "CMD:HISTORY") {
+    // Between begin and end, so a reader knows it has the whole ring.
+    dlog("history: begin");
+    size_t count = 0;
+    forEachHistory([&](const std::string& record) {
+      dlog("history: %s", record.c_str());
+      ++count;
+      Serial.flush();  // the TX timeout is 0: let each line drain before the next
+    });
+    dlog("history: end %u", static_cast<unsigned>(count));
   } else if (line == "CMD:INFO") {
     dlog("version %s, board %s", DITHER_VERSION, board::kId);
   } else {

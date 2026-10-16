@@ -2,8 +2,9 @@
 // The editor's preview is a simulation; this is the panel speaking.
 
 import { useEffect, useMemo, useState } from "react";
-import { AlarmClock, Cable, Copy, Loader2, Unplug } from "lucide-react";
+import { AlarmClock, Cable, Copy, History as HistoryIcon, Loader2, Unplug } from "lucide-react";
 import { describeWake, formatDuration, summarize, type Labels, type Step, type Wake } from "@/device/activity";
+import { pastRows, type History, type PastRow } from "@/device/history";
 import { Button, Note } from "../kit";
 import type { ActivityNames } from "./labels";
 import { SummaryCard } from "./SummaryCard";
@@ -13,6 +14,7 @@ const MAX_SHOWN = 60;
 const TICK_MS = 15_000;
 
 const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+const dayAndClock = (ms: number) => new Date(ms).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" });
 const clockSeconds = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
 function useNow(): number {
@@ -98,16 +100,64 @@ function WakeRow({ wake, labels }: { wake: Wake; labels: Labels }) {
           {wake.number !== null ? <>Woke up <span className="text-muted">#{wake.number}</span></> : "Already awake when you connected"}
           {wake.state === "running" && <span className="ml-2 text-[12px] font-normal text-muted">working…</span>}
         </p>
-        <p className="mt-0.5 text-[13px] leading-relaxed">
-          {steps.map((s, i) => (
-            <span key={i}>
-              {i > 0 && <span className="text-muted/60"> · </span>}
-              <span className={STEP_TONE[s.tone]}>{s.text}</span>
-            </span>
-          ))}
-        </p>
+        <p className="mt-0.5 text-[13px] leading-relaxed"><Steps steps={steps} /></p>
       </div>
     </li>
+  );
+}
+
+function Steps({ steps }: { steps: readonly Step[] }) {
+  return (
+    <>
+      {steps.map((s, i) => (
+        <span key={i}>
+          {i > 0 && <span className="text-muted/60"> · </span>}
+          <span className={STEP_TONE[s.tone]}>{s.text}</span>
+        </span>
+      ))}
+    </>
+  );
+}
+
+function PastWakeRow({ row }: { row: PastRow }) {
+  const { record } = row;
+  return (
+    <li className="py-3">
+      <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-3">
+        <time className="font-semibold tabular-nums">{record.at !== null ? dayAndClock(record.at) : "—"}</time>
+        <div className="min-w-0">
+          <p className="font-medium">
+            Woke up <span className="text-muted">#{record.wake}</span>
+            <span className="ml-2 text-[12px] font-normal text-muted">{(record.awakeMs / 1000).toFixed(1)} s awake · {record.version}</span>
+          </p>
+          <p className="mt-0.5 text-[13px] leading-relaxed"><Steps steps={row.steps} /></p>
+        </div>
+      </div>
+      {row.before && <p className={`mt-2 rounded-md bg-raised px-3 py-1.5 text-[13px] ${STEP_TONE[row.before.tone]}`}>{row.before.text}</p>}
+    </li>
+  );
+}
+
+/** What the panel wrote to its own flash, wake by wake, while nobody was listening. */
+function PastWakes({ history, labels, canAsk, onAsk }: { history: History; labels: Labels; canAsk: boolean; onAsk: () => Promise<void> }) {
+  const rows = useMemo(() => pastRows(history, labels), [history, labels]);
+  if (history.state === "none" && !canAsk) return null;
+  return (
+    <section aria-label="Wake history" className="space-y-2">
+      <div className="flex items-center gap-2">
+        <h2 className="text-[13px] font-semibold text-muted">Before you connected — the panel's own record</h2>
+        {canAsk && (
+          <Button size="sm" variant="ghost" className="ml-auto" icon={<HistoryIcon size={14} />} onClick={() => void onAsk().catch(() => undefined)}>
+            Read again
+          </Button>
+        )}
+      </div>
+      {history.state === "unsupported" && <Note>This panel's firmware keeps no record of its wakes. Flash the latest firmware and it starts keeping one.</Note>}
+      {history.state === "loading" && rows.length === 0 && <p className="text-[13px] text-muted">Reading…</p>}
+      {history.state === "none" && <p className="text-[13px] text-muted">Asked the panel; it answers once it is between wakes.</p>}
+      {history.state === "done" && rows.length === 0 && <p className="text-[13px] text-muted">Nothing recorded yet.</p>}
+      {rows.length > 0 && <ol className="divide-y divide-line">{rows.map((r, i) => <PastWakeRow key={`${r.record.at}-${i}`} row={r} />)}</ol>}
+    </section>
   );
 }
 
@@ -182,6 +232,8 @@ export function ActivityView({ panel, names, compiledCrc, refreshSeconds }: {
           </ol>
         </section>
       )}
+
+      <PastWakes history={panel.history} labels={labels} canAsk={link.kind === "watching"} onAsk={panel.loadHistory} />
 
       {activity.raw.length > 0 && <RawLog lines={activity.raw} />}
     </div>

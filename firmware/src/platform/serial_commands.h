@@ -2,6 +2,7 @@
 //   CMD:SCREENSHOT  "SCREENSHOT_START:<n>\n", then the panel frame (P4 layout)
 //   CMD:WAKE        run a wake now
 //   CMD:SLEEP:<s>   deep-sleep for s seconds (1-600), to test a sleep cycle
+//   CMD:HISTORY     the wake history kept in flash, oldest first
 //   CMD:INFO        version and board
 #pragma once
 

@@ -28,7 +28,9 @@ class Device {
 
   uint32_t openAndRun(uint32_t number);
   void logSummary(uint32_t number, uint32_t sleepSeconds) const;
+  void keepHistory(uint32_t number, uint32_t sleepSeconds, uint32_t startMs) const;
   void noteSource(const std::string& id, const char* outcome);
+  void noteError(const std::string& id, const std::string& error);
   uint32_t notSetUp(const std::string& reason, uint32_t sleepSeconds);
   uint32_t run(const Program& program);
   void fetchDue(const Program& program, bool online, std::optional<int64_t> now, ValueCache& cache);
@@ -42,6 +44,9 @@ class Device {
   Frame frameResult_ = Frame::None;
   bool online_ = false;
   bool clockSet_ = false;
+  bool network_ = false;
+  std::optional<double> rssi_;
+  std::string firstError_;  // "<id>:<why>", for the history
   std::vector<std::pair<std::string, const char*>> outcomes_;
 };
 

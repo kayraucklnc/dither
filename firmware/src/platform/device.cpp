@@ -4,6 +4,7 @@
 #include <esp_system.h>
 
 #include "../runtime/crc32.h"
+#include "../runtime/history.h"
 #include "../runtime/notice_screen.h"
 #include "../runtime/rotate.h"
 #include "../runtime/wake.h"
@@ -44,16 +45,50 @@ std::vector<SourceState> statesOf(const Program& p, const ValueCache& cache) {
 }  // namespace
 
 uint32_t Device::wake() {
+  const uint32_t startMs = millis();
   const uint32_t number = countWake();
   state_ = "ran";
   screen_ = -1;
   frameResult_ = Frame::None;
   online_ = false;
   clockSet_ = false;
+  network_ = false;
+  rssi_.reset();
+  firstError_.clear();
   outcomes_.clear();
   const uint32_t seconds = openAndRun(number);
   logSummary(number, seconds);
+  keepHistory(number, seconds, startMs);
   return seconds;
+}
+
+// The summary again, kept in flash: CMD:HISTORY reads it back later.
+void Device::keepHistory(uint32_t number, uint32_t sleepSeconds, uint32_t startMs) const {
+  static const char* const kFrames[] = {"none", "updated", "same", "failed"};
+  WakeRecord r;
+  r.at = clockNow();
+  r.version = DITHER_VERSION;
+  r.reset = static_cast<int>(esp_reset_reason());
+  r.wake = number;
+  r.state = state_;
+  r.frame = kFrames[static_cast<int>(frameResult_)];
+  r.online = online_;
+  r.clockSet = clockSet_;
+  r.usb = usbHostConnected();
+  r.network = network_;
+  if (rssi_) r.rssi = static_cast<int>(*rssi_);
+  for (const auto& o : outcomes_) {
+    const std::string outcome = o.second;
+    if (outcome == "ok") ++r.ok;
+    else if (outcome == "fail") ++r.fail;
+    else if (outcome == "offline") ++r.offline;
+    else if (outcome == "noclock") ++r.noclock;
+  }
+  r.sleep = sleepSeconds;
+  r.awakeMs = millis() - startMs;
+  r.lowestHeap = ESP.getMinFreeHeap();
+  r.error = firstError_;
+  appendHistory(historyLine(r));
 }
 
 // One line per wake that the app's "Panel activity" view reads; the lines
@@ -69,6 +104,10 @@ void Device::logSummary(uint32_t number, uint32_t sleepSeconds) const {
        static_cast<unsigned long>(number), state_, screen_, kFrames[static_cast<int>(frameResult_)],
        online_ ? "yes" : "no", clockSet_ ? "set" : "unknown", sources.empty() ? "-" : sources.c_str(),
        static_cast<unsigned long>(sleepSeconds));
+}
+
+void Device::noteError(const std::string& id, const std::string& error) {
+  if (firstError_.empty()) firstError_ = id + ":" + error;
 }
 
 void Device::noteSource(const std::string& id, const char* outcome) {
@@ -125,6 +164,8 @@ uint32_t Device::run(const Program& program) {
   device.usb = usbHostConnected();
   if (needsNetwork(program.sources(), statesOf(program, cache), now)) {
     WifiResult wifi = joinWifi(program.wifi());
+    network_ = true;
+    rssi_ = wifi.rssi;
     device.online = cache.lastOnline = wifi.online;
     device.rssi = cache.lastRssi = wifi.rssi;
     if (wifi.online && syncTime(program.ntpServer())) now = clockNow();
@@ -186,6 +227,7 @@ void Device::fetchDue(const Program& program, bool online, std::optional<int64_t
       if (noInternet.empty()) {
         dlog("source %s: failed: not enough memory for a secure connection (%lu KB free)", source.id.c_str(),
              static_cast<unsigned long>(ESP.getFreeHeap() / 1024));
+        noteError(source.id, "not enough memory");
       } else {
         dlog("source %s: failed: not tried, %s", source.id.c_str(), noInternet.c_str());
       }
@@ -211,6 +253,7 @@ void Device::fetchDue(const Program& program, bool online, std::optional<int64_t
         noteSource(source.id, "ok");
       } else {
         dlog("source %s: failed: %s", source.id.c_str(), error.c_str());
+        noteError(source.id, error);
         noteSource(source.id, "fail");
       }
     }
@@ -220,6 +263,7 @@ void Device::fetchDue(const Program& program, bool online, std::optional<int64_t
 
 uint32_t Device::notSetUp(const std::string& reason, uint32_t sleepSeconds) {
   state_ = "not-set-up";
+  firstError_ = reason;
   dlog("not set up: %s", reason.c_str());
   Framebuffer fb(board::kPanelWidth, board::kPanelHeight);
   drawNotSetUp(fb, std::string("Dither ") + DITHER_VERSION + " - " + reason);

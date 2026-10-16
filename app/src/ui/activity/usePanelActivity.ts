@@ -1,9 +1,11 @@
-// Listen to the panel's log over USB and keep what it said. Read-only: the
-// port is opened as a plain serial reader and nothing is ever written to it.
+// Listen to the panel's log over USB and keep what it said. The port is opened
+// as a plain serial reader; the only things written are requests (a wake now,
+// the wake history the panel keeps in flash), never anything that changes it.
 // Lives above the views so the history survives switching between them.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { addLine, EMPTY_ACTIVITY, type Activity } from "@/device/activity";
+import { addHistoryLine, EMPTY_HISTORY, HISTORY_COMMAND, type History } from "@/device/history";
 import { DeviceError, isPanelPort, openMonitor, PanelConnection, toDeviceError, type Board, type Monitor } from "@/device";
 import { startDemo, type DemoShape } from "./demo";
 
@@ -20,6 +22,8 @@ export type Link =
 export interface PanelActivity {
   readonly link: Link;
   readonly activity: Activity;
+  /** What the panel did while nobody was watching, from its own flash. */
+  readonly history: History;
   /** From a click: may open the browser's port chooser. */
   readonly connect: () => void;
   /** Watch again without asking, e.g. after the Flash dialog lets go of the port. */
@@ -28,6 +32,8 @@ export interface PanelActivity {
   readonly clear: () => void;
   /** Asks the panel for a wake now; it wakes as it would on its own. */
   readonly wakeNow: () => Promise<void>;
+  /** Asks the panel for its wake history again. */
+  readonly loadHistory: () => Promise<void>;
 }
 
 export const BUSY_MESSAGE =
@@ -42,6 +48,7 @@ async function askForPort(board: Board | null): Promise<SerialPort | undefined> 
 export function usePanelActivity({ board, paused, demo }: { board: Board | null; paused: boolean; demo: DemoShape | null }): PanelActivity {
   const [link, setLink] = useState<Link>({ kind: "idle" });
   const [activity, setActivity] = useState<Activity>(EMPTY_ACTIVITY);
+  const [history, setHistory] = useState<History>(EMPTY_HISTORY);
   const monitor = useRef<Monitor | null>(null);
   const stopDemo = useRef<(() => void) | null>(null);
   // Bumped whenever the port is let go: callbacks from an older attempt report to nobody.
@@ -80,7 +87,11 @@ export function usePanelActivity({ board, paused, demo }: { board: Board | null;
       if (!current()) return;
       const m = await openMonitor(port, {
         prefix: null,
-        onLine: (line) => current() && setActivity((x) => addLine(x, line, Date.now())),
+        onLine: (line) => {
+          if (!current()) return;
+          setActivity((x) => addLine(x, line, Date.now()));
+          setHistory((h) => addHistoryLine(h, line));
+        },
         onEnd: () => {
           if (!current()) return;
           monitor.current = null;
@@ -90,6 +101,8 @@ export function usePanelActivity({ board, paused, demo }: { board: Board | null;
       if (!current()) return void m.close().catch(() => undefined);
       monitor.current = m;
       setLink({ kind: "watching", since: Date.now() });
+      // Answered once the panel is between wakes; older firmware says it does not know it.
+      void m.send(HISTORY_COMMAND).catch(() => undefined);
     } catch (e) {
       if (!current()) return;
       const err = e instanceof DeviceError ? e : toDeviceError(e);
@@ -122,11 +135,18 @@ export function usePanelActivity({ board, paused, demo }: { board: Board | null;
     setLink({ kind: "idle" });
   }, [release]);
 
-  const clear = useCallback(() => setActivity(EMPTY_ACTIVITY), []);
+  const clear = useCallback(() => {
+    setActivity(EMPTY_ACTIVITY);
+    setHistory(EMPTY_HISTORY);
+  }, []);
 
   /** Ask the panel for a wake now, rather than waiting out its interval. A normal wake: nothing else changes. */
   const wakeNow = useCallback(async () => {
     await monitor.current?.send("CMD:WAKE");
+  }, []);
+
+  const loadHistory = useCallback(async () => {
+    await monitor.current?.send(HISTORY_COMMAND);
   }, []);
 
   // Give the port to the Flash dialog while it is open, and take it back after.
@@ -153,5 +173,5 @@ export function usePanelActivity({ board, paused, demo }: { board: Board | null;
 
   useEffect(() => release, [release]);
 
-  return { link, activity, connect, watch, disconnect, clear, wakeNow };
+  return { link, activity, history, connect, watch, disconnect, clear, wakeNow, loadHistory };
 }
