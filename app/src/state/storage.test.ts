@@ -29,9 +29,9 @@ describe("withoutSecrets", () => {
   it("drops linked accounts whole", () => {
     const linked = {
       ...base,
-      accounts: { google: [{ id: "me@x", clientId: "id", clientSecret: "s", refreshToken: "r", email: "me@x", label: "Me" }], stripe: { key: "rk_live_k", name: "" }, opensky: { clientId: "c", clientSecret: "s" } },
+      accounts: { google: [{ id: "me@x", clientId: "id", clientSecret: "s", refreshToken: "r", email: "me@x", label: "Me" }], stripe: { key: "rk_live_k", name: "" }, opensky: { clientId: "c", clientSecret: "s" }, finnhub: { key: "k" } },
     };
-    expect(withoutSecrets(linked).accounts).toEqual({ google: [], stripe: null, opensky: null });
+    expect(withoutSecrets(linked).accounts).toEqual({ google: [], stripe: null, opensky: null, finnhub: null });
   });
 
   it("keeps secrets in the file only when asked", async () => {

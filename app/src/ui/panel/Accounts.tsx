@@ -7,6 +7,7 @@ import { CALENDAR_SCOPES } from "@/extensions/google-calendar";
 import { linkGoogle, redirectUri } from "@/extensions/google-calendar/oauth";
 import { OPENSKY_TOKEN_URL } from "@/extensions/aircraft";
 import { isStripeKey } from "@/extensions/stripe";
+import { finnhubUrl } from "@/extensions/stocks";
 import type { Accounts as AccountsDef, GoogleLink } from "@/project/schema";
 import { useProject } from "@/state/project-store";
 import { Button, Field, Note, TextInput } from "../kit";
@@ -204,6 +205,40 @@ function OpenSky({ account, set }: { account: AccountsDef["opensky"]; set: (a: A
   );
 }
 
+function Finnhub({ account, set }: { account: AccountsDef["finnhub"]; set: (a: AccountsDef["finnhub"]) => void }) {
+  const [key, setKey] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (account) return <Linked who={`Finnhub — ${account.key.slice(0, 6)}…`} onUnlink={() => set(null)} />;
+
+  // One quote, the request the panel will make, proves the key before the panel depends on it.
+  const check = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(finnhubUrl("quote?symbol=AAPL", key.trim()), { credentials: "omit" });
+      if (res.status === 401 || res.status === 403) throw new Error("Finnhub does not recognise that key.");
+      if (!res.ok) throw new Error(`Finnhub answered ${res.status}.`);
+      set({ key: key.trim() });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not reach Finnhub.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <Field label="API key" help="On finnhub.io, sign up for free: the dashboard shows your key. It is stored on the panel and in this browser.">
+        {(id) => <TextInput id={id} type="password" value={key} onChange={setKey} />}
+      </Field>
+      <Button variant="primary" disabled={busy || !key.trim()} onClick={check}>{busy ? "Checking…" : "Connect Finnhub"}</Button>
+      {error && <Note tone="warn">{error}</Note>}
+    </div>
+  );
+}
+
 export function Accounts() {
   const { project, update } = useProject();
   const set = <K extends keyof AccountsDef>(kind: K, value: AccountsDef[K]) =>
@@ -224,6 +259,11 @@ export function Accounts() {
         <h3 className="font-medium">OpenSky</h3>
         <p className="text-[13px] text-muted">For the Aircraft widget. The account is free; without one OpenSky allows only 400 requests a day for your whole connection, which a day of trying things out runs through.</p>
         <OpenSky account={project.accounts.opensky} set={(a) => set("opensky", a)} />
+      </div>
+      <div className="space-y-2">
+        <h3 className="font-medium">Finnhub</h3>
+        <p className="text-[13px] text-muted">For the Stocks widget. The free key allows 60 requests a minute, far more than a panel asks for.</p>
+        <Finnhub account={project.accounts.finnhub} set={(a) => set("finnhub", a)} />
       </div>
     </div>
   );
