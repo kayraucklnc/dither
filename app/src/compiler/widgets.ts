@@ -4,8 +4,8 @@ import type { Env, Extension } from "@/extensions/api";
 import { EXTENSIONS } from "@/extensions";
 import type { Project, Widget } from "@/project/schema";
 
-export function envOf(project: Project): Env {
-  return { units: project.units, place: project.place, language: project.language, timezone: project.timezone, accounts: project.accounts };
+export function envOf(project: Project, now = Math.floor(Date.now() / 1000)): Env {
+  return { units: project.units, place: project.place, language: project.language, timezone: project.timezone, accounts: project.accounts, now };
 }
 
 export function extensionFor(type: string): Extension | undefined {

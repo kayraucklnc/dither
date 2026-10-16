@@ -214,6 +214,13 @@ export class ElementDraw implements Draw {
     this.push({ t: "bitmap", x: b.x, y: b.y, a: index, ...this.color() });
   }
 
+  pictureFor(valueKey: string, pick: Format, box: Box, key: string, pictures: Record<string, (x: number, y: number) => boolean>): void {
+    const b = this.at(box);
+    const set = Object.fromEntries(Object.entries(pictures).map(([name, ink]) =>
+      [name, this.deps.assets.add(`bitmap:${key}:${name}:${b.w}x${b.h}`, async () => encodeBitmap(b.w, b.h, false, ink))]));
+    this.push({ t: "icon", ...b, v: this.ref(valueKey), f: this.scopeFormat(pick), set, ...this.color() });
+  }
+
   place(at: Placement, fn: () => void): void {
     if ("globe" in at) return this.placeOnGlobe(at, fn);
     const box = this.at(at.box);

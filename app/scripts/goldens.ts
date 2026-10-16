@@ -38,7 +38,7 @@ function write(name: string, blob: Uint8Array, runtime: Runtime, values: Record<
 const fonts = await loadFonts();
 const deps = { library: nodeLibrary, fonts, picture: async () => null, boardPanel: () => ({ width: 800, height: 480 }) };
 
-for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "starter-showcase", "primitives", "text-and-formats", "chart-labels", "air-quality", "air-quality-no-pollen", "air-quality-quiet", "aircraft", "aircraft-sky", "iss", "quote"]) {
+for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "starter-showcase", "primitives", "text-and-formats", "chart-labels", "air-quality", "air-quality-no-pollen", "air-quality-quiet", "aircraft", "aircraft-sky", "iss", "quote", "moon"]) {
   rmSync(`${root}${dir}`, { recursive: true, force: true });
 }
 
@@ -242,6 +242,20 @@ for (const [name, timezone, at, pollen] of [
   ];
   const c = await compile(project, deps);
   write("quote", c.blob, c.runtime, { ...DEVICE });
+}
+
+// The moon, built on the fixture's day and shown the evening before it is full: the
+// picture, name and dates read off the clock; beside it, under it, and from the south.
+{
+  const project = createProject({ starter: "blank", timezone: "Europe/Rome", language: "en", units: "metric", place });
+  project.screens[0].widgets = [
+    { id: "wide", type: "moon", x: 0, y: 0, w: 10, h: 7, frame: "outline", settings: {} },
+    { id: "tall", type: "moon", x: 10, y: 0, w: 5, h: 7, frame: "none", settings: {} },
+    { id: "south", type: "moon", x: 15, y: 0, w: 5, h: 4, frame: "none", settings: { hemisphere: "south", details: false } },
+    { id: "side", type: "moon", x: 0, y: 7, w: 10, h: 5, frame: "none", settings: {} },
+  ];
+  const c = await compile(project, { ...deps, now: NOW });
+  write("moon", c.blob, c.runtime, { ...DEVICE }, Date.UTC(2026, 9, 25, 19, 30) / 1000);
 }
 
 // Hand-placed elements at their edges: what the starters do not reach.
