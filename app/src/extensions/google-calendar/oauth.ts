@@ -101,7 +101,11 @@ export async function listCalendars(link: GoogleLink): Promise<{ id: string; nam
   const res = await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList?fields=items(id,summary,primary)", {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error(`Google answered ${res.status} for the calendar list.`);
+  if (!res.ok) {
+    // Google says why ("Google Calendar API has not been used in project …", "insufficient authentication scopes"): pass it on.
+    const why = ((await res.json().catch(() => null)) as { error?: { message?: string } } | null)?.error?.message;
+    throw new Error(`Google answered ${res.status} for the calendar list${why ? `: ${why}` : "."}`);
+  }
   const body = (await res.json()) as { items?: { id: string; summary: string; primary?: boolean }[] };
   return (body.items ?? []).map((c) => ({ id: c.primary ? "primary" : c.id, name: c.summary }));
 }
