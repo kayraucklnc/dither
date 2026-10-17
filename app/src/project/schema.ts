@@ -76,6 +76,8 @@ export const accountsSchema = z.object({
   stripe: z.object({ key: z.string(), name: z.string().default("") }).nullable().default(null),
   /** An OpenSky API client: optional, it only raises how often the aircraft widget may ask. */
   opensky: z.object({ clientId: z.string(), clientSecret: z.string() }).nullable().default(null),
+  /** A Finnhub API key, for share prices. */
+  finnhub: z.object({ key: z.string() }).nullable().default(null),
 });
 
 export const wifiSchema = z.object({
@@ -99,7 +101,7 @@ export const projectSchema = z.object({
   units: z.enum(["metric", "imperial"]).default("metric"),
   place: placeSchema.nullable().default(null),
   wifi: z.array(wifiSchema).default([]),
-  accounts: accountsSchema.default({ google: [], stripe: null, opensky: null }),
+  accounts: accountsSchema.default({ google: [], stripe: null, opensky: null, finnhub: null }),
   refreshMinutes: z.number().int().min(1).max(1440).default(15),
   quiet: z.object({ enabled: z.boolean(), from: z.string(), to: z.string() })
     .default({ enabled: false, from: "23:00", to: "07:00" }),

@@ -33,9 +33,10 @@ const PREVIEW_ACCOUNTS: Project["accounts"] = {
   google: [{ id: "preview", clientId: "preview", clientSecret: "preview", refreshToken: "preview", email: "", label: "Personal" }],
   stripe: { key: "rk_test_preview", name: "" },
   opensky: { clientId: "preview", clientSecret: "preview" },
+  finnhub: { key: "preview" },
 };
 
-const ACCOUNT_NAMES: Record<string, string> = { google: "Google", stripe: "Stripe", opensky: "OpenSky" };
+const ACCOUNT_NAMES: Record<string, string> = { google: "Google", stripe: "Stripe", opensky: "OpenSky", finnhub: "Finnhub" };
 
 // Thumbnails compile in the browser, so each is compiled once per look (zone, language, units, place, pictures).
 const compiledThumbs = new WeakMap<object, Map<string, Promise<Compiled | null>>>();

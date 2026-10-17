@@ -38,7 +38,7 @@ function write(name: string, blob: Uint8Array, runtime: Runtime, values: Record<
 const fonts = await loadFonts();
 const deps = { library: nodeLibrary, fonts, picture: async () => null, boardPanel: () => ({ width: 800, height: 480 }) };
 
-for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "starter-showcase", "primitives", "text-and-formats", "chart-labels", "air-quality", "air-quality-no-pollen", "air-quality-quiet", "aircraft", "aircraft-sky", "iss", "quote"]) {
+for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "starter-showcase", "primitives", "text-and-formats", "chart-labels", "air-quality", "air-quality-no-pollen", "air-quality-quiet", "aircraft", "aircraft-sky", "iss", "quote", "stocks"]) {
   rmSync(`${root}${dir}`, { recursive: true, force: true });
 }
 
@@ -66,7 +66,7 @@ for (const s of STARTERS.filter((x) => x.id !== "blank")) {
     { id: "next", type: "google-calendar", x: 12, y: 6, w: 8, h: 5, frame: "none", settings: { show: "next" } },
     { id: "strip", type: "trenord", x: 0, y: 8, w: 12, h: 2, frame: "none", settings: {} },
   ];
-  project.accounts = { google: [account], stripe: null, opensky: null };
+  project.accounts = { google: [account], stripe: null, opensky: null, finnhub: null };
   project.alerts = [
     { id: "late", enabled: true, match: "any", checks: [{ fact: "train:trouble", op: "is", value: true }], icon: "train-front", text: "Trouble on your line", value: null, style: "banner" },
   ];
@@ -114,7 +114,7 @@ for (const s of STARTERS.filter((x) => x.id !== "blank")) {
 {
   const project = createProject({ starter: "blank", timezone: "Europe/Istanbul", language: "en", units: "metric", place });
   const link = (id: string, label: string) => ({ id, clientId: "id", clientSecret: "secret", refreshToken: `token-${id}`, email: `${id}@example.com`, label });
-  project.accounts = { google: [link("me", "Personal"), link("work", "Work"), link("home", "Family")], stripe: null, opensky: null };
+  project.accounts = { google: [link("me", "Personal"), link("work", "Work"), link("home", "Family")], stripe: null, opensky: null, finnhub: null };
   project.screens[0].widgets = [
     { id: "cal", type: "google-calendar", x: 0, y: 0, w: 20, h: 12, frame: "none", settings: {} },
   ];
@@ -142,7 +142,7 @@ for (const s of STARTERS.filter((x) => x.id !== "blank")) {
 // Revenue: a board (totals, buckets, a comparison, names) and a compact figure.
 {
   const project = createProject({ starter: "blank", timezone: "Europe/Istanbul", language: "tr", units: "metric", place });
-  project.accounts = { google: [], stripe: { key: "rk_test_golden", name: "" }, opensky: null };
+  project.accounts = { google: [], stripe: { key: "rk_test_golden", name: "" }, opensky: null, finnhub: null };
   project.screens[0].widgets = [
     { id: "board", type: "stripe", x: 0, y: 0, w: 20, h: 8, frame: "none", settings: { currency: "try", names: true, period: "month" } },
     { id: "fig", type: "stripe", x: 0, y: 8, w: 8, h: 4, frame: "outline", settings: { style: "figure", compact: true, currency: "jpy" } },
@@ -242,6 +242,37 @@ for (const [name, timezone, at, pollen] of [
   ];
   const c = await compile(project, deps);
   write("quote", c.blob, c.runtime, { ...DEVICE });
+}
+
+// Share prices after the close: a list, tiles and one large; up, down, unknown and stale; in euro and lira.
+{
+  const project = createProject({ starter: "blank", timezone: "Europe/Rome", language: "en", units: "metric", place });
+  project.accounts.finnhub = { key: "key" };
+  project.screens[0].widgets = [
+    { id: "list", type: "stocks", x: 0, y: 0, w: 10, h: 8, frame: "none", settings: { symbols: ["AAPL", "MSFT", "NVDA", "XYZQ", "ASTS AST SpaceMobile"] } },
+    { id: "one", type: "stocks", x: 10, y: 0, w: 10, h: 4, frame: "outline", settings: { symbols: ["QQQ"], currency: "eur" } },
+    { id: "lira", type: "stocks", x: 10, y: 4, w: 10, h: 4, frame: "none", settings: { symbols: ["AAPL", "MSFT"], currency: "try", layout: "list" } },
+    { id: "tiles", type: "stocks", x: 0, y: 9, w: 20, h: 3, frame: "none", settings: { symbols: ["AAPL", "MSFT", "NVDA"] } },
+  ];
+  const c = await compile(project, deps);
+  const values: Record<string, Value> = { ...DEVICE };
+  const quote = (id: string, [cur, d, h, l]: number[], age = 4) => {
+    const pc = cur - d;
+    Object.assign(values, {
+      [`${id}.c`]: cur, [`${id}.d`]: d, [`${id}.dp`]: cur === 0 ? null : Math.round((d / pc) * 1e4) / 100, [`${id}.h`]: h, [`${id}.l`]: l, [`${id}.pc`]: pc,
+      [`${id}.t`]: Date.UTC(2026, 9, 2, 20) / 1000, [`${id}._ok`]: true, [`${id}._age`]: age,
+    });
+  };
+  const list = c.widgetSources.get("list")!;
+  quote(list.q0, [343.46, 1.46, 347.82, 340.46]);
+  quote(list.q1, [12529.05, -10.39, 12543.82, 12524.43]);
+  quote(list.q2, [214.13, 0, 218.68, 213.32]);
+  quote(list.q3, [0, 0, 0, 0]);
+  quote(list.q4, [48.12, 2.2, 49, 45.5], 95);
+  quote(c.widgetSources.get("one")!.q0, [709.8, -18.2, 725.96, 707.23]);
+  Object.assign(values, { [`${c.widgetSources.get("one")!.fx}.rate`]: 0.88865, [`${c.widgetSources.get("lira")!.fx}.rate`]: 49.527 });
+  Object.assign(values, { [`${list.mkt}.open`]: false, [`${list.mkt}.session`]: null, [`${list.mkt}._ok`]: true, [`${list.mkt}._age`]: 10 });
+  write("stocks", c.blob, c.runtime, values);
 }
 
 // Hand-placed elements at their edges: what the starters do not reach.
