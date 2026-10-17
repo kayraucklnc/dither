@@ -43,7 +43,7 @@ export function withoutSecrets(project: Project): Project {
     ...project,
     wifi: project.wifi.map((n) => ({ ...n, password: "" })),
     // A linked account is a client secret and a refresh token: it goes whole or not at all.
-    accounts: { google: [], stripe: null, opensky: null },
+    accounts: { google: [], stripe: null, opensky: null, finnhub: null },
     screens: project.screens.map((s) => ({ ...s, widgets: s.widgets.map(blankSecrets) })),
   };
 }

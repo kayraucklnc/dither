@@ -26,7 +26,7 @@ function project(): Project {
     { id: "cal", type: "google-calendar", x: 10, y: 0, w: 10, h: 6, frame: "none", settings: {} },
     { id: "sky", type: "weather", x: 0, y: 6, w: 10, h: 6, frame: "none", settings: {} },
   ];
-  p.accounts = { google: [account], stripe: null, opensky: null };
+  p.accounts = { google: [account], stripe: null, opensky: null, finnhub: null };
   p.alerts = [
     { id: "a1", enabled: true, match: "any", checks: [{ fact: "train:trouble", op: "is", value: true }], icon: "train-front", text: "Trouble on your line", value: "train:delay", style: "banner" },
     { id: "a2", enabled: true, match: "any", checks: [{ fact: "sky:rain", op: "ge", value: 60 }], icon: "umbrella", text: "Take an umbrella", value: "sky:rain", style: "banner" },
@@ -95,7 +95,7 @@ describe("transit, calendar and alerts", () => {
 
   it("asks Stripe for the period, the one before and the graph, and totals them on the panel", async () => {
     const p = createProject({ starter: "blank", timezone: "Europe/Rome", language: "en", units: "metric", place: null });
-    p.accounts = { google: [], stripe: { key: "rk_live_abc", name: "" }, opensky: null };
+    p.accounts = { google: [], stripe: { key: "rk_live_abc", name: "" }, opensky: null, finnhub: null };
     p.screens[0].widgets = [{ id: "rev", type: "stripe", x: 0, y: 0, w: 10, h: 8, frame: "none", settings: { period: "week" } }];
     const out = await compile(p, deps);
     const named = out.widgetSources.get("rev")!;
@@ -112,7 +112,7 @@ describe("transit, calendar and alerts", () => {
   it("reads every linked account into one agenda, or the ones a widget picks", async () => {
     const p = createProject({ starter: "blank", timezone: "Europe/Rome", language: "en", units: "metric", place: null });
     const work = { ...account, id: "work@example.com", email: "work@example.com", refreshToken: "1//work", label: "Work" };
-    p.accounts = { google: [account, work], stripe: null, opensky: null };
+    p.accounts = { google: [account, work], stripe: null, opensky: null, finnhub: null };
     p.screens[0].widgets = [
       { id: "both", type: "google-calendar", x: 0, y: 0, w: 12, h: 8, frame: "none", settings: {} },
       { id: "job", type: "google-calendar", x: 12, y: 0, w: 8, h: 8, frame: "none", settings: { lanes: [{ account: "work@example.com", calendar: "team@group", name: "Team" }] } },

@@ -133,6 +133,7 @@ back in, then let go.
 | 🗓️ | Google Calendar | Every linked account as one agenda, grouped by day: what's on now, what's next, and the days ahead | A Google OAuth client (the app walks you through it) |
 | 🚆 | Trains (Trenord) | Your next train, how late it is, and the ones after it | — |
 | 💶 | Revenue (Stripe) | A figure, a smooth graph with each day's amount on it, a ledger or a full board with payments, converted to another currency if you like | A restricted Stripe key |
+| 📈 | Stocks | Up to five share prices and how they moved today, every five minutes ([Finnhub](https://finnhub.io/)) | A free Finnhub key |
 | ₿ | Crypto price | A coin's price and today's change ([CoinGecko](https://www.coingecko.com/)) | — |
 | 🔢 | Number from the web | Any value from a JSON address: a sensor, a counter, a price | — |
 | 📄 | Web page | The text of any web page, fetched by the panel itself: a status page, a menu, a notice | — |
@@ -329,6 +330,7 @@ The full guide, with layout tips and the whole `Draw` API, is
 - ✅ Stripe: figure, curved graph, ledger and payments board
 - ✅ Trains from Trenord, with delays, cancellations and line alerts
 - ✅ The moon tonight, from NASA's map, with its next phases
+- ✅ Share prices from Finnhub, up to five, every five minutes
 - ✅ Crypto prices, countdowns, messages, quotes, pictures, text and any JSON value
 - ⬜ Any calendar from an iCal link, with no OAuth
 - ⬜ Public transport anywhere through GTFS-Realtime, plus TfL, SBB, BVG and NS

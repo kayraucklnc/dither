@@ -1,16 +1,6 @@
 import type { Condition, Format, Part } from "@/runtime/types";
 import { defineExtension, type Draw, type SourceSpec } from "../api";
-
-// Stripe counts in minor units, and a few currencies have none: divide yen by
-// a hundred and every figure is wrong by two orders of magnitude.
-const CURRENCIES = [
-  { value: "eur", label: "Euro", sign: "€", decimals: 2 },
-  { value: "usd", label: "US dollar", sign: "$", decimals: 2 },
-  { value: "gbp", label: "Pound", sign: "£", decimals: 2 },
-  { value: "try", label: "Turkish lira", sign: "₺", decimals: 2 },
-  { value: "chf", label: "Swiss franc", sign: "CHF ", decimals: 2 },
-  { value: "jpy", label: "Yen", sign: "¥", decimals: 0 },
-];
+import { CURRENCIES, rateSource } from "../currency";
 
 const DAY = 86400;
 /** A period: where it starts, and the equal stretch before it to compare with. */
@@ -92,10 +82,7 @@ function sources(s: Settings, key: string): Record<string, SourceSpec> {
     },
   };
   if (converts(s)) {
-    // The ECB's daily reference rates; no key, and a reply of a few dozen bytes.
-    const from = accountCurrency(s).value.toUpperCase();
-    const to = currencyOf(s).value.toUpperCase();
-    out.fx = { url: `https://api.frankfurter.dev/v1/latest?base=${from}&symbols=${to}`, every: 360, values: { rate: `rates.${to}` } };
+    out.fx = rateSource(accountCurrency(s).value, currencyOf(s).value);
   }
   if (s.compare) out.before = { url: search(p.before, p.since), headers: auth, every: 60, values: { total: { path: "data", agg: "sum", field: "amount" } } };
   if (s.style === "ledger") {
