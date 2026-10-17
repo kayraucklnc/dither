@@ -129,6 +129,7 @@ back in, then let go.
 | 🕰️ | Clock | The time as digits, flip tiles, a dial or words | — |
 | 📅 | Date | Today, like a page torn off a calendar | — |
 | ⛅ | Weather | Now, today and the next days ([Open-Meteo](https://open-meteo.com/)) | — |
+| 🌖 | Moon | Tonight's moon, drawn from NASA's map of it, how much is lit, and when it is next full and new — worked out ahead, so it needs no internet | — |
 | 🗓️ | Google Calendar | Every linked account as one agenda, grouped by day: what's on now, what's next, and the days ahead | A Google OAuth client (the app walks you through it) |
 | 🚆 | Trains (Trenord) | Your next train, how late it is, and the ones after it | — |
 | 💶 | Revenue (Stripe) | A figure, a smooth graph with each day's amount on it, a ledger or a full board with payments, converted to another currency if you like | A restricted Stripe key |
@@ -328,12 +329,13 @@ The full guide, with layout tips and the whole `Draw` API, is
 - ✅ Google Calendar, several accounts merged into one agenda
 - ✅ Stripe: figure, curved graph, ledger and payments board
 - ✅ Trains from Trenord, with delays, cancellations and line alerts
+- ✅ The moon tonight, from NASA's map, with its next phases
 - ✅ Share prices from Finnhub, up to five, every five minutes
 - ✅ Crypto prices, countdowns, messages, quotes, pictures, text and any JSON value
 - ⬜ Any calendar from an iCal link, with no OAuth
 - ⬜ Public transport anywhere through GTFS-Realtime, plus TfL, SBB, BVG and NS
 - ⬜ Home Assistant: sensors, rooms and switches
-- ⬜ Air quality, pollen, UV, sunrise and sunset, moon phase
+- ⬜ Air quality, pollen, UV, sunrise and sunset
 - ⬜ GitHub: open PRs, CI status, a contribution graph
 - ⬜ Analytics: Plausible, Umami, Google Analytics
 - ⬜ Tasks: Todoist, Linear, Notion

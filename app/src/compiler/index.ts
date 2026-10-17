@@ -26,6 +26,8 @@ export interface CompileDeps {
   boardPanel: (board: string) => Panel;
   /** Trim fonts to the characters the screens can show. On unless a test says otherwise. */
   subsetFonts?: boolean;
+  /** Unix seconds to build as of; now unless a test says otherwise. */
+  now?: number;
 }
 
 export interface CompiledSource {
@@ -142,7 +144,7 @@ function frameElements(box: { x: number; y: number; w: number; h: number }, fram
 const isFont = (b: Uint8Array) => b[0] === 0x44 && b[1] === 0x46 && b[2] === 0x4e && b[3] === 0x54; // "DFNT"
 
 export async function compile(project: Project, deps: CompileDeps): Promise<Compiled> {
-  const env = envOf(project);
+  const env = envOf(project, deps.now);
   const panel = rotated(deps.boardPanel(project.board), project.rotation);
   const assets = new AssetTable();
   const problems: Compiled["problems"] = [];
@@ -225,7 +227,7 @@ export async function compile(project: Project, deps: CompileDeps): Promise<Comp
     const keep = charsets.get(i);
     return deps.subsetFonts !== false && keep && keep !== "all" && isFont(bytes) ? subsetFont(bytes, keep) : bytes;
   });
-  const blob = encodeBlob({ runtime, assets: resolved, project: projectBytes });
+  const blob = encodeBlob({ runtime, assets: resolved, project: projectBytes, builtAt: deps.now });
   return { blob: blob.bytes, runtime: blob.runtime, sources, widgetSources: ids, ruleIds, problems };
 }
 

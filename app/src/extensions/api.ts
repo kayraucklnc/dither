@@ -215,6 +215,12 @@ export interface Draw {
    */
   bitmap(box: Box, key: string, ink: (x: number, y: number) => boolean): void;
   /**
+   * Bitmaps the widget draws itself, one chosen when the panel wakes: `pick`
+   * turns the value into one of `pictures`' names, as with `iconFor`. Each is
+   * drawn at the box's size; `key` names the set, as with `bitmap`.
+   */
+  pictureFor(valueKey: string, pick: Format, box: Box, key: string, pictures: Record<string, (x: number, y: number) => boolean>): void;
+  /**
    * Everything drawn inside `fn` only shows when `condition` holds on the panel.
    * References without a dot are this widget's own values.
    */
@@ -239,6 +245,8 @@ export interface Env {
   language: string;
   /** IANA zone, e.g. "Europe/Rome" — for examples that must be in the panel's local time. */
   timezone: string;
+  /** Unix seconds when the project is built: where tables worked out ahead of time start. */
+  now: number;
   /** Linked in Panel settings; shared by every widget. Never put credentials in a widget's settings. */
   accounts: Accounts;
 }
