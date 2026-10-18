@@ -134,7 +134,7 @@ back in, then let go.
 | 🚆 | Trains (Trenord) | Your next train, how late it is, and the ones after it | — |
 | 💶 | Revenue (Stripe) | A figure, a smooth graph with each day's amount on it, a ledger or a full board with payments, converted to another currency if you like | A restricted Stripe key |
 | 📈 | Stocks | Up to five share prices and how they moved today, every five minutes ([Finnhub](https://finnhub.io/)) | A free Finnhub key |
-| 🤖 | Claude Code | Your plan, its session and weekly limits and when they reset, what you've spent today and over seven days, the session you're in, and everything `/stats` shows | [The bridge](#claude-code-usage) running on your computer |
+| 🤖 | Claude Code | Your plan, its session and weekly limits and when they reset, and everything `/stats` shows | [The bridge](#claude-code-usage) running on your computer |
 | ₿ | Crypto price | A coin's price and today's change ([CoinGecko](https://www.coingecko.com/)) | — |
 | 🔢 | Number from the web | Any value from a JSON address: a sensor, a counter, a price | — |
 | 📄 | Web page | The text of any web page, fetched by the panel itself: a status page, a menu, a notice | — |
@@ -182,10 +182,9 @@ widget's settings walk you through these steps, with each line ready to copy:
    editor's preview on the same computer can use `http://127.0.0.1:8787/usage.json`.
 
 The first time it serves, and once a day after that, the bridge also reads
-back the past week from Claude Code's transcripts, so "Last 7 days" is right
-from the start rather than from the day you set it up. Those days are priced at
-list prices the way Claude Code estimates its own cost. Days the status line
-saw keep its figures.
+back the past week from Claude Code's transcripts, so its figures cover the days
+before you set it up. Those days are priced at list prices the way Claude Code
+estimates its own cost. Days the status line saw keep its figures.
 
 The figures only change while Claude Code is running. While the computer is
 asleep the panel keeps showing the last ones. A window that has reset since

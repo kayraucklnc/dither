@@ -306,10 +306,12 @@ for (const [name, timezone, at, pollen] of [
     const src = c.widgetSources.get(id)![""];
     for (const [k, v] of Object.entries({ _ok: true, _age: 3, ...figures })) values[`${src}.${k}`] = v;
   };
-  const day = { today: 12.4, todayTok: 18_300_000, todaySes: 5, week: 1048.25, weekTok: 171_900_000, weekSes: 21, upd: NOW - 180 };
+  const day = {
+    upd: NOW - 180, sModel: "Sonnet 5", sTok: 12_739_720_000, sIn: 1_420_000, sOut: 48_300_000,
+    sSes: 148, sLong: "6d 4h 12m", sAct: 61, sSpan: 84, sBusy: "2026-09-24", sStreak: 17, sCur: 6, sWap: 68,
+  };
   usage("board", {
     ...day, s5: 87.5, r5: NOW + 38 * 60 + 20, s7: 100, r7: NOW + 3 * 86400 + 5 * 3600,
-    cost: 3.21, tok: 4_820_000, ctx: 38, model: "Opus 5.5", add: 214, del: 57, min: 48,
     plan: "Claude Max 5x",
   });
   usage("free", { ...day, s5: null, r5: null, s7: null, r7: null });
@@ -329,9 +331,7 @@ for (const [name, timezone, at, pollen] of [
   const figures: Record<string, Value> = {
     _ok: true, _age: 2, upd: NOW - 120, plan: "Claude Max 5x",
     s5: 42, r5: NOW + 2 * 3600 + 14 * 60, s7: 61, r7: NOW + 3 * 86400 + 5 * 3600,
-    cost: 3.21, tok: 4_820_000, ctx: 38, model: "Opus 5.5", add: 214, del: 57, min: 48,
-    today: 12.4, todayTok: 18_300_000, todaySes: 5, week: 48.2, weekTok: 71_900_000, weekSes: 21,
-    sModel: "Sonnet 5", sTok: 12_739_720_000, sIn: 1_420_000, sOut: 48_300_000, sRead: 12_400_000_000, sWrite: 290_000_000,
+    sModel: "Sonnet 5", sTok: 12_739_720_000, sIn: 1_420_000, sOut: 48_300_000,
     sSes: 148, sLong: "6d 4h 12m", sAct: 61, sSpan: 84, sBusy: "2026-09-24", sStreak: 17, sCur: 6, sWap: 68,
   };
   write("claude-code-stats", c.blob, c.runtime, { ...DEVICE, ...Object.fromEntries(Object.entries(figures).map(([k, v]) => [`${src}.${k}`, v])) });
