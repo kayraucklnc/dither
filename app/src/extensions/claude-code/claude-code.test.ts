@@ -20,6 +20,13 @@ describe("Claude Code source", () => {
     });
   });
 
+  it("shows the limits alone in the limits mode, as projects that turned the stats off did", () => {
+    expect(claudeCode.defaults(env)).toMatchObject({ show: "all" });
+    expect(claudeCode.title!(settings({ show: "limits" }), env)).toBe("Claude Code · Limits");
+    expect(claudeCode.title!({ ...settings(), show: undefined, stats: false } as never, env)).toBe("Claude Code · Limits");
+    expect(claudeCode.title!({ ...settings(), show: undefined } as never, env)).toBe("Claude Code");
+  });
+
   it("asks nothing without a web address", () => {
     expect(claudeCode.source!(settings(), env)).toBeNull();
     expect(claudeCode.source!(settings({ url: "192.168.1.20:8787" }), env)).toBeNull();
@@ -42,10 +49,10 @@ describe("Claude Code widget", () => {
   });
 
   it("lays out at every size, with and without its rows, without a problem", async () => {
-    for (const stats of [true, false]) {
+    for (const show of ["limits", "all"]) {
       for (const [w, h] of [[5, 2], [5, 3], [10, 6], [12, 8], [20, 3], [6, 12], [20, 12]]) {
         const project = createProject({ starter: "blank", timezone: "Europe/Istanbul", language: "en", units: "metric", place: null });
-        project.screens[0].widgets = [{ id: "c", type: "claude-code", x: 0, y: 0, w, h, frame: "none", settings: { url: URL, stats } }];
+        project.screens[0].widgets = [{ id: "c", type: "claude-code", x: 0, y: 0, w, h, frame: "none", settings: { url: URL, show } }];
         const c = await compile(project, deps);
         expect(c.problems).toEqual([]);
       }

@@ -25,8 +25,13 @@ const COUNT: Format = { num: { d: 0, sep: "," } };
 interface Settings extends Record<string, unknown> {
   url: string;
   every: number;
-  stats: boolean;
+  /** "limits": the two limits alone, large; "all": the limits, all time and the tokens. */
+  show: "limits" | "all";
+  /** Before there were modes: false meant the limits alone. */
+  stats?: boolean;
 }
+
+const modeOf = (s: Settings) => s.show ?? (s.stats === false ? "limits" : "all");
 
 const addressOf = (s: Settings) => {
   const url = String(s.url ?? "").trim();
@@ -96,14 +101,15 @@ interface Section {
 
 /** The spark, "Claude Code" and the plan, and how fresh the figures are, over a rule. */
 function header(d: Draw, box: Box, scale: Type) {
-  // The title gives way until the longest plan and the time fit beside it.
+  // The title, and the plan and time beside it in proportion, give way until the longest plan fits.
+  const labelFor = (title: number) => Math.min(scale.label, Math.max(12, Math.round(title * 0.6)));
   const room = (title: number) => {
     const mark = Math.round(d.lineHeight(title, 700) * 1.05);
-    return mark * 1.4 + d.measure("Claude Code", title, 700) + title * 0.5 + d.measure("Claude Enterprise", t.label) + 16 + d.measure("Updated 88:88", t.label);
+    return mark * 1.4 + d.measure("Claude Code", title, 700) + title * 0.5 + d.measure("Claude Enterprise", labelFor(title)) + 16 + d.measure("Updated 88:88", labelFor(title));
   };
-  const t = { ...scale, label: Math.min(scale.label, Math.max(12, Math.round(scale.title * 0.6))) };
-  let title = t.title;
+  let title = scale.title;
   while (title > 14 && room(title) > box.w) title--;
+  const t = { ...scale, label: labelFor(title) };
   const mark = Math.round(d.lineHeight(title, 700) * 1.05);
   spark(d, { x: box.x, y: box.y + Math.floor((box.h - mark) / 2), w: mark, h: mark });
   const x = box.x + mark + Math.round(mark * 0.4);
@@ -175,14 +181,15 @@ function meter(d: Draw, key: "s5" | "s7", label: string, pattern: string, box: B
 
 const meterH = (d: Draw, t: Type) => d.lineHeight(t.label) + d.lineHeight(t.value, 700);
 
-/** Both limits, one long bar each. */
-function limitsSection(d: Draw, x: number, w: number, t: Type): Section {
+/** Both limits, one long bar each; under a heading unless they are all there is. */
+function limitsSection(d: Draw, x: number, w: number, t: Type, titled = true): Section {
   const gap = Math.round(t.value * 0.55);
+  const head = titled ? headingH(d, t) : 0;
   return {
-    h: headingH(d, t) + 2 * meterH(d, t) + gap,
+    h: head + 2 * meterH(d, t) + gap,
     draw: (y) => {
-      heading(d, "LIMITS", { x, y, w, h: 0 }, t);
-      const top = y + headingH(d, t);
+      if (titled) heading(d, "LIMITS", { x, y, w, h: 0 }, t);
+      const top = y + head;
       meter(d, "s5", "Session", "HH:mm", { x, y: top, w, h: meterH(d, t) }, t);
       meter(d, "s7", "Week", "ddd HH:mm", { x, y: top + meterH(d, t) + gap, w, h: meterH(d, t) }, t);
     },
@@ -311,16 +318,26 @@ function wide(d: Draw) {
   stack(columns[0], bodyTop(d, t), H);
 }
 
-/** The limits and, with room and the stats on, all time two by two. */
-function dashboard(d: Draw, s: Settings) {
+/** The limits and, with room, all time two by two. */
+function dashboard(d: Draw) {
   const W = d.width, H = d.height;
   const sections = (scale: Type) => {
     const t = { ...scale, value: figureSize(d, scale, W, 2) };
-    return [[limitsSection(d, 0, W, t), ...(s.stats ? [allTimeSection(d, 0, W, t, 2), tokensSection(d, 0, W, t, 2)] : [])]];
+    return [[limitsSection(d, 0, W, t), allTimeSection(d, 0, W, t, 2), tokensSection(d, 0, W, t, 2)]];
   };
   const { t, columns } = fitType(Math.min(W / 300, H / 240, 1.6), (t) => H - bodyTop(d, t), sections, 0.75);
   header(d, { x: 0, y: 0, w: W, h: headerH(d, t) }, t);
   stack(columns[0], bodyTop(d, t), H, Math.round(t.value * 1.4));
+}
+
+/** The limits mode: the header and both limits, as large as the box allows, in the middle of it. */
+function limitsOnly(d: Draw) {
+  const W = d.width, H = d.height;
+  const sections = (t: Type) => [[limitsSection(d, 0, W, t, false)]];
+  const { t, columns } = fitType(Math.min(W / 220, H / 180, 3), (t) => H - bodyTop(d, t), sections);
+  header(d, { x: 0, y: 0, w: W, h: headerH(d, t) }, t);
+  const free = H - bodyTop(d, t) - columns[0][0].h;
+  columns[0][0].draw(bodyTop(d, t) + Math.floor(free / 2));
 }
 
 /** Both limits, as large as the box allows. */
@@ -370,11 +387,18 @@ export default defineExtension<Settings>({
       help: "Limits show on Pro and Max plans, after a session's first reply. The figures change only while Claude Code is running; while the computer sleeps the panel keeps the last ones.",
     },
     { key: "every", label: "Check every", kind: "number", min: 1, max: 60, unit: "min" },
-    { key: "stats", label: "All-time stats", kind: "toggle", help: "What /stats shows, where there is room for it." },
+    {
+      key: "show", label: "Show", kind: "select",
+      options: [
+        { value: "limits", label: "Limits — the session and weekly limits, large" },
+        { value: "all", label: "Everything — the limits, all-time stats and tokens" },
+      ],
+      help: "Everything needs about the whole screen to show all of it; smaller, it shows what fits.",
+    },
   ],
-  defaults: () => ({ url: "", every: 5, stats: true }),
+  defaults: () => ({ url: "", every: 5, show: "all" }),
   example: { url: "http://192.168.1.20:8787/usage.json" },
-  title: () => "Claude Code",
+  title: (s) => (modeOf(s) === "limits" ? "Claude Code · Limits" : "Claude Code"),
   source(s) {
     const url = addressOf(s);
     if (!url) return null;
@@ -398,8 +422,10 @@ export default defineExtension<Settings>({
   ],
   draw(d, s) {
     if (!addressOf(s)) return needsAddress(d);
-    if (s.stats && d.width >= 640 && d.height >= 400) return wide(d);
-    if (d.width >= 360 && d.height >= 220) return dashboard(d, s);
+    const mode = modeOf(s);
+    if (mode === "limits" && d.width >= 300 && d.height >= 200) return limitsOnly(d);
+    if (mode === "all" && d.width >= 640 && d.height >= 400) return wide(d);
+    if (mode === "all" && d.width >= 360 && d.height >= 220) return dashboard(d);
     if (d.width >= 200 && d.height >= 100) return compact(d);
     single(d);
   },

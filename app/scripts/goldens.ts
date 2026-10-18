@@ -38,7 +38,7 @@ function write(name: string, blob: Uint8Array, runtime: Runtime, values: Record<
 const fonts = await loadFonts();
 const deps = { library: nodeLibrary, fonts, picture: async () => null, boardPanel: () => ({ width: 800, height: 480 }) };
 
-for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "starter-showcase", "primitives", "text-and-formats", "chart-labels", "air-quality", "air-quality-no-pollen", "air-quality-quiet", "aircraft", "aircraft-sky", "iss", "quote", "moon", "stocks", "claude-code", "claude-code-stats"]) {
+for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "starter-showcase", "primitives", "text-and-formats", "chart-labels", "air-quality", "air-quality-no-pollen", "air-quality-quiet", "aircraft", "aircraft-sky", "iss", "quote", "moon", "stocks", "claude-code", "claude-code-stats", "claude-code-limits"]) {
   rmSync(`${root}${dir}`, { recursive: true, force: true });
 }
 
@@ -335,6 +335,18 @@ for (const [name, timezone, at, pollen] of [
     sSes: 148, sLong: "6d 4h 12m", sAct: 61, sSpan: 84, sBusy: "2026-09-24", sStreak: 17, sCur: 6, sWap: 68,
   };
   write("claude-code-stats", c.blob, c.runtime, { ...DEVICE, ...Object.fromEntries(Object.entries(figures).map(([k, v]) => [`${src}.${k}`, v])) });
+}
+
+// Claude Code's limits mode on the whole screen: the two limits alone, large.
+{
+  const project = createProject({ starter: "blank", timezone: "Europe/Rome", language: "en", units: "metric", place });
+  project.screens[0].widgets = [
+    { id: "limits", type: "claude-code", x: 0, y: 0, w: 20, h: 12, frame: "none", settings: { url: "http://192.168.1.20:8787/usage.json", show: "limits" } },
+  ];
+  const c = await compile(project, deps);
+  const src = c.widgetSources.get("limits")![""];
+  const figures: Record<string, Value> = { _ok: true, _age: 2, upd: NOW - 120, plan: "Claude Max 5x", s5: 87.5, r5: NOW + 38 * 60 + 20, s7: 61, r7: NOW + 3 * 86400 + 5 * 3600 };
+  write("claude-code-limits", c.blob, c.runtime, { ...DEVICE, ...Object.fromEntries(Object.entries(figures).map(([k, v]) => [`${src}.${k}`, v])) });
 }
 
 // Hand-placed elements at their edges: what the starters do not reach.

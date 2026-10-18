@@ -134,7 +134,7 @@ back in, then let go.
 | 🚆 | Trains (Trenord) | Your next train, how late it is, and the ones after it | — |
 | 💶 | Revenue (Stripe) | A figure, a smooth graph with each day's amount on it, a ledger or a full board with payments, converted to another currency if you like | A restricted Stripe key |
 | 📈 | Stocks | Up to five share prices and how they moved today, every five minutes ([Finnhub](https://finnhub.io/)) | A free Finnhub key |
-| 🤖 | Claude Code | Your plan, its session and weekly limits and when they reset, and everything `/stats` shows | [The bridge](#claude-code-usage) running on your computer |
+| 🤖 | Claude Code | Your plan's session and weekly limits and when they reset, large — or with them everything `/stats` shows | [The bridge](#claude-code-usage) running on your computer |
 | ₿ | Crypto price | A coin's price and today's change ([CoinGecko](https://www.coingecko.com/)) | — |
 | 🔢 | Number from the web | Any value from a JSON address: a sensor, a counter, a price | — |
 | 📄 | Web page | The text of any web page, fetched by the panel itself: a status page, a menu, a notice | — |
