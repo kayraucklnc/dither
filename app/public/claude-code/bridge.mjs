@@ -6,11 +6,12 @@
 // it happened, and serves the result as one JSON file the panel fetches over
 // your Wi-Fi.
 //
-//   node tools/claude-code/bridge.mjs statusline   # as Claude Code's statusLine command
-//   node tools/claude-code/bridge.mjs serve        # http://<this computer>:8787/usage.json
-//   node tools/claude-code/bridge.mjs print        # what the panel would get
+//   node ~/.claude/dither/bridge.mjs statusline   # as Claude Code's statusLine command
+//   node ~/.claude/dither/bridge.mjs serve        # http://<this computer>:8787/usage.json
+//   node ~/.claude/dither/bridge.mjs print        # what the panel would get
 //
-// No dependencies. Tokens are read from the session transcripts, whose format
+// The app serves this file, so the widget's settings can give a one-line
+// download to ~/.claude/dither/. No dependencies. Tokens are read from the session transcripts, whose format
 // Claude Code does not promise to keep; when it changes they stop counting and
 // everything else still works.
 

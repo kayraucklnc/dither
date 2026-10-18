@@ -152,13 +152,16 @@ a project to a file, they're left out unless you choose to include them.
 ### Claude Code usage
 
 Claude Code keeps your usage on your computer, so the panel reads it from there,
-over your Wi-Fi. `tools/claude-code/bridge.mjs` (Node, nothing to install) does
-two jobs:
+over your Wi-Fi. A small bridge (Node, nothing to install) does that. The
+widget's settings walk you through these steps, with each line ready to copy:
 
-1. **It is Claude Code's status line.** Add this to `~/.claude/settings.json`:
+1. **Download it:**
+   `curl -fsSL --create-dirs -o ~/.claude/dither/bridge.mjs https://kayraucklnc.github.io/dither/claude-code/bridge.mjs`
+   (it is `app/public/claude-code/bridge.mjs` in this repository).
+2. **Make it Claude Code's status line.** Add this to `~/.claude/settings.json`:
 
    ```json
-   "statusLine": { "type": "command", "command": "node /path/to/dither/tools/claude-code/bridge.mjs statusline" }
+   "statusLine": { "type": "command", "command": "node ~/.claude/dither/bridge.mjs statusline" }
    ```
 
    On every update Claude Code hands it the session's estimated cost, its
@@ -166,18 +169,19 @@ two jobs:
    files each session's spend under the day it happened and counts tokens from
    the session transcripts (subagents included), then prints a short line:
    `Opus 5.5 · 41% context · $1.50 · 5h 24% · week 61%`.
-2. **It serves the result.** Run `node tools/claude-code/bridge.mjs serve`
+3. **Serve the result.** Run `node ~/.claude/dither/bridge.mjs serve`
    and enter the address it prints, such as
    `http://192.168.1.20:8787/usage.json`, in the widget. Use the IP
    address: the panel cannot look up `name.local`. Give the computer a fixed address
-   in your router, and allow the incoming connection when macOS asks.
+   in your router, and allow the incoming connection when macOS asks. The
+   editor's preview on the same computer can use `http://127.0.0.1:8787/usage.json`.
 
 The figures only change while Claude Code is running. While the computer is
 asleep the panel keeps showing the last ones. A window that has reset since
 then says so. Spend is Claude Code's own estimate at list prices, not your
 bill. Tokens are best effort: Claude Code doesn't promise to keep its
 transcript format, so after an update they may stop counting while
-everything else carries on. `node tools/claude-code/bridge.mjs print` shows
+everything else carries on. `node ~/.claude/dither/bridge.mjs print` shows
 what the panel would get.
 
 ## How it works

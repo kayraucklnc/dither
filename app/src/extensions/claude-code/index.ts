@@ -3,7 +3,7 @@ import { defineExtension, type Box, type Draw } from "../api";
 
 // Your Claude Code usage: the plan's 5-hour and weekly limits, what you have
 // spent, and the session you are in. Claude Code keeps these on your computer,
-// so the panel reads them from tools/claude-code/bridge.mjs there — Claude
+// so the panel reads them from a bridge there (app/public/claude-code/bridge.mjs) — Claude
 // Code's status line, which also serves them as one JSON file on your Wi-Fi.
 
 /** The bridge's answer, kept under these names. */
@@ -193,7 +193,17 @@ export default defineExtension<Settings>({
   fields: [
     {
       key: "url", label: "Bridge address", kind: "text", placeholder: "http://192.168.1.20:8787/usage.json",
-      help: "Run “node tools/claude-code/bridge.mjs serve” on the computer you use Claude Code on, with the bridge as Claude Code's status line, and enter the address it prints. See the README.",
+      help: "The address the bridge prints when it starts. Setting it up takes a minute; see below.",
+    },
+    {
+      key: "setup", label: "How to set up the bridge", kind: "guide",
+      steps: [
+        { text: "Download the bridge to the computer you use Claude Code on. It needs Node.js and nothing else.", code: "curl -fsSL --create-dirs -o ~/.claude/dither/bridge.mjs {{app}}claude-code/bridge.mjs" },
+        { text: "Make it Claude Code's status line: add this to ~/.claude/settings.json, then start a new Claude Code session.", code: '"statusLine": { "type": "command", "command": "node ~/.claude/dither/bridge.mjs statusline" }' },
+        { text: "Start its server, and leave it running. It prints the addresses it can be reached at.", code: "node ~/.claude/dither/bridge.mjs serve" },
+        { text: "Enter an address above. This preview can use the one below; the panel needs the one with your computer's network address (192.168…), and that address fixed in your router.", code: "http://127.0.0.1:8787/usage.json" },
+      ],
+      help: "Limits show on Pro and Max plans, after a session's first reply. The figures change only while Claude Code is running; while the computer sleeps the panel keeps the last ones.",
     },
     { key: "every", label: "Check every", kind: "number", min: 1, max: 60, unit: "min" },
     { key: "tokens", label: "Tokens", kind: "toggle" },

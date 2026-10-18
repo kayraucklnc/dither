@@ -11,6 +11,7 @@ import { useProject } from "@/state/project-store";
 import { Field, NumberInput, Select, TextArea, TextInput, Toggle } from "../kit";
 import type { Lane } from "@/extensions/google-calendar";
 import { CalendarsField } from "../fields/CalendarsField";
+import { GuideField } from "../fields/GuideField";
 import { ImagesField } from "../fields/ImagesField";
 import { RemoteSelect } from "../fields/RemoteSelect";
 import { PlaceSearch } from "../fields/PlaceSearch";
@@ -59,7 +60,9 @@ export function SettingsForm({ fields, values, onChange }: Props) {
   const { project } = useProject();
   return (
     <div className="space-y-4">
-      {fields.filter((f) => !f.visible || f.visible(values)).map((f) => (
+      {fields.filter((f) => !f.visible || f.visible(values)).map((f) => f.kind === "guide" ? (
+        <GuideField key={f.key} label={f.label} steps={f.steps} help={f.help} />
+      ) : (
         <Field key={f.key} label={f.label} help={f.help}>
           {(id) => {
             const v = values[f.key];

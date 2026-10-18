@@ -6,7 +6,7 @@ import { test } from "node:test";
 
 const home = mkdtempSync(join(tmpdir(), "dither-claude-"));
 process.env.DITHER_CLAUDE_DIR = join(home, "state");
-const { dayOf, line, load, record, save, usage } = await import("./bridge.mjs");
+const { dayOf, line, load, record, save, usage } = await import("../../app/public/claude-code/bridge.mjs");
 
 const empty = () => ({ sessions: {}, days: {}, limits: {}, files: {}, latest: null });
 const noon = (y, m, d) => new Date(y, m - 1, d, 12).getTime();
