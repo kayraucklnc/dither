@@ -134,7 +134,7 @@ back in, then let go.
 | 🚆 | Trains (Trenord) | Your next train, how late it is, and the ones after it | — |
 | 💶 | Revenue (Stripe) | A figure, a smooth graph with each day's amount on it, a ledger or a full board with payments, converted to another currency if you like | A restricted Stripe key |
 | 📈 | Stocks | Up to five share prices and how they moved today, every five minutes ([Finnhub](https://finnhub.io/)) | A free Finnhub key |
-| 🤖 | Claude Code | Your session and weekly limits and when they reset, what you've spent today and over seven days, tokens, and the session you're in | [The bridge](#claude-code-usage) running on your computer |
+| 🤖 | Claude Code | Your plan, its session and weekly limits and when they reset, what you've spent today and over seven days, the session you're in, and everything `/stats` shows | [The bridge](#claude-code-usage) running on your computer |
 | ₿ | Crypto price | A coin's price and today's change ([CoinGecko](https://www.coingecko.com/)) | — |
 | 🔢 | Number from the web | Any value from a JSON address: a sensor, a counter, a price | — |
 | 📄 | Web page | The text of any web page, fetched by the panel itself: a status page, a menu, a notice | — |
@@ -169,12 +169,23 @@ widget's settings walk you through these steps, with each line ready to copy:
    files each session's spend under the day it happened and counts tokens from
    the session transcripts (subagents included), then prints a short line:
    `Opus 5.5 · 41% context · $1.50 · 5h 24% · week 61%`.
-3. **Serve the result.** Run `node ~/.claude/dither/bridge.mjs serve`
+3. **Serve the result.** Along with what the status line saw, it reads
+   two of Claude Code's own files when the panel asks: `~/.claude/stats-cache.json`,
+   for the all-time figures `/stats` shows (favorite model, sessions, streaks,
+   tokens by kind, and how many War and Peaces your input and output come to),
+   and, from `~/.claude.json`, only your plan's name (such as Claude Max 20x).
+   Neither file is a documented format, so these are best effort too. Run `node ~/.claude/dither/bridge.mjs serve`
    and enter the address it prints, such as
    `http://192.168.1.20:8787/usage.json`, in the widget. Use the IP
    address: the panel cannot look up `name.local`. Give the computer a fixed address
    in your router, and allow the incoming connection when macOS asks. The
    editor's preview on the same computer can use `http://127.0.0.1:8787/usage.json`.
+
+The first time it serves, and once a day after that, the bridge also reads
+back the past week from Claude Code's transcripts, so "Last 7 days" is right
+from the start rather than from the day you set it up. Those days are priced at
+list prices the way Claude Code estimates its own cost. Days the status line
+saw keep its figures.
 
 The figures only change while Claude Code is running. While the computer is
 asleep the panel keeps showing the last ones. A window that has reset since
