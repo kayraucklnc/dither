@@ -17,6 +17,7 @@ firmware: ## Build the firmware and hand it to the app (needs uv)
 
 test: ## Every test: app, firmware host tests, shared golden images
 	cd app && npm test && npx tsc -b
+	node --test tools/claude-code/bridge.test.mjs
 	$(MAKE) -C firmware test
 
 goldens: ## Redraw spec/fixtures from the TypeScript runtime

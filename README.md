@@ -134,6 +134,7 @@ back in, then let go.
 | 🚆 | Trains (Trenord) | Your next train, how late it is, and the ones after it | — |
 | 💶 | Revenue (Stripe) | A figure, a smooth graph with each day's amount on it, a ledger or a full board with payments, converted to another currency if you like | A restricted Stripe key |
 | 📈 | Stocks | Up to five share prices and how they moved today, every five minutes ([Finnhub](https://finnhub.io/)) | A free Finnhub key |
+| 🤖 | Claude Code | Your session and weekly limits and when they reset, what you've spent today and over seven days, tokens, and the session you're in | [The bridge](#claude-code-usage) running on your computer |
 | ₿ | Crypto price | A coin's price and today's change ([CoinGecko](https://www.coingecko.com/)) | — |
 | 🔢 | Number from the web | Any value from a JSON address: a sensor, a counter, a price | — |
 | 📄 | Web page | The text of any web page, fetched by the panel itself: a status page, a menu, a notice | — |
@@ -147,6 +148,37 @@ back in, then let go.
 
 Keys and account links stay in your browser and on your panel. When you save
 a project to a file, they're left out unless you choose to include them.
+
+### Claude Code usage
+
+Claude Code keeps your usage on your computer, so the panel reads it from there,
+over your Wi-Fi. `tools/claude-code/bridge.mjs` (Node, nothing to install) does
+two jobs:
+
+1. **It is Claude Code's status line.** Add this to `~/.claude/settings.json`:
+
+   ```json
+   "statusLine": { "type": "command", "command": "node /path/to/dither/tools/claude-code/bridge.mjs statusline" }
+   ```
+
+   On every update Claude Code hands it the session's estimated cost, its
+   context and, on Pro and Max plans, the 5-hour and weekly limits. The bridge
+   files each session's spend under the day it happened and counts tokens from
+   the session transcripts (subagents included), then prints a short line:
+   `Opus 5.5 · 41% context · $1.50 · 5h 24% · week 61%`.
+2. **It serves the result.** Run `node tools/claude-code/bridge.mjs serve`
+   and enter the address it prints, such as
+   `http://192.168.1.20:8787/usage.json`, in the widget. Use the IP
+   address: the panel cannot look up `name.local`. Give the computer a fixed address
+   in your router, and allow the incoming connection when macOS asks.
+
+The figures only change while Claude Code is running. While the computer is
+asleep the panel keeps showing the last ones. A window that has reset since
+then says so. Spend is Claude Code's own estimate at list prices, not your
+bill. Tokens are best effort: Claude Code doesn't promise to keep its
+transcript format, so after an update they may stop counting while
+everything else carries on. `node tools/claude-code/bridge.mjs print` shows
+what the panel would get.
 
 ## How it works
 

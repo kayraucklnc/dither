@@ -4,6 +4,7 @@ import type { Extension } from "./api";
 import airQuality from "./air-quality";
 import aircraft from "./aircraft";
 import iss from "./iss";
+import claudeCode from "./claude-code";
 import clock from "./clock";
 import countdown from "./countdown";
 import crypto from "./crypto";
@@ -24,5 +25,5 @@ import webPage from "./web-page";
 import webValue from "./web-value";
 
 export const EXTENSIONS: readonly Extension[] = [
-  clock, date, weather, airQuality, googleCalendar, trenord, aircraft, iss, moon, text, messages, quote, countdown, picture, gallery, stripe, stocks, crypto, webValue, webPage, status,
+  clock, date, weather, airQuality, googleCalendar, trenord, aircraft, iss, moon, text, messages, quote, countdown, picture, gallery, stripe, stocks, claudeCode, crypto, webValue, webPage, status,
 ] as unknown as Extension[];

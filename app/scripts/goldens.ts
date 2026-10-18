@@ -38,7 +38,7 @@ function write(name: string, blob: Uint8Array, runtime: Runtime, values: Record<
 const fonts = await loadFonts();
 const deps = { library: nodeLibrary, fonts, picture: async () => null, boardPanel: () => ({ width: 800, height: 480 }) };
 
-for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "starter-showcase", "primitives", "text-and-formats", "chart-labels", "air-quality", "air-quality-no-pollen", "air-quality-quiet", "aircraft", "aircraft-sky", "iss", "quote", "moon", "stocks"]) {
+for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "starter-showcase", "primitives", "text-and-formats", "chart-labels", "air-quality", "air-quality-no-pollen", "air-quality-quiet", "aircraft", "aircraft-sky", "iss", "quote", "moon", "stocks", "claude-code"]) {
   rmSync(`${root}${dir}`, { recursive: true, force: true });
 }
 
@@ -287,6 +287,35 @@ for (const [name, timezone, at, pollen] of [
   Object.assign(values, { [`${c.widgetSources.get("one")!.fx}.rate`]: 0.88865, [`${c.widgetSources.get("lira")!.fx}.rate`]: 49.527 });
   Object.assign(values, { [`${list.mkt}.open`]: false, [`${list.mkt}.session`]: null, [`${list.mkt}._ok`]: true, [`${list.mkt}._age`]: 10 });
   write("stocks", c.blob, c.runtime, values);
+}
+
+// Claude Code usage: the whole dashboard with the session limit about to reset, two
+// compact ones (no plan limits; a window that reset while the computer slept), the limit alone.
+{
+  const project = createProject({ starter: "blank", timezone: "Europe/Rome", language: "en", units: "metric", place });
+  const url = (q: string) => `http://192.168.1.20:8787/usage.json?${q}`;
+  project.screens[0].widgets = [
+    { id: "board", type: "claude-code", x: 0, y: 0, w: 12, h: 8, frame: "none", settings: { url: url("board") } },
+    { id: "free", type: "claude-code", x: 12, y: 0, w: 8, h: 4, frame: "outline", settings: { url: url("free") } },
+    { id: "slept", type: "claude-code", x: 12, y: 4, w: 8, h: 4, frame: "none", settings: { url: url("slept") } },
+    { id: "one", type: "claude-code", x: 0, y: 9, w: 12, h: 2, frame: "none", settings: { url: url("one") } },
+  ];
+  const c = await compile(project, deps);
+  const values: Record<string, Value> = { ...DEVICE };
+  const usage = (id: string, figures: Record<string, Value>) => {
+    const src = c.widgetSources.get(id)![""];
+    for (const [k, v] of Object.entries({ _ok: true, _age: 3, ...figures })) values[`${src}.${k}`] = v;
+  };
+  const day = { today: 12.4, todayTok: 18_300_000, todaySes: 5, week: 1048.25, weekTok: 171_900_000, weekSes: 21, upd: NOW - 180 };
+  usage("board", {
+    ...day, s5: 87.5, r5: NOW + 38 * 60 + 20, s7: 100, r7: NOW + 3 * 86400 + 5 * 3600,
+    cost: 3.21, tok: 4_820_000, ctx: 38, model: "Opus 5.5", proj: "dither", add: 214, del: 57, min: 48,
+    days: [3.1, 0, 8.4, 911.2, 6, 7.1, 12.4],
+  });
+  usage("free", { ...day, s5: null, r5: null, s7: null, r7: null, days: [0, 0, 0, 0, 0, 0, 0] });
+  usage("slept", { ...day, s5: 64, r5: NOW - 25 * 60, s7: 0, r7: NOW + 6 * 86400 });
+  usage("one", { s5: 3, r5: NOW + 4 * 3600 + 59 * 60 });
+  write("claude-code", c.blob, c.runtime, values);
 }
 
 // Hand-placed elements at their edges: what the starters do not reach.
