@@ -42,6 +42,11 @@ export type Field =
    */
   /** Which linked Google accounts to show, and which calendar of each. */
   | (FieldBase & { kind: "calendars" })
+  /**
+   * Steps to follow, folded under the label; it stores nothing. A step's `code`
+   * is a line to copy, in which `{{app}}` becomes the app's own address.
+   */
+  | (FieldBase & { kind: "guide"; steps: { text: string; code?: string }[] })
   | (FieldBase & { kind: "remote-select"; load: (env: Env, settings: Record<string, unknown>) => Promise<{ value: string; label: string }[]> });
 
 // ---------------------------------------------------------------- data

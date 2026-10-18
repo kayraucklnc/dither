@@ -1,0 +1,18 @@
+{
+  "now": 1791119250,
+  "values": {
+    "device.battery": 64,
+    "device.usb": false,
+    "device.online": true,
+    "device.rssi": -61,
+    "device.changed": 1791118530,
+    "s0._ok": true,
+    "s0._age": 2,
+    "s0.upd": 1791119130,
+    "s0.plan": "Claude Max 5x",
+    "s0.s5": 87.5,
+    "s0.r5": 1791121550,
+    "s0.s7": 61,
+    "s0.r7": 1791396450
+  }
+}
