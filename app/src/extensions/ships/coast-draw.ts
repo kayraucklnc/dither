@@ -5,15 +5,56 @@
 
 import type { Box } from "../api";
 import { shade } from "../stipple";
-import { COAST, COAST_GRID } from "./coast";
+import { COAST, COAST_GRID, COAST_PAD } from "./coast";
 import { type Bounds, REGIONS, areaOf, boundsOf, contains } from "./regions";
 
 /** A closed ring of [longitude, latitude] points. */
 export type Ring = [number, number][];
 
 const DEG = Math.PI / 180;
-/** How dark the land is: light enough for a black hull and its name to read on it. */
-export const LAND_SHADE = 0.14;
+/** How dark the land is inland: light enough for a black hull and its name to read on it. */
+export const LAND_SHADE = 0.12;
+/** The shore band just inside the coastline, darker, as a chart shades it. */
+export const SHORE_SHADE = 0.45;
+/** How wide that band is, in pixels. */
+const SHORE_PX = 3;
+
+/** The box a region's coast is kept for: its own, grown by COAST_PAD of its span each way, so a chart can show around it. */
+export function paddedBounds(b: Bounds): Bounds {
+  const dLat = (b.north - b.south) * COAST_PAD;
+  const dLon = (b.east - b.west) * COAST_PAD;
+  return { south: b.south - dLat, west: b.west - dLon, north: b.north + dLat, east: b.east + dLon };
+}
+
+/** The bounds grown by a share of their span each way, within `limit`: room around the waters, so nothing at their edge sits under the chart's furniture. */
+export function grown(b: Bounds, share: number, limit: Bounds): Bounds {
+  const dLat = (b.north - b.south) * share;
+  const dLon = (b.east - b.west) * share;
+  return { south: Math.max(limit.south, b.south - dLat), west: Math.max(limit.west, b.west - dLon), north: Math.min(limit.north, b.north + dLat), east: Math.min(limit.east, b.east + dLon) };
+}
+
+/** The bounds grown about their centre to the chart's shape on the ground, as far as `limit` allows; what is left over is letterboxed. */
+export function expandTo(b: Bounds, aspect: number, limit: Bounds): Bounds {
+  const mid = ((b.south + b.north) / 2) * DEG;
+  const cosMid = Math.cos(mid);
+  const own = ((b.east - b.west) * cosMid) / (b.north - b.south);
+  let { south, west, north, east } = b;
+  if (aspect > own) {
+    // Wider than the box: more longitude, up to the limit.
+    const want = ((north - south) * aspect) / cosMid;
+    const half = Math.min(want, limit.east - limit.west) / 2;
+    const centre = (west + east) / 2;
+    west = Math.max(limit.west, centre - half);
+    east = Math.min(limit.east, centre + half);
+  } else if (aspect < own) {
+    const want = ((east - west) * cosMid) / aspect;
+    const half = Math.min(want, limit.north - limit.south) / 2;
+    const centre = (south + north) / 2;
+    south = Math.max(limit.south, centre - half);
+    north = Math.min(limit.north, centre + half);
+  }
+  return { south, west, north, east };
+}
 
 const decoded = new Map<string, Ring[]>();
 
@@ -24,20 +65,41 @@ export function ringsOf(id: string): Ring[] {
   const region = REGIONS.find((r) => r.id === id);
   const table = COAST[id];
   if (!region || !table) return [];
-  const b = boundsOf(region);
-  const rings: Ring[] = table.map((deltas) => {
+  const b = paddedBounds(boundsOf(region));
+  const numbers = unpack(table);
+  const rings: Ring[] = [];
+  for (let at = 0; at < numbers.length; ) {
+    const n = numbers[at++];
     const ring: Ring = [];
     let x = 0;
     let y = 0;
-    for (let i = 0; i < deltas.length; i += 2) {
-      x += deltas[i];
-      y += deltas[i + 1];
+    for (let i = 0; i < n; i++) {
+      x += numbers[at++];
+      y += numbers[at++];
       ring.push([b.west + (x / (COAST_GRID - 1)) * (b.east - b.west), b.north - (y / (COAST_GRID - 1)) * (b.north - b.south)]);
     }
-    return ring;
-  });
+    rings.push(ring);
+  }
   decoded.set(id, rings);
   return rings;
+}
+
+/** Base64 of zigzag varints back to numbers. */
+export function unpack(text: string): number[] {
+  const bytes = Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
+  const out: number[] = [];
+  let v = 0;
+  let shift = 0;
+  for (const byte of bytes) {
+    v += (byte & 127) * 2 ** shift;
+    if (byte & 128) shift += 7;
+    else {
+      out.push(v % 2 === 0 ? v / 2 : -(v + 1) / 2);
+      v = 0;
+      shift = 0;
+    }
+  }
+  return out;
 }
 
 const overlaps = (a: Bounds, b: Bounds): boolean => a.south < b.north && b.south < a.north && a.west < b.east && b.west < a.east;
@@ -50,10 +112,11 @@ const overlaps = (a: Bounds, b: Bounds): boolean => a.south < b.north && b.south
  * through one another. Empty when no preset comes near.
  */
 export function ringsFor(b: Bounds, regionId?: string): Ring[][] {
-  if (regionId && COAST[regionId]) return [ringsOf(regionId)];
-  const holders = REGIONS.filter((r) => contains(boundsOf(r), b)).sort((p, q) => areaOf(boundsOf(p)) - areaOf(boundsOf(q)));
+  const region = regionId ? REGIONS.find((r) => r.id === regionId) : undefined;
+  if (region && COAST[region.id] && contains(paddedBounds(boundsOf(region)), b)) return [ringsOf(region.id)];
+  const holders = REGIONS.filter((r) => contains(paddedBounds(boundsOf(r)), b)).sort((p, q) => areaOf(boundsOf(p)) - areaOf(boundsOf(q)));
   if (holders.length) return [ringsOf(holders[0].id)];
-  return REGIONS.filter((r) => overlaps(boundsOf(r), b)).map((r) => ringsOf(r.id)).filter((rings) => rings.length);
+  return REGIONS.filter((r) => overlaps(paddedBounds(boundsOf(r)), b)).map((r) => ringsOf(r.id)).filter((rings) => rings.length);
 }
 
 /** The largest box of the bounds' shape on the ground that fits `area`, centred in it. */
@@ -97,9 +160,27 @@ function fillLand(rings: Ring[], b: Bounds, w: number, h: number, land: Uint8Arr
   }
 }
 
-/** The ink for a coast picture: a solid line where land meets water, a light stipple inland. The picture's edge is not a coast. */
+/** Land with its outermost pixels taken off: what is left is at least a pixel farther from the water. The picture's edge is not a coast. */
+function eroded(land: Uint8Array, w: number, h: number): Uint8Array {
+  const out = new Uint8Array(w * h);
+  const at = (x: number, y: number) => land[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (land[y * w + x] && at(x - 1, y) && at(x + 1, y) && at(x, y - 1) && at(x, y + 1)) out[y * w + x] = 1;
+  return out;
+}
+
+/**
+ * The ink for a coast picture, as a chart shades it: a solid line where land
+ * meets water, a darker band along the shore, a light stipple inland.
+ */
 export function coastInk(ringSets: Ring[][], b: Bounds, w: number, h: number): (x: number, y: number) => boolean {
   const land = landMask(ringSets, b, w, h);
-  const at = (x: number, y: number) => land[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))];
-  return (x, y) => !!land[y * w + x] && (!at(x - 1, y) || !at(x + 1, y) || !at(x, y - 1) || !at(x, y + 1) || shade(x, y, LAND_SHADE));
+  const inland = eroded(land, w, h);
+  let interior = inland;
+  for (let i = 1; i < SHORE_PX; i++) interior = eroded(interior, w, h);
+  return (x, y) => {
+    const i = y * w + x;
+    if (!land[i]) return false;
+    if (!inland[i]) return true;
+    return shade(x, y, interior[i] ? LAND_SHADE : SHORE_SHADE);
+  };
 }

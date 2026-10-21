@@ -2,7 +2,7 @@ import type { Condition, Format } from "@/runtime/types";
 import type { Place } from "@/project/schema";
 import { defineExtension, type Box, type Draw, type Env, type Fact, type MergeSpec, type SourceSpec } from "../api";
 import { boxAround, KM_PER_DEG } from "../geo";
-import { coastInk, letterbox, ringsFor } from "./coast-draw";
+import { coastInk, expandTo, grown, letterbox, paddedBounds, ringsFor } from "./coast-draw";
 import { type Bounds, CUSTOM, REGION_OPTIONS, boundsOf as regionBounds, regionOf } from "./regions";
 
 // The ships in a stretch of sea right now — the Bosphorus, the Cyclades, the
@@ -14,15 +14,20 @@ import { type Bounds, CUSTOM, REGION_OPTIONS, boundsOf as regionBounds, regionOf
 
 export const OPEN_WATERS = "https://ais.openwaters.io/v1/vessels";
 
-const FIELDS = ["name", "lat", "lon", "sog", "cog", "nav", "type", "dest", "flag"] as const;
+const FIELDS = ["name", "lat", "lon", "sog", "cog", "hdg", "nav", "type", "dest", "flag"] as const;
 type Field = (typeof FIELDS)[number];
 /** Where each field sits in a GeoJSON feature. */
 const PATH: Record<Field, string> = {
   name: "properties.name", lat: "geometry.coordinates.1", lon: "geometry.coordinates.0", sog: "properties.sog", cog: "properties.cog",
-  nav: "properties.nav_status", type: "properties.type", dest: "properties.destination", flag: "properties.flag",
+  hdg: "properties.heading", nav: "properties.nav_status", type: "properties.type", dest: "properties.destination", flag: "properties.flag",
 };
-/** A chart needs only where each ship is, which way it goes and its name, so it can carry twice as many. */
-const CHART_FIELDS: readonly Field[] = ["name", "lat", "lon", "sog", "cog", "type"];
+/**
+ * A chart needs only where each ship is, which way it points and goes, and
+ * its name, so it can carry twice as many. Every value kept costs the panel
+ * about 200 bytes of heap for as long as the program is loaded, so a chart
+ * does without the kind of ship: every hull on it is a ship's.
+ */
+const CHART_FIELDS: readonly Field[] = ["name", "lat", "lon", "sog", "cog", "hdg"];
 const COUNT_FIELDS: readonly Field[] = ["sog"];
 /** Every slot is kept across sleeps in a cache shared by every widget, so few. */
 const SLOTS = { chart: 24, count: 20, full: 12 } as const;
@@ -107,8 +112,10 @@ const bound = (i: number): Condition => ({ all: [{ v: fk("dest", i), op: "presen
 type Kind = "ship" | "boat";
 export const namesOf = (kind: Kind) => Array.from({ length: 16 }, (_, i) => `${kind}-${Math.floor(i * 22.5)}`);
 const SLICES = Array.from({ length: 16 }, (_, i) => Math.round(i * 22.5 + 11.25));
-/** The icon for a course; without one (or 360, "not available"), the ship points north. */
+/** The icon for a course or heading; without one (or AIS's 360 and 511, "not available"), the ship points north. */
 export const course = (kind: Kind): Format => ({ steps: { t: SLICES, o: [...namesOf(kind), `${kind}-0`] }, fallback: `${kind}-0` });
+/** Knots at which a course vector grows a step: under way, and making way. */
+const FAST = [0.5, 8];
 
 /** AIS navigational status, where it says something. */
 const STATUSES: [number, string][] = [
@@ -156,10 +163,10 @@ function nameSize(d: Draw, w: number, h: number): number {
   return 14;
 }
 
-/** The ship itself, its kind's hull turned to its course. */
-function hull(d: Draw, typeKey: string, cogKey: string, box: Box) {
-  d.when(boatIs(typeKey), () => d.iconFor(cogKey, course("boat"), namesOf("boat"), box));
-  d.when({ not: boatIs(typeKey) }, () => d.iconFor(cogKey, course("ship"), namesOf("ship"), box));
+/** The ship itself, its kind's hull turned to its course (or, lying still, its heading). */
+function hull(d: Draw, typeKey: string, turnKey: string, box: Box) {
+  d.when(boatIs(typeKey), () => d.iconFor(turnKey, course("boat"), namesOf("boat"), box));
+  d.when({ not: boatIs(typeKey) }, () => d.iconFor(turnKey, course("ship"), namesOf("ship"), box));
 }
 
 /** "Moored", or by its speed when the status says nothing: "Under way" or "Stopped". */
@@ -317,7 +324,7 @@ function list(d: Draw, s: Settings, box: Box, slots: number) {
   nothingUnderWay(d, box);
 }
 
-/** A round length for the scale bar: at most a third of the chart. */
+/** A round length for the scale bar: at most a third of the chart, bottom left, on white. */
 function scaleBar(d: Draw, plot: Box, b: Bounds, small: number) {
   const kmPerPx = ((b.east - b.west) * KM_PER_DEG * Math.cos(((b.south + b.north) / 2) * (Math.PI / 180))) / plot.w;
   const km = [1, 2, 5, 10, 20, 50, 100, 200, 500].filter((n) => n / kmPerPx <= plot.w / 3).pop();
@@ -326,83 +333,132 @@ function scaleBar(d: Draw, plot: Box, b: Bounds, small: number) {
   const text = `${km} km`;
   const th = d.lineHeight(small);
   const tw = d.measure(text, small);
-  const x0 = plot.x + 6;
-  const y0 = plot.y + plot.h - 6;
-  d.rect({ x: x0 - 3, y: y0 - th - 5, w: Math.max(len, tw) + 6, h: th + 8 }, { fill: true, white: true });
+  const x0 = plot.x + 8;
+  const y0 = plot.y + plot.h - 8;
+  d.rect({ x: x0 - 4, y: y0 - th - 6, w: Math.max(len, tw) + 8, h: th + 10 }, { fill: true, white: true });
   d.line(x0, y0, x0 + len, y0, { width: 2 });
-  d.line(x0, y0 - 4, x0, y0, { width: 2 });
-  d.line(x0 + len, y0 - 4, x0 + len, y0, { width: 2 });
+  d.line(x0, y0 - 5, x0, y0, { width: 2 });
+  d.line(x0 + len, y0 - 5, x0 + len, y0, { width: 2 });
   d.text(text, { x: x0, y: y0 - th - 3, w: tw + 4, h: th, size: small });
 }
 
+/** North, top right: an arrow and its letter, on white. */
+function northMark(d: Draw, plot: Box, small: number) {
+  const th = d.lineHeight(small, 700);
+  const tw = d.measure("N", small, 700);
+  const cx = plot.x + plot.w - 10 - Math.round(tw / 2);
+  const top = plot.y + 6;
+  d.rect({ x: cx - Math.round(tw / 2) - 6, y: top - 2, w: tw + 12, h: th + 18 }, { fill: true, white: true });
+  d.text("N", { x: cx - tw, y: top, w: tw * 2, h: th, size: small, weight: 700, align: "center" });
+  const ay = top + th + 1;
+  d.line(cx, ay + 13, cx, ay + 1, { width: 2 });
+  d.line(cx - 4, ay + 6, cx, ay + 1, { width: 2 });
+  d.line(cx + 4, ay + 6, cx, ay + 1, { width: 2 });
+}
+
 /**
- * Where they are: the region's coast, and each ship placed by its latitude and
- * longitude, its hull turned to its course, north up. Ships that are stopped
- * are dots. The first few carry their name.
+ * Where they are: the coast around the waters, filling the box, and each
+ * ship placed by its latitude and longitude, north up. A ship under way is a
+ * hull turned to its course with a vector ahead of it as long as it is fast;
+ * one lying still is a smaller hull turned to its heading. The fastest few
+ * carry their name and speed. The waters themselves are framed when the
+ * chart shows more around them.
  */
 function chart(d: Draw, s: Settings, env: Env, box: Box, slots: number, labelled: boolean) {
-  const b = boundsFor(s, env)!;
-  const { x, y, w, h } = box;
-  const small = Math.max(13, Math.min(16, Math.round(Math.min(w, h) / 30)));
+  const u = s.units;
+  const custom = regionIdOf(s) === CUSTOM;
+  const watched = boundsFor(s, env)!;
+  const small = Math.max(13, Math.min(16, Math.round(Math.min(box.w, box.h) / 30)));
   const th = d.lineHeight(small, 700);
-  const headH = th + 6;
-  const footH = h >= 200 ? th + 6 : 0;
   const name = nameOf(s, env);
-  const title = regionIdOf(s) === CUSTOM ? `Ships ${name}` : name.replace(/^the /, "The ");
+  const title = custom ? `Ships ${name}` : name.replace(/^the /, "The ");
 
-  // The header: the waters, and how many ships the whole box holds.
-  const countW = d.measure(`8,888 ships · ${slots} shown`, small) + 4;
-  onBaseline(d, title, x, y + th - 3, w - countW, small, 700);
-  const n = d.value("n", { num: { d: 0, sep: "," }, fallback: "–" });
-  d.when({ v: "n", op: "gt", x: slots }, () => onBaseline(d, [n, ` ships · ${slots} shown`], x + w - countW, y + th - 3, countW, small, 400, "right"));
-  d.when({ v: "n", op: "le", x: slots }, () => onBaseline(d, [n, " ships"], x + w - countW, y + th - 3, countW, small, 400, "right"));
-
-  const plot = letterbox(b, { x, y: y + headH, w, h: h - headH - footH });
-  const rings = ringsFor(b, regionIdOf(s) === CUSTOM ? undefined : regionIdOf(s));
-  if (rings.length) {
-    const key = regionIdOf(s) === CUSTOM ? `coast:${b.south},${b.west},${b.north},${b.east}` : `coast:${regionIdOf(s)}`;
-    d.bitmap(plot, key, coastInk(rings, b, plot.w, plot.h));
-  }
+  // The chart fills the box: the waters with a little room around them, grown to its shape as far as the coast is known.
+  const limit = paddedBounds(watched);
+  const b = expandTo(grown(watched, 0.06, limit), box.w / box.h, limit);
+  const plot = letterbox(b, box);
+  const px = (lon: number) => plot.x + Math.round(((lon - b.west) / (b.east - b.west)) * plot.w);
+  const py = (lat: number) => plot.y + Math.round(((b.north - lat) / (b.north - b.south)) * plot.h);
+  const rings = ringsFor(b, custom ? undefined : regionIdOf(s));
+  const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
+  if (rings.length) d.bitmap(plot, `coast:${custom ? "custom" : regionIdOf(s)}:${[b.south, b.west, b.north, b.east].map(r4).join(",")}`, coastInk(rings, b, plot.w, plot.h));
   d.rect(plot, { fill: false, stroke: 1 });
-  scaleBar(d, plot, b, small - 1);
-  if (regionIdOf(s) === CUSTOM) d.icon("house", { x: plot.x + Math.round(plot.w / 2) - 8, y: plot.y + Math.round(plot.h / 2) - 8, w: 16, h: 16 });
+  // The waters watched, marked at their corners, when the chart shows more around them.
+  const framed = b.west < watched.west - 1e-9 || b.east > watched.east + 1e-9 || b.south < watched.south - 1e-9 || b.north > watched.north + 1e-9;
+  if (framed) {
+    const x0 = px(watched.west);
+    const x1 = px(watched.east);
+    const y0 = py(watched.north);
+    const y1 = py(watched.south);
+    const arm = Math.max(8, Math.round(Math.min(x1 - x0, y1 - y0) / 12));
+    for (const [cx, cy, sx, sy] of [[x0, y0, 1, 1], [x1, y0, -1, 1], [x0, y1, 1, -1], [x1, y1, -1, -1]]) {
+      d.line(cx, cy, cx + sx * arm, cy, { width: 2 });
+      d.line(cx, cy, cx, cy + sy * arm, { width: 2 });
+    }
+  }
+  if (custom) d.icon("house", { x: px((watched.west + watched.east) / 2) - 8, y: py((watched.south + watched.north) / 2) - 8, w: 16, h: 16 });
 
   // The ships, last slot first so the first are drawn on top.
   const span = Math.min(plot.w, plot.h);
-  const iconS = span >= 400 ? 24 : 16;
-  const half = Math.round(iconS / 2);
-  const dot = span >= 400 ? 3 : 2;
-  const labelW = d.measure("MAERSK KOTKA", small, 700) + 8;
-  // Ringed in white, a pixel each way, so it reads over the coast or another hull.
-  const label = (i: number) => {
-    const parts = [d.value(fk("name", i), { fallback: "" })];
-    const at = (dx: number, dy: number, white: boolean) =>
-      d.text(parts, { x: -Math.round(labelW / 2) + dx, y: half + 1 + dy, w: labelW, h: th, size: small, weight: 700, align: "center", white });
-    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) at(dx, dy, true);
-    at(0, 0, false);
+  const big = span >= 400 ? 32 : span >= 240 ? 24 : 16;
+  const little = 16;
+  const halfBig = Math.round(big / 2);
+  const craft = (size: number, turnKey: string) => {
+    const half = Math.round(size / 2);
+    d.iconFor(turnKey, course("ship"), namesOf("ship"), { x: -half, y: -half, w: size, h: size });
   };
-  // At 16 px a boat's hull is a ship's: one icon a slot, not two under a condition each.
-  const hullBox = { x: -half, y: -half, w: iconS, h: iconS };
-  const craft = (i: number) => (iconS >= 24 ? hull(d, k("type", i), k("cog", i), hullBox) : d.iconFor(k("cog", i), course("ship"), namesOf("ship"), hullBox));
+  const faster = (i: number, kn: number): Condition => ({ v: k("sog", i), op: "ge", x: kn });
   for (let i = slots - 1; i >= 0; i--) {
     d.place({ x: k("lon", i), y: k("lat", i), box: plot, xs: [b.west, b.east], ys: [b.north, b.south] }, () => {
-      d.when(moving(k("sog", i)), () => craft(i));
-      if (s.show !== "underway") d.when({ not: moving(k("sog", i)) }, () => d.circle(0, 0, dot, { fill: true }));
+      d.when(moving(k("sog", i)), () => {
+        // A vector ahead: a hull's length, or two when making way.
+        for (let step = FAST.length - 1; step >= 0; step--) {
+          const below: Condition[] = step < FAST.length - 1 ? [{ not: faster(i, FAST[step + 1]) }] : [];
+          d.when({ all: [faster(i, FAST[step]), ...below] }, () => d.hand(0, 0, halfBig + Math.round(big * 0.8 * (step + 1)), k("cog", i), 360, { width: 2 }));
+        }
+        craft(big, k("cog", i));
+      });
+      if (s.show !== "underway") d.when({ not: moving(k("sog", i)) }, () => craft(little, k("hdg", i)));
     });
   }
+
   // The names last, under the fastest few, so no hull covers one; a stopped ship is not worth a name.
   if (labelled) {
+    const labelW = d.measure("KADRIYE ANA KAPTAN · 88.8 kn", small, 700) + 8;
+    const label = (i: number) => {
+      const parts = [d.value(fk("name", i), { fallback: "" }), " · ", d.value(fk("sog", i), speed(u)), ` ${UNITS[u].unit}`];
+      const at = (dx: number, dy: number, white: boolean) =>
+        d.text(parts, { x: -Math.round(labelW / 2) + dx, y: halfBig + 1 + dy, w: labelW, h: th, size: small, weight: 700, align: "center", white });
+      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) at(dx, dy, true);
+      at(0, 0, false);
+    };
     for (let i = LABELLED - 1; i >= 0; i--) {
       d.place({ x: fk("lon", i), y: fk("lat", i), box: plot, xs: [b.west, b.east], ys: [b.north, b.south] }, () => d.when(moving(fk("sog", i)), () => label(i)));
     }
   }
 
-  // The footer: whose data, and how many are under way.
-  if (footH) {
-    const fy = y + h - Math.round(small * 0.3);
-    onBaseline(d, "Open Waters AIS · AISHub", x, fy, Math.round(w * 0.6), small - 1, 400);
-    howMany(d, underway, slots, (m) => onBaseline(d, `${m} under way`, x + Math.round(w * 0.6), fy, w - Math.round(w * 0.6), small - 1, 400, "right"));
-  }
+  // The furniture, on white: the waters and their traffic top left, north top right, the scale bottom left, whose data bottom right.
+  const titleSize = Math.min(small + 4, 20);
+  const tth = d.lineHeight(titleSize, 700);
+  const n = d.value("n", { num: { d: 0, sep: "," }, fallback: "–" });
+  // Minutes since the answer, never below none: the preview's clock can run a moment behind its own fetch.
+  const age = d.value("_age", { steps: { t: Array.from({ length: STALE + 1 }, (_, i) => i + 1), o: [...Array.from({ length: STALE + 1 }, (_, i) => String(i)), `${STALE}+`] }, fallback: "?" });
+  const lineW = d.measure(`8,888 ships · ${slots}+ under way · 888 min ago`, small) + 2;
+  const headW = Math.max(d.measure(title, titleSize, 700), lineW) + 12;
+  const hx = plot.x + 6;
+  const hy = plot.y + 6;
+  d.rect({ x: hx - 2, y: hy - 2, w: headW, h: tth + th + 6 }, { fill: true, white: true });
+  onBaseline(d, title, hx + 4, hy + d.metrics(titleSize, 700).ascent, headW - 8, titleSize, 700);
+  // One line per count of ships under way, whole, so nothing in it is spaced for the worst case.
+  const line2 = hy + tth + d.metrics(small).ascent + 1;
+  howMany(d, underway, slots, (m) => onBaseline(d, [n, ` ships · ${m} under way · `, age, " min ago"], hx + 4, line2, lineW, small, 400));
+  northMark(d, plot, small);
+  scaleBar(d, plot, b, small - 1);
+  const credit = "Open Waters AIS · AISHub";
+  const cw = d.measure(credit, small - 1) + 8;
+  const cth = d.lineHeight(small - 1);
+  d.rect({ x: plot.x + plot.w - cw - 4, y: plot.y + plot.h - cth - 6, w: cw + 2, h: cth + 4 }, { fill: true, white: true });
+  d.text(credit, { x: plot.x + plot.w - cw - 2, y: plot.y + plot.h - cth - 4, w: cw, h: cth, size: small - 1, align: "right" });
 }
 
 function layoutFor(d: Draw, s: Settings): Exclude<Layout, "auto"> {
@@ -455,23 +511,23 @@ function mergesFor(s: Settings, env: Env): Record<string, MergeSpec> {
 }
 
 /** Plausible traffic, placed at fractions of the box so every region's preview looks right. */
-const SAMPLE: { name: string; fx: number; fy: number; sog: number; cog: number | null; nav: number | null; type: number | null; dest: string; flag: string }[] = [
-  { name: "ASTROL-2", fx: 0.46, fy: 0.42, sog: 11.8, cog: 210, nav: 0, type: 70, dest: "POTI", flag: "RU" },
-  { name: "MAERSK KOTKA", fx: 0.58, fy: 0.55, sog: 8.2, cog: 28, nav: 0, type: 80, dest: "NOVOROSSIYSK", flag: "DK" },
-  { name: "TURGUT-REIS", fx: 0.52, fy: 0.48, sog: 18.4, cog: 95, nav: 0, type: 60, dest: "KADIKOY", flag: "TR" },
-  { name: "KADRIYE ANA", fx: 0.38, fy: 0.61, sog: 4.1, cog: 300, nav: 7, type: 30, dest: "", flag: "TR" },
-  { name: "THOE", fx: 0.63, fy: 0.37, sog: 5.6, cog: 160, nav: 8, type: 36, dest: "", flag: "GB" },
-  { name: "LEADER S", fx: 0.35, fy: 0.35, sog: 0.1, cog: 360, nav: 1, type: 70, dest: "ISTANBUL", flag: "PA" },
-  { name: "OCEAN MARY", fx: 0.41, fy: 0.52, sog: 0, cog: 360, nav: 1, type: 80, dest: "", flag: "LR" },
-  { name: "PRINCE AMIN", fx: 0.66, fy: 0.62, sog: 0.2, cog: 360, nav: 1, type: 70, dest: "AMBARLI", flag: "MT" },
-  { name: "YILDIZ BURNU", fx: 0.32, fy: 0.47, sog: 0, cog: 360, nav: 5, type: 69, dest: "", flag: "TR" },
-  { name: "SAFE SEA", fx: 0.57, fy: 0.68, sog: 0, cog: 360, nav: 5, type: 79, dest: "", flag: "TR" },
-  { name: "PILOT 3", fx: 0.49, fy: 0.58, sog: 9.3, cog: 352, nav: 0, type: 50, dest: "", flag: "TR" },
-  { name: "VASILIKI", fx: 0.44, fy: 0.3, sog: 12.6, cog: 190, nav: null, type: null, dest: "", flag: "GR" },
-  { name: "GOLDEN HIND", fx: 0.69, fy: 0.45, sog: 6.9, cog: 72, nav: 0, type: 37, dest: "", flag: "GB" },
-  { name: "ARMONY", fx: 0.3, fy: 0.66, sog: 2.4, cog: 120, nav: 0, type: 90, dest: "", flag: "TR" },
-  { name: "MSC FANTASIA", fx: 0.54, fy: 0.32, sog: 14.2, cog: 42, nav: 0, type: 60, dest: "PIRAEUS", flag: "PA" },
-  { name: "BOSPHORUS 1", fx: 0.6, fy: 0.5, sog: 0.3, cog: 360, nav: 5, type: 52, dest: "", flag: "TR" },
+const SAMPLE: { name: string; fx: number; fy: number; sog: number; cog: number | null; hdg: number | null; nav: number | null; type: number | null; dest: string; flag: string }[] = [
+  { name: "ASTROL-2", fx: 0.46, fy: 0.42, sog: 11.8, cog: 210, hdg: 210, nav: 0, type: 70, dest: "POTI", flag: "RU" },
+  { name: "MAERSK KOTKA", fx: 0.58, fy: 0.55, sog: 8.2, cog: 28, hdg: 28, nav: 0, type: 80, dest: "NOVOROSSIYSK", flag: "DK" },
+  { name: "TURGUT-REIS", fx: 0.52, fy: 0.48, sog: 18.4, cog: 95, hdg: 95, nav: 0, type: 60, dest: "KADIKOY", flag: "TR" },
+  { name: "KADRIYE ANA", fx: 0.38, fy: 0.61, sog: 4.1, cog: 300, hdg: 300, nav: 7, type: 30, dest: "", flag: "TR" },
+  { name: "THOE", fx: 0.63, fy: 0.37, sog: 5.6, cog: 160, hdg: 160, nav: 8, type: 36, dest: "", flag: "GB" },
+  { name: "LEADER S", fx: 0.35, fy: 0.35, sog: 0.1, cog: 360, hdg: 95, nav: 1, type: 70, dest: "ISTANBUL", flag: "PA" },
+  { name: "OCEAN MARY", fx: 0.41, fy: 0.52, sog: 0, cog: 360, hdg: 140, nav: 1, type: 80, dest: "", flag: "LR" },
+  { name: "PRINCE AMIN", fx: 0.66, fy: 0.62, sog: 0.2, cog: 360, hdg: 250, nav: 1, type: 70, dest: "AMBARLI", flag: "MT" },
+  { name: "YILDIZ BURNU", fx: 0.32, fy: 0.47, sog: 0, cog: 360, hdg: 30, nav: 5, type: 69, dest: "", flag: "TR" },
+  { name: "SAFE SEA", fx: 0.57, fy: 0.68, sog: 0, cog: 360, hdg: 200, nav: 5, type: 79, dest: "", flag: "TR" },
+  { name: "PILOT 3", fx: 0.49, fy: 0.58, sog: 9.3, cog: 352, hdg: 352, nav: 0, type: 50, dest: "", flag: "TR" },
+  { name: "VASILIKI", fx: 0.44, fy: 0.3, sog: 12.6, cog: 190, hdg: 190, nav: null, type: null, dest: "", flag: "GR" },
+  { name: "GOLDEN HIND", fx: 0.69, fy: 0.45, sog: 6.9, cog: 72, hdg: 72, nav: 0, type: 37, dest: "", flag: "GB" },
+  { name: "ARMONY", fx: 0.3, fy: 0.66, sog: 2.4, cog: 120, hdg: 120, nav: 0, type: 90, dest: "", flag: "TR" },
+  { name: "MSC FANTASIA", fx: 0.54, fy: 0.32, sog: 14.2, cog: 42, hdg: 42, nav: 0, type: 60, dest: "PIRAEUS", flag: "PA" },
+  { name: "BOSPHORUS 1", fx: 0.6, fy: 0.5, sog: 0.3, cog: 360, hdg: 511, nav: 5, type: 52, dest: "", flag: "TR" },
 ];
 
 function sampleFor(s: Settings, env: Env): Record<string, string | number | boolean | null> {

@@ -46,10 +46,13 @@ Lucide icon used for it; it is empty today, since every name exists in Lucide.
 cd tools && npm run coast
 ```
 
-Clips Natural Earth's 1:10m land (public domain, fetched from GitHub) to each
-sea region in `app/src/extensions/ships/regions.json`, simplifies it to what a
-chart could draw, and writes the rings to `app/src/extensions/ships/coast.ts`.
-Run it after adding or moving a region. It refuses to write a file over 150 KB.
+Clips GSHHG's full-resolution shorelines (Wessel and Smith, LGPL v3;
+`coast/LICENSE-GSHHG.txt`) to a box around each sea region in
+`app/src/extensions/ships/regions.json`, leaves out islets a chart could not
+show, simplifies the rest to the pixel, and writes the rings to
+`app/src/extensions/ships/coast.ts` as base64 varints. The 118 MB archive is
+fetched once into `coast/.cache/`. Run it after adding or moving a region. It
+refuses to write a file over 384 KB.
 
 ## Checking them
 

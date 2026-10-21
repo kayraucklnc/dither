@@ -11,7 +11,7 @@ import { formatValue } from "@/runtime/format";
 import { parseZone } from "@/runtime/tz";
 import ships, { boundsFor, course, shapeOf, STATUS, TYPE } from "./index";
 import { COAST } from "./coast";
-import { landMask, letterbox, ringsFor, ringsOf } from "./coast-draw";
+import { expandTo, landMask, letterbox, paddedBounds, ringsFor, ringsOf } from "./coast-draw";
 import { AREA_CAP, REGIONS, areaOf, boundsOf, regionOf } from "./regions";
 
 const istanbul = { name: "Istanbul", latitude: 41.01, longitude: 28.98 };
@@ -28,22 +28,20 @@ describe("the regions", () => {
       expect(b.west, r.id).toBeLessThan(b.east);
       expect(areaOf(b), r.id).toBeLessThanOrEqual(AREA_CAP);
       expect(COAST[r.id]?.length, r.id).toBeGreaterThan(0);
+      expect(ringsOf(r.id).length, r.id).toBeGreaterThan(0);
     }
   });
 
-  it("keep every coast point inside the box, and the table small", () => {
+  it("keep every coast point inside the padded box, and the table small", () => {
     for (const r of REGIONS) {
-      const b = boundsOf(r);
+      const b = paddedBounds(boundsOf(r));
+      let outside = 0;
       for (const ring of ringsOf(r.id)) {
-        for (const [lon, lat] of ring) {
-          expect(lon).toBeGreaterThanOrEqual(b.west - 1e-9);
-          expect(lon).toBeLessThanOrEqual(b.east + 1e-9);
-          expect(lat).toBeGreaterThanOrEqual(b.south - 1e-9);
-          expect(lat).toBeLessThanOrEqual(b.north + 1e-9);
-        }
+        for (const [lon, lat] of ring) if (lon < b.west - 1e-9 || lon > b.east + 1e-9 || lat < b.south - 1e-9 || lat > b.north + 1e-9) outside++;
       }
+      expect(outside, r.id).toBe(0);
     }
-    expect(readFileSync(new URL("./coast.ts", import.meta.url)).length).toBeLessThan(150 * 1024);
+    expect(readFileSync(new URL("./coast.ts", import.meta.url)).length).toBeLessThan(384 * 1024);
   });
 
   it("draw the Bosphorus as a strait between two shores", () => {
@@ -65,9 +63,10 @@ describe("the regions", () => {
   it("lend a custom box the smallest preset that holds it, or every one it overlaps", () => {
     expect(ringsFor({ south: 41.0, west: 29.0, north: 41.2, east: 29.2 })).toEqual([ringsOf("bosphorus")]);
     expect(ringsFor({ south: 40.9, west: 28.5, north: 41.4, east: 29.5 })).toEqual([ringsOf("istanbul")]);
-    // 25 km around Istanbul straddles the Istanbul and Marmara presets, and holds the Bosphorus whole.
-    const around = ringsFor({ south: 40.7854, west: 28.6824, north: 41.2346, east: 29.2776 });
-    expect(around).toHaveLength(3);
+    // 25 km around Istanbul sits within the Istanbul preset's padded box; a wider box straddles it, the Marmara and the Bosphorus.
+    expect(ringsFor({ south: 40.7854, west: 28.6824, north: 41.2346, east: 29.2776 })).toEqual([ringsOf("istanbul")]);
+    const around = ringsFor({ south: 40.5, west: 27.5, north: 41.5, east: 29.9 });
+    expect(around.length).toBeGreaterThanOrEqual(3);
     expect(around).toContain(ringsOf("istanbul"));
     expect(around).toContain(ringsOf("marmara"));
     expect(around).toContain(ringsOf("bosphorus"));
@@ -75,7 +74,7 @@ describe("the regions", () => {
   });
 
   it("fill overlapping presets over one another, not through one another", () => {
-    const b = { south: 40.7854, west: 28.6824, north: 41.2346, east: 29.2776 };
+    const b = { south: 40.5, west: 27.5, north: 41.5, east: 29.9 };
     const w = 200;
     const h = 200;
     const both = landMask(ringsFor(b), b, w, h);
@@ -83,6 +82,21 @@ describe("the regions", () => {
     // Wherever the Istanbul preset says land, so does the pair: nothing cancelled.
     for (let i = 0; i < w * h; i++) if (one[i]) expect(both[i]).toBe(1);
     expect(both.reduce((n, v) => n + v, 0)).toBeGreaterThan(one.reduce((n, v) => n + v, 0));
+  });
+
+  it("grow the waters to the chart's shape, as far as the coast is known", () => {
+    const b = boundsOf(regionOf("bosphorus")!);
+    const wide = expandTo(b, 2, paddedBounds(b));
+    expect(wide.south).toBe(b.south);
+    expect(wide.north).toBe(b.north);
+    expect(wide.west).toBeLessThan(b.west);
+    expect(wide.east).toBeGreaterThan(b.east);
+    expect(wide.west).toBeGreaterThanOrEqual(paddedBounds(b).west);
+    expect((wide.west + wide.east) / 2).toBeCloseTo((b.west + b.east) / 2, 9);
+    const tall = expandTo(b, 0.3, paddedBounds(b));
+    expect(tall.west).toBe(b.west);
+    expect(tall.south).toBeLessThan(b.south);
+    expect(tall.north).toBeGreaterThan(b.north);
   });
 
   it("letterbox a box to its shape on the ground", () => {
@@ -115,7 +129,7 @@ describe("ships source", () => {
   });
 
   it("carries more ships, with less about each, on a chart; only speeds for a count", () => {
-    expect(shapeOf({ ...settings, layout: "chart" })).toEqual({ slots: 24, fields: ["name", "lat", "lon", "sog", "cog", "type"] });
+    expect(shapeOf({ ...settings, layout: "chart" })).toEqual({ slots: 24, fields: ["name", "lat", "lon", "sog", "cog", "hdg"] });
     const chart = source({ ...settings, layout: "chart" })!.values;
     expect(chart.lat23).toBeDefined();
     expect(chart.name23).toBeDefined();
@@ -140,7 +154,7 @@ describe("ships source", () => {
         const v = sample[key];
         return sum + 4 + key.length + 3 + (typeof v === "string" ? 4 + v.length : 9);
       }, 0);
-      expect(bytes, layout).toBeLessThan(3.5 * 1024);
+      expect(bytes, layout).toBeLessThan(4 * 1024);
     }
   });
 });
