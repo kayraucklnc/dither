@@ -40,14 +40,20 @@ export function ringsOf(id: string): Ring[] {
   return rings;
 }
 
+const overlaps = (a: Bounds, b: Bounds): boolean => a.south < b.north && b.south < a.north && a.west < b.east && b.west < a.east;
+
 /**
- * Rings to draw a coast within these bounds: the region's own, or for a box of
- * one's own the smallest preset that holds it whole. Null when none does.
+ * The coasts to draw within these bounds, one set of rings per region: the
+ * region's own; for a box of one's own, the smallest preset that holds it
+ * whole, or failing that every preset it overlaps. Each set is clipped to its
+ * own region, so they are filled separately and laid over one another, never
+ * through one another. Empty when no preset comes near.
  */
-export function ringsFor(b: Bounds, regionId?: string): Ring[] | null {
-  if (regionId && COAST[regionId]) return ringsOf(regionId);
+export function ringsFor(b: Bounds, regionId?: string): Ring[][] {
+  if (regionId && COAST[regionId]) return [ringsOf(regionId)];
   const holders = REGIONS.filter((r) => contains(boundsOf(r), b)).sort((p, q) => areaOf(boundsOf(p)) - areaOf(boundsOf(q)));
-  return holders.length ? ringsOf(holders[0].id) : null;
+  if (holders.length) return [ringsOf(holders[0].id)];
+  return REGIONS.filter((r) => overlaps(boundsOf(r), b)).map((r) => ringsOf(r.id)).filter((rings) => rings.length);
 }
 
 /** The largest box of the bounds' shape on the ground that fits `area`, centred in it. */
@@ -64,8 +70,13 @@ export function letterbox(b: Bounds, area: Box): Box {
 }
 
 /** Which pixels of a w × h picture of the bounds are land: even-odd through every ring at each row's centre, so lakes stay water. */
-export function landMask(rings: Ring[], b: Bounds, w: number, h: number): Uint8Array {
+export function landMask(ringSets: Ring[][], b: Bounds, w: number, h: number): Uint8Array {
   const land = new Uint8Array(w * h);
+  for (const rings of ringSets) fillLand(rings, b, w, h, land);
+  return land;
+}
+
+function fillLand(rings: Ring[], b: Bounds, w: number, h: number, land: Uint8Array): void {
   const sx = w / (b.east - b.west);
   for (let py = 0; py < h; py++) {
     const lat = b.north - ((py + 0.5) / h) * (b.north - b.south);
@@ -84,12 +95,11 @@ export function landMask(rings: Ring[], b: Bounds, w: number, h: number): Uint8A
       for (let x = from; x <= to; x++) land[py * w + x] = 1;
     }
   }
-  return land;
 }
 
 /** The ink for a coast picture: a solid line where land meets water, a light stipple inland. The picture's edge is not a coast. */
-export function coastInk(rings: Ring[], b: Bounds, w: number, h: number): (x: number, y: number) => boolean {
-  const land = landMask(rings, b, w, h);
+export function coastInk(ringSets: Ring[][], b: Bounds, w: number, h: number): (x: number, y: number) => boolean {
+  const land = landMask(ringSets, b, w, h);
   const at = (x: number, y: number) => land[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))];
   return (x, y) => !!land[y * w + x] && (!at(x - 1, y) || !at(x + 1, y) || !at(x, y - 1) || !at(x, y + 1) || shade(x, y, LAND_SHADE));
 }

@@ -21,12 +21,12 @@ const PATH: Record<Field, string> = {
   name: "properties.name", lat: "geometry.coordinates.1", lon: "geometry.coordinates.0", sog: "properties.sog", cog: "properties.cog",
   nav: "properties.nav_status", type: "properties.type", dest: "properties.destination", flag: "properties.flag",
 };
-/** A chart needs only where each ship is and which way it goes, so it can carry twice as many. */
-const CHART_FIELDS: readonly Field[] = ["lat", "lon", "sog", "cog", "type"];
+/** A chart needs only where each ship is, which way it goes and its name, so it can carry twice as many. */
+const CHART_FIELDS: readonly Field[] = ["name", "lat", "lon", "sog", "cog", "type"];
 const COUNT_FIELDS: readonly Field[] = ["sog"];
 /** Every slot is kept across sleeps in a cache shared by every widget, so few. */
 const SLOTS = { chart: 24, count: 20, full: 12 } as const;
-/** Ships on the chart that carry their name. */
+/** Ships on the chart that carry their name: the fastest few, which are the ones going somewhere. */
 const LABELLED = 4;
 /** Knots below which a ship is stopped: anchored, moored, or drifting at a quay. */
 const MOVING_KN = 0.5;
@@ -359,7 +359,7 @@ function chart(d: Draw, s: Settings, env: Env, box: Box, slots: number, labelled
 
   const plot = letterbox(b, { x, y: y + headH, w, h: h - headH - footH });
   const rings = ringsFor(b, regionIdOf(s) === CUSTOM ? undefined : regionIdOf(s));
-  if (rings?.length) {
+  if (rings.length) {
     const key = regionIdOf(s) === CUSTOM ? `coast:${b.south},${b.west},${b.north},${b.east}` : `coast:${regionIdOf(s)}`;
     d.bitmap(plot, key, coastInk(rings, b, plot.w, plot.h));
   }
@@ -373,8 +373,9 @@ function chart(d: Draw, s: Settings, env: Env, box: Box, slots: number, labelled
   const half = Math.round(iconS / 2);
   const dot = span >= 400 ? 3 : 2;
   const labelW = d.measure("MAERSK KOTKA", small, 700) + 8;
+  // Ringed in white, a pixel each way, so it reads over the coast or another hull.
   const label = (i: number) => {
-    const parts = [d.value(k("name", i), { fallback: "" })];
+    const parts = [d.value(fk("name", i), { fallback: "" })];
     const at = (dx: number, dy: number, white: boolean) =>
       d.text(parts, { x: -Math.round(labelW / 2) + dx, y: half + 1 + dy, w: labelW, h: th, size: small, weight: 700, align: "center", white });
     for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) at(dx, dy, true);
@@ -387,8 +388,13 @@ function chart(d: Draw, s: Settings, env: Env, box: Box, slots: number, labelled
     d.place({ x: k("lon", i), y: k("lat", i), box: plot, xs: [b.west, b.east], ys: [b.north, b.south] }, () => {
       d.when(moving(k("sog", i)), () => craft(i));
       if (s.show !== "underway") d.when({ not: moving(k("sog", i)) }, () => d.circle(0, 0, dot, { fill: true }));
-      if (labelled && i < LABELLED) d.when(s.show === "underway" ? moving(k("sog", i)) : there(i), () => label(i));
     });
+  }
+  // The names last, under the fastest few, so no hull covers one; a stopped ship is not worth a name.
+  if (labelled) {
+    for (let i = LABELLED - 1; i >= 0; i--) {
+      d.place({ x: fk("lon", i), y: fk("lat", i), box: plot, xs: [b.west, b.east], ys: [b.north, b.south] }, () => d.when(moving(fk("sog", i)), () => label(i)));
+    }
   }
 
   // The footer: whose data, and how many are under way.
@@ -417,8 +423,6 @@ function sourceFor(s: Settings, env: Env): SourceSpec | null {
   const { slots, fields } = shapeOf(s);
   const values: SourceSpec["values"] = { n: { path: "features", agg: "count" } };
   for (let i = 0; i < slots; i++) for (const f of fields) values[k(f, i)] = `features.${i}.${PATH[f]}`;
-  // The chart names its first few ships.
-  if (s.layout === "chart") for (let i = 0; i < LABELLED; i++) values[k("name", i)] = `features.${i}.${PATH.name}`;
   return {
     // Ships not heard from lately are left out: that keeps the answer small, and the quays' sleepers off the chart.
     url: `${OPEN_WATERS}?bbox=${r(b.south)},${r(b.west)},${r(b.north)},${r(b.east)}&max_age=${maxAgeOf(s)}`,
@@ -478,7 +482,6 @@ function sampleFor(s: Settings, env: Env): Record<string, string | number | bool
     const at = { lat: Math.round((b.south + ship.fy * (b.north - b.south)) * 1e5) / 1e5, lon: Math.round((b.west + ship.fx * (b.east - b.west)) * 1e5) / 1e5 };
     const value = (f: Field) => (f === "lat" ? at.lat : f === "lon" ? at.lon : ship[f]);
     for (const f of fields) out[k(f, i)] = value(f);
-    if (s.layout === "chart" && i < LABELLED) out[k("name", i)] = ship.name;
   });
   return out;
 }
