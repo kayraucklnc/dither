@@ -114,8 +114,6 @@ export const namesOf = (kind: Kind) => Array.from({ length: 16 }, (_, i) => `${k
 const SLICES = Array.from({ length: 16 }, (_, i) => Math.round(i * 22.5 + 11.25));
 /** The icon for a course or heading; without one (or AIS's 360 and 511, "not available"), the ship points north. */
 export const course = (kind: Kind): Format => ({ steps: { t: SLICES, o: [...namesOf(kind), `${kind}-0`] }, fallback: `${kind}-0` });
-/** Knots at which a course vector grows a step: under way, and making way. */
-const FAST = [0.5, 8];
 
 /** AIS navigational status, where it says something. */
 const STATUSES: [number, string][] = [
@@ -359,8 +357,8 @@ function northMark(d: Draw, plot: Box, small: number) {
 /**
  * Where they are: the coast around the waters, filling the box, and each
  * ship placed by its latitude and longitude, north up. A ship under way is a
- * hull turned to its course with a vector ahead of it as long as it is fast;
- * one lying still is a smaller hull turned to its heading. The fastest few
+ * hull turned to its course; one lying still is a smaller hull turned to its
+ * heading. The fastest few
  * carry their name and speed. The waters themselves are framed when the
  * chart shows more around them.
  */
@@ -407,17 +405,9 @@ function chart(d: Draw, s: Settings, env: Env, box: Box, slots: number, labelled
     const half = Math.round(size / 2);
     d.iconFor(turnKey, course("ship"), namesOf("ship"), { x: -half, y: -half, w: size, h: size });
   };
-  const faster = (i: number, kn: number): Condition => ({ v: k("sog", i), op: "ge", x: kn });
   for (let i = slots - 1; i >= 0; i--) {
     d.place({ x: k("lon", i), y: k("lat", i), box: plot, xs: [b.west, b.east], ys: [b.north, b.south] }, () => {
-      d.when(moving(k("sog", i)), () => {
-        // A vector ahead: a hull's length, or two when making way.
-        for (let step = FAST.length - 1; step >= 0; step--) {
-          const below: Condition[] = step < FAST.length - 1 ? [{ not: faster(i, FAST[step + 1]) }] : [];
-          d.when({ all: [faster(i, FAST[step]), ...below] }, () => d.hand(0, 0, halfBig + Math.round(big * 0.8 * (step + 1)), k("cog", i), 360, { width: 2 }));
-        }
-        craft(big, k("cog", i));
-      });
+      d.when(moving(k("sog", i)), () => craft(big, k("cog", i)));
       if (s.show !== "underway") d.when({ not: moving(k("sog", i)) }, () => craft(little, k("hdg", i)));
     });
   }
