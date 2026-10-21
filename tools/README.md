@@ -40,6 +40,17 @@ Lucide's stock 2 so strokes stay whole on e-ink; the table is `STROKE` in
 `icons.json` and `LICENSE-Lucide.txt`. `ALIASES` maps a requested name to the
 Lucide icon used for it; it is empty today, since every name exists in Lucide.
 
+## Coastlines
+
+```bash
+cd tools && npm run coast
+```
+
+Clips Natural Earth's 1:10m land (public domain, fetched from GitHub) to each
+sea region in `app/src/extensions/ships/regions.json`, simplifies it to what a
+chart could draw, and writes the rings to `app/src/extensions/ships/coast.ts`.
+Run it after adding or moving a region. It refuses to write a file over 150 KB.
+
 ## Checking them
 
 ```bash

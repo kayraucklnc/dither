@@ -132,6 +132,7 @@ back in, then let go.
 | 🌖 | Moon | Tonight's moon, drawn from NASA's map of it, how much is lit, and when it is next full and new — worked out ahead, so it needs no internet | — |
 | 🗓️ | Google Calendar | Every linked account as one agenda, grouped by day: what's on now, what's next, and the days ahead | A Google OAuth client (the app walks you through it) |
 | 🚆 | Trains (Trenord) | Your next train, how late it is, and the ones after it | — |
+| 🚢 | Ships | The ships in a stretch of sea right now — the Bosphorus, the Cyclades, the Gulf of Finland — on a coastline chart, as a list, or just how many ([Open Waters AIS](https://openwaters.io/ais/)) | — |
 | 💶 | Revenue (Stripe) | A figure, a smooth graph with each day's amount on it, a ledger or a full board with payments, converted to another currency if you like | A restricted Stripe key |
 | 📈 | Stocks | Up to five share prices and how they moved today, every five minutes ([Finnhub](https://finnhub.io/)) | A free Finnhub key |
 | 🤖 | Claude Code | Your plan's session and weekly limits and when they reset, large — or with them everything `/stats` shows | [The bridge](#claude-code-usage) running on your computer |
@@ -325,6 +326,7 @@ of these patterns, and there's a bundled widget to copy for each:
 | An encrypted reply | `decode: { aes256ecb: key }` | Trains (Trenord) |
 | A web page, not JSON | `html: true`, then `values: { text: "text", title: "title" }` | Web page |
 | The date or time in the URL | `{{now\|YYYY-MM-DD}}`, `{{today-86400}}` | Google Calendar, Stripe |
+| Things to put on a map | `d.place` by latitude and longitude, a coast drawn with `d.bitmap` | Ships, Aircraft overhead |
 
 The panel can't run JavaScript, follow a login page, or read anything other
 than JSON. If a service needs any of those, it isn't a fit yet.

@@ -38,7 +38,7 @@ function write(name: string, blob: Uint8Array, runtime: Runtime, values: Record<
 const fonts = await loadFonts();
 const deps = { library: nodeLibrary, fonts, picture: async () => null, boardPanel: () => ({ width: 800, height: 480 }) };
 
-for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "starter-showcase", "primitives", "text-and-formats", "chart-labels", "air-quality", "air-quality-no-pollen", "air-quality-quiet", "aircraft", "aircraft-sky", "iss", "quote", "moon", "stocks", "claude-code", "claude-code-stats", "claude-code-limits"]) {
+for (const dir of ["clocks", "calendar-three-accounts", "revenue", "transit-calendar-alerts", "starter-clock-weather-day", "starter-clock-weather-night", "starter-dashboard", "starter-photo", "starter-showcase", "primitives", "text-and-formats", "chart-labels", "air-quality", "air-quality-no-pollen", "air-quality-quiet", "aircraft", "aircraft-sky", "iss", "quote", "moon", "stocks", "claude-code", "claude-code-stats", "claude-code-limits", "ships", "ships-gulf"]) {
   rmSync(`${root}${dir}`, { recursive: true, force: true });
 }
 
@@ -216,6 +216,35 @@ for (const [name, timezone, at, pollen] of [
   for (const src of sky.sources) for (const [k, v] of src.sample) skyValues[k] = v;
   for (const src of sky.sources) Object.assign(skyValues, { [`${src.source.id}._ok`]: true, [`${src.source.id}._age`]: 2 });
   write("aircraft-sky", sky.blob, sky.runtime, skyValues);
+}
+
+// Ships: a coast drawn when the project compiles, hulls placed by position and turned to their course, lists ordered by a ruler.
+{
+  const project = createProject({ starter: "blank", timezone: "Europe/Istanbul", language: "en", units: "metric", place: { name: "Istanbul", latitude: 41.01, longitude: 28.98 } });
+  const ship = (id: string, x: number, y: number, w: number, h: number, settings: Record<string, unknown>, frame: "none" | "outline" | "inverted" = "none") =>
+    ({ id, type: "ships", x, y, w, h, frame, settings });
+  project.screens[0].widgets = [
+    ship("chart", 0, 0, 12, 12, { layout: "chart" }),
+    ship("list", 12, 0, 8, 7, { layout: "list" }, "outline"),
+    ship("hero", 12, 7, 8, 3, { layout: "hero" }),
+    ship("count", 12, 10, 8, 2, { layout: "count" }, "inverted"),
+  ];
+  const c = await compile(project, deps);
+  const values: Record<string, Value> = { ...DEVICE };
+  for (const src of c.sources) for (const [k, v] of src.sample) values[k] = v;
+  for (const src of c.sources) Object.assign(values, { [`${src.source.id}._ok`]: true, [`${src.source.id}._age`]: 4 });
+  write("ships", c.blob, c.runtime, values);
+
+  // The Gulf of Finland, wide, only what is under way, in km/h; the ferries beneath.
+  project.screens[0].widgets = [
+    ship("gulf", 0, 0, 20, 9, { region: "gulf-of-finland", layout: "chart", show: "underway", units: "kmh" }),
+    ship("ferries", 0, 9, 20, 3, { region: "tallinn-helsinki", layout: "list", units: "kmh" }, "outline"),
+  ];
+  const g = await compile(project, deps);
+  const gulfValues: Record<string, Value> = { ...DEVICE };
+  for (const src of g.sources) for (const [k, v] of src.sample) gulfValues[k] = v;
+  for (const src of g.sources) Object.assign(gulfValues, { [`${src.source.id}._ok`]: true, [`${src.source.id}._age`]: 4 });
+  write("ships-gulf", g.blob, g.runtime, gulfValues);
 }
 
 // The space station: a globe chosen by longitude, globe-placed orbit points front and back, a strip.

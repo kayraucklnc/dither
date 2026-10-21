@@ -1,8 +1,11 @@
 import type { Condition, Format } from "@/runtime/types";
 import type { Place } from "@/project/schema";
 import { defineExtension, type Box, type Draw, type Env, type SourceSpec } from "../api";
+import { boxAround, KM_PER_DEG } from "../geo";
 import { AIRLINES } from "./airlines";
 import AIRPORTS from "./airports.json";
+
+export { boxAround };
 
 // OpenSky's live state vectors: every aircraft whose transponder was heard in
 // a box around the place. The answer is a list of positional arrays, read slot
@@ -17,7 +20,6 @@ const FIELDS = ["cs", "lat", "lon", "alt", "vel", "trk", "vr", "cat", "sq"] as c
 type Field = (typeof FIELDS)[number];
 /** Index of each field in an OpenSky state vector (`cat` needs `extended=1`). */
 const COLUMN: Record<Field, number> = { cs: 1, lon: 5, lat: 6, alt: 7, vel: 9, trk: 10, vr: 11, sq: 14, cat: 17 };
-const KM_PER_DEG = 111.32;
 /** Faster than this, in m/s, a plane is climbing or descending rather than level. */
 const CLIMB = 1;
 /** Minutes after which kept positions are too old to draw: a jet covers 100 km in ten. */
@@ -47,19 +49,6 @@ const UNITS: Record<Units, { alt: number; altUnit: string; vel: number; velUnit:
 
 const radiusOf = (s: Settings) => Math.min(100, Math.max(5, Number(s.radius) || 25));
 const placeOf = (s: Settings, env: Env) => s.place ?? env.place;
-
-/** The box OpenSky is asked about: square on the ground, so a degree of longitude shrinks with latitude. */
-export function boxAround(place: Place, km: number): { lamin: number; lamax: number; lomin: number; lomax: number } {
-  const dLat = km / KM_PER_DEG;
-  const dLon = km / (KM_PER_DEG * Math.max(0.05, Math.cos((place.latitude * Math.PI) / 180)));
-  const r = (n: number) => Math.round(n * 1e4) / 1e4;
-  return {
-    lamin: r(Math.max(-90, place.latitude - dLat)),
-    lamax: r(Math.min(90, place.latitude + dLat)),
-    lomin: r(Math.max(-180, place.longitude - dLon)),
-    lomax: r(Math.min(180, place.longitude + dLon)),
-  };
-}
 
 /** Airports inside a box, the large ones first. */
 export function airportsIn(b: ReturnType<typeof boxAround>): { code: string; lat: number; lon: number; large: boolean }[] {

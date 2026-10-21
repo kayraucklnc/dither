@@ -46,6 +46,7 @@ const NAMES = [
   "arrow-down", "bitcoin", "dollar-sign", "euro", "chart-line", "heart", "star",
   "check", "x", "circle-alert", "info", "music", "coffee", "book-open", "quote",
   "gift", "cake", "map-pin", "sparkles", "leaf", "flower-2", "trees", "wheat", "sprout", "haze", "satellite", "gauge", "navigation", "orbit",
+  "ship", "anchor", "sailboat",
 ];
 
 // Aircraft seen from above, nose up, one per kind, each turned to 16
@@ -66,9 +67,18 @@ const AIRCRAFT = {
   // Fast and military: a pointed nose, sharply swept wings, tailplanes.
   fast: `<path d="M12 .8l1 3.4.4 4.3 8.1 7v1.5l-7.9-1.4.6 3 2.8 2.6v1.2l-4.2-1-.8 1.4-.8-1.4-4.2 1v-1.2l2.8-2.6.6-3-7.9 1.4v-1.5l8.1-7 .4-4.3z"/>`,
 };
+// Ships seen from above, bow up, turned the same 16 ways: "ship-90" steams
+// east. The cut-outs are white, which the rasterizer leaves clear.
+const SHIPS = {
+  // A merchant hull: a pointed bow, parallel sides, a square stern; the bridge aft and a hatch forward.
+  ship: `<path d="M12 .8 16.2 7.4 V21.2 Q16.2 23 14.4 23 H9.6 Q7.8 23 7.8 21.2 V7.4 Z"/><rect x="9.4" y="16.6" width="5.2" height="3.4" fill="#fff"/><rect x="10.2" y="9" width="3.6" height="1.6" fill="#fff"/>`,
+  // A small craft: shorter and rounder, a cockpit amidships.
+  boat: `<path d="M12 2.5 C15 6 16.3 10 16.3 15 Q16.3 21.5 12 21.5 Q7.7 21.5 7.7 15 C7.7 10 9 6 12 2.5 Z"/><rect x="10.6" y="12" width="2.8" height="4.5" rx="1.2" fill="#fff"/>`,
+};
+const TOPDOWN = { ...AIRCRAFT, ...SHIPS };
 const HEADINGS = Array.from({ length: 16 }, (_, i) => i * 22.5);
 const ROTATED = {};
-for (const kind of Object.keys(AIRCRAFT)) for (const deg of HEADINGS) ROTATED[`${kind}-${Math.floor(deg)}`] = [kind, deg];
+for (const kind of Object.keys(TOPDOWN)) for (const deg of HEADINGS) ROTATED[`${kind}-${Math.floor(deg)}`] = [kind, deg];
 NAMES.push(...Object.keys(ROTATED));
 // The same kinds as solid models for the 3D view: "jet-3d-90" is seen side-on.
 const MODELLED = {};
@@ -88,7 +98,7 @@ async function loadSvg(name, size) {
   if (name in DRAWN) return `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#000" stroke="none" stroke-width="0">${DRAWN[name]}</svg>`;
   if (name in ROTATED) {
     const [kind, deg] = ROTATED[name];
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#000" stroke="none" stroke-width="0"><g transform="rotate(${deg} 12 12)">${AIRCRAFT[kind]}</g></svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#000" stroke="none" stroke-width="0"><g transform="rotate(${deg} 12 12)">${TOPDOWN[kind]}</g></svg>`;
   }
   const lucideName = ALIASES[name] ?? name;
   const file = path.join(lucideDir, "icons", `${lucideName}.svg`);
