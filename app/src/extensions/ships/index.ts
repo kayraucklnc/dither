@@ -449,20 +449,12 @@ function chart(d: Draw, s: Settings, env: Env, box: Box, shape: Shape, labelled:
     }
   }
 
-  // The furniture, on white: the waters and their traffic top left, north top right, the scale bottom left.
-  const titleSize = Math.min(small + 4, 20);
-  const tth = d.lineHeight(titleSize, 700);
-  const n = d.value(N, { num: { d: 0, sep: "," }, fallback: "–" });
-  // Minutes since the answer, never below none: the preview's clock can run a moment behind its own fetch.
-  const age = d.value(`${ALL}/_age`, { steps: { t: Array.from({ length: STALE + 1 }, (_, i) => i + 1), o: [...Array.from({ length: STALE + 1 }, (_, i) => String(i)), `${STALE}+`] }, fallback: "?" });
-  const lineW = d.measure("8,888 ships · 888 under way · 30+ min ago", small) + 2;
-  const headW = Math.max(d.measure(title, titleSize, 700), lineW) + 12;
+  // The furniture, on white: the waters' name top left, north top right, the scale bottom left.
+  const tw = d.measure(title, small, 700) + 8;
   const hx = plot.x + 6;
   const hy = plot.y + 6;
-  d.rect({ x: hx - 2, y: hy - 2, w: headW, h: tth + th + 6 }, { fill: true, white: true });
-  onBaseline(d, title, hx + 4, hy + d.metrics(titleSize, 700).ascent, headW - 8, titleSize, 700);
-  const line2 = hy + tth + d.metrics(small).ascent + 1;
-  onBaseline(d, [n, " ships · ", d.value(MV, { num: { d: 0 }, fallback: "–" }), " under way · ", age, " min ago"], hx + 4, line2, lineW, small, 400);
+  d.rect({ x: hx - 2, y: hy - 2, w: tw + 4, h: th + 4 }, { fill: true, white: true });
+  onBaseline(d, title, hx + 2, hy + d.metrics(small, 700).ascent, tw, small, 700);
   northMark(d, plot, small);
   scaleBar(d, plot, b, small - 1);
 }
