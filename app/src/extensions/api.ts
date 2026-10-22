@@ -34,8 +34,11 @@ export type Field =
   | (FieldBase & { kind: "images" })
   | (FieldBase & { kind: "icon" })
   | (FieldBase & { kind: "list"; placeholder?: string })
-  /** Type to find one of many options — stations, stops, symbols. */
-  | (FieldBase & { kind: "search"; placeholder?: string; options: () => readonly { value: string; label: string; hint?: string }[] })
+  /**
+   * One of many options — stations, stops, waters. A few dozen are shown
+   * whole, under their `group`s, and narrow as one types; more are found by typing.
+   */
+  | (FieldBase & { kind: "search"; placeholder?: string; options: () => readonly { value: string; label: string; hint?: string; group?: string }[] })
   /**
    * A choice whose options come from somewhere else — an account's calendars, say.
    * The chosen option's label is kept too, as `<key>Name`.

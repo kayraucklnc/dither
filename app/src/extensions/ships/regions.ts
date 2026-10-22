@@ -10,8 +10,10 @@ export interface Region {
   name: string;
   /** As a label: "Bosphorus". */
   label: string;
-  /** Where that is, for the picker. */
+  /** Which seas these are, for the picker: "Turkish Straits". */
   group: string;
+  /** Where exactly, for the picker: "Istanbul". */
+  hint: string;
   /** South, west, north, east, in degrees: the order Open Waters takes a `bbox`. */
   box: [number, number, number, number];
 }
@@ -42,7 +44,7 @@ export const contains = (outer: Bounds, inner: Bounds): boolean =>
 
 export const CUSTOM = "custom";
 
-export const REGION_OPTIONS: readonly { value: string; label: string; hint?: string }[] = [
-  ...REGIONS.map((r) => ({ value: r.id, label: r.label, hint: r.group })),
-  { value: CUSTOM, label: "Around a place…", hint: "your own place and radius" },
+export const REGION_OPTIONS: readonly { value: string; label: string; hint?: string; group?: string }[] = [
+  ...REGIONS.map((r) => ({ value: r.id, label: r.label, hint: r.hint || undefined, group: r.group })),
+  { value: CUSTOM, label: "Around a place…", hint: "your own place and radius", group: "Anywhere" },
 ];
