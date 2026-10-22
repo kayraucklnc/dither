@@ -9,8 +9,13 @@ import { type Bounds, CUSTOM, REGION_OPTIONS, boundsOf as regionBounds, regionOf
 // Gulf of Finland — from Open Waters AIS, which gathers the national feeds
 // (Fintraffic, Kystverket) and AISHub's receivers worldwide, and answers a box
 // as GeoJSON to anyone. The answer is unordered and can run to hundreds of
-// ships; the panel reads the first few slots of it, draws them where they are
-// on a coastline drawn when the project compiles, and counts them all.
+// ships, most of them moored, and the panel can read only the first few slots
+// of it. So the ships under way — the ones going somewhere — are asked for on
+// their own (`min_sog`), as a grid of tiles so no one ferry port fills every
+// slot, and a few of the rest come from the whole box as the background. The
+// whole box is asked twice more, for how many ships there are and how many
+// are under way. They are drawn where they are on a coastline drawn when the
+// project compiles.
 
 export const OPEN_WATERS = "https://ais.openwaters.io/v1/vessels";
 
@@ -29,8 +34,8 @@ const PATH: Record<Field, string> = {
  */
 const CHART_FIELDS: readonly Field[] = ["name", "lat", "lon", "sog", "cog", "hdg"];
 const COUNT_FIELDS: readonly Field[] = ["sog"];
-/** Every slot is kept across sleeps in a cache shared by every widget, so few. */
-const SLOTS = { chart: 24, count: 20, full: 12 } as const;
+/** Every slot is kept across sleeps in a cache shared by every widget, so few: ships under way, and ships lying still, by layout. */
+const SLOTS = { chart: { moving: 16, still: 8 }, full: { moving: 8, still: 4 } } as const;
 /** Ships on the chart that carry their name: the fastest few, which are the ones going somewhere. */
 const LABELLED = 4;
 /** Knots below which a ship is stopped: anchored, moored, or drifting at a quay. */
@@ -80,31 +85,70 @@ function nameOf(s: Settings, env: Env): string {
   return regionOf(regionIdOf(s))!.name;
 }
 
-/** How many slots a layout reads, and what of each. */
-export function shapeOf(s: Settings): { slots: number; fields: readonly Field[] } {
-  if (s.layout === "chart") return { slots: SLOTS.chart, fields: CHART_FIELDS };
-  if (s.layout === "count") return { slots: SLOTS.count, fields: COUNT_FIELDS };
-  return { slots: SLOTS.full, fields: FIELDS };
+/** The grid the ships under way are asked about in, and the names of its tiles. */
+const GRID = { cols: 2, rows: 2 };
+export const TILES = Array.from({ length: GRID.cols * GRID.rows }, (_, i) => `m${i}`);
+/** The whole box: how many ships, and the first few of them as they come, for the background. */
+export const ALL = "all";
+/** The whole box, ships under way only: how many. */
+export const MOVING = "mv";
+
+export interface Shape {
+  /** Ships under way read from each tile. */
+  perTile: number;
+  /** Ships of any kind read from the whole box. */
+  still: number;
+  fields: readonly Field[];
 }
+
+/** What a layout reads: a count reads no ships at all, only the two counts. */
+export function shapeOf(s: Settings): Shape {
+  if (s.layout === "count") return { perTile: 0, still: 0, fields: COUNT_FIELDS };
+  const slots = s.layout === "chart" ? SLOTS.chart : SLOTS.full;
+  const fields = s.layout === "chart" ? CHART_FIELDS : FIELDS;
+  // Only the ships under way wanted: their slots take the still ones' too.
+  if (s.show === "underway") return { perTile: (slots.moving + slots.still) / TILES.length, still: 0, fields };
+  return { perTile: slots.moving / TILES.length, still: slots.still, fields };
+}
+/** The sources a shape's ships come from, the tiles first. */
+const sourcesOf = (shape: Shape) => [...(shape.perTile ? TILES : []), ...(shape.still ? [ALL] : [])];
+const totalOf = (shape: Shape) => shape.perTile * TILES.length + shape.still;
+
+/** Tile `i` of the box: row by row from the north-west. */
+export function tileBounds(b: Bounds, i: number): Bounds {
+  const col = i % GRID.cols;
+  const row = Math.floor(i / GRID.cols);
+  const dLon = (b.east - b.west) / GRID.cols;
+  const dLat = (b.north - b.south) / GRID.rows;
+  return { west: b.west + col * dLon, east: b.west + (col + 1) * dLon, north: b.north - row * dLat, south: b.north - (row + 1) * dLat };
+}
+
+/** Which tile a point of the box falls in. */
+const tileAt = (fx: number, fy: number) =>
+  TILES[Math.min(GRID.rows - 1, Math.floor((1 - fy) * GRID.rows)) * GRID.cols + Math.min(GRID.cols - 1, Math.floor(fx * GRID.cols))];
 
 // --------------------------------------------------------------- what a ship is
 
-/** A raw slot, as the answer lists them. */
-const k = (f: Field, i: number) => `${f}${i}`;
+/** A raw slot of a source, as its answer lists them. */
+const k = (t: string, f: Field, i: number) => `${t}/${f}${i}`;
+/** How many ships the whole box holds, and how many of them are under way. */
+const N = `${ALL}/n`;
+const MV = `${MOVING}/n`;
 /** The fleet: fastest first (nearest first around a place). */
 const fk = (f: Field | "dist" | "brg", i: number) => `fleet/${f}${i}`;
-/** Only the ships under way. */
-const mk = (i: number) => `moving/sog${i}`;
 
-const there = (i: number): Condition => ({ v: k("lat", i), op: "present" });
+/** There are ships. */
+const there: Condition = { v: N, op: "gt", x: 0 };
+/** Some of them are under way. */
+const anyMoving: Condition = { v: MV, op: "gt", x: 0 };
 const listed = (i: number): Condition => ({ v: fk("sog", i), op: "present" });
 const moving = (sogKey: string): Condition => ({ v: sogKey, op: "ge", x: MOVING_KN });
 /** Fishing boats, yachts and pleasure craft: a smaller hull. */
 const BOATS = [30, 36, 37];
 const boatIs = (typeKey: string): Condition => ({ v: typeKey, op: "in", x: BOATS });
 /** The last answer is recent enough to say where anything is. */
-const fresh: Condition = { v: "_age", op: "le", x: STALE };
-const showing: Condition = { all: [there(0), fresh] };
+const fresh: Condition = { v: `${ALL}/_age`, op: "le", x: STALE };
+const showing: Condition = { all: [there, fresh] };
 /** A destination worth printing. */
 const bound = (i: number): Condition => ({ all: [{ v: fk("dest", i), op: "present" }, { v: fk("dest", i), op: "ne", x: "" }] });
 
@@ -181,15 +225,6 @@ function aboutText(d: Draw, i: number, x: number, baseline: number, w: number, s
   d.when({ not: bound(i) }, () => onBaseline(d, [d.value(fk("type", i), { ...TYPE, fallback: "Ship" })], x, baseline, w, size, 400));
 }
 
-/** How many of a list's slots hold a ship: drawn once per count. */
-function howMany(d: Draw, present: (i: number) => Condition, slots: number, draw: (text: string) => void) {
-  d.when({ not: present(0) }, () => draw("0"));
-  for (let i = 0; i < slots - 1; i++) d.when({ all: [present(i), { not: present(i + 1) }] }, () => draw(String(i + 1)));
-  d.when(present(slots - 1), () => draw(`${slots}+`));
-}
-
-const underway = (i: number): Condition => ({ v: mk(i), op: "present" });
-
 // --------------------------------------------------------------- nothing to show
 
 function empty(d: Draw, s: Settings, env: Env, box: Box) {
@@ -198,7 +233,7 @@ function empty(d: Draw, s: Settings, env: Env, box: Box) {
   const say = (text: string) => d.text(text, { ...box, size, weight: 700, align: "center", valign: "middle", wrap: true, lines: 2 });
   // An empty sea and no answer are different news. Positions kept from an
   // answer long ago are no news at all: those ships are elsewhere by now.
-  const emptySea: Condition = { all: [{ not: there(0) }, fresh] };
+  const emptySea: Condition = { all: [{ not: there }, fresh] };
   d.when(emptySea, () => say(`No ships ${regionIdOf(s) === CUSTOM ? name : `in ${name}`}`));
   d.when({ all: [{ not: showing }, { not: emptySea }] }, () => say("Open Waters isn't answering — ships will show when it does"));
 }
@@ -206,7 +241,7 @@ function empty(d: Draw, s: Settings, env: Env, box: Box) {
 /** Ships about, but none under way, when only those are wanted. */
 function nothingUnderWay(d: Draw, box: Box) {
   const size = Math.max(14, Math.min(22, Math.round(box.h * 0.12)));
-  d.when({ all: [there(0), { not: listed(0) }] }, () => d.text("Nothing under way", { ...box, size, weight: 700, align: "center", valign: "middle" }));
+  d.when({ all: [there, { not: listed(0) }] }, () => d.text("Nothing under way", { ...box, size, weight: 700, align: "center", valign: "middle" }));
 }
 
 function needsSetup(d: Draw, text: string) {
@@ -217,7 +252,7 @@ function needsSetup(d: Draw, text: string) {
 // --------------------------------------------------------------- layouts
 
 /** Just how many: "97 ships in the Bosphorus · 13 under way". */
-function count(d: Draw, s: Settings, env: Env, slots: number) {
+function count(d: Draw, s: Settings, env: Env) {
   const { width: w, height: h } = d;
   const name = nameOf(s, env);
   const icon = Math.min(Math.round(h * 0.6), Math.round(w * 0.28), 64);
@@ -225,23 +260,23 @@ function count(d: Draw, s: Settings, env: Env, slots: number) {
   const small = Math.max(14, Math.min(22, Math.round(big * 0.3)));
   const numW = d.measure("8,888", big, 700) + 6;
   const lines = h >= small * 3.6 ? 3 : 2;
-  const block = numW + small * 0.4 + Math.max(d.measure("ships", small, 700), d.measure(`in ${name}`, small), lines === 3 ? d.measure(`${slots}+ under way`, small) : 0);
+  const block = numW + small * 0.4 + Math.max(d.measure("ships", small, 700), d.measure(`in ${name}`, small), lines === 3 ? d.measure("888 under way", small) : 0);
   const x0 = Math.max(0, Math.round((w - icon - 12 - block) / 2));
   d.icon("ship", { x: x0, y: Math.round((h - icon) / 2), w: icon, h: icon });
   const nx = x0 + icon + 12;
   const base = centre(0, h, big);
-  d.when(fresh, () => onBaseline(d, [d.value("n", { num: { d: 0, sep: "," }, fallback: "–" })], nx, base, numW, big, 700));
+  d.when(fresh, () => onBaseline(d, [d.value(N, { num: { d: 0, sep: "," }, fallback: "–" })], nx, base, numW, big, 700));
   d.when({ not: fresh }, () => onBaseline(d, "–", nx, base, numW, big, 700));
   const tx = nx + numW + Math.round(small * 0.4);
   const lh = Math.round(small * 1.15);
   const top = lines === 3 ? base - lh : base - Math.round(lh / 2);
   onBaseline(d, "ships", tx, top, w - tx, small, 700);
   onBaseline(d, `in ${name}`, tx, top + lh, w - tx, small, 400);
-  if (lines === 3) d.when(fresh, () => howMany(d, underway, slots, (n) => onBaseline(d, `${n} under way`, tx, top + lh * 2, w - tx, small, 400)));
+  if (lines === 3) d.when(fresh, () => onBaseline(d, [d.value(MV, { num: { d: 0 }, fallback: "–" }), " under way"], tx, top + lh * 2, w - tx, small, 400));
 }
 
 /** The first ship, large: its name, what it is, where it is bound, how fast and which way. */
-function hero(d: Draw, s: Settings, env: Env, box: Box, slots: number) {
+function hero(d: Draw, s: Settings, env: Env, box: Box) {
   const u = s.units;
   const { x, y, w, h } = box;
   const footH = h >= 160 ? Math.max(18, Math.round(h * 0.12)) : 0;
@@ -275,9 +310,7 @@ function hero(d: Draw, s: Settings, env: Env, box: Box, slots: number) {
     const fs = Math.max(13, Math.min(18, Math.round(footH * 0.8)));
     d.line(x, y + bodyH + 2, x + w, y + bodyH + 2, { width: 1 });
     const fy = y + h - Math.round(fs * 0.25);
-    const countW = d.measure(`8,888 ships in ${nameOf(s, env)} · `, fs) + 4;
-    onBaseline(d, [d.value("n", { num: { d: 0, sep: "," }, fallback: "–" }), ` ships in ${nameOf(s, env)} · `], x, fy, countW, fs, 400);
-    howMany(d, underway, slots, (n) => onBaseline(d, `${n} under way`, x + countW, fy, w - countW, fs, 400));
+    onBaseline(d, [d.value(N, { num: { d: 0, sep: "," }, fallback: "–" }), ` ships in ${nameOf(s, env)} · `, d.value(MV, { num: { d: 0 }, fallback: "–" }), " under way"], x, fy, w, fs, 400);
   }
 }
 
@@ -362,7 +395,7 @@ function northMark(d: Draw, plot: Box, small: number) {
  * carry their name and speed. The waters themselves are framed when the
  * chart shows more around them.
  */
-function chart(d: Draw, s: Settings, env: Env, box: Box, slots: number, labelled: boolean) {
+function chart(d: Draw, s: Settings, env: Env, box: Box, shape: Shape, labelled: boolean) {
   const u = s.units;
   const custom = regionIdOf(s) === CUSTOM;
   const watched = boundsFor(s, env)!;
@@ -396,7 +429,7 @@ function chart(d: Draw, s: Settings, env: Env, box: Box, slots: number, labelled
   }
   if (custom) d.icon("house", { x: px((watched.west + watched.east) / 2) - 8, y: py((watched.south + watched.north) / 2) - 8, w: 16, h: 16 });
 
-  // The ships, last slot first so the first are drawn on top.
+  // The ships: those lying still first, from the whole box, then those under way, tile by tile, so the latter are on top.
   const span = Math.min(plot.w, plot.h);
   const big = span >= 400 ? 32 : span >= 240 ? 24 : 16;
   const little = 16;
@@ -405,12 +438,15 @@ function chart(d: Draw, s: Settings, env: Env, box: Box, slots: number, labelled
     const half = Math.round(size / 2);
     d.iconFor(turnKey, course("ship"), namesOf("ship"), { x: -half, y: -half, w: size, h: size });
   };
-  for (let i = slots - 1; i >= 0; i--) {
-    d.place({ x: k("lon", i), y: k("lat", i), box: plot, xs: [b.west, b.east], ys: [b.north, b.south] }, () => {
-      d.when(moving(k("sog", i)), () => craft(big, k("cog", i)));
-      if (s.show !== "underway") d.when({ not: moving(k("sog", i)) }, () => craft(little, k("hdg", i)));
+  const at = (t: string, i: number, fn: () => void) => d.place({ x: k(t, "lon", i), y: k(t, "lat", i), box: plot, xs: [b.west, b.east], ys: [b.north, b.south] }, fn);
+  // The whole box's first few come as they are: a ship among them that is under way is drawn as one.
+  for (let i = shape.still - 1; i >= 0; i--) {
+    at(ALL, i, () => {
+      d.when(moving(k(ALL, "sog", i)), () => craft(big, k(ALL, "cog", i)));
+      d.when({ not: moving(k(ALL, "sog", i)) }, () => craft(little, k(ALL, "hdg", i)));
     });
   }
+  for (const t of TILES) for (let i = shape.perTile - 1; i >= 0; i--) at(t, i, () => craft(big, k(t, "cog", i)));
 
   // The names last, under the fastest few, so no hull covers one; a stopped ship is not worth a name.
   if (labelled) {
@@ -430,18 +466,17 @@ function chart(d: Draw, s: Settings, env: Env, box: Box, slots: number, labelled
   // The furniture, on white: the waters and their traffic top left, north top right, the scale bottom left, whose data bottom right.
   const titleSize = Math.min(small + 4, 20);
   const tth = d.lineHeight(titleSize, 700);
-  const n = d.value("n", { num: { d: 0, sep: "," }, fallback: "–" });
+  const n = d.value(N, { num: { d: 0, sep: "," }, fallback: "–" });
   // Minutes since the answer, never below none: the preview's clock can run a moment behind its own fetch.
-  const age = d.value("_age", { steps: { t: Array.from({ length: STALE + 1 }, (_, i) => i + 1), o: [...Array.from({ length: STALE + 1 }, (_, i) => String(i)), `${STALE}+`] }, fallback: "?" });
-  const lineW = d.measure(`8,888 ships · ${slots}+ under way · 888 min ago`, small) + 2;
+  const age = d.value(`${ALL}/_age`, { steps: { t: Array.from({ length: STALE + 1 }, (_, i) => i + 1), o: [...Array.from({ length: STALE + 1 }, (_, i) => String(i)), `${STALE}+`] }, fallback: "?" });
+  const lineW = d.measure("8,888 ships · 888 under way · 30+ min ago", small) + 2;
   const headW = Math.max(d.measure(title, titleSize, 700), lineW) + 12;
   const hx = plot.x + 6;
   const hy = plot.y + 6;
   d.rect({ x: hx - 2, y: hy - 2, w: headW, h: tth + th + 6 }, { fill: true, white: true });
   onBaseline(d, title, hx + 4, hy + d.metrics(titleSize, 700).ascent, headW - 8, titleSize, 700);
-  // One line per count of ships under way, whole, so nothing in it is spaced for the worst case.
   const line2 = hy + tth + d.metrics(small).ascent + 1;
-  howMany(d, underway, slots, (m) => onBaseline(d, [n, ` ships · ${m} under way · `, age, " min ago"], hx + 4, line2, lineW, small, 400));
+  onBaseline(d, [n, " ships · ", d.value(MV, { num: { d: 0 }, fallback: "–" }), " under way · ", age, " min ago"], hx + 4, line2, lineW, small, 400);
   northMark(d, plot, small);
   scaleBar(d, plot, b, small - 1);
   const credit = "Open Waters AIS · AISHub";
@@ -462,19 +497,33 @@ function layoutFor(d: Draw, s: Settings): Exclude<Layout, "auto"> {
 
 // --------------------------------------------------------------- the widget
 
-function sourceFor(s: Settings, env: Env): SourceSpec | null {
+/**
+ * The whole box for how many ships there are (and the first few of them),
+ * the whole box under way for how many of those, and each tile under way for
+ * its first few ships. `min_sog` is Open Waters' own filter, undocumented but
+ * honoured: a knot and a half of noise is still "under way" to it, so the
+ * threshold is ours.
+ */
+function sourceFor(s: Settings, env: Env): Record<string, SourceSpec> | null {
   const b = boundsFor(s, env);
   if (!b) return null;
-  const r = (n: number) => Math.round(n * 1e4) / 1e4;
-  const { slots, fields } = shapeOf(s);
-  const values: SourceSpec["values"] = { n: { path: "features", agg: "count" } };
-  for (let i = 0; i < slots; i++) for (const f of fields) values[k(f, i)] = `features.${i}.${PATH[f]}`;
-  return {
-    // Ships not heard from lately are left out: that keeps the answer small, and the quays' sleepers off the chart.
-    url: `${OPEN_WATERS}?bbox=${r(b.south)},${r(b.west)},${r(b.north)},${r(b.east)}&max_age=${maxAgeOf(s)}`,
-    every: EVERY,
-    values,
+  const r = (v: number) => Math.round(v * 1e4) / 1e4;
+  // Ships not heard from lately are left out: that keeps the answer small, and the quays' sleepers off the chart.
+  const url = (bb: Bounds, movingOnly: boolean) =>
+    `${OPEN_WATERS}?bbox=${r(bb.south)},${r(bb.west)},${r(bb.north)},${r(bb.east)}&max_age=${maxAgeOf(s)}${movingOnly ? `&min_sog=${MOVING_KN}` : ""}`;
+  const shape = shapeOf(s);
+  const count: SourceSpec["values"] = { n: { path: "features", agg: "count" } };
+  const slots = (how: number) => {
+    const values: SourceSpec["values"] = {};
+    for (let i = 0; i < how; i++) for (const f of shape.fields) values[`${f}${i}`] = `features.${i}.${PATH[f]}`;
+    return values;
   };
+  const out: Record<string, SourceSpec> = {
+    [ALL]: { url: url(b, false), every: EVERY, values: { ...count, ...slots(shape.still) } },
+    [MOVING]: { url: url(b, true), every: EVERY, values: count },
+  };
+  if (shape.perTile) for (const t of TILES) out[t] = { url: url(tileBounds(b, TILES.indexOf(t)), true), every: EVERY, values: slots(shape.perTile) };
+  return out;
 }
 
 /**
@@ -486,7 +535,8 @@ function sourceFor(s: Settings, env: Env): SourceSpec | null {
  * first is what is asked for.
  */
 function mergesFor(s: Settings, env: Env): Record<string, MergeSpec> {
-  const { slots, fields } = shapeOf(s);
+  const shape = shapeOf(s);
+  if (!totalOf(shape)) return {};
   const ruler = { lat: "sog", lon: "sog", at: [0, RULER_KN] as [number, number], kx: 1, ky: 0 };
   const underwayOnly = { ...ruler, within: RULER_KN - MOVING_KN };
   const place = regionIdOf(s) === CUSTOM ? placeOf(s, env) : null;
@@ -495,8 +545,8 @@ function mergesFor(s: Settings, env: Env): Record<string, MergeSpec> {
     kx: Math.round(KM_PER_DEG * Math.cos((place.latitude * Math.PI) / 180) * 1000) / 1000, ky: KM_PER_DEG, within: radiusOf(s),
   } : null;
   return {
-    fleet: { from: [""], fields: [...fields], count: slots, sort: ["dist"], geo: around ?? (s.show === "underway" ? underwayOnly : ruler) },
-    moving: { from: [""], fields: ["sog"], count: slots, geo: underwayOnly },
+    // A ship under way near a quay comes from its tile and the whole box both: one place, one ship.
+    fleet: { from: sourcesOf(shape), fields: [...shape.fields], count: totalOf(shape), sort: ["dist"], unique: ["lat", "lon"], geo: around ?? (s.show === "underway" ? underwayOnly : ruler) },
   };
 }
 
@@ -522,13 +572,20 @@ const SAMPLE: { name: string; fx: number; fy: number; sog: number; cog: number |
 
 function sampleFor(s: Settings, env: Env): Record<string, string | number | boolean | null> {
   const b = boundsFor(s, env) ?? regionBounds(regionOf("bosphorus")!);
-  const { slots, fields } = shapeOf(s);
-  const out: Record<string, string | number | boolean | null> = { n: 97 };
-  SAMPLE.slice(0, slots).forEach((ship, i) => {
+  const shape = shapeOf(s);
+  const out: Record<string, string | number | boolean | null> = { [N]: 97, [MV]: 10 };
+  // Each ship under way into the tile it lies in, the rest into the whole box's few, as the answers would list them.
+  const filled = new Map<string, number>();
+  for (const ship of SAMPLE) {
+    const t = ship.sog >= MOVING_KN ? tileAt(ship.fx, ship.fy) : ALL;
+    const room = t === ALL ? shape.still : shape.perTile;
+    const i = filled.get(t) ?? 0;
+    if (i >= room) continue;
+    filled.set(t, i + 1);
     const at = { lat: Math.round((b.south + ship.fy * (b.north - b.south)) * 1e5) / 1e5, lon: Math.round((b.west + ship.fx * (b.east - b.west)) * 1e5) / 1e5 };
     const value = (f: Field) => (f === "lat" ? at.lat : f === "lon" ? at.lon : ship[f]);
-    for (const f of fields) out[k(f, i)] = value(f);
-  });
+    for (const f of shape.fields) out[k(t, f, i)] = value(f);
+  }
   return out;
 }
 
@@ -577,8 +634,9 @@ export default defineExtension<Settings>({
     const u = UNITS[s.units];
     const custom = regionIdOf(s) === CUSTOM;
     const facts: Fact[] = [
-      { key: "count", label: "Ships in the area (the whole box)", type: "number", value: "n" },
-      { key: "underway", label: "A ship is under way", type: "flag", test: underway(0) },
+      { key: "count", label: "Ships in the area (the whole box)", type: "number", value: N },
+      { key: "moving", label: "Ships under way", type: "number", value: MV },
+      { key: "underway", label: "A ship is under way", type: "flag", test: anyMoving },
       { key: "fastest", label: custom ? "Nearest ship's speed" : "Fastest ship's speed", type: "number", value: fk("sog", 0), unit: ` ${u.unit}`, format: { scale: u.scale } },
     ];
     if (custom) facts.push({ key: "nearest", label: "Nearest ship's distance", type: "number", value: fk("dist", 0), unit: " km" });
@@ -586,20 +644,20 @@ export default defineExtension<Settings>({
   },
   draw(d, s, env) {
     if (!boundsFor(s, env)) return needsSetup(d, "Choose a place in Panel settings");
-    const { slots } = shapeOf(s);
+    const shape = shapeOf(s);
     const layout = layoutFor(d, s);
-    if (layout === "count") return count(d, s, env, slots);
+    if (layout === "count") return count(d, s, env);
     const full = { x: 0, y: 0, w: d.width, h: d.height };
     empty(d, s, env, full);
     d.when(showing, () => {
-      if (layout === "hero") return hero(d, s, env, full, slots);
-      if (layout === "list") return list(d, s, full, slots);
+      if (layout === "hero") return hero(d, s, env, full);
+      if (layout === "list") return list(d, s, full, totalOf(shape));
       // A chart with room beside it lists the ships there too, when the layout is left to fit.
       const side = Math.min(d.width, d.height);
       if (s.layout === "auto" && d.width - side >= 200) {
-        chart(d, s, env, { x: 0, y: 0, w: side, h: side }, slots, s.labels !== false);
-        list(d, s, { x: side + 16, y: 0, w: d.width - side - 16, h: d.height }, slots);
-      } else chart(d, s, env, full, slots, s.labels !== false);
+        chart(d, s, env, { x: 0, y: 0, w: side, h: side }, shape, s.labels !== false);
+        list(d, s, { x: side + 16, y: 0, w: d.width - side - 16, h: d.height }, totalOf(shape));
+      } else chart(d, s, env, full, shape, s.labels !== false);
     });
   },
 });

@@ -8,8 +8,10 @@ import type { Project } from "@/project/schema";
 import type { Env, SourceSpec } from "../api";
 import { boxAround } from "../geo";
 import { formatValue } from "@/runtime/format";
+import { applyMerges } from "@/runtime/merge";
+import { formatContext } from "@/runtime/render";
 import { parseZone } from "@/runtime/tz";
-import ships, { boundsFor, course, shapeOf, STATUS, TYPE } from "./index";
+import ships, { ALL, boundsFor, course, MOVING, shapeOf, STATUS, TILES, tileBounds, TYPE } from "./index";
 import { COAST } from "./coast";
 import { expandTo, landMask, letterbox, paddedBounds, ringsFor, ringsOf } from "./coast-draw";
 import { AREA_CAP, REGIONS, areaOf, boundsOf, regionOf } from "./regions";
@@ -17,7 +19,7 @@ import { AREA_CAP, REGIONS, areaOf, boundsOf, regionOf } from "./regions";
 const istanbul = { name: "Istanbul", latitude: 41.01, longitude: 28.98 };
 const env = { units: "metric", place: istanbul, language: "en", timezone: "Europe/Istanbul", accounts: { google: [], stripe: null, opensky: null, finnhub: null } } as unknown as Env;
 const settings = ships.defaults(env);
-const source = (s = settings, e = env) => ships.source!(s, e) as SourceSpec | null;
+const source = (s = settings, e = env) => ships.source!(s, e) as Record<string, SourceSpec> | null;
 
 describe("the regions", () => {
   it("are distinct boxes small enough for an anonymous request, each with a coast", () => {
@@ -110,32 +112,51 @@ describe("the regions", () => {
 });
 
 describe("ships source", () => {
-  it("asks Open Waters about the region's box, for ships heard lately", () => {
+  it("asks Open Waters for the whole box, the whole box under way, and each tile under way, all heard lately", () => {
     const s = source()!;
-    expect(s.url).toBe("https://ais.openwaters.io/v1/vessels?bbox=40.98,28.9,41.28,29.22&max_age=600");
-    expect(s.every).toBe(10);
-    expect(s.panelOnly).toBeUndefined();
-    expect(source({ ...settings, maxAge: "1800" })!.url).toContain("max_age=1800");
+    expect(Object.keys(s)).toEqual([ALL, MOVING, ...TILES]);
+    expect(s.all.url).toBe("https://ais.openwaters.io/v1/vessels?bbox=40.98,28.9,41.28,29.22&max_age=600");
+    expect(s.mv.url).toBe("https://ais.openwaters.io/v1/vessels?bbox=40.98,28.9,41.28,29.22&max_age=600&min_sog=0.5");
+    expect(s.mv.values).toEqual({ n: { path: "features", agg: "count" } });
+    // Row by row from the north-west: the first tile is the Black Sea mouth, the last the Marmara side.
+    expect(s.m0.url).toBe("https://ais.openwaters.io/v1/vessels?bbox=41.13,28.9,41.28,29.06&max_age=600&min_sog=0.5");
+    expect(s.m3.url).toBe("https://ais.openwaters.io/v1/vessels?bbox=40.98,29.06,41.13,29.22&max_age=600&min_sog=0.5");
+    expect(s.m0.every).toBe(10);
+    expect(s.m0.panelOnly).toBeUndefined();
+    expect(source({ ...settings, maxAge: "1800" })!.all.url).toContain("max_age=1800");
+    expect(tileBounds({ south: 0, west: 0, north: 2, east: 2 }, 1)).toEqual({ south: 1, west: 1, north: 2, east: 2 });
   });
 
-  it("reads each ship's fields from its slot of the GeoJSON", () => {
-    const v = source()!.values;
-    expect(v.lat3).toBe("features.3.geometry.coordinates.1");
-    expect(v.lon3).toBe("features.3.geometry.coordinates.0");
-    expect(v.name0).toBe("features.0.properties.name");
-    expect(v.nav11).toBe("features.11.properties.nav_status");
-    expect(v.n).toEqual({ path: "features", agg: "count" });
-    expect(v.lat12).toBeUndefined();
+  it("reads each ship's fields from its slot of an answer", () => {
+    const s = source()!;
+    // Eight under way over four tiles, and four of any kind from the whole box, with its count.
+    expect(s.m1.values.lat1).toBe("features.1.geometry.coordinates.1");
+    expect(s.m1.values.lon1).toBe("features.1.geometry.coordinates.0");
+    expect(s.m1.values.name0).toBe("features.0.properties.name");
+    expect(s.m1.values.nav1).toBe("features.1.properties.nav_status");
+    expect(s.m1.values.lat2).toBeUndefined();
+    expect(s.m1.values.n).toBeUndefined();
+    expect(s.all.values.n).toEqual({ path: "features", agg: "count" });
+    expect(s.all.values.dest3).toBe("features.3.properties.destination");
+    expect(s.all.values.lat4).toBeUndefined();
   });
 
-  it("carries more ships, with less about each, on a chart; only speeds for a count", () => {
-    expect(shapeOf({ ...settings, layout: "chart" })).toEqual({ slots: 24, fields: ["name", "lat", "lon", "sog", "cog", "hdg"] });
-    const chart = source({ ...settings, layout: "chart" })!.values;
-    expect(chart.lat23).toBeDefined();
-    expect(chart.name23).toBeDefined();
-    expect(chart.dest0).toBeUndefined();
-    const count = source({ ...settings, layout: "count" })!.values;
-    expect(Object.keys(count).sort()).toEqual(["n", ...Array.from({ length: 20 }, (_, i) => `sog${i}`)].sort());
+  it("carries more ships, with less about each, on a chart; only the two counts for a count", () => {
+    expect(shapeOf({ ...settings, layout: "chart" })).toEqual({ perTile: 4, still: 8, fields: ["name", "lat", "lon", "sog", "cog", "hdg"] });
+    const chart = source({ ...settings, layout: "chart" })!;
+    expect(chart.m3.values.lat3).toBeDefined();
+    expect(chart.m3.values.name3).toBeDefined();
+    expect(chart.m3.values.lat4).toBeUndefined();
+    expect(chart.m3.values.dest0).toBeUndefined();
+    expect(chart.all.values.hdg7).toBeDefined();
+    // Only the ships under way wanted: six a tile, none from the whole box.
+    const underway = source({ ...settings, layout: "chart", show: "underway" })!;
+    expect(underway.m0.values.lat5).toBeDefined();
+    expect(underway.all.values).toEqual({ n: { path: "features", agg: "count" } });
+    const count = source({ ...settings, layout: "count" })!;
+    expect(Object.keys(count)).toEqual([ALL, MOVING]);
+    expect(count.all.values).toEqual({ n: { path: "features", agg: "count" } });
+    expect(ships.merges!({ ...settings, layout: "count" }, env)).toEqual({});
   });
 
   it("boxes a place of one's own, and asks nothing without one", () => {
@@ -150,9 +171,9 @@ describe("ships source", () => {
     for (const layout of ["auto", "chart", "list", "hero", "count"] as const) {
       const s = { ...settings, layout };
       const sample = ships.sample!(s, env);
-      const bytes = Object.entries(source(s)!.values).reduce((sum, [key]) => {
-        const v = sample[key];
-        return sum + 4 + key.length + 3 + (typeof v === "string" ? 4 + v.length : 9);
+      const bytes = Object.entries(source(s)!).flatMap(([name, src]) => Object.keys(src.values).map((key) => [name, key] as const)).reduce((sum, [name, key]) => {
+        const v = sample[`${name}/${key}`];
+        return sum + 4 + name.length + 1 + key.length + 3 + (typeof v === "string" ? 4 + v.length : 9);
       }, 0);
       expect(bytes, layout).toBeLessThan(4 * 1024);
     }
@@ -200,19 +221,38 @@ describe("ships on the panel", () => {
     return p;
   }
 
-  it("lists the fastest ship first, and knows which are under way", async () => {
+  it("lists the fastest ship first, from every tile and the whole box's few", async () => {
     const out = await compile(project([{ id: "sea", w: 20, h: 12, settings: { layout: "list" } }]), deps);
     expect(out.problems).toEqual([]);
     const fleet = out.widgetSources.get("sea")!.fleet;
-    const moving = out.widgetSources.get("sea")!.moving;
     const values = sampleValues(out, Math.floor(Date.now() / 1000));
     const speeds = Array.from({ length: 12 }, (_, i) => values.get(`${fleet}.sog${i}`)).filter((x): x is number => typeof x === "number");
     expect(values.get(`${fleet}.name0`)).toBe("TURGUT-REIS");
     expect(speeds).toEqual([...speeds].sort((a, b) => b - a));
-    expect(speeds).toHaveLength(12);
-    // Seven of the first twelve sample ships make half a knot.
-    expect(values.get(`${moving}.sog6`)).toBeTypeOf("number");
-    expect(values.get(`${moving}.sog7`)).toBeNull();
+    // Two under way a tile and four of any kind: whatever the sample puts there, every one is listed.
+    const sample = ships.sample!({ ...settings, layout: "list" }, env);
+    const sampled = Object.keys(sample).filter((key) => /\/sog\d+$/.test(key)).length;
+    expect(speeds).toHaveLength(sampled);
+    expect(sampled).toBeGreaterThanOrEqual(8);
+    expect(values.get(`${out.widgetSources.get("sea")!.mv}.n`)).toBe(10);
+  });
+
+  it("lists a ship that both a tile and the whole box answered with once", async () => {
+    const out = await compile(project([{ id: "sea", w: 20, h: 12, settings: { layout: "list" } }]), deps);
+    const ids = out.widgetSources.get("sea")!;
+    const values = sampleValues(out, Math.floor(Date.now() / 1000));
+    // The same ship, as the whole box's first answer: the fastest, so it would top the list twice.
+    for (const f of ["name", "lat", "lon", "sog", "cog", "hdg", "nav", "type", "dest", "flag"]) {
+      const tile = [...TILES].map((t) => values.get(`${ids[t]}.${f}0`)).find((v) => v !== null && v !== undefined);
+      values.set(`${ids.all}.${f}0`, values.get(`${ids.m3}.${f}0`) ?? tile ?? null);
+    }
+    const turgut = ["name", "lat", "lon", "sog", "cog", "hdg", "nav", "type", "dest", "flag"].map((f) => values.get(`${ids.m3}.${f}0`));
+    expect(turgut[0]).toBe("TURGUT-REIS");
+    const merges = out.runtime.merges ?? [];
+    applyMerges(merges, values, formatContext(out.runtime, Math.floor(Date.now() / 1000), values));
+    const names = Array.from({ length: 12 }, (_, i) => values.get(`${ids.fleet}.name${i}`)).filter(Boolean);
+    expect(names.filter((n) => n === "TURGUT-REIS")).toHaveLength(1);
+    expect(merges.find((m) => m.id === ids.fleet)!.unique).toEqual(["lat", "lon"]);
   });
 
   it("leaves the stopped ones out of the list when asked", async () => {
@@ -220,18 +260,20 @@ describe("ships on the panel", () => {
     const fleet = out.widgetSources.get("sea")!.fleet;
     const values = sampleValues(out, Math.floor(Date.now() / 1000));
     const listed = Array.from({ length: 12 }, (_, i) => values.get(`${fleet}.name${i}`)).filter(Boolean);
-    expect(listed).toHaveLength(7);
+    expect(listed.length).toBeGreaterThan(0);
     expect(listed).not.toContain("LEADER S");
+    for (let i = 0; i < listed.length; i++) expect(values.get(`${fleet}.sog${i}`)).toBeGreaterThanOrEqual(0.5);
   });
 
-  it("asks once for a region shown twice, with everything both need", async () => {
+  it("asks six times for a region shown twice — the box, the box under way, four tiles — with everything both need", async () => {
     const out = await compile(project([{ id: "chart", w: 12, h: 12, settings: { layout: "chart" } }, { id: "list", w: 8, h: 12, settings: { layout: "list" } }]), deps);
     expect(out.problems).toEqual([]);
     const sources = out.sources.filter((s) => s.source.url.includes("openwaters.io"));
-    expect(sources).toHaveLength(1);
-    const keys = sources[0].source.values.map((v) => v.key);
-    expect(keys).toContain("lat23");
-    expect(keys).toContain("dest11");
+    expect(sources).toHaveLength(6);
+    const tile = sources.find((s) => s.source.url.includes("min_sog") && s.source.values.some((v) => v.key === "lat3"))!;
+    const keys = tile.source.values.map((v) => v.key);
+    expect(keys).toContain("hdg3"); // the chart's four a tile
+    expect(keys).toContain("dest1"); // the list's two
   });
 
   it("draws every layout, and keeps a full-panel chart within budget", async () => {
