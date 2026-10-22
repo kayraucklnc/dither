@@ -392,8 +392,7 @@ function northMark(d: Draw, plot: Box, small: number) {
  * ship placed by its latitude and longitude, north up. A ship under way is a
  * hull turned to its course; one lying still is a smaller hull turned to its
  * heading. The fastest few
- * carry their name and speed. The waters themselves are framed when the
- * chart shows more around them.
+ * carry their name and speed.
  */
 function chart(d: Draw, s: Settings, env: Env, box: Box, shape: Shape, labelled: boolean) {
   const u = s.units;
@@ -414,19 +413,6 @@ function chart(d: Draw, s: Settings, env: Env, box: Box, shape: Shape, labelled:
   const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
   if (rings.length) d.bitmap(plot, `coast:${custom ? "custom" : regionIdOf(s)}:${[b.south, b.west, b.north, b.east].map(r4).join(",")}`, coastInk(rings, b, plot.w, plot.h));
   d.rect(plot, { fill: false, stroke: 1 });
-  // The waters watched, marked at their corners, when the chart shows more around them.
-  const framed = b.west < watched.west - 1e-9 || b.east > watched.east + 1e-9 || b.south < watched.south - 1e-9 || b.north > watched.north + 1e-9;
-  if (framed) {
-    const x0 = px(watched.west);
-    const x1 = px(watched.east);
-    const y0 = py(watched.north);
-    const y1 = py(watched.south);
-    const arm = Math.max(8, Math.round(Math.min(x1 - x0, y1 - y0) / 12));
-    for (const [cx, cy, sx, sy] of [[x0, y0, 1, 1], [x1, y0, -1, 1], [x0, y1, 1, -1], [x1, y1, -1, -1]]) {
-      d.line(cx, cy, cx + sx * arm, cy, { width: 2 });
-      d.line(cx, cy, cx, cy + sy * arm, { width: 2 });
-    }
-  }
   if (custom) d.icon("house", { x: px((watched.west + watched.east) / 2) - 8, y: py((watched.south + watched.north) / 2) - 8, w: 16, h: 16 });
 
   // The ships: those lying still first, from the whole box, then those under way, tile by tile, so the latter are on top.
@@ -463,7 +449,7 @@ function chart(d: Draw, s: Settings, env: Env, box: Box, shape: Shape, labelled:
     }
   }
 
-  // The furniture, on white: the waters and their traffic top left, north top right, the scale bottom left, whose data bottom right.
+  // The furniture, on white: the waters and their traffic top left, north top right, the scale bottom left.
   const titleSize = Math.min(small + 4, 20);
   const tth = d.lineHeight(titleSize, 700);
   const n = d.value(N, { num: { d: 0, sep: "," }, fallback: "–" });
@@ -479,11 +465,6 @@ function chart(d: Draw, s: Settings, env: Env, box: Box, shape: Shape, labelled:
   onBaseline(d, [n, " ships · ", d.value(MV, { num: { d: 0 }, fallback: "–" }), " under way · ", age, " min ago"], hx + 4, line2, lineW, small, 400);
   northMark(d, plot, small);
   scaleBar(d, plot, b, small - 1);
-  const credit = "Open Waters AIS · AISHub";
-  const cw = d.measure(credit, small - 1) + 8;
-  const cth = d.lineHeight(small - 1);
-  d.rect({ x: plot.x + plot.w - cw - 4, y: plot.y + plot.h - cth - 6, w: cw + 2, h: cth + 4 }, { fill: true, white: true });
-  d.text(credit, { x: plot.x + plot.w - cw - 2, y: plot.y + plot.h - cth - 4, w: cw, h: cth, size: small - 1, align: "right" });
 }
 
 function layoutFor(d: Draw, s: Settings): Exclude<Layout, "auto"> {
